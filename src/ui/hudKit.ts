@@ -1,0 +1,318 @@
+// HUD readouts and a tap-zone helper (city-view.md §4.1, §4.3, §4.4, §3.1;
+// spec §3.5, §6.3, §8, §9.2, §9.4). The readouts are pure functions over the
+// data tables and ViewSim values, so they are unit-tested under Node
+// (tests/ui/hud.test.ts); Phaser is a type-only import. The display
+// thresholds below are spec display rules (face icon, shield colour, trend
+// glyph), not balance numbers: balance stays in src/data/*.json.
+import type Phaser from 'phaser'
+import type { GameData } from '../data/types.ts'
+import type { FrameName } from '../render/frames.ts'
+import type { MoneyReason } from '../sim/events.ts'
+import type { Size, VehicleType } from '../sim/types.ts'
+import type { Trend, VehicleSnapshot } from '../sim/view-api.ts'
+import type { Rect } from './layout.ts'
+import { formatMoney } from './text.ts'
+import { THEME } from './theme.ts'
+
+/** spec §9.4: the HUD face is happy at ≥ 70, neutral at 40–69, angry below. */
+export const MOOD_HAPPY_MIN = 70
+export const MOOD_NEUTRAL_MIN = 40
+/** spec §6.3: detection readout green ≥ 90, amber 70–89, red < 70. */
+export const DETECTION_GREEN_MIN = 90
+export const DETECTION_AMBER_MIN = 70
+/** Tap travel above which a press is a drag, not a tap (notes §4). */
+export const TAP_PX = 8
+
+export const LIVES_TAP_TEXT =
+  'Lives: a malware parcel delivered to a customer costs one'
+
+export function moodFace(value: number): FrameName {
+  if (value >= MOOD_HAPPY_MIN) return 'ic_mood_happy'
+  if (value >= MOOD_NEUTRAL_MIN) return 'ic_mood_neutral'
+  return 'ic_mood_angry'
+}
+
+/** Shield / detection colour (spec §6.3 thresholds) as a palette tint. */
+export function detectionColour(pct: number): number {
+  if (pct >= DETECTION_GREEN_MIN) return THEME.ok
+  if (pct >= DETECTION_AMBER_MIN) return THEME.warn
+  return THEME.danger
+}
+
+export function trendGlyph(trend: Trend): string {
+  return trend === 'up' ? '▲' : trend === 'down' ? '▼' : '▬'
+}
+
+/** `Lv1 Scrappy` (levels.json title). */
+export function levelLabel(data: GameData, level: number): string {
+  const row = data.levels.find((l) => l.level === level)
+  return row ? `Lv${level} ${row.title}` : `Lv${level}`
+}
+
+export interface LevelProgress {
+  /** Bar fill 0..1. */
+  frac: number
+  /** `$1,240 / $2,000` (+ ` · Lv 3 coming soon` at the playtest cap). */
+  text: string
+  /** level ≥ economy.playtestMaxLevel. */
+  atCap: boolean
+}
+
+/**
+ * The level bar (city-view §4.1, spec §8): lifetime earned between this
+ * level's threshold and `nextThreshold`. At `playtestMaxLevel` the bar keeps
+ * counting toward the next row's threshold and says "Lv N coming soon".
+ */
+export function levelProgress(
+  data: GameData,
+  level: number,
+  lifetime: number,
+  nextThreshold: number | null,
+): LevelProgress {
+  const atCap = level >= data.economy.playtestMaxLevel
+  const base = data.levels.find((l) => l.level === level)?.threshold ?? 0
+  if (nextThreshold === null) {
+    return { frac: 1, text: formatMoney(lifetime), atCap }
+  }
+  const span = nextThreshold - base
+  const raw = span > 0 ? (lifetime - base) / span : 1
+  const frac = Math.min(1, Math.max(0, Number.isFinite(raw) ? raw : 0))
+  let text = `${formatMoney(lifetime)} / ${formatMoney(nextThreshold)}`
+  if (atCap) text += ` · Lv ${level + 1} coming soon`
+  return { frac, text, atCap }
+}
+
+/**
+ * The level cell's tap toast: `Lv 2: Hoist Hill + trucks + Shaky shaker`
+ * from the next levels.json row (region flavour names, vehicle names,
+ * machine names); `Lv 3 coming soon` at the playtest cap.
+ */
+export function nextUnlockLine(data: GameData, level: number): string {
+  if (level >= data.economy.playtestMaxLevel)
+    return `Lv ${level + 1} coming soon`
+  const row = data.levels.find((l) => l.level === level + 1)
+  if (!row) return `${levelLabel(data, level)} — top level`
+  const parts: string[] = []
+  for (const id of row.unlockRegions) {
+    const d = data.districts.find((x) => x.id === id)
+    parts.push(d?.flavour ?? id)
+  }
+  for (const id of row.vehicles) {
+    const v = data.vehicles.types.find((t) => t.id === id)
+    parts.push(`${(v?.name ?? id).toLowerCase()}s`)
+  }
+  const machines = [
+    ...data.machines.checkers,
+    ...data.machines.upgrades,
+  ] as readonly { id: string; name: string }[]
+  for (const id of row.machines) {
+    parts.push(machines.find((m) => m.id === id)?.name ?? id)
+  }
+  return parts.length > 0
+    ? `Lv ${row.level}: ${parts.join(' + ')}`
+    : `Lv ${row.level}`
+}
+
+/** The money cell's tap toast. */
+export function moneyTapText(lifetime: number, payrollPerDay: number): string {
+  return `Lifetime earned ${formatMoney(lifetime)} · Payroll ${formatMoney(payrollPerDay)}/day`
+}
+
+/** spec §3.5: "Hoist Hill — unlocks at Lv 2". */
+export function lockedRegionText(data: GameData, districtId: string): string {
+  const d = data.districts.find((x) => x.id === districtId)
+  if (!d) return 'Locked'
+  return `${d.flavour} — unlocks at Lv ${d.unlockLevel}`
+}
+
+/** money:changed reasons that float gold next to the money cell (§3.1). */
+const GOLD_REASONS: ReadonlySet<MoneyReason> = new Set<MoneyReason>([
+  'delivery',
+  'clearance',
+  'bounty',
+  'quest',
+  'refund',
+])
+/** Reasons that count as earned for the daily ticker summary. */
+const EARNED_REASONS: ReadonlySet<MoneyReason> = new Set<MoneyReason>([
+  'delivery',
+  'clearance',
+  'bounty',
+  'quest',
+])
+
+export function floatsGold(reason: MoneyReason): boolean {
+  return GOLD_REASONS.has(reason)
+}
+
+export function isEarned(reason: MoneyReason): boolean {
+  return EARNED_REASONS.has(reason)
+}
+
+// ---- chips row (city-view §4.4) ---------------------------------------------
+
+export interface ChipEntry {
+  /** map.json regions[].id ('warehouse' = HQ). */
+  id: string
+  label: string
+  /** The next region to unlock: drawn with the lock and `Lv N`. */
+  lockLevel: number | null
+}
+
+/**
+ * `HQ` + every live region by `chipLabel` (map.json order) + the regions
+ * that unlock at the next level (lock + `Lv N`).
+ */
+export function chipEntries(
+  data: GameData,
+  level: number,
+  regionState: (id: string) => 'locked' | 'live',
+): ChipEntry[] {
+  const out: ChipEntry[] = []
+  for (const r of data.map.regions) {
+    if (r.id === 'warehouse') {
+      out.push({ id: r.id, label: r.chipLabel, lockLevel: null })
+      continue
+    }
+    const d = data.districts.find((x) => x.id === r.id)
+    if (!d) continue
+    if (regionState(r.id) === 'live')
+      out.push({ id: r.id, label: r.chipLabel, lockLevel: null })
+    else if (d.unlockLevel === level + 1)
+      out.push({ id: r.id, label: r.chipLabel, lockLevel: d.unlockLevel })
+  }
+  return out
+}
+
+// ---- bottom bar --------------------------------------------------------------
+
+/** Speed segment shown as active: 0 = ❚❚, 1 = 1×, 2 = 2× (also 4× debug). */
+export function speedSegment(paused: boolean, speed: number): 0 | 1 | 2 {
+  if (paused || speed <= 0) return 0
+  return speed === 1 ? 1 : 2
+}
+
+/** Garage badge (§4.3): `!` while a driver is unpaid or a vehicle inactive. */
+export function garageAlert(vehicles: readonly VehicleSnapshot[]): boolean {
+  return vehicles.some((v) => v.unpaid || v.state === 'inactive')
+}
+
+/**
+ * Vehicle types unlocked after level 1 that are now unlocked and affordable
+ * and not yet announced with the Garage `+` badge (§4.3).
+ */
+export function newlyAffordableTypes(
+  data: GameData,
+  level: number,
+  money: number,
+  seen: ReadonlySet<VehicleType>,
+): VehicleType[] {
+  return data.vehicles.types
+    .filter(
+      (t) =>
+        t.unlockLevel > 1 &&
+        t.unlockLevel <= level &&
+        t.price <= money &&
+        !seen.has(t.id),
+    )
+    .map((t) => t.id)
+}
+
+// ---- follow strip (city-view §2, spec §4.6) ---------------------------------
+
+const SIZES: readonly Size[] = ['S', 'M', 'L', 'XL']
+
+/** The §4.6 state as shown in the follow strip (`Delivering · 2 stops`). */
+export function vehicleStateText(
+  v: Pick<VehicleSnapshot, 'state' | 'queuePos' | 'stopsLeft'>,
+): string {
+  switch (v.state) {
+    case 'idle_lot':
+      return 'Idle'
+    case 'collecting':
+      return 'Collecting'
+    case 'returning':
+      return 'Returning'
+    case 'queued':
+      return v.queuePos === null ? 'Queued' : `Queued #${v.queuePos + 1}`
+    case 'docked_unloading':
+      return 'Unloading'
+    case 'docked_loading':
+      return 'Loading'
+    case 'delivering': {
+      const n = v.stopsLeft
+      if (n <= 0) return 'Delivering'
+      return `Delivering · ${n} ${n === 1 ? 'stop' : 'stops'}`
+    }
+    case 'inactive':
+      return 'No driver'
+  }
+  return ''
+}
+
+/** `Bike 1 · Dee · Delivering · 2 stops` (`Bike 2 · No driver` when inactive). */
+export function followText(
+  v: Pick<
+    VehicleSnapshot,
+    'name' | 'driverName' | 'state' | 'queuePos' | 'stopsLeft'
+  >,
+): string {
+  if (v.state === 'inactive' || v.driverName === null)
+    return `${v.name} · No driver`
+  return `${v.name} · ${v.driverName} · ${vehicleStateText(v)}`
+}
+
+/** Cargo counts by size, in S, M, L, XL order, zero sizes omitted. */
+export function cargoCounts(
+  cargo: readonly { size: Size }[],
+): { size: Size; n: number }[] {
+  const n: Record<Size, number> = { S: 0, M: 0, L: 0, XL: 0 }
+  for (const c of cargo) n[c.size]++
+  return SIZES.filter((s) => n[s] > 0).map((size) => ({ size, n: n[size] }))
+}
+
+// ---- tap zones -----------------------------------------------------------------
+
+/**
+ * An invisible interactive Zone over `rect` (a layout Target's `hit`): a tap
+ * (down + up on it with ≤ TAP_PX travel) emits `ui:tap {id}` and calls onTap.
+ * Zones never render, so they cost no draw calls; the tap is swallowed so it
+ * never reaches the city (globalTopOnly).
+ */
+export function addTapZone(
+  scene: Phaser.Scene,
+  rect: Rect,
+  onTap: () => void,
+  id = '',
+): Phaser.GameObjects.Zone {
+  const z = scene.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0, 0)
+  z.setInteractive()
+  let down = false
+  z.on('pointerdown', () => {
+    down = true
+  })
+  z.on('pointerout', () => {
+    down = false
+  })
+  z.on('pointerup', (p: Phaser.Input.Pointer) => {
+    if (!down) return
+    down = false
+    if (p.getDistance() > TAP_PX) return
+    scene.game.events.emit('ui:tap', { id })
+    onTap()
+  })
+  z.setData('id', id)
+  return z
+}
+
+/** Move/resize a tap zone (input hit area follows the size). */
+export function setZoneRect(
+  z: Phaser.GameObjects.Zone,
+  rect: Rect,
+): Phaser.GameObjects.Zone {
+  z.setPosition(Math.round(rect.x), Math.round(rect.y))
+  z.setSize(Math.round(rect.w), Math.round(rect.h))
+  const area = z.input?.hitArea as Phaser.Geom.Rectangle | undefined
+  area?.setTo(0, 0, Math.round(rect.w), Math.round(rect.h))
+  return z
+}

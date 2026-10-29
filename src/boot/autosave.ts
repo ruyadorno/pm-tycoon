@@ -1,0 +1,317 @@
+// Autosave and the three localStorage keys (plan.md §5 "localStorage keys",
+// §6.4 "Save and load"; spec §2; city-view.md §9.1, §9.5).
+//
+//   pm.save.v1      {version: 1, savedAt, build, dataHash, seed, state,
+//                    commandLog, onboarding} via src/sim/save.ts
+//   pm.settings.v1  {muted, speed} (merged: the AudioDirector writes `muted`
+//                    through its own store and keeps `speed`; we keep `muted`)
+//   pm.playtest.v1  the metrics object (M4); Reset clears all three.
+//
+// The HUD drives `Autosave`: tick(delta) from its update every 10 s of real
+// time, save('hidden') on Phaser HIDDEN and save('pagehide') on window
+// pagehide; a failed write (quota, blocked storage) reports once through
+// onError (a one-line toast) and is retried next cycle. The Title reads the
+// save header (`Day 7 · $1,240 · Lv 2`) and offers Continue only for a
+// version-1 payload whose dataHash matches the running tables; anything else
+// is discarded with the toast "Save from an older build was reset" (R9: no
+// migrations). The sim never sees the onboarding object: HudScene keeps it in
+// the game registry under REG_ONBOARDING and this module serialises it.
+//
+// Phaser is a type-only import and storage is injectable, so everything here
+// runs under Vitest (tests/ui/autosave.test.ts).
+import type { GameData } from '../data/types.ts'
+import {
+  deserialise,
+  isCompatible,
+  restore,
+  SAVE_KEY,
+  saveProblems,
+  serialise,
+  type OnboardingSave,
+  type SavePayload,
+} from '../sim/save.ts'
+import { Sim } from '../sim/sim.ts'
+import { formatMoney } from '../ui/text.ts'
+import { freshOnboarding, normaliseOnboarding } from '../ui/Onboarding.ts'
+
+export { SAVE_KEY }
+export const SETTINGS_KEY = 'pm.settings.v1'
+export const PLAYTEST_KEY = 'pm.playtest.v1'
+/** Every key Reset clears (plan.md §5). */
+export const STORAGE_KEYS: readonly string[] = [
+  SAVE_KEY,
+  SETTINGS_KEY,
+  PLAYTEST_KEY,
+]
+
+/** Autosave period in real ms (spec §2). */
+export const AUTOSAVE_MS = 10_000
+
+/** Game registry: the live OnboardingSave object (HudScene / Onboarding). */
+export const REG_ONBOARDING = 'onboarding'
+/** Game registry: a toast for the HUD to show once at create (Boot). */
+export const REG_PENDING_TOAST = 'pendingToast'
+
+export const STALE_SAVE_TEXT = 'Save from an older build was reset'
+export const SAVE_FAILED_TEXT = 'Autosave failed — retrying'
+
+// ---- storage -------------------------------------------------------------------
+
+/** The subset of Storage used here (localStorage, or a test fake). */
+export interface KeyValueStore {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+}
+
+/** window.localStorage, or null where storage is unavailable or blocked. */
+export function browserStorage(): KeyValueStore | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
+function getText(store: KeyValueStore | null, key: string): string | null {
+  if (!store) return null
+  try {
+    return store.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function remove(store: KeyValueStore | null, key: string): void {
+  if (!store) return
+  try {
+    store.removeItem(key)
+  } catch {
+    // blocked storage: nothing to remove
+  }
+}
+
+/** Drop the save only (stale save, New game). */
+export function discardSave(store = browserStorage()): void {
+  remove(store, SAVE_KEY)
+}
+
+/** Reset: clear every pm.* key (save, settings, playtest). */
+export function clearAllKeys(store = browserStorage()): void {
+  for (const k of STORAGE_KEYS) remove(store, k)
+}
+
+// ---- settings --------------------------------------------------------------------
+
+export type SavedSpeed = 1 | 2
+
+export interface Settings {
+  muted: boolean
+  /** The last chosen running speed (pause is never persisted). */
+  speed: SavedSpeed
+}
+
+export const DEFAULT_SETTINGS: Readonly<Settings> = { muted: false, speed: 1 }
+
+function parseObject(text: string | null): Record<string, unknown> {
+  if (!text) return {}
+  try {
+    const v: unknown = JSON.parse(text)
+    return typeof v === 'object' && v !== null && !Array.isArray(v)
+      ? (v as Record<string, unknown>)
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+export function parseSettings(text: string | null): Settings {
+  const o = parseObject(text)
+  return {
+    muted: o.muted === true,
+    speed: o.speed === 2 ? 2 : 1,
+  }
+}
+
+export function readSettings(store = browserStorage()): Settings {
+  return parseSettings(getText(store, SETTINGS_KEY))
+}
+
+/** Merge `patch` into pm.settings.v1, keeping any other fields. */
+export function writeSettings(
+  patch: Partial<Settings>,
+  store = browserStorage(),
+): boolean {
+  if (!store) return false
+  try {
+    const o = parseObject(store.getItem(SETTINGS_KEY))
+    store.setItem(SETTINGS_KEY, JSON.stringify({ ...o, ...patch }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+// ---- the save ---------------------------------------------------------------------
+
+/** Title Continue subtitle: `Day 7 · $1,240 · Lv 2` (Day = completed days + 1). */
+export function saveHeader(payload: Pick<SavePayload, 'state'>): string {
+  const s = payload.state
+  return `Day ${s.day + 1} · ${formatMoney(s.economy.balance)} · Lv ${s.level.level}`
+}
+
+export type SaveCheck =
+  | { kind: 'none' }
+  | { kind: 'ok'; payload: SavePayload; header: string }
+  | { kind: 'stale'; problems: string[] }
+
+/**
+ * Classify stored save text: none, ok (version 1, same dataHash, loadable),
+ * or stale (anything else, to be discarded with STALE_SAVE_TEXT).
+ */
+export function checkSave(text: string | null, data: GameData): SaveCheck {
+  if (text === null || text === '') return { kind: 'none' }
+  let payload: SavePayload
+  try {
+    payload = deserialise(text)
+  } catch (err) {
+    return {
+      kind: 'stale',
+      problems: [err instanceof Error ? err.message : String(err)],
+    }
+  }
+  if (!isCompatible(payload, data))
+    return { kind: 'stale', problems: ['version or dataHash mismatch'] }
+  const problems = saveProblems(data, payload)
+  if (problems.length > 0) return { kind: 'stale', problems }
+  return { kind: 'ok', payload, header: saveHeader(payload) }
+}
+
+export function readSave(data: GameData, store = browserStorage()): SaveCheck {
+  return checkSave(getText(store, SAVE_KEY), data)
+}
+
+export interface LoadedGame {
+  sim: Sim
+  onboarding: OnboardingSave
+}
+
+/** Resume a checked payload (Sim.load; throws SimLoadError on a bad state). */
+export function loadGame(data: GameData, payload: SavePayload): LoadedGame {
+  return {
+    sim: restore(data, payload),
+    onboarding: normaliseOnboarding(payload.onboarding),
+  }
+}
+
+/** A fresh game: the §7.1 start state and an untouched tour. */
+export function newGame(data: GameData, seed: number): LoadedGame {
+  return { sim: new Sim(data, seed), onboarding: freshOnboarding() }
+}
+
+export interface StartupChoice {
+  /** The restored game, or null to keep Boot's fresh sim. */
+  game: LoadedGame | null
+  /** STALE_SAVE_TEXT when a save was found and discarded. */
+  toast: string | null
+}
+
+/**
+ * Boot without the Title (?skipTitle=1 / ?view=city|warehouse): resume the
+ * autosave unless `?newGame=1` or an explicit `?seed=` asks for a fresh game.
+ * A stale save is discarded (the HUD toasts STALE_SAVE_TEXT).
+ */
+export function startupGame(
+  data: GameData,
+  opts: { skipTitle: boolean; newGame: boolean; seedFromUrl: boolean },
+  store = browserStorage(),
+): StartupChoice {
+  if (!opts.skipTitle || opts.newGame || opts.seedFromUrl)
+    return { game: null, toast: null }
+  const check = readSave(data, store)
+  if (check.kind === 'none') return { game: null, toast: null }
+  if (check.kind === 'ok') {
+    try {
+      return { game: loadGame(data, check.payload), toast: null }
+    } catch {
+      // fall through: unloadable = stale
+    }
+  }
+  discardSave(store)
+  return { game: null, toast: STALE_SAVE_TEXT }
+}
+
+// ---- the autosaver ------------------------------------------------------------------
+
+export type SaveReason = 'timer' | 'hidden' | 'pagehide' | 'manual'
+
+export interface AutosaveDeps {
+  /** The live Sim (registry 'sim'); null skips the save. */
+  getSim: () => Sim | null
+  /** The live onboarding object (registry REG_ONBOARDING). */
+  getOnboarding: () => OnboardingSave | null
+  /** __BUILD_STAMP__ (or the registry buildStamp). */
+  build: string
+  /** Wall clock for savedAt (Date.now in the game layer). */
+  now: () => number
+  store?: KeyValueStore | null
+  /** Called once per failure streak (the HUD shows a one-line toast). */
+  onError?: (message: string, reason: SaveReason) => void
+}
+
+export class Autosave {
+  /** Saves are skipped while false (e.g. the game-over screen in M2). */
+  enabled = true
+  /** Real ms accumulated toward the next timed save. */
+  elapsed = 0
+  lastSavedAt: number | null = null
+  failures = 0
+  private deps: AutosaveDeps
+
+  constructor(deps: AutosaveDeps) {
+    this.deps = deps
+  }
+
+  private get store(): KeyValueStore | null {
+    return this.deps.store === undefined ? browserStorage() : this.deps.store
+  }
+
+  /** Write pm.save.v1 now. Returns true on success. */
+  save(reason: SaveReason = 'manual'): boolean {
+    if (!this.enabled) return false
+    const sim = this.deps.getSim()
+    if (!sim) return false
+    try {
+      const store = this.store
+      if (!store) throw new Error('localStorage unavailable')
+      const savedAt = this.deps.now()
+      const text = serialise(sim, {
+        savedAt,
+        build: this.deps.build,
+        onboarding: this.deps.getOnboarding(),
+      })
+      store.setItem(SAVE_KEY, text)
+      this.lastSavedAt = savedAt
+      this.failures = 0
+      this.elapsed = 0
+      return true
+    } catch (err) {
+      this.failures++
+      this.elapsed = 0
+      if (this.failures === 1) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`autosave (${reason}) failed: ${msg}`)
+        this.deps.onError?.(SAVE_FAILED_TEXT, reason)
+      }
+      return false
+    }
+  }
+
+  /** Advance the 10-s timer by `deltaMs` of real time; saves when it elapses. */
+  tick(deltaMs: number): boolean {
+    if (!this.enabled) return false
+    this.elapsed += Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0)
+    if (this.elapsed < AUTOSAVE_MS) return false
+    return this.save('timer')
+  }
+}

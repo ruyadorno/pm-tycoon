@@ -1,8 +1,14 @@
 // Boot (plan.md §5, §6.6-§6.8; city-view.md §11.1): URL params, data load +
-// validation (a full-screen problem list on DataError), the Sim (new; the
-// autosave restore lands in M1), the stepper, navigation and the debug API;
-// then Preload. Runs once per page.
+// validation (a full-screen problem list on DataError), the Sim (new, or the
+// autosave when the Title is skipped; the Title's Continue / New game swap it
+// with setSim), the stepper, navigation and the debug API; then Preload.
+// Runs once per page.
 import Phaser from 'phaser'
+import {
+  REG_ONBOARDING,
+  REG_PENDING_TOAST,
+  startupGame,
+} from '../boot/autosave.ts'
 import { REG, setSim } from '../boot/simBinding.ts'
 import { installNav } from '../boot/nav.ts'
 import { installStepper } from '../boot/stepper.ts'
@@ -104,7 +110,16 @@ export class BootScene extends Phaser.Scene {
     const game = this.game
     const p = params()
     game.registry.set(REG.data, data)
-    const sim = new Sim(data, p.seed)
+    // Without the Title (?skipTitle=1, ?view=city|warehouse) resume the
+    // autosave unless ?newGame=1 or an explicit ?seed= (src/boot/autosave.ts).
+    const resume = startupGame(data, {
+      skipTitle: p.skipTitle || p.view === 'city' || p.view === 'warehouse',
+      newGame: p.newGame,
+      seedFromUrl: p.seedFromUrl,
+    })
+    if (resume.game) game.registry.set(REG_ONBOARDING, resume.game.onboarding)
+    if (resume.toast) game.registry.set(REG_PENDING_TOAST, resume.toast)
+    const sim = resume.game?.sim ?? new Sim(data, p.seed)
     const stepper = installStepper(game, sim)
     if (p.policy) {
       const createPolicy = await loadPolicyFactory()

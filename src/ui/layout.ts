@@ -25,7 +25,14 @@ export const BTN_H = 44
 export const BTN_TOP_PAD = 10
 export const SPEED_SEG_W = 44
 export const MUTE_W = 44
+/** city-view §4.3's Warehouse / Garage width (what W = 360 leaves them: 77). */
 export const WIDE_BTN_W = 76
+/**
+ * The two wide buttons grow into the free space between Mute and them up to
+ * this width (93 px is free at W 393): at 76 the `Warehouse` icon + label
+ * left 1 px of air inside the face (UX review).
+ */
+export const WIDE_BTN_MAX_W = 92
 export const SHIELD_W = 56
 export const LIVES_SLOTS = 5
 export const LIVES_SLOT = 16
@@ -265,7 +272,7 @@ export function computeLayout(
   const rightSpace = W - (muteR.x + muteR.w) - 3 * MARGIN
   const wideW = Math.max(
     Math.max(BTN_H, minHit),
-    Math.min(WIDE_BTN_W, Math.floor(rightSpace / 2)),
+    Math.min(WIDE_BTN_MAX_W, Math.floor(rightSpace / 2)),
   )
   const garageR = rect(W - MARGIN - wideW, btnY, wideW, BTN_H)
   const warehouseR = rect(garageR.x - MARGIN - wideW, btnY, wideW, BTN_H)

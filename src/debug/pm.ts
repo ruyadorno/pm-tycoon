@@ -2,7 +2,8 @@
 // §10). Installed by Boot when import.meta.env.DEV || ?debug=1. The clock
 // helpers drive TimeStep (not Game) so input, scene clocks, tweens and timers
 // all see one synthetic clock:
-//   freeze()  = loop.sleep(); loop.smoothStep = false (exact deltas)
+//   freeze()  = loop.sleep(); loop.smoothStep = false (exact deltas);
+//               tweens follow the stepped clock too (installTweenClock)
 //   step(ms)  = loop.step(loop.now + ms): one update + render
 //   settle(n) = n x step(16)
 //   thaw()    = loop.smoothStep = true; loop.wake()
@@ -100,6 +101,28 @@ declare global {
 export const WAIT_STEP_MS = 100
 export const WAIT_CAP_MS = 60_000
 
+type TweenClock = { getDelta(tick?: boolean): number }
+
+/**
+ * Phaser 4.2.1's TweenManager times itself with Date.now() (getDelta,
+ * src:tweens/TweenManager.js), not the TimeStep, so under freeze() + step()
+ * tweens crawled at wall-clock speed (a 250 ms sheet slide was caught
+ * half-way, the HUD money counter lagged the sim). While frozen every
+ * manager's delta is the stepped frame's delta instead; thawed, Phaser's own
+ * clock (with its lag smoothing) takes over again.
+ */
+function installTweenClock(loop: Phaser.Core.TimeStep): (on: boolean) => void {
+  const proto = Phaser.Tweens.TweenManager.prototype as unknown as TweenClock
+  const wallClock = proto.getDelta
+  let frozen = false
+  proto.getDelta = function (this: TweenClock, tick?: boolean): number {
+    return frozen ? loop.delta : wallClock.call(this, tick)
+  }
+  return (on) => {
+    frozen = on
+  }
+}
+
 export function installDebugApi(
   game: Phaser.Game,
   stepper: Stepper,
@@ -109,6 +132,7 @@ export function installDebugApi(
   const core = (): Sim => game.registry.get(REG.sim) as Sim
   const data = (): GameData => game.registry.get(REG.data) as GameData
   installDrawCallCounter(game)
+  const tweenClock = installTweenClock(loop)
 
   const pm: PmApi = {
     game,
@@ -134,8 +158,10 @@ export function installDebugApi(
     freeze() {
       loop.sleep()
       loop.smoothStep = false
+      tweenClock(true)
     },
     thaw() {
+      tweenClock(false)
       loop.smoothStep = true
       loop.wake()
     },

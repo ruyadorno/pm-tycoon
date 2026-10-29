@@ -7,7 +7,7 @@ Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 �
 ## Milestone checklist
 
 - [x] M0 scaffold + tooling + data tables + sim skeleton + procedural art + Gallery scene (commit `M0: …`)
-- [ ] M1 city loop: spawn → collect → pass-through warehouse → deliver → money; Garage sheet; autosave (commit `M1: …`)
+- [x] M1 city loop: spawn → collect → pass-through warehouse → deliver → money; Garage sheet; autosave (commit `M1: …`)
 - [ ] M2 warehouse loop: fixed lane, checkers, Hold Bay, Toss/Clear, lives, lost-life card, game over (commit `M2: …`)
 - [ ] M3 levels 1→2, Industrial + truck + Shaky shaker, payroll and walkouts, audio, polish (commit `M3: …`)
 - [ ] M4 playtest instrumentation, summary card, build, screenshots, report, hand-off (commit `M4: …`)
@@ -31,6 +31,16 @@ JSON values retuned from spec §12: <none | `file.key` old → new — §7.6 rul
 L3–L5 informational rows (build 2): <level 3 at <> min, level 4 at <> min, level 5 at <> min, or "counter capped at 2 — not measured">
 
 ## Checkpoint entries (newest first)
+
+## M1 — city loop — 2026-10-29 08:40 UTC — DONE at the `M1:` commit (parent ecfc695)
+
+Built: the spec §3–§5/§6.4–§6.5/§7.3/§9 world sim (trimmed road graph + cached A*, spawn with hidden malware/decoys and the scripted first malware, the §4.6 vehicle state machine + §4.5 greedy dispatcher with reservations, rush and home zones, one loading dock with the FIFO lot queue and idle-wait rule, the generic lane with pass-through slots, payouts with decay, satisfaction with both daily caps and drift), the competent policy (opening A) and the gate with `SIM_FEATURES` gating M2/M3 windows; CityScene (ground bake, buildings, fog + signs, interpolated vehicles, waiting badges tinted by decay phase, popups, tooltip, tap/double-tap/drag/pinch/long-press + desktop parity, follow, zone highlight, nav to the warehouse stub); the UI kit (Button, Sheet, Dialog, Toast, Panel); HudScene (top bar, ticker, toasts, chips, speed/mute/Warehouse/Garage, follow strip, paused/rotate cards, onboarding steps 1+3); GarageSheet + ZonePicker + DistrictPanel + ShieldPopover; autosave + Title Continue/New/Reset. The audio track (lead sheet, arranger, director, SFX, vendored samples) landed alongside, integration in M3.
+Gate: first delivery median 39.4 s over seeds 1–10 (min 28.3 / max 56.4 s), shelf stall 0 s on every seed; malware/lives/Hold Bay windows informational until M2, L2/truck until M3. Deliveries/min at minute 10: median 9. Seed-1 30-min run: 240 deliveries, conservation holds, tick p99 0.09 ms.
+Tests: 627 (vitest, 31 files: 624 passed, 1 skipped, 1 todo); e2e: PASS (smoke M0 + M1 groups: first delivery at 25.8 s sim, draw calls 3/frame, hit rects ≥ 44 px, chips row 265/309 px ≤ 348 at W 360); `vlr check` 30.1 s.
+Shots (iPhone 16, + 430×932 column for two): `title` — clean, sign and title centred above the skyline; `city-0s` — empty lot, $450, onboarding step 1 pointing at Garage; `city-30s` (+430 column) — HUD numbers match the sim, step 3 card; `city-first-delivery` — gold "DELIVERED +$20" at the stop + money float; `city-zoom2` — followed bike at camera zoom 2, follow strip; `city-rush` — tooltip "Waiting: 1 · oldest 0:12 / Rushed · 0:59", bell + ring (the step-3 card overlaps the tooltip's last line — minor); `city-late-badge` — plain/amber/red counts distinct; `city-locked` — fogged Hoist Hill with its sign, active chip; `garage` (+430 column) — 3 fleet rows, unaffordable prices red, truck "Unlocks at Lv 2"; `garage-zone-picker` — Any/Node Heights/Registry Row + greyed locked rows; `district-panel` — satisfaction, favours, earned, waiting with oldest age; `paused` — scrim card, PAUSED ticker, ❚❚ latched. All in the STYLE.md look.
+Deviations from spec-core.md: none in rules or numbers. View-level: `map.json lot.parking` re-ordered so the first bikes park on tiles the warehouse sprite does not hide (+2.5 s first delivery); top bar/ticker alpha 0.94 (0.85 let world labels read through); Warehouse/Garage buttons 92 px where W ≥ 393; onboarding step 3 waits until a building with waiting parcels is on screen; Phaser 4.2.1 tweens read Date.now(), so `__pm.freeze` drives tweens from the stepped delta (phaser4-notes §10 is wrong on this).
+Open for the author: Q-RUN1 single-dock deadlock with a full shelf (decided in M2, see below); the Garage header/money toast show payroll copy before payroll exists (M3 makes it real).
+Next: M2 warehouse loop
 
 ## M0 — scaffold + gallery — 2026-10-29 07:15 UTC — DONE at the `M0:` commit (parent d9f78d4)
 

@@ -133,8 +133,18 @@ describe('computeLayout (city-view.md §4)', () => {
       const L = computeLayout(W, 800, 0, 0, 1)
       expect(L.speed).toMatchObject({ x: 6, w: 132, h: 44, y: 800 - 64 + 10 })
       expect(L.mute.rect.x).toBe(144)
-      expect(L.warehouse.rect).toMatchObject({ x: W - 6 - 76 - 6 - 76, w: 76 })
-      expect(L.garage.rect).toMatchObject({ x: W - 6 - 76, w: 76 })
+      // Warehouse / Garage: at least the specified 76, grown into the free
+      // space after Mute up to WIDE_BTN_MAX_W (92), right-aligned.
+      const wide = Math.min(92, Math.floor((W - 188 - 18) / 2))
+      expect(wide).toBeGreaterThanOrEqual(76)
+      expect(L.warehouse.rect).toMatchObject({
+        x: W - 6 - wide - 6 - wide,
+        w: wide,
+      })
+      expect(L.garage.rect).toMatchObject({ x: W - 6 - wide, w: wide })
+      expect(L.warehouse.rect.x).toBeGreaterThanOrEqual(
+        L.mute.rect.x + L.mute.rect.w + 6,
+      )
       expect(L.shield.rect).toMatchObject({ x: W - 62, w: 56, y: 24 })
       expect(L.levelBar).toMatchObject({ x: 76, y: 29, w: W - 76 - 6 - 56 })
     }

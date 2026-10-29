@@ -3,8 +3,9 @@
 // the iPhone 16 / desktop-column profiles; these fixtures add
 //   - consoleErrors: every console.error + uncaught page error (auto);
 //   - pm: helpers over window.__pm — open(url) waits for __pm.ready, the
-//     frozen-clock helpers (freeze / advance / settle / step / stamp) and
-//     shot(name) = a `scale: 'device'` PNG in shots/ with the overlay hidden.
+//     frozen-clock helpers (freeze / advance / settle / step / stamp),
+//     shot(name) = a `scale: 'device'` PNG in shots/ with the overlay hidden,
+//     and tap(x, y) = a real touch/mouse tap at logical game px.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -30,6 +31,11 @@ export interface PmHelpers {
    * shots/<name>.png at device scale. Returns the path.
    */
   shot(name: string, settleFrames?: number): Promise<string>
+  /**
+   * A real tap at logical game px (x, y): canvas offset + `scale.zoom`
+   * → CSS px, then a touch tap (touch profiles) or a mouse click.
+   */
+  tap(x: number, y: number): Promise<void>
 }
 
 function helpers(page: Page): PmHelpers {
@@ -71,6 +77,23 @@ function helpers(page: Page): PmHelpers {
       const path = join(SHOTS_DIR, `${name}.png`)
       await page.screenshot({ path, scale: 'device' })
       return path
+    },
+    async tap(x, y) {
+      const p = await page.evaluate(
+        ([lx, ly]) => {
+          const game = window.__pm!.game
+          const r = game.canvas.getBoundingClientRect()
+          const z = game.scale.zoom
+          return {
+            x: r.left + (lx! + 0.5) * z,
+            y: r.top + (ly! + 0.5) * z,
+            touch: navigator.maxTouchPoints > 0,
+          }
+        },
+        [x, y] as const,
+      )
+      if (p.touch) await page.touchscreen.tap(p.x, p.y)
+      else await page.mouse.click(p.x, p.y)
     },
   }
   return h

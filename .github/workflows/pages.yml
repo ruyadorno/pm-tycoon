@@ -1,0 +1,69 @@
+# Deploy the game to GitHub Pages (plan.md §6.12). Inert by design: it runs only
+# when started by hand (Actions → "Pages" → Run workflow). To deploy on every
+# push to main, uncomment the `push` block below in one commit.
+# Repo settings: Pages → Source "GitHub Actions". vite `base: './'` makes the
+# same dist/ work at a custom domain's /pm-tycoon/ path or at
+# https://ruyadorno.github.io/pm-tycoon/.
+# Checked by eye against the actions/deploy-pages README; unverified until the
+# first run (plan.md §14 Q58).
+name: Pages
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+
+permissions:
+  contents: read # actions/checkout
+  pages: write # deploy to Pages
+  id-token: write # verify the deployment's origin
+
+# One deployment at a time; let a running one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Install vlt
+        run: npm i -g vlt@1.6.0
+
+      - name: Install dependencies (frozen vlt-lock.json)
+        run: vlt ci
+
+      # Toolchain, typecheck, lint, fmt, vitest, art lint, quick sim gate.
+      # No Chromium marker on the runner, so the e2e step prints SKIPPED.
+      - name: vlr check
+        run: vlr check
+        env:
+          PM_E2E_OPTIONAL: '1'
+
+      - name: Build
+        run: vlr build
+
+      # Transfer budget (≤ 6 MB without *.map), atlas, samples, spicy.json.
+      - name: Check dist
+        run: node tools/check-dist.mjs dist
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

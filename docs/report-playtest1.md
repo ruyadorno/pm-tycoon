@@ -1,6 +1,6 @@
 # Playtest 1 — end-of-run report
 
-Package Management Tycoon, company levels 1 → 2, built in one run on 2026-10-29 (05:13 → ~16:40 UTC) from
+Package Management Tycoon, company levels 1 → 2, built in one run on 2026-10-29 (05:13 → 16:55 UTC) from
 plans/pm-tycoon/plan.md v1. Node v26.12.1, vlt 1.6.0, Phaser 4.2.1, Chromium 156 (SwiftShader) with the Playwright
 `iPhone 16` profile. Sources for every number below: docs/status.md (M0–M3 entries), docs/decisions.md,
 docs/gate/latest.md, the M4 agents' verification logs (.logs/handoff/, local to the VM) and art/manifest.json.
@@ -75,7 +75,7 @@ loading docks 2–3 (`economy.json docks`), Hold Bay cap 5, slots 5–6, strains
 
 ### 2.1 Get the build
 
-Hand-off bundle: <zip path and sha — filled by the orchestrator>
+Hand-off bundle: `dist-zip/pm-tycoon-77615ef.zip` (5.4 MB, `vlr bundle` of `dist/` built from the M4 commit 77615ef; sha256 prefix 247d26fdbac75807), sent with this report and `pm-tycoon-shots-77615ef.zip` (the 44 PNGs + the 8-bar audio render). Rebuild any time with `vlr build && vlr bundle`.
 
 | Path                    | How                                                                                                                                            |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -506,8 +506,8 @@ Provenance per batch (time, tool, ids, balance before/after) is in `art/manifest
 ### 11.1 GitHub state and Pages
 
 - The repository `github.com/ruyadorno/pm-tycoon` exists (public, created by you, with the ruy-bot app installed).
-  `main` was pushed at each checkpoint; `origin/main` is 77061cd (M3, pushed 2026-10-29 14:32 UTC). The M4 commit is
-  pushed the same way (`git push origin main`, no PR).
+  `main` was pushed at each checkpoint (M0 5bce619, M1 460e515, M2 820e4f4, M3 77061cd) and at the end (M4 77615ef + this
+  hand-off commit), always `git push origin main`, no PR.
 - `.github/workflows/pages.yml` is inert: `workflow_dispatch` only. It installs with `vlt ci`, runs `vlr check`
   (e2e is SKIPPED on the runner), `vlr build` and `tools/check-dist.mjs`, then deploys with `actions/deploy-pages@v4`.
   It is committed last because the app token may lack **Workflows: write**; if GitHub refuses it, push that commit
@@ -519,7 +519,7 @@ Provenance per batch (time, tool, ids, balance before/after) is in `art/manifest
 
 ### 11.2 Hand-off
 
-<zip path and sha — filled by the orchestrator>
+`dist-zip/pm-tycoon-77615ef.zip` (built from 77615ef; the build stamp in the HUD reads `77615ef 2026-10-29`) and `dist-zip/pm-tycoon-shots-77615ef.zip`, both sent with this report. `dist-zip/` is gitignored; the full 68-bar audio render (`shots/audio/semver-swing-full.wav`, 22.9 MB) stays on the VM.
 
 The zip holds `dist/` with `playtest-README.txt`; this report and `shots/` (PNGs + `audio/*.wav`) travel with it.
 

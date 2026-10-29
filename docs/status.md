@@ -2,7 +2,7 @@
 
 Filled in place by the playtest-1 run (format: plans/pm-tycoon/status.md); newest checkpoint entry first; copied back to plans/pm-tycoon/status.md as the last M4 step.
 
-Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: <updated per checkpoint>
+Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: 77615ef (M4) + the hand-off docs commit; zip dist-zip/pm-tycoon-77615ef.zip
 
 ## Milestone checklist
 
@@ -32,7 +32,7 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M4 — playtest build — 2026-10-29 16:55 UTC — DONE at the `M4:` commit (sha in the hand-off commit after it)
+## M4 — playtest build — 2026-10-29 16:55 UTC — DONE at 77615ef
 
 Built: the §12.9 playtest recorder (`src/metrics/playtest.ts`, 32 keys, `pm.playtest.v1` every 10 s and on hide, resumes after a reload of the same run) + `__pm.playtest()`/`downloadPlaytest()`; the SummaryCard (fun-bar ticks, Download playtest.json, Copy summary, Keep playing / New game) from the pause menu (❚❚ twice), the Game Over card and a one-time 20:00 offer; `tests/playtest/seed-7.json` from a 12-minute automated run; the build checks (`tools/check-dist.mjs`, `e2e/dist.spec.ts`: `__pm` absent without `?debug=1`), `public/playtest-README.txt`, docs/playtest.md, docs/phone-checklist.md, docs/art-todo.md, README "How to play" + "How to serve on a phone", CREDITS complete, the inert Pages workflow (committed last); three adversarial review passes fixed 3 sim bugs (unloadable save after large sales, damaged saves crashing after Continue → `src/sim/validate.ts`, a driverless vehicle loading a trip), 5 scene bugs (pan freeze on a HUD tap, a leaked 19 MB ground texture after New game, taps on hidden vehicles, a 2 s view-switch stall, vehicles clipped by multi-tile buildings) and 6 mobile/UI issues; new robustness sweeps and `e2e/lifecycle.spec.ts`.
 Gate: unchanged from M3 (no balance change in M4): every window passes by median (first delivery 44.05 s, scripted catch 174.3 s, L2 13.05 min, truck +2.10 min, lives 0, shelf stall 0 s, Hold Bay 7.15/10 min); 5/10 seeds pass every window; no `level:up {3}`.
@@ -41,6 +41,7 @@ Shots: 44 PNGs regenerated at the final tree, 44/44 PASS (one line each in docs/
 Dist: 4.88 MB transfer (~3.2 MB gzip) of the 6 MB budget; sourcemaps (14.6 MB) excluded from the budget and kept; the dev gallery removed before the hand-off build.
 Deviations from spec-core.md: none new in M4 (decisions.md "Run decisions (M4)": save validation, walked-out driver at the dock, picking/depth rules, samples preloaded before the Title tap per audio.md).
 Open for the author: everything in docs/report-playtest1.md §6–§9 (balance notes, desktop pause-menu keys, ticker pacing, unverified iOS-only behaviours, art approvals G1–G3, the music verdict).
+Hand-off: dist-zip/pm-tycoon-77615ef.zip (5.4 MB) + docs/report-playtest1.md + pm-tycoon-shots-77615ef.zip sent; `main` pushed.
 Next: author playtest (20 minutes cold on the iPhone 16 + desktop devtools) + the Pages workflow run
 
 ## M3 — levels/economy/audio/polish — 2026-10-29 14:32 UTC — DONE at 77061cd

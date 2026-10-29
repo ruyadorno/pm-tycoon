@@ -278,10 +278,15 @@ describe('configs (plan.md §6.6)', () => {
     expect(problemsOf(applyConfig(loadRawData(), patch, name))).toEqual([])
   })
 
-  it('spicy.json triples malware, doubles decoys, caps the Hold Bay at 2 on L1-L2 only', () => {
+  it('spicy.json raises malware and decoys above the base tables, caps the Hold Bay at 2 on L1-L2 only', () => {
     const d = loadGameData('public/configs/spicy.json')
+    const base = buildGameData(loadRawData())
     expect(d.parcels.malware.baseShare).toBe(0.09)
-    expect(d.parcels.decoyShare).toBe(0.2)
+    expect(d.parcels.decoyShare).toBe(0.3)
+    expect(d.parcels.malware.baseShare).toBeGreaterThan(
+      base.parcels.malware.baseShare,
+    )
+    expect(d.parcels.decoyShare).toBeGreaterThan(base.parcels.decoyShare)
     expect(d.levels.map((l) => l.holdBayCap)).toEqual([2, 2, 5, 5, 5])
     expect(d.parcels.malware.cap).toBe(0.2)
     expect(d.hash).not.toBe(buildGameData(loadRawData()).hash)

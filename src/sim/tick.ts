@@ -9,6 +9,8 @@ import type { Sim } from './sim.ts'
 import { dispatchStep, LEG_HOOKS } from './systems/dispatch.ts'
 import { docksStep } from './systems/docks.ts'
 import { laneStep } from './systems/lane.ts'
+import { levelsStep } from './systems/levels.ts'
+import { paydayStep } from './systems/payroll.ts'
 import { driftStep, waitingStep } from './systems/satisfaction.ts'
 import { spawnStep } from './systems/spawn.ts'
 import { vehiclesStep } from './systems/vehicles.ts'
@@ -81,9 +83,11 @@ export function waiting(sim: Sim, _ctx: TickContext): void {
 }
 
 /** 10. Lifetime earned vs the next threshold → level:up, unlocks, strain announce (capped at playtestMaxLevel). */
-export function levels(_sim: Sim, _ctx: TickContext): void {
-  if (!SIM_FEATURES.levels) return
-  // TODO(M3): systems/levels.ts.
+export function levels(sim: Sim, _ctx: TickContext): void {
+  // systems/levels.ts (SIM_FEATURES.levels): the threshold crossed this tick
+  // levels up (never past economy.playtestMaxLevel); a strain entering the
+  // spawn pool gets its ticker line.
+  levelsStep(sim)
 }
 
 /**
@@ -94,12 +98,13 @@ export function levels(_sim: Sim, _ctx: TickContext): void {
 export function day(sim: Sim, ctx: TickContext): void {
   if (!ctx.dayBoundary) return
   const s = sim.state
-  if (SIM_FEATURES.payroll) {
-    // TODO(M3): systems/payroll.ts — payday, pay order, unpaid marks, walkouts (§7.3-§7.4).
-  }
+  // Payday, pay order, unpaid marks, walkouts (§7.3-§7.4, systems/payroll.ts).
+  if (SIM_FEATURES.payroll) paydayStep(sim)
   driftStep(sim)
   // Malware escalation needs no state: malwareShare() derives it from the
-  // day count and stats.levelTick (§5.4).
+  // day count and stats.levelTick (§5.4): + postVictoryPerDay at every day
+  // boundary from the first one after the counter capped at
+  // economy.playtestMaxLevel, up to malware.cap.
   for (const d of s.lane.docks) {
     sim.emit('dock:occupancy', {
       dockId: d.id,
@@ -114,7 +119,10 @@ export function day(sim: Sim, ctx: TickContext): void {
   sim.emit('day:ended', { day: s.day })
   s.stats.minutes.push(buildMinuteRow(sim))
   // Per-day counters (read by the row above and by the day's systems).
-  for (const d of s.lane.docks) d.busyTicksThisDay = 0
+  for (const d of s.lane.docks) {
+    d.busyTicksThisDay = 0
+    d.blockedTicksThisDay = 0
+  }
   s.lane.stallSecondsToday = 0
   for (const d of Object.values(s.districts)) {
     d.dayPositive = 0

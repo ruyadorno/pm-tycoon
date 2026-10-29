@@ -24,6 +24,13 @@
 //   cleared) by any pickup at the building.
 // - §11 in_transit_in starts when the vehicle turns for the warehouse
 //   (`vehicle:returning`), in_transit_out on `vehicle:departed`.
+// - M3, a driver who walked out (§7.4, payroll.ts): the vehicle "finishes its
+//   trip" — it serves the stop it is driving to or standing at, then starts
+//   no new collect target or leg (back to the warehouse with cargo, else it
+//   parks); it is never rush-eligible; and wherever it would park `idle_lot`
+//   it parks `inactive` instead (goInactive), as it does right after its
+//   next unload (docks.ts) and when it reaches the lot with nothing aboard
+//   (it never queues for a dock with nothing to unload).
 
 import type { CommandResult, FailReason } from '../commands.ts'
 import {
@@ -45,12 +52,15 @@ import { deliverParcel } from './economy.ts'
 import { laneParcelIds, shelfNode } from './lane.ts'
 import { changeSatisfaction } from './satisfaction.ts'
 import {
+  emitQueueLength,
   freeUnits,
+  hasDriver,
   joinQueue,
   leaveDockBay,
   originTile,
   parkingTile,
   releaseReservations,
+  repositionQueue,
   routeTo,
   typeOf,
   type LegHooks,
@@ -253,6 +263,7 @@ export function rushEligible(
 ): boolean {
   if (v.rushBuildingId !== null) return false
   if (v.state !== 'idle_lot' && v.state !== 'collecting') return false
+  if (!hasDriver(sim, v)) return false
   const district = districtOf(sim.data, buildingId)
   if (!typeAllowedIn(sim.data, v.type, district)) return false
   if (!zonePermits(sim.data, v.zone, district)) return false
@@ -444,7 +455,8 @@ function continueCollecting(sim: Sim, v: Vehicle): void {
     return
   }
   releaseReservations(sim, v)
-  const c = freeUnits(sim, v) > 0 ? pickCollectTarget(sim, v) : null
+  const more = freeUnits(sim, v) > 0 && hasDriver(sim, v)
+  const c = more ? pickCollectTarget(sim, v) : null
   if (c) setCollectTarget(sim, v, c.buildingId)
   else endCollecting(sim, v)
 }
@@ -471,8 +483,15 @@ export function goReturning(sim: Sim, v: Vehicle): void {
   routeTo(sim, v, sim.roads.entrance)
 }
 
-/** → idle_lot (`vehicle:parked`): drive to a free parking tile. */
+/**
+ * → idle_lot (`vehicle:parked`): drive to a free parking tile. A vehicle
+ * whose driver walked out parks `inactive` instead (§4.6).
+ */
 export function goIdle(sim: Sim, v: Vehicle): void {
+  if (!hasDriver(sim, v)) {
+    goInactive(sim, v)
+    return
+  }
   v.state = 'idle_lot'
   v.stops = []
   v.stopIndex = 0
@@ -481,6 +500,33 @@ export function goIdle(sim: Sim, v: Vehicle): void {
   releaseReservations(sim, v)
   sim.emit('vehicle:parked', { id: v.id })
   routeTo(sim, v, parkingTile(sim, v.id))
+}
+
+/**
+ * → inactive (`vehicle:inactive`, §4.6 / §7.4): the driver walked out and
+ * the trip is over (nothing aboard). Leaves the dock queue / bay if in one,
+ * drops its reservations and rush, and drives to a free parking tile; never
+ * dispatched, never docked, no payroll line until re-hired (payroll.ts
+ * rehire → goIdle).
+ */
+export function goInactive(sim: Sim, v: Vehicle): void {
+  const q = sim.state.lane.dockQueue
+  const qi = q.indexOf(v.id)
+  if (qi >= 0) q.splice(qi, 1)
+  leaveDockBay(sim, v)
+  v.state = 'inactive'
+  v.stops = []
+  v.stopIndex = 0
+  v.waitUntilTick = null
+  v.collectedThisLeg = false
+  v.rushBuildingId = null
+  releaseReservations(sim, v)
+  sim.emit('vehicle:inactive', { id: v.id })
+  routeTo(sim, v, parkingTile(sim, v.id))
+  if (qi >= 0) {
+    emitQueueLength(sim)
+    repositionQueue(sim)
+  }
 }
 
 /** §4.5 step 3: deliver stops in nearest-neighbour order from `from` (ties → lower building id). */
@@ -547,7 +593,7 @@ export function departDelivering(sim: Sim, v: Vehicle): void {
 export function leaveDock(sim: Sim, v: Vehicle): void {
   leaveDockBay(sim, v)
   v.waitUntilTick = null
-  if (hasCollectable(sim, v)) startCollecting(sim, v)
+  if (hasDriver(sim, v) && hasCollectable(sim, v)) startCollecting(sim, v)
   else goIdle(sim, v)
 }
 
@@ -555,6 +601,12 @@ export function leaveDock(sim: Sim, v: Vehicle): void {
 function afterDelivering(sim: Sim, v: Vehicle): void {
   v.stops = []
   v.stopIndex = 0
+  if (!hasDriver(sim, v)) {
+    // Walked out (§7.4): the trip ends here — home to unload, else park.
+    if (v.cargo.length > 0) goReturning(sim, v)
+    else goInactive(sim, v)
+    return
+  }
   if (freeUnits(sim, v) > 0 && hasCollectable(sim, v)) startCollecting(sim, v)
   else goReturning(sim, v)
 }
@@ -666,7 +718,11 @@ export const LEG_HOOKS: LegHooks = {
         return
       }
       case 'returning':
-        joinQueue(sim, v)
+        // Walked out (§7.4) with nothing aboard: nothing to unload, so the
+        // trip ends here — park inactive instead of queueing for a dock (the
+        // payroll.ts rule for a vehicle queued with nothing aboard).
+        if (v.cargo.length === 0 && !hasDriver(sim, v)) goInactive(sim, v)
+        else joinQueue(sim, v)
         return
       case 'queued':
         if (v.dockId !== null) dockArrive(sim, v)

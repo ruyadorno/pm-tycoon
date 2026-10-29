@@ -35,8 +35,9 @@ import {
   meanSatisfaction,
   TICKS_PER_DAY,
   TICKS_PER_S,
-  ticksFromS,
 } from './types.ts'
+import { holdBays } from './systems/lane.ts'
+import { ticksToPayday } from './systems/payroll.ts'
 import { paidValue } from './value.ts'
 
 export {
@@ -148,7 +149,11 @@ export interface PayrollView {
   drivers: number
 }
 
-/** One Hold Bay item (bay = 0-based rack position, lowest first). */
+/**
+ * One Hold Bay item. bay = 0-based rack position, STABLE (M3): a held parcel
+ * keeps the bay it arrived in until it leaves; a new arrival takes the lowest
+ * free bay (so bays can have gaps and items are not sorted by bay).
+ */
 export interface HoldBayItem {
   parcelId: number
   bay: number
@@ -164,7 +169,7 @@ export interface HoldBayItem {
 }
 
 export interface HoldBayView {
-  /** bay = 0-based rack position (index in the Hold Bay queue, lowest first). */
+  /** Held parcels in arrival order; `bay` = the stable 0-based rack position. */
   readonly items: readonly HoldBayItem[]
   readonly cap: number
   readonly count: number
@@ -342,8 +347,11 @@ export function createViewSim(
   const holdBay: HoldBayView = {
     get items() {
       const s = st()
-      const q = node(s.lane.holdBayNodeId)?.queue ?? []
-      return q.map((parcelId, bay): HoldBayItem => {
+      const hold = node(s.lane.holdBayNodeId)
+      const q = hold?.queue ?? []
+      const bays = hold ? holdBays(s, hold) : {}
+      return q.map((parcelId, i): HoldBayItem => {
+        const bay = bays[String(parcelId)] ?? i
         const p = s.parcels[String(parcelId)]
         const flagged = p?.trace.findLast((t) => t.what === 'flagged')
         // "Slot 1 Metal detector: flagged (metal)" → "Metal detector"
@@ -450,8 +458,8 @@ export function createViewSim(
       return (st().tick % TICKS_PER_DAY) / TICKS_PER_DAY
     },
     get ticksToPayday() {
-      const every = ticksFromS(get().data.employees.payrollIntervalS)
-      return every - (st().tick % every)
+      const sim = get()
+      return ticksToPayday(sim.state, sim.data)
     },
     holdBay,
     lane,
@@ -606,7 +614,13 @@ export function createViewSim(
       const active = s.employees.filter((e) => e.active)
       return {
         perDay: active.reduce((sum, e) => sum + e.salaryPerDay, 0),
-        short: (s.economy.lastPayroll?.shortEmployeeIds.length ?? 0) > 0,
+        // Short while someone the last payday missed is still owed: a
+        // re-hire (unpaidPaydays = 0) or the next paid payday clears it, so
+        // the Garage `!` and the red payroll line do not outlive the problem
+        // (UX M3 review: they stayed up after every walkout was re-hired).
+        short: (s.economy.lastPayroll?.shortEmployeeIds ?? []).some((id) =>
+          active.some((e) => e.id === id && e.unpaidPaydays > 0),
+        ),
         inspectors: active.filter((e) => e.kind === 'inspector').length,
         drivers: active.filter((e) => e.kind === 'driver').length,
       }

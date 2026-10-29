@@ -11,7 +11,11 @@
 // could carry are still inside the lane and nobody is queued → wait up to
 // dockIdleWaitS, then recompute once; still empty → leave to collect, else
 // park. `busyTicksThisDay` counts every tick a dock is assigned (incl. the
-// short drive onto the bay) → `dock:occupancy` per in-game minute (tick.ts).
+// short drive onto the bay) → `dock:occupancy` per in-game minute (tick.ts);
+// `blockedTicksThisDay` (M3) every tick a docked vehicle's due unload is
+// refused by a full conveyor — the "dock blocked" seconds the §7 policy
+// hires its 2nd / 3rd inspector on (policy.ts). A vehicle whose driver
+// walked out (§7.4) parks `inactive` right after it has unloaded (M3).
 //
 // Resolved ambiguity (reported): the idle wait ends at the FIRST of
 // dockIdleWaitS elapsed, a vehicle joining the queue
@@ -52,6 +56,7 @@ import { unitsOf } from '../map.ts'
 import {
   carriableInLane,
   departDelivering,
+  goInactive,
   leaveDock,
   outboundSet,
   shelfHasEligible,
@@ -60,6 +65,7 @@ import { enterNode, hasRoom, shelfNode, takeFrom } from './lane.ts'
 import {
   dockTile,
   emitQueueLength,
+  hasDriver,
   joinQueue,
   leaveDockBay,
   repositionQueue,
@@ -114,8 +120,12 @@ function finishUnloading(sim: Sim, dock: LoadingDock, v: Vehicle): void {
   dock.nextTransferTick = null
   delete dock.relief
   sim.emit('vehicle:unloaded', { id: v.id })
-  // TODO(M3, SIM_FEATURES.payroll): a driver who walked out parks the vehicle
-  // `inactive` here, after the trip's cargo is unloaded (§4.6, §7.4).
+  if (!hasDriver(sim, v)) {
+    // §4.6 / §7.4: the driver walked out — the trip's cargo is unloaded, so
+    // the vehicle leaves the dock and parks `inactive` (never loads again).
+    goInactive(sim, v)
+    return
+  }
   beginLoading(sim, dock, v)
 }
 
@@ -135,8 +145,9 @@ function unloadTick(sim: Sim, dock: LoadingDock, v: Vehicle): void {
       sim.emit('parcel:unloaded', { id, dockId: dock.id })
       dock.nextTransferTick = s.tick + unloadTicks(sim)
       dock.stuckSinceTick = null
-    } else if ((dock.stuckSinceTick ?? null) === null) {
-      dock.stuckSinceTick = s.tick
+    } else {
+      dock.blockedTicksThisDay = (dock.blockedTicksThisDay ?? 0) + 1
+      if ((dock.stuckSinceTick ?? null) === null) dock.stuckSinceTick = s.tick
     }
   }
   if (v.cargo.length === 0) {

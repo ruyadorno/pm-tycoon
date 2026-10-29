@@ -16,6 +16,7 @@ import type {
   VehicleType,
 } from '../../src/sim/types.ts'
 import { liveSlotIds, laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
+import { holdBays } from '../../src/sim/systems/lane.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
 
 let shipped: GameData | null = null
@@ -102,7 +103,17 @@ export function buy(sim: Sim, type: VehicleType): Vehicle {
   return sim.state.vehicles.at(-1) as Vehicle
 }
 
-/** Make a locked district live (scenario setup; levels are M3). */
+/**
+ * Give a scenario enough money that payroll (spec §7.3-§7.4, M3) never runs
+ * short — for tests about something else, whose `buy` calls leave $0 and
+ * whose drivers would otherwise walk out after two paydays.
+ */
+export function fund(sim: Sim, amount = 1_000_000): Sim {
+  sim.state.economy.balance = Math.max(sim.state.economy.balance, amount)
+  return sim
+}
+
+/** Make a locked district live (scenario setup without a level-up). */
 export function unlockDistrict(sim: Sim, id: DistrictId, spawn = false): void {
   const d = sim.state.districts[id]
   if (!d) throw new Error(`no district ${id}`)
@@ -293,7 +304,12 @@ export function heldParcel(
   conv.queue.splice(conv.queue.indexOf(p.id), 1)
   const hold = laneNode(sim.state.lane, sim.state.lane.holdBayNodeId)
   if (!hold) throw new Error('no Hold Bay')
+  // The lowest free bay, as a real arrival takes it (stable bays, M3).
+  const used = Object.values(holdBays(sim.state, hold))
+  let bay = 0
+  while (used.includes(bay)) bay += 1
   hold.queue.push(p.id)
+  p.bay = bay
   p.state = 'held'
   p.nodeId = hold.id
   p.flaggedBy =

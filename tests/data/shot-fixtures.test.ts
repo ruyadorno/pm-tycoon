@@ -46,6 +46,9 @@ describe('shot fixtures load under the shipped data hash', () => {
     'holdbay-full',
     'malware-cleared',
     'one-life',
+    'level-up',
+    'payroll-short',
+    'l2-lane',
   ]) {
     it(`${name}.json is current (else: its fixture.regenerate)`, () => {
       const { fx } = read(name)
@@ -55,8 +58,14 @@ describe('shot fixtures load under the shipped data hash', () => {
   }
 })
 
-describe('the M2 fixtures are plain runs (seed + command log, no state patching)', () => {
-  for (const name of ['holdbay-full', 'malware-cleared', 'one-life']) {
+describe('the M2/M3 fixtures are plain runs (seed + command log, no state patching)', () => {
+  for (const name of [
+    'holdbay-full',
+    'malware-cleared',
+    'one-life',
+    'level-up',
+    'l2-lane',
+  ]) {
     it(`${name}.json replays to the same state hash`, () => {
       const { sim } = load(name)
       const again = replay(
@@ -142,5 +151,95 @@ describe('one-life: the third malware delivery ends the game (§10)', () => {
     expect((sim.state.tick - t0) / TICKS_PER_S).toBe(fx.fixture.gameOverInS)
     expect(sim.state.economy.lives).toBe(0)
     expect(sim.state.economy.gameOver).toBe(true)
+  })
+})
+
+describe('level-up: lifetime ≈ $1,990, one payout from the L2 threshold (spec §8, city-view §9.6)', () => {
+  it('is at L1 with lifetime earned just under the L2 threshold, tier 1, Industrial locked', () => {
+    const { sim, fx } = load('level-up')
+    const st = sim.state
+    expect(st.level.level).toBe(1)
+    expect(st.level.warehouseTier).toBe(1)
+    expect(fx.fixture.threshold).toBe(st.level.nextThreshold)
+    expect(st.economy.lifetimeEarned).toBe(fx.fixture.lifetime)
+    const next = st.level.nextThreshold ?? Infinity
+    expect(st.economy.lifetimeEarned).toBeLessThan(next)
+    expect(st.economy.lifetimeEarned).toBeGreaterThanOrEqual(next - 50)
+    expect(st.districts.industrial!.live).toBe(false)
+  })
+
+  it('under ?policy=1 level:up {2} lands at fixture.levelUpInS, then region:unlocked industrial on the same tick', () => {
+    const { sim, fx } = load('level-up')
+    const order: string[] = []
+    sim.events.on('level:up', (p) => order.push(`level:${p.level}`))
+    sim.events.on('region:unlocked', (p) => order.push(`region:${p.district}`))
+    const t0 = sim.state.tick
+    let upTick = -1
+    withPolicy(sim, 10, () => {
+      if (upTick < 0 && sim.state.level.level === 2) upTick = sim.state.tick
+      return upTick >= 0
+    })
+    expect(order).toEqual(['level:2', 'region:industrial'])
+    expect((upTick - t0) / TICKS_PER_S).toBe(fx.fixture.levelUpInS)
+    expect(sim.state.level.warehouseTier).toBe(2)
+    expect(sim.state.districts.industrial!.live).toBe(true)
+  })
+})
+
+describe('payroll-short: $0 just before a payday with staff (spec §7.3, city-view §9.7)', () => {
+  it('has a $0 balance, active staff and no unpaid mark yet', () => {
+    const { sim, fx } = load('payroll-short')
+    const st = sim.state
+    expect(fx.fixture.patched).toBe('economy.balance = 0')
+    expect(st.economy.balance).toBe(0)
+    const staff = st.employees.filter((e) => e.active)
+    expect(staff.map((e) => e.id)).toEqual(fx.fixture.unpaid)
+    expect(staff.every((e) => e.unpaidPaydays === 0)).toBe(true)
+  })
+
+  it('without the policy, payroll:short names every worker at fixture.paydayInS — nobody paid, nobody walks out', () => {
+    const { sim, fx } = load('payroll-short')
+    const short = collect(sim, 'payroll:short')
+    const paid = collect(sim, 'payroll:paid')
+    const walked = collect(sim, 'worker:walkedOut')
+    const t0 = sim.state.tick
+    while (short.length === 0 && sim.state.tick - t0 < 10 * TICKS_PER_S)
+      sim.tick()
+    expect(short.length).toBe(1)
+    expect((sim.state.tick - t0) / TICKS_PER_S).toBe(fx.fixture.paydayInS)
+    expect(short[0]!.employeeIds).toEqual(fx.fixture.unpaid)
+    expect(paid.filter((p) => p.amount > 0)).toEqual([])
+    expect(walked).toEqual([])
+    expect(sim.state.economy.balance).toBeGreaterThanOrEqual(0)
+    for (const id of fx.fixture.unpaid as number[])
+      expect(sim.state.employees.find((e) => e.id === id)!.unpaidPaydays).toBe(
+        1,
+      )
+  })
+})
+
+describe('l2-lane: L2 with four live slots and the Shaky shaker (warehouse-view §5.2, §7.5)', () => {
+  it('is at L2, tier 2, slots 1-4 live, the shaker in fixture.shakerSlot, a truck owned', () => {
+    const { sim, fx } = load('l2-lane')
+    const st = sim.state
+    expect(st.level.level).toBe(2)
+    expect(st.level.warehouseTier).toBe(2)
+    const live = st.lane.nodes
+      .filter((n) => n.kind === 'slot' && !n.locked)
+      .map((n) => n.id)
+    expect(live).toEqual(fx.fixture.slots)
+    expect(live.length).toBe(4)
+    const f = laneNode(st.lane, String(fx.fixture.shakerSlot))!.fixture
+    expect(f?.kind === 'machine' ? f.checker.defId : null).toBe('shaky_shaker')
+    expect(st.vehicles.some((v) => v.type === 'truck')).toBe(true)
+  })
+
+  it('under ?policy=1 no level:up past the playtest cap and no life lost in the next 30 s', () => {
+    const { sim } = load('l2-lane')
+    const ups = collect(sim, 'level:up')
+    const lost = collect(sim, 'life:lost')
+    withPolicy(sim, 30)
+    expect(ups).toEqual([])
+    expect(lost).toEqual([])
   })
 })

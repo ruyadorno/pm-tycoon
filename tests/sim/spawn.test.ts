@@ -3,7 +3,8 @@
 // the 3-per-building cap, size mix, the destination rule (20 % same
 // district, overseas only with a live hub, origin ≠ dest), malware grace
 // (90 s AND 8 spawns), share by level + escalation + cap, decoys, labels, and
-// the scripted first malware (≥ 120 s, size S, a servable origin, deferral).
+// the scripted first malware (≥ 120 s, size S, a servable origin, deferral;
+// M3 run decision Q-RUN3: the origin is where a vehicle collects next).
 
 import { describe, expect, it } from 'vitest'
 import type { Sim } from '../../src/sim/sim.ts'
@@ -17,8 +18,10 @@ import { laneNode, malwareShare } from '../../src/sim/types.ts'
 import {
   buy,
   dataFixture,
+  eventLog,
   makeSim,
   openingA,
+  quiet,
   runSeconds,
   runTicks,
   unlockDistrict,
@@ -41,6 +44,21 @@ function spawnLog(sim: Sim): Parcel[] {
 
 const districtOf = (id: string) =>
   data.buildings.find((b) => b.id === id)?.district
+
+/** Q-RUN3: the buildings each vehicle collects at next (collecting target / last delivery stop). */
+function nextPickups(sim: Sim): string[] {
+  const out: string[] = []
+  for (const v of sim.state.vehicles) {
+    if (v.state === 'collecting') {
+      const stop = v.stops[v.stopIndex]
+      if (stop) out.push(stop.buildingId)
+    } else if (v.state === 'delivering') {
+      const last = v.stops.at(-1)
+      if (last) out.push(last.buildingId)
+    }
+  }
+  return out
+}
 
 describe('spawn timers (spec §5.2, §9.3)', () => {
   it('interval × m(s): 225 ticks at s = 0, 150 at 50, 90 at 100, 138 at the start value 60', () => {
@@ -271,14 +289,22 @@ describe('malware at spawn (spec §5.4)', () => {
     }
   })
 
-  it('scripted first malware: the first spawn at or after 120 s, strain metal, size S, a servable origin (seeds 1-10)', () => {
+  it("scripted first malware (run decision Q-RUN3): the first spawn at or after 120 s while a vehicle is about to collect, its origin that vehicle's next pickup (a collecting target or a delivering vehicle's last stop), strain metal, size S, a servable district (seeds 1-10)", () => {
     const fs = data.parcels.malware.firstScripted
     for (let seed = 1; seed <= 10; seed++) {
       const sim = makeSim(seed)
       openingA(sim)
       const log = spawnLog(sim)
-      runSeconds(sim, fs.atS + 30)
-      const first = log.find((p) => p.spawnedTick >= fs.atS * 10)
+      let next: string[] | null = null
+      sim.addTap((name, p) => {
+        if (name !== 'parcel:spawned') return
+        if (!sim.state.parcels[String((p as { id: number }).id)]?.scripted) {
+          return
+        }
+        next = nextPickups(sim)
+      })
+      runSeconds(sim, fs.atS + fs.deferUntilCheckerS + 30)
+      const first = log.find((p) => p.scripted)
       expect(first, `seed ${seed}`).toBeDefined()
       expect(first).toMatchObject({
         malware: true,
@@ -286,10 +312,56 @@ describe('malware at spawn (spec §5.4)', () => {
         size: fs.size,
         scripted: true,
       })
+      expect(first!.spawnedTick).toBeGreaterThanOrEqual(fs.atS * 10)
+      expect(first!.spawnedTick).toBeLessThan(
+        (fs.atS + fs.deferUntilCheckerS) * 10,
+      )
+      expect(next, `seed ${seed}`).toContain(first!.origin)
       expect(['highres', 'downtown']).toContain(districtOf(first!.origin))
       expect(log.filter((p) => p.scripted)).toHaveLength(1)
       expect(sim.state.spawn.scriptedDone).toBe(true)
     }
+  })
+
+  it('Q-RUN3: opening A picks the scripted malware up within 60 s of its spawn (seeds 1-10; the M2 nearest-first tail waited up to 8 min)', () => {
+    const fs = data.parcels.malware.firstScripted
+    const waits: number[] = []
+    for (let seed = 1; seed <= 10; seed++) {
+      const sim = makeSim(seed)
+      openingA(sim)
+      const log = spawnLog(sim)
+      const events = eventLog(sim)
+      runSeconds(sim, fs.atS + fs.deferUntilCheckerS + 120)
+      const p = log.find((x) => x.scripted)!
+      const picked = events.find(
+        (e) =>
+          e.name === 'parcel:pickedUp' && (e.p as { id: number }).id === p.id,
+      )
+      expect(picked, `seed ${seed}`).toBeDefined()
+      waits.push((picked!.tick - p.spawnedTick) / 10)
+    }
+    expect(waits.filter((w) => w <= 60).length).toBeGreaterThanOrEqual(9)
+  })
+
+  it('Q-RUN3: while no vehicle is about to collect, the forced spawn stays due (later spawns retry); deferUntilCheckerS past atS any servable building with room takes it', () => {
+    const fs = data.parcels.malware.firstScripted
+    const sim = makeSim(4)
+    // A bike homed on highres while highres never spawns: it stays idle on
+    // the lot, so no next pickup exists; downtown keeps spawning.
+    sim.state.districts.highres!.nextSpawnTick = null
+    const bike = buy(sim, 'bike')
+    sim.dispatch({ kind: 'setZone', id: bike.id, zone: 'highres' })
+    const log = spawnLog(sim)
+    runSeconds(sim, fs.atS + fs.deferUntilCheckerS - 1)
+    expect(log.some((p) => p.spawnedTick >= fs.atS * 10)).toBe(true)
+    expect(log.some((p) => p.scripted)).toBe(false)
+    expect(sim.state.spawn.scriptedDone).toBe(false)
+    expect(sim.state.vehicles[0]!.state).toBe('idle_lot')
+    runSeconds(sim, 30)
+    const p = log.find((x) => x.scripted)
+    expect(p).toMatchObject({ malware: true, size: fs.size, scripted: true })
+    // the servable pool: the bike's zone (highres), any building with room
+    expect(districtOf(p!.origin)).toBe('highres')
   })
 
   it('a bike-only fleet never gets the scripted malware from Industrial (seeds 1-20, Industrial live)', () => {
@@ -299,12 +371,44 @@ describe('malware at spawn (spec §5.4)', () => {
       openingA(sim)
       unlockDistrict(sim, 'industrial', true)
       const log = spawnLog(sim)
-      runSeconds(sim, fs.atS + 30)
+      runSeconds(sim, fs.atS + fs.deferUntilCheckerS + 30)
       const scripted = log.find((p) => p.scripted)
       expect(scripted, `seed ${seed}`).toBeDefined()
       expect(districtOf(scripted!.origin)).not.toBe('industrial')
       expect(scripted!.size).toBe('S')
     }
+  })
+
+  it('malware share climbs by postVictoryPerDay per day after the cap and stops at malware.cap (a real level-up; the MinuteRow malShare column)', () => {
+    const m = data.parcels.malware
+    const sim = quiet(makeSim(1))
+    const capLevel = data.economy.playtestMaxLevel
+    const row = data.levels.find((l) => l.level === capLevel)!
+    runTicks(sim, 100)
+    sim.state.economy.lifetimeEarned = row.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(capLevel)
+    const atCap = m.baseShare + m.perLevel * (capLevel - 1)
+    expect(malwareShare(sim.state, data)).toBeCloseTo(atCap, 10)
+    const days = Math.ceil((m.cap - atCap) / m.postVictoryPerDay) + 5
+    runTicks(sim, 600 * days - 101)
+    const shares = sim.state.stats.minutes.map((r) => r.malShare)
+    // day 1 is the first boundary after the cap (reached during day 0)
+    shares.forEach((share, i) => {
+      const want = Math.min(m.cap, atCap + m.postVictoryPerDay * (i + 1))
+      expect(share, `day ${i + 1}`).toBeCloseTo(want, 10)
+    })
+    expect(shares.at(-1)).toBe(m.cap)
+    expect(shares.filter((x) => x === m.cap).length).toBeGreaterThan(3)
+    for (let i = 1; i < shares.length; i++) {
+      expect(shares[i]!).toBeGreaterThanOrEqual(shares[i - 1]!)
+    }
+    // no escalation before the cap: an L1 game keeps baseShare all along
+    const l1 = quiet(makeSim(1))
+    runTicks(l1, 600 * 10)
+    expect(
+      l1.state.stats.minutes.every((r) => r.malShare === m.baseShare),
+    ).toBe(true)
   })
 
   it('no checker in the lane: deferred up to deferUntilCheckerS, then ordinary malware (no forced catch)', () => {

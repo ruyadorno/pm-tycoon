@@ -81,6 +81,77 @@ overrules any line by number.
 - Lost-life card, counterOwned branch: "This one got through on the 3%" (city-view's "Your lane was at 97% — …" repeated
   the line above it).
 
+## Run decisions and retunes (M3)
+
+- **Q-RUN3 — scripted first malware origin** (`src/sim/systems/spawn.ts` nextPickupOrigins): among fleet-servable
+  buildings with room, the origin is narrowed to where a vehicle collects next (a collecting vehicle's current target
+  when an S still fits, or a delivering vehicle's last stop), so the §4.5 nearest-first leg starts there; after
+  `atS + deferUntilCheckerS` any servable building is used. Before: the scripted parcel waited up to ~8 min for pickup
+  (seed 3: 473 s; 4/10 seeds > 300 s). After: catch median 174 s, max 198 s on seeds 1–10. The suggested "within
+  collectRadiusTiles of the lot" rule did not help (vehicles collect from wherever they finished delivering). Default —
+  confirm.
+- **Competent-policy extensions** (`src/sim/policy.ts`; spec §7 defines the gate policy, these make it play like a
+  competent human): (1) **COUNTERS** — once the level's spec purchases are done (3 bikes at L1; truck + shaker at L2), a
+  free slot gets the counter machine of the weakest announced strain at price + $50 (a 2nd Metal detector at L1, the
+  shaker in slot 4 at L2). Share of 80 seeds losing ≥ 1 life in 30 min: spec policy 37/80 → 22/80. (2) **REHIRE** —
+  walked-out workers are re-hired in pay order at fee + $50 before any purchase (spec §7 is silent; without it one
+  walkout disables a run for good). (3) The "2nd/3rd inspector when the lane stalls > 10 s in a day" rule is re-based on
+  the dock being blocked (summed `LoadingDock.blockedTicksThisDay` > 10 s), since a busy checker is backpressure, not a
+  stall; at most one hire per day. It is dormant in playtest 1 (worst blocked day 7.9 s; the desk is ~68 % busy at L2).
+- **Retune — `parcels.decoyShare` 0.20 → 0.22** (gate row `holdBayEventsPer10MinMin`; the quick gate of `vlr check`
+  was 5.97 < 6 once the policy bought a 2nd detector): quick gate 5.97 → 7.87, full gate 6.59 → 7.15; 80 seeds below 6:
+  21/80 → 11/80. `baseShare` 0.06 was tried first per the lever order and rejected (full-gate lives median → 1).
+- **Retune — truck price $1,300 → $1,200** (gate row `truckAfterLevel2MaxMin`, §7.6 "truck late → lower its price"):
+  with COUNTERS' $150 at L1 and decoy 0.22, the quick-gate truck landed +5.18 min after L2; after: +3.86 (quick), +2.10
+  (full median); 80 seeds > 4 min: 29/80 → 12/80. Sell refund becomes $600. UI tests now read prices from data.
+- **`malware.postVictoryPerDay` stays 0.01** (a 0.005 retune was tried and reverted by the sim review: at the final
+  config it moved no gate row).
+- **`public/configs/spicy.json` decoyShare 0.2 → 0.3**: the plan's literal 0.20 is now below the base 0.22; the schema
+  test asserts both spicy levers sit above the base tables.
+- **Residual risk (author)**: the "no lost life in 30 min" window is dice at D ≈ 0.97–0.99 with the post-cap escalation
+  (malware share 20 % by minute 30): ~19–29 % of 80 seeds lose one life; seeds 1–10 pass by median (2/10 lose one).
+  Per-seed, 5/10 seeds miss at least one window while every median passes (docs/gate/latest.md).
+- **Balance observation (author; not a gate row, not tuned per R5)**: under the competent policy the mean
+  satisfaction drifts into the angry band during L2 (seed 7: 61 at 3 min → 26 at 12 → 6 at 30); late deliveries (−3,
+  uncapped) outweigh the +4/day positive cap when the fleet saturates. The UX journey with a human-like opening stayed
+  44–62 through L2 until a starvation walkout. Levers if the author wants a happier city: `satisfaction.late`,
+  `positiveCapPerDay`, or more vehicles in the policy.
+- **Walkout "finishes its trip"**: the vehicle serves the stop it is driving to or standing at, starts no new leg,
+  unloads at home if it carries inbound parcels, then parks `inactive`; a vehicle already empty on the lot goes inactive
+  at once. A driver who walks out during `docked_loading` departs and delivers the loaded parcels (§4.6) rather than
+  returning them to the shelf (§11's lifecycle line) — author to confirm.
+- **Payroll details**: `payroll:paid` only when the amount > 0; payroll runs before `day:ended` so the daily ticker line
+  counts it; pay order keeps the original hire time after a re-hire; `payroll().short` means someone is still owed
+  (re-hire clears it); hiring is refused while walked-out inspectors hold the free seats ("Seat held for re-hire").
+- **Hold Bay bays are stable** (a held parcel keeps its bay; new ones take the lowest free bay) so the rack no longer
+  compacts under the player's finger.
+
+## View-level deviations (M3)
+
+- PixelLab art installed: 63 generated sprites (7 anchors agent-approved provisionally, G2), 3 kept procedural (desk,
+  shelf_t1, shelf_t2); 1,700 generations spent of the 2,500 run budget. Both style-reference routes copied the anchors'
+  structure (breaking "one unique feature per building"), so the bulk pass used text prompts only; 3×3/exterior
+  canvases use a keyed solid background. `tools/art/normalize.ts` passes through finals already on their class canvas
+  (the first build re-centred 44 generated frames).
+- Docked vehicles are drawn at a render-only dock pose on the visible SW face of the warehouse sprite (`dockBlend` near
+  the dock tile): `map.json` docks run along the sprite's hidden NW side. Sim and map data unchanged.
+- Vehicle origin from the manifest's `VEHICLE_FOOT` instead of Q24's (0.5, 0.75).
+- Level-up: the warehouse swaps to `wh_ext_t2` on the dust "reveal" frame (750 ms); the stamp holds 800 ms then fades;
+  the level/region newspapers wait 2.4 s so they never cover the moment; fx_dust is a jittered grid of 32×32 puffs over
+  the exterior (no setScale on world art).
+- Newspaper pictures larger than 48×48 become a palette-snapped 46-px "photo" texture (no setScale); two greeked text
+  columns fill the card; several walkouts on one payday → one red toast, one paper, one ticker line; DEFUSED lines do
+  not open a paper (only a lost life does, after its card closes).
+- The "Now playing" toast shows once per title per session (audio.md says every loop pass ≈ every 2.3 min).
+- Lost-life card rates keep one decimal from 99 % (a 99.8 % lane read "100 %").
+- Grumble plays for an angry district label on screen (spec §9.2), throttled to one per 20 s by the director.
+- The fps-based quality sampler is off under `navigator.webdriver` (SwiftShader frame rates would degrade every shot).
+- Audio (Q46 addendum): the audio code is its own lazily imported chunk (~74 KB gz) started in `main.ts`; the director
+  costs ~5 ms in Boot; the 18 zzfx renders are spread one per macrotask after boot; the Title retries `unlock()` on
+  pointerup (iOS activation is on touchend). The plan's "ctx.state === 'suspended' before the tap" check cannot hold in
+  headless Chromium (contexts start running), so e2e asserts the director's stronger guarantee: not unlocked, Transport
+  stopped, no notes, SFX dropped as 'locked'.
+
 ## Runtime dependencies
 
 - `phaser@4.2.1` — the engine (MIT). ~1.2 MB min / ~0.3 MB gz in its own chunk.

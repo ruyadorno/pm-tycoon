@@ -17,6 +17,7 @@ import { joinQueue, originTile } from '../../src/sim/systems/vehicles.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import {
   buy,
+  fund,
   collect,
   dataFixture,
   injectParcel,
@@ -273,6 +274,7 @@ describe('§4.5 step 2 — the idle pass, and the dock idle wait (§4.6)', () =>
   it('§4.6 / Q-RUN1 one dock cannot deadlock: a full shelf never strands the docked vehicle once the fleet can carry the shelf again', () => {
     const sim = makeSim(2)
     const bikes = [buy(sim, 'bike'), buy(sim, 'bike'), buy(sim, 'bike')]
+    fund(sim) // payroll (M3) always paid: nobody walks out
     for (const b of bikes) {
       sim.dispatch({ kind: 'setZone', id: b.id, zone: 'highres' })
     }
@@ -313,9 +315,12 @@ describe('§4.5 step 2 — the idle pass, and the dock idle wait (§4.6)', () =>
   })
 
   it('Q-RUN1 (c) relief: the M1 review jam (highres bikes, then every zone → any, nobody empty, no vehicle bought) recovers — the shelf takes the lane past its cap only while a docked bike that can carry a shelf parcel unloads', () => {
-    for (const seed of [2, 3, 5]) {
+    // Seeds whose jam has every bike loaded or collecting (re-picked in M3:
+    // seed 3's jam left one bike empty after the decoyShare retune).
+    for (const seed of [2, 4, 5]) {
       const sim = makeSim(seed)
       const bikes = [buy(sim, 'bike'), buy(sim, 'bike'), buy(sim, 'bike')]
+      fund(sim) // payroll (M3) always paid: nobody walks out
       for (const b of bikes) {
         sim.dispatch({ kind: 'setZone', id: b.id, zone: 'highres' })
       }

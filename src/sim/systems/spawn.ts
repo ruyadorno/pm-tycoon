@@ -23,7 +23,13 @@
 // (firstScripted.strain, size firstScripted.size, origin among the districts
 // an owned vehicle may serve) with `scripted` = forcedCatch; with no checker
 // in the lane it is deferred ≤ deferUntilCheckerS, then spawns as ordinary
-// malware. Malware / decoy flags stay hidden (detection is M2).
+// malware. Run decision Q-RUN3 (M3): its origin is further narrowed to where
+// a vehicle collects next (a collecting vehicle's target, a delivering
+// vehicle's last stop — nextPickupOrigins), so the §4.5 nearest-first tail
+// no longer leaves it waiting minutes; while no such building has room the
+// forced spawn stays due (a later spawn retries), and from atS +
+// deferUntilCheckerS any servable building with room takes it.
+// Malware / decoy flags stay hidden until a checker flags them.
 
 import type {
   BuildingDef,
@@ -37,6 +43,7 @@ import {
   mapIndex,
   sizeAllowed,
   typeAllowedIn,
+  unitsOf,
   vehicleTypeDef,
   zonePermits,
 } from '../map.ts'
@@ -44,6 +51,7 @@ import type { Sim } from '../sim.ts'
 import type { Parcel, Strain } from '../types.ts'
 import { malwareShare, ticksFromS, TICKS_PER_S } from '../types.ts'
 import { hasActiveChecker } from './lane.ts'
+import { freeUnits, hasDriver } from './vehicles.ts'
 import { spawnMultiplier } from './satisfaction.ts'
 
 const SIZES: readonly SizeId[] = ['S', 'M', 'L', 'XL']
@@ -100,7 +108,9 @@ const underCap = (sim: Sim, b: BuildingDef): boolean =>
  */
 function servableOrigins(sim: Sim, size: SizeId): BuildingDef[] | null {
   const s = sim.state
-  const fleet = s.vehicles.filter((v) => v.state !== 'inactive')
+  const fleet = s.vehicles.filter(
+    (v) => v.state !== 'inactive' && hasDriver(sim, v),
+  )
   if (fleet.length === 0) return null
   const out: BuildingDef[] = []
   for (const d of sim.data.districts) {
@@ -115,6 +125,37 @@ function servableOrigins(sim: Sim, size: SizeId): BuildingDef[] | null {
       out.push(...(mapIndex(sim.data).buildingsByDistrict[d.id] ?? []))
   }
   return out
+}
+
+/**
+ * Run decision Q-RUN3 (M3): the scripted malware's origin pool narrowed to
+ * the buildings of `pool` a vehicle is about to collect at — a collecting
+ * vehicle's current target, when a parcel of `size` still fits beside what
+ * it carries and has reserved, and a delivering vehicle's last stop, where
+ * its next collect leg starts nearest-first (§4.5 step 4: the building at
+ * its own anchor is the nearest candidate). Vehicles whose driver walked out
+ * start no new leg and are skipped.
+ */
+function nextPickupOrigins(
+  sim: Sim,
+  pool: readonly BuildingDef[],
+  size: SizeId,
+): BuildingDef[] {
+  const ids: string[] = []
+  for (const v of sim.state.vehicles) {
+    if (!hasDriver(sim, v)) continue
+    if (!sizeAllowed(vehicleTypeDef(sim.data, v.type), size)) continue
+    if (v.state === 'collecting') {
+      const stop = v.stops[v.stopIndex]
+      if (stop && freeUnits(sim, v) >= unitsOf(sim.data, size)) {
+        ids.push(stop.buildingId)
+      }
+    } else if (v.state === 'delivering') {
+      const last = v.stops.at(-1)
+      if (last) ids.push(last.buildingId)
+    }
+  }
+  return pool.filter((b) => ids.includes(b.id))
 }
 
 /** Strains that may spawn now (§5.4: level ≤ company level, announced + delay). */
@@ -199,8 +240,15 @@ function spawnOne(sim: Sim, district: LiveDistrictDef): void {
     const servable = servableOrigins(sim, forcedSize)
     if (servable !== null) {
       const open = servable.filter((b) => underCap(sim, b))
-      if (open.some((b) => b.send > 0)) pool = open
-      else forced = 'none' // nowhere servable has room: stays due
+      // Q-RUN3: where a vehicle collects next; else it stays due (a later
+      // spawn retries) until deferUntilCheckerS past atS, then any servable
+      // building with room.
+      const soon = nextPickupOrigins(sim, open, forcedSize)
+      const fs = m.firstScripted
+      const late = s.tick >= ticksFromS(fs.atS + fs.deferUntilCheckerS)
+      if (soon.some((b) => b.send > 0)) pool = soon
+      else if (late && open.some((b) => b.send > 0)) pool = open
+      else forced = 'none' // stays due
     }
   }
   const origin = rng.weighted(pool, (b) => b.send)

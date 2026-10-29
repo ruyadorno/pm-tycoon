@@ -241,6 +241,14 @@ export interface Parcel {
   /** Overseas clearance pay tick (§5.6). */
   clearTick: Tick | null
   trace: TraceEntry[]
+  /**
+   * ADDITION (M3): while `held`, the 0-based Hold Bay rack position it took
+   * on arrival (the lowest free one) and keeps until it leaves (Toss /
+   * Clear), so the rack never compacts under the player's finger. Absent
+   * otherwise (and on parcels held in pre-M3 saves: holdBayItems then gives
+   * them the lowest bays left free).
+   */
+  bay?: number
 }
 
 export type LaneNodeKind =
@@ -270,7 +278,8 @@ export interface LaneNode {
   cap: number | null
   /**
    * Parcel ids at this node in arrival order: the conveyor belt, a slot's
-   * input buffer, the Hold Bay (index = bay, lowest first), the shelf.
+   * input buffer, the Hold Bay (arrival order; the rack position is the
+   * parcel's stable `bay`, M3), the shelf.
    * The bin keeps no ids (tossed parcels are terminal; see Lane.quarantine).
    */
   queue: number[]
@@ -315,6 +324,14 @@ export interface LoadingDock {
   nextTransferTick: Tick | null
   /** Ticks with a vehicle in the dock this day → dock:occupancy (§6.5). */
   busyTicksThisDay: number
+  /**
+   * ADDITION (M3): ticks this day a docked vehicle's due unload was refused
+   * by a full conveyor (the lane backing up into the dock — a saturated
+   * checker included, which is backpressure and never a `lane:stalled`).
+   * The §7 policy's "2nd / 3rd inspector" signal (policy.ts). Reset on the
+   * day boundary; absent in pre-M3 saves (read as 0).
+   */
+  blockedTicksThisDay?: number
   /**
    * ADDITION (M2, run decision Q-RUN1): first tick of the current run of
    * due-but-blocked unloads (the conveyor full); null while unloading flows

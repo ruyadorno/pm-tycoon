@@ -2,8 +2,7 @@
 // validates the shape (isCommand), runs the handler — which validates the
 // rules and applies the change immediately, or returns a stable failure
 // reason without touching state or the rng — and logs successful commands.
-// Handlers marked TODO(Mn) validate what they can and return 'locked' until
-// that milestone wires them to src/sim/systems/*.ts. A handler that changes
+// Build-2 commands (buyDock, acceptQuest) return 'locked'. A handler that changes
 // state while reporting a failure marks it `applied` (logged for replay).
 // The three `debug*` kinds back ViewSim.debug (debug builds only; logged
 // like any command, so __pm.replay stays exact).
@@ -39,6 +38,7 @@ import {
   placeFixture,
   removeFixture,
 } from './systems/lane.ts'
+import { rehire, rehireFee } from './systems/payroll.ts'
 import { parkingTile, sellVehicle } from './systems/vehicles.ts'
 
 export type Command =
@@ -291,9 +291,11 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     const node = sim.state.lane.nodes.find((n) => n.fixture?.kind === 'desk')
     if (!node || node.fixture?.kind !== 'desk') return fail('invalid')
     const def = sim.data.employees.inspector
-    if (node.fixture.inspectorIds.length >= def.maxPerDesk) {
-      return fail('desk-full')
-    }
+    // Walked-out inspectors keep their seat for a re-hire (§7.4): they count
+    // against maxPerDesk until re-hired or the desk is removed.
+    const seats =
+      node.fixture.inspectorIds.length + node.fixture.walkedOutIds.length
+    if (seats >= def.maxPerDesk) return fail('desk-full')
     if (sim.state.economy.balance < def.hireFee) {
       return fail('insufficient-funds')
     }
@@ -328,9 +330,12 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   rehire(sim, cmd) {
     const e = sim.state.employees.find((x) => x.id === cmd.employeeId)
     if (!e || e.active) return fail('invalid')
-    // TODO(M3): systems/payroll.ts re-hire (§7.4: one day's salary × rehireFeeDays,
-    // clears the unpaid mark; driver vehicle inactive → idle_lot).
-    return fail('locked')
+    // §7.4: one day's salary × rehireFeeDays, immediate; clears the unpaid
+    // mark; back at the desk / the vehicle inactive → idle_lot (payroll.ts).
+    if (sim.state.economy.balance < rehireFee(sim, e)) {
+      return fail('insufficient-funds')
+    }
+    return rehire(sim, e) ? OK : fail('invalid')
   },
 
   toss(sim, cmd) {

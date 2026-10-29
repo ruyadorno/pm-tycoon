@@ -401,6 +401,7 @@ function buildStartLane(data: GameData, L1: LevelDef): Lane {
         vehicleId: null,
         nextTransferTick: null,
         busyTicksThisDay: 0,
+        blockedTicksThisDay: 0,
         stuckSinceTick: null,
       },
     ],

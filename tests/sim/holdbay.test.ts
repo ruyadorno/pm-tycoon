@@ -19,6 +19,7 @@ import {
   openingA,
   quietSim,
   runTicks,
+  runUntil,
   shelveParcel,
 } from './helpers.ts'
 
@@ -203,10 +204,58 @@ describe('the Hold Bay as a queue (spec §6.4, §6.6)', () => {
     expect(vs.holdBay.cap).toBe(data.levels[0]!.holdBayCap)
     expect(vs.holdBay.count).toBe(2)
     expect(vs.holdBay.toss(a.id)).toEqual({ ok: true })
-    expect(vs.holdBay.items).toMatchObject([{ parcelId: b.id, bay: 0 }])
+    // stable bays (M3): b keeps its bay when a leaves
+    expect(vs.holdBay.items).toMatchObject([{ parcelId: b.id, bay: 1 }])
     expect(vs.holdBay.clear(b.id)).toEqual({ ok: true })
     expect(vs.quarantine).toEqual({ count: 1, malware: 1, clean: 0 })
     expect(vs.holdBay.count).toBe(0)
+  })
+
+  it('stable bays (M3): a held parcel keeps its bay until it leaves; a new arrival takes the lowest free bay; the rack never compacts', () => {
+    const sim = quietSim(1)
+    const vs = createViewSim(sim)
+    const bays = () =>
+      Object.fromEntries(vs.holdBay.items.map((i) => [i.parcelId, i.bay]))
+    // three flags through the desk, each to the next free bay
+    const flagged = [0, 1, 2].map(() => {
+      const p = laneParcel(sim, 'conv1', { malware: true, scripted: true })
+      runUntil(sim, () => sim.state.parcels[String(p.id)]?.state === 'held')
+      return p
+    })
+    const [a, b, c] = flagged.map((p) => p.id) as [number, number, number]
+    expect(bays()).toEqual({ [a]: 0, [b]: 1, [c]: 2 })
+    expect(sim.state.parcels[String(b)]?.bay).toBe(1)
+    expect(sim.dispatch({ kind: 'toss', parcelId: b })).toEqual({ ok: true })
+    expect(bays()).toEqual({ [a]: 0, [c]: 2 }) // a and c stay put
+    expect(sim.dispatch({ kind: 'clear', parcelId: a })).toEqual({ ok: true })
+    expect(bays()).toEqual({ [c]: 2 })
+    const cleared = sim.state.parcels[String(a)]!
+    expect(cleared.bay).toBeUndefined() // left the bay: the field goes
+    // the next arrival takes the lowest free bay (0), then 1
+    const d = laneParcel(sim, 'conv1', { malware: true, scripted: true })
+    runUntil(sim, () => sim.state.parcels[String(d.id)]?.state === 'held')
+    const e = laneParcel(sim, 'conv1', { malware: true, scripted: true })
+    runUntil(sim, () => sim.state.parcels[String(e.id)]?.state === 'held')
+    expect(bays()).toEqual({ [c]: 2, [d.id]: 0, [e.id]: 1 })
+    // items stay in arrival order (c, d, e); `bay` is the rack position
+    expect(vs.holdBay.items.map((i) => i.parcelId)).toEqual([c, d.id, e.id])
+    expect(auditState(sim.state, data)).toEqual([])
+  })
+
+  it('stable bays: held parcels without a bay (pre-M3 saves) take the lowest bays the others leave free, in arrival order', () => {
+    const sim = quietSim(1)
+    const vs = createViewSim(sim)
+    const a = heldParcel(sim)
+    const b = heldParcel(sim)
+    const c = heldParcel(sim)
+    delete sim.state.parcels[String(a.id)]!.bay
+    sim.state.parcels[String(b.id)]!.bay = 0
+    delete sim.state.parcels[String(c.id)]!.bay
+    expect(vs.holdBay.items.map((i) => [i.parcelId, i.bay])).toEqual([
+      [a.id, 1],
+      [b.id, 0],
+      [c.id, 2],
+    ])
   })
 
   it('debug fillHoldBay fills every free bay with flagged parcels (malware and decoys in turn); conservation holds', () => {

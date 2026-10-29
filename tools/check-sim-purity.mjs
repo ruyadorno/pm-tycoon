@@ -9,6 +9,8 @@ const PHASER_FREE = [
   'src/ui/layout.ts',
   'src/render/warehouse/RoomLayout.ts',
   'src/render/decayPhase.ts',
+  'src/render/cityFx.ts',
+  'src/render/quality.ts',
   'src/audio/chords.ts',
   'src/audio/leadsheet.ts',
   'src/audio/arranger.ts',

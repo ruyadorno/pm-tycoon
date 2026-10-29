@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "dataHash": "34873b38",
+  "dataHash": "2112987b",
   "config": null,
   "policy": "competent",
   "seeds": [
@@ -46,16 +46,16 @@
         "seed": 1,
         "minutes": 30,
         "firstDeliveryS": 57.3,
-        "firstMalwareCaughtS": 252.5,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
-        "livesLost": 1,
+        "firstMalwareCaughtS": 154.4,
+        "level2Min": 11.44,
+        "truckAfterLevel2Min": 1.17,
+        "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 7.67,
-        "holdBayEventsPer10Min": 7.67,
-        "scriptedCaughtS": 252.5,
-        "wrongTosses": 10,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 7.87,
+        "holdBayEventsPer10Min": 16,
+        "scriptedCaughtS": 154.4,
+        "wrongTosses": 19,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -73,7 +73,7 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 252.5,
+          "value": 154.4,
           "pass": true,
           "note": null
         },
@@ -81,24 +81,24 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 11.44,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 1.17,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
           "metric": "livesLost",
           "target": "≤ 0",
-          "value": 1,
-          "pass": false,
+          "value": 0,
+          "pass": true,
           "note": null
         },
         {
@@ -113,29 +113,29 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 7.67,
+          "value": 7.87,
           "pass": true,
           "note": null
         }
       ],
       "asserts": [],
-      "pass": false
+      "pass": true
     },
     {
       "metrics": {
         "seed": 2,
         "minutes": 30,
         "firstDeliveryS": 58.3,
-        "firstMalwareCaughtS": 211,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 178.1,
+        "level2Min": 13.78,
+        "truckAfterLevel2Min": 3.86,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 7.33,
-        "holdBayEventsPer10Min": 7.33,
-        "scriptedCaughtS": 211,
-        "wrongTosses": 10,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 8.71,
+        "holdBayEventsPer10Min": 16.33,
+        "scriptedCaughtS": 178.1,
+        "wrongTosses": 21,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -153,7 +153,7 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 211,
+          "value": 178.1,
           "pass": true,
           "note": null
         },
@@ -161,17 +161,17 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 13.78,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 3.86,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -193,7 +193,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 7.33,
+          "value": 8.71,
           "pass": true,
           "note": null
         }
@@ -206,16 +206,16 @@
         "seed": 3,
         "minutes": 30,
         "firstDeliveryS": 54.8,
-        "firstMalwareCaughtS": 473.1,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 161.8,
+        "level2Min": 14.4,
+        "truckAfterLevel2Min": 5.11,
         "livesLost": 1,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 8,
-        "holdBayEventsPer10Min": 8,
-        "scriptedCaughtS": 473.1,
-        "wrongTosses": 13,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 7.64,
+        "holdBayEventsPer10Min": 12.67,
+        "scriptedCaughtS": 161.8,
+        "wrongTosses": 19,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -233,25 +233,25 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 473.1,
-          "pass": false,
+          "value": 161.8,
+          "pass": true,
           "note": null
         },
         {
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 14.4,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
+          "value": 5.11,
           "pass": false,
-          "note": "informational (M3)"
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -273,7 +273,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 8,
+          "value": 7.64,
           "pass": true,
           "note": null
         }
@@ -286,16 +286,16 @@
         "seed": 4,
         "minutes": 30,
         "firstDeliveryS": 50.8,
-        "firstMalwareCaughtS": 270.3,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 172.1,
+        "level2Min": 10.93,
+        "truckAfterLevel2Min": 0.92,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 6.67,
-        "holdBayEventsPer10Min": 6.67,
-        "scriptedCaughtS": 270.3,
-        "wrongTosses": 8,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 7.32,
+        "holdBayEventsPer10Min": 18,
+        "scriptedCaughtS": 172.1,
+        "wrongTosses": 21,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -313,7 +313,7 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 270.3,
+          "value": 172.1,
           "pass": true,
           "note": null
         },
@@ -321,17 +321,17 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 10.93,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 0.92,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -353,7 +353,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 6.67,
+          "value": 7.32,
           "pass": true,
           "note": null
         }
@@ -366,16 +366,16 @@
         "seed": 5,
         "minutes": 30,
         "firstDeliveryS": 60.8,
-        "firstMalwareCaughtS": 225.8,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 176.5,
+        "level2Min": 13.05,
+        "truckAfterLevel2Min": 1.81,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 11.67,
-        "holdBayEventsPer10Min": 11.67,
-        "scriptedCaughtS": 225.8,
-        "wrongTosses": 19,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 9.2,
+        "holdBayEventsPer10Min": 13.33,
+        "scriptedCaughtS": 176.5,
+        "wrongTosses": 20,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -393,7 +393,7 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 225.8,
+          "value": 176.5,
           "pass": true,
           "note": null
         },
@@ -401,17 +401,17 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 13.05,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 1.81,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -433,7 +433,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 11.67,
+          "value": 9.2,
           "pass": true,
           "note": null
         }
@@ -446,16 +446,16 @@
         "seed": 6,
         "minutes": 30,
         "firstDeliveryS": 37.3,
-        "firstMalwareCaughtS": 196.5,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 180,
+        "level2Min": 16.23,
+        "truckAfterLevel2Min": 3.96,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 9.67,
-        "holdBayEventsPer10Min": 9.67,
-        "scriptedCaughtS": 196.5,
-        "wrongTosses": 12,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 4.31,
+        "holdBayEventsPer10Min": 13,
+        "scriptedCaughtS": 180,
+        "wrongTosses": 11,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -473,7 +473,7 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 196.5,
+          "value": 180,
           "pass": true,
           "note": null
         },
@@ -481,17 +481,17 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
+          "value": 16.23,
           "pass": false,
-          "note": "informational (M3)"
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 3.96,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -513,29 +513,29 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 9.67,
-          "pass": true,
+          "value": 4.31,
+          "pass": false,
           "note": null
         }
       ],
       "asserts": [],
-      "pass": true
+      "pass": false
     },
     {
       "metrics": {
         "seed": 7,
         "minutes": 30,
         "firstDeliveryS": 33.3,
-        "firstMalwareCaughtS": 381.4,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 191,
+        "level2Min": 12.91,
+        "truckAfterLevel2Min": 2.27,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 6,
-        "holdBayEventsPer10Min": 6,
-        "scriptedCaughtS": 381.4,
-        "wrongTosses": 9,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 6.97,
+        "holdBayEventsPer10Min": 15.33,
+        "scriptedCaughtS": 191,
+        "wrongTosses": 27,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -553,25 +553,25 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 381.4,
-          "pass": false,
+          "value": 191,
+          "pass": true,
           "note": null
         },
         {
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 12.91,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 2.27,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -593,29 +593,29 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 6,
+          "value": 6.97,
           "pass": true,
           "note": null
         }
       ],
       "asserts": [],
-      "pass": false
+      "pass": true
     },
     {
       "metrics": {
         "seed": 8,
         "minutes": 30,
         "firstDeliveryS": 37.3,
-        "firstMalwareCaughtS": 234.5,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 197.7,
+        "level2Min": 13.46,
+        "truckAfterLevel2Min": 1.26,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 5,
-        "holdBayEventsPer10Min": 5,
-        "scriptedCaughtS": 312.6,
-        "wrongTosses": 7,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 4.46,
+        "holdBayEventsPer10Min": 13.67,
+        "scriptedCaughtS": 197.7,
+        "wrongTosses": 11,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -633,7 +633,7 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 234.5,
+          "value": 197.7,
           "pass": true,
           "note": null
         },
@@ -641,17 +641,17 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 13.46,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 1.26,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -673,7 +673,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 5,
+          "value": 4.46,
           "pass": false,
           "note": null
         }
@@ -686,16 +686,16 @@
         "seed": 9,
         "minutes": 30,
         "firstDeliveryS": 37.3,
-        "firstMalwareCaughtS": 326.5,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
+        "firstMalwareCaughtS": 166.4,
+        "level2Min": 13.04,
+        "truckAfterLevel2Min": 2.69,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 8.33,
-        "holdBayEventsPer10Min": 8.33,
-        "scriptedCaughtS": 326.5,
-        "wrongTosses": 11,
-        "malwareShareAtEnd": 0.05,
+        "holdBayEventsPer10MinL1": 6.13,
+        "holdBayEventsPer10Min": 14.33,
+        "scriptedCaughtS": 166.4,
+        "wrongTosses": 18,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -713,25 +713,25 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 326.5,
-          "pass": false,
+          "value": 166.4,
+          "pass": true,
           "note": null
         },
         {
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 13.04,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 2.69,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
@@ -753,29 +753,29 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 8.33,
+          "value": 6.13,
           "pass": true,
           "note": null
         }
       ],
       "asserts": [],
-      "pass": false
+      "pass": true
     },
     {
       "metrics": {
         "seed": 10,
         "minutes": 30,
         "firstDeliveryS": 37.3,
-        "firstMalwareCaughtS": 306.1,
-        "level2Min": null,
-        "truckAfterLevel2Min": null,
-        "livesLost": 0,
+        "firstMalwareCaughtS": 166,
+        "level2Min": 12.51,
+        "truckAfterLevel2Min": 1.93,
+        "livesLost": 1,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 7.67,
-        "holdBayEventsPer10Min": 7.67,
-        "scriptedCaughtS": 306.1,
+        "holdBayEventsPer10MinL1": 6.39,
+        "holdBayEventsPer10Min": 12,
+        "scriptedCaughtS": 166,
         "wrongTosses": 11,
-        "malwareShareAtEnd": 0.05,
+        "malwareShareAtEnd": 0.2,
         "level3Min": null,
         "level4Min": null,
         "level5Min": null
@@ -793,32 +793,32 @@
           "key": "firstMalwareCaughtMaxS",
           "metric": "firstMalwareCaughtS",
           "target": "≤ 300 s",
-          "value": 306.1,
-          "pass": false,
+          "value": 166,
+          "pass": true,
           "note": null
         },
         {
           "key": "level2Min",
           "metric": "level2Min",
           "target": "8-15 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 12.51,
+          "pass": true,
+          "note": null
         },
         {
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": null,
-          "pass": false,
-          "note": "informational (M3)"
+          "value": 1.93,
+          "pass": true,
+          "note": null
         },
         {
           "key": "maxLivesLost",
           "metric": "livesLost",
           "target": "≤ 0",
-          "value": 0,
-          "pass": true,
+          "value": 1,
+          "pass": false,
           "note": null
         },
         {
@@ -833,7 +833,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 7.67,
+          "value": 6.39,
           "pass": true,
           "note": null
         }
@@ -844,16 +844,16 @@
   ],
   "medians": {
     "firstDeliveryS": 44.05,
-    "firstMalwareCaughtS": 261.4,
-    "level2Min": null,
-    "truckAfterLevel2Min": null,
+    "firstMalwareCaughtS": 174.3,
+    "level2Min": 13.05,
+    "truckAfterLevel2Min": 2.1,
     "livesLost": 0,
     "shelfStallS": 0,
-    "holdBayEventsPer10MinL1": 7.67,
-    "holdBayEventsPer10Min": 7.67,
-    "scriptedCaughtS": 288.2,
-    "wrongTosses": 10.5,
-    "malwareShareAtEnd": 0.05,
+    "holdBayEventsPer10MinL1": 7.15,
+    "holdBayEventsPer10Min": 14,
+    "scriptedCaughtS": 174.3,
+    "wrongTosses": 19,
+    "malwareShareAtEnd": 0.2,
     "level3Min": null,
     "level4Min": null,
     "level5Min": null
@@ -871,7 +871,7 @@
       "key": "firstMalwareCaughtMaxS",
       "metric": "firstMalwareCaughtS",
       "target": "≤ 300 s",
-      "value": 261.4,
+      "value": 174.3,
       "pass": true,
       "note": null
     },
@@ -879,17 +879,17 @@
       "key": "level2Min",
       "metric": "level2Min",
       "target": "8-15 min",
-      "value": null,
-      "pass": false,
-      "note": "informational (M3)"
+      "value": 13.05,
+      "pass": true,
+      "note": null
     },
     {
       "key": "truckAfterLevel2MaxMin",
       "metric": "truckAfterLevel2Min",
       "target": "≤ 4 min",
-      "value": null,
-      "pass": false,
-      "note": "informational (M3)"
+      "value": 2.1,
+      "pass": true,
+      "note": null
     },
     {
       "key": "maxLivesLost",
@@ -911,7 +911,7 @@
       "key": "holdBayEventsPer10MinMin",
       "metric": "holdBayEventsPer10MinL1",
       "target": "≥ 6 /10 min at L1",
-      "value": 7.67,
+      "value": 7.15,
       "pass": true,
       "note": null
     }
@@ -919,32 +919,32 @@
   "features": {
     "lane": true,
     "lives": true,
-    "levels": false,
-    "payroll": false
+    "levels": true,
+    "payroll": true
   },
   "informational": [
     {
       "key": "holdBayEventsPer10Min",
       "target": "whole run",
-      "median": 7.67,
+      "median": 14,
       "note": "informational"
     },
     {
       "key": "scriptedCaughtS",
       "target": "flag time of the scripted malware",
-      "median": 288.2,
+      "median": 174.3,
       "note": "informational"
     },
     {
       "key": "wrongTosses",
       "target": "clean parcels tossed (Toss-everything)",
-      "median": 10.5,
+      "median": 19,
       "note": "informational"
     },
     {
       "key": "malwareShareAt30Min",
       "target": "share at 30 min",
-      "median": 0.05,
+      "median": 0.2,
       "note": "informational"
     },
     {

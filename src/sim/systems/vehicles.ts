@@ -59,6 +59,18 @@ export function freeUnits(sim: Sim, v: Vehicle): number {
   )
 }
 
+/**
+ * The vehicle's driver is on the payroll (spec §7.4): false once the driver
+ * walked out (Employee.active false) and until re-hire — the vehicle then
+ * finishes its trip and parks `inactive` (payroll.ts, dispatch.ts goInactive).
+ * A vehicle without a driver row counts as driven.
+ */
+export function hasDriver(sim: Sim, v: Vehicle): boolean {
+  if (v.driverId === null) return true
+  const e = sim.state.employees.find((x) => x.id === v.driverId)
+  return e?.active ?? true
+}
+
 /** Release every parcel reserved for `v` (collection or loading). */
 export function releaseReservations(sim: Sim, v: Vehicle): void {
   for (const id of v.reserved) {

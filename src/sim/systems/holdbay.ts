@@ -13,8 +13,9 @@
 //           shelf is at cap (Q35 — Toss always works). A cleared malware
 //           parcel costs a life when delivered, and the card says when it
 //           was cleared (the 'cleared' trace entry).
-// Any Toss / Clear frees a bay; a flagged parcel waiting in its slot diverts
-// on the next lane step (`lane:resumed`).
+// Any Toss / Clear frees a bay (the other held parcels keep theirs — stable
+// bays, M3: lane.ts holdBays); a flagged parcel waiting in its slot diverts
+// on the next lane step (`lane:resumed`) into the lowest free bay.
 
 import { checkerName, slotLabel } from '../detection.ts'
 import type { Sim } from '../sim.ts'
@@ -42,6 +43,7 @@ export function tossParcel(sim: Sim, p: Parcel): number {
   const lane = s.lane
   const eco = sim.data.economy
   takeFrom(holdNode(lane), p.id)
+  delete p.bay
   p.state = 'tossed'
   p.nodeId = lane.binNodeId
   p.nodeEnterTick = s.tick
@@ -83,6 +85,7 @@ export function clearParcel(sim: Sim, p: Parcel): 'shelf-full' | null {
   if (shelf.cap !== null && shelf.queue.length >= shelf.cap) return 'shelf-full'
   const hold = holdNode(lane)
   takeFrom(hold, p.id)
+  delete p.bay
   p.trace.push({
     tick: s.tick,
     what: 'cleared',

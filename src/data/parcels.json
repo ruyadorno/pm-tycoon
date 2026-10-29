@@ -9,6 +9,6 @@
     "strains":[{"id":"metal","level":1,"counter":"metal_detector"},{"id":"rattle","level":2,"counter":"shaky_shaker"},{"id":"battery","level":3,"counter":"battery_checker"},{"id":"dense","level":4,"counter":"xray","flavour":"typosquat"}],
     "firstScripted":{"atS":120,"strain":"metal","size":"S","servableOrigin":true,"forcedCatch":true,"deferUntilCheckerS":120}
   },
-  "decoyShare":0.20,
+  "decoyShare":0.22,
   "magic":{"countdownS":120,"reward":150,"lives":1,"maxAlive":1,"skipsCheckers":true}
 }

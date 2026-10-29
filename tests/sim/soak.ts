@@ -21,6 +21,7 @@ import type {
 import { laneNode } from '../../src/sim/types.ts'
 import {
   buy,
+  fund,
   injectParcel,
   laneParcel,
   placeMachine,
@@ -123,6 +124,7 @@ export function soakScenario(
     sim.dispatch({ kind: 'setZone', id: v.id, zone })
     fleet.push(v)
   }
+  fund(sim) // payroll (M3) is not what this soak is about: nobody walks out
 
   // A full shelf, random parcels in the lane and waiting in the city.
   const shelf = laneNode(sim.state.lane, 'shelf')

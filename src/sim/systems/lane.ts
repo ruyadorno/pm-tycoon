@@ -62,6 +62,7 @@ import type {
   Lane,
   LaneNode,
   Parcel,
+  SimState,
   Strain,
 } from '../types.ts'
 import { laneNode, liveSlotIds, nextLiveNodeId } from '../types.ts'
@@ -159,10 +160,52 @@ export function enterNode(sim: Sim, p: Parcel, node: LaneNode): void {
     p.state = 'in_conveyor'
   } else if (node.kind === 'holdBay') {
     p.state = 'held'
+    p.bay = freeBay(s, node, p.id)
     p.trace.push({ tick, what: 'held', ref: node.id })
     s.stats.holdBayEvents += 1
     sim.emit('parcel:held', { id: p.id })
   }
+}
+
+/**
+ * The Hold Bay rack position of every held parcel (M3, stable bays): its own
+ * `bay` when it has one (kept from arrival until it leaves); a parcel without
+ * one (held in a pre-M3 save, or put there by a test) takes the lowest bay
+ * left free, in arrival order. Parcel id → bay.
+ */
+export function holdBays(
+  state: SimState,
+  hold: LaneNode,
+): Record<string, number> {
+  const out: Record<string, number> = {}
+  const used: number[] = []
+  for (const id of hold.queue) {
+    const b = state.parcels[String(id)]?.bay
+    if (b !== undefined && !used.includes(b)) {
+      out[String(id)] = b
+      used.push(b)
+    }
+  }
+  for (const id of hold.queue) {
+    if (out[String(id)] !== undefined) continue
+    let b = 0
+    while (used.includes(b)) b += 1
+    out[String(id)] = b
+    used.push(b)
+  }
+  return out
+}
+
+/** The lowest bay no other held parcel occupies (the arriving `id` excluded). */
+function freeBay(state: SimState, hold: LaneNode, id: number): number {
+  const taken = holdBays(state, {
+    ...hold,
+    queue: hold.queue.filter((x) => x !== id),
+  })
+  const used = Object.values(taken)
+  let b = 0
+  while (used.includes(b)) b += 1
+  return b
 }
 
 /** Sold-vehicle cargo (§4.1, §6.8): back on the shelf, accepted past cap. */
@@ -581,6 +624,21 @@ export function removeFixture(sim: Sim, node: LaneNode): Fixture | null {
 }
 
 /**
+ * A desk loses one station (an inspector fired or walked out, §6.7 / §7.4):
+ * a free one when there is one, else the last, whose parcel goes back to the
+ * front of the buffer (it restarts when re-seated).
+ */
+export function removeDeskStation(node: LaneNode): void {
+  const f = node.fixture
+  if (f?.kind !== 'desk') return
+  f.checker.stations = Math.max(0, f.checker.stations - 1)
+  let i = node.stations.findLastIndex((st) => st.parcelId === null)
+  if (i < 0) i = node.stations.length - 1
+  const st = i >= 0 ? node.stations.splice(i, 1)[0] : undefined
+  if (st && st.parcelId !== null) node.queue.unshift(st.parcelId)
+}
+
+/**
  * §6.7 Fire: the inspector leaves at once (no refund) and the desk loses a
  * station — a free one when there is one, else the last, whose parcel goes
  * back to the front of the buffer (it restarts when re-seated).
@@ -593,11 +651,7 @@ export function fireInspector(
   const f = node.fixture
   if (f?.kind !== 'desk') return
   f.inspectorIds = f.inspectorIds.filter((id) => id !== employeeId)
-  f.checker.stations = Math.max(0, f.checker.stations - 1)
-  let i = node.stations.findLastIndex((st) => st.parcelId === null)
-  if (i < 0) i = node.stations.length - 1
-  const st = i >= 0 ? node.stations.splice(i, 1)[0] : undefined
-  if (st && st.parcelId !== null) node.queue.unshift(st.parcelId)
+  removeDeskStation(node)
   sim.state.employees = sim.state.employees.filter((e) => e.id !== employeeId)
   sim.emit('worker:fired', {
     employeeId,

@@ -3,15 +3,15 @@
 // land: `lane` (checkers roll, flagged parcels divert to the Hold Bay; the
 // policy Tosses) and `lives` (malware delivered costs a life) are on since
 // M2, `levels` (level-ups, region unlocks, lane growth) and `payroll`
-// (paydays, walkouts) come in M3.
+// (paydays, walkouts) since M3 — every playtest-1 gate window is active.
 // tools/sim/report.ts reads the same flags so a gate window whose system is
 // not built yet prints as informational instead of failing.
 
 export const SIM_FEATURES = {
   lane: true,
   lives: true,
-  levels: false,
-  payroll: false,
+  levels: true,
+  payroll: true,
 }
 
 export type SimFeature = keyof typeof SIM_FEATURES

@@ -378,7 +378,7 @@ describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {
     expect(auditState(s, d)).toEqual([])
   })
 
-  it('§2 clock: 600 ticks = one day; day:ended {day: 1} and one MinuteRow', () => {
+  it('§2 clock: 600 ticks = one day; day:ended {day: 1} and one MinuteRow (after payday 1: the pre-hired inspector, §7.3)', () => {
     const sim = makeSim(1)
     const ended = collect(sim, 'day:ended')
     runTicks(sim, TICKS_PER_DAY - 1)
@@ -392,7 +392,8 @@ describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {
     expect(sim.state.stats.minutes[0]).toMatchObject({
       min: 1,
       tick: 600,
-      money: sim.data.economy.startMoney,
+      money:
+        sim.data.economy.startMoney - sim.data.employees.inspector.salaryPerDay,
       lvl: 1,
       lives: 3,
     })

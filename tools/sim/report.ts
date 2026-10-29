@@ -99,8 +99,9 @@ export function clockOf(tick: number): string {
 /**
  * The '!' lines: firsts (pickup, shelved, delivery, malware delivered,
  * scripted malware flagged + tossed, first malware toss, first wrong toss,
- * first stall per reason, first short payroll) and every rush, level-up, unlock, purchase, sale, hire, walkout, life
- * lost and game over. Call in emit order, while the sim is current (purchases
+ * first stall per reason, first short payroll) and every rush, level-up,
+ * unlock, strain spotted, purchase, sale, hire, walkout, inactive vehicle,
+ * life lost and game over. Call in emit order, while the sim is current (purchases
  * are named from its state).
  */
 export class Highlights {
@@ -187,6 +188,12 @@ export class Highlights {
         return this.#first('payrollShort')
           ? `${at} first short payroll (${(e.employeeIds as number[]).length} unpaid)`
           : null
+      case 'vehicle:inactive': {
+        const v = s.vehicles.find((x) => x.id === e.id)
+        return `${at} ${v?.name ?? `vehicle ${e.id}`} inactive (no driver)`
+      }
+      case 'ticker:news':
+        return e.kind === 'strain' ? `${at} ${String(e.text)}` : null
       case 'life:lost':
         return `${at} LIFE LOST: #${e.parcelId} ${e.label} → ${e.destBuildingId} (lives ${s.economy.lives})`
       case 'game:over':

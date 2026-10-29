@@ -1,0 +1,18 @@
+{
+  "startMoney":450,
+  "sellRefund":0.5,
+  "tossBounty":50,
+  "wrongTossFee":25,
+  "docks":[{"index":2,"unlockLevel":3,"price":800},{"index":3,"unlockLevel":4,"price":2000}],
+  "satisfaction":{
+    "start":60,"min":0,"max":100,"driftPerDayToward":50,"driftStep":1,
+    "onTime":2,"favouredBonus":1,"favouredPickup":1,"positiveCapPerDay":4,"late":-3,
+    "waitingOver180s":-2,"waitingPenaltyCapPerDay":-6,"malwareDelivered":-20,"wrongToss":-3,
+    "intervalMultAt0":1.5,"intervalMultAt50":1.0,"intervalMultAt100":0.6,
+    "loudBelow":30,"happyAbove":80
+  },
+  "lives":{"start":3,"cap":5},
+  "continueWithOneLife":false,
+  "playtestMaxLevel":2,
+  "pacingTargets":{"firstDeliveryS":60,"firstMalwareCaughtMaxS":300,"level2Min":[8,15],"truckAfterLevel2MaxMin":4,"maxLivesLost":0,"maxShelfStallS":0,"holdBayEventsPer10MinMin":6,"level3Min":[15,20],"level4Min":[20,25],"level5Min":[25,30]}
+}

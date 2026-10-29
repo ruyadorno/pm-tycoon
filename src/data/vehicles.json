@@ -1,0 +1,17 @@
+{
+  "unitsBySize":{"S":1,"M":2,"L":4,"XL":8},
+  "stopS":1.5,
+  "dockUnloadPerS":1,
+  "dockLoadPerS":1,
+  "dockIdleWaitS":10,
+  "dockIdleWaitOnlyIfQueueEmpty":true,
+  "collectRadiusTiles":12,
+  "rushExpireS":60,
+  "dispatchTickS":1,
+  "lastVehicleUnsellable":true,
+  "types":[
+    {"id":"bike","name":"Bike","unlockLevel":1,"price":200,"capacityUnits":4,"sizes":["S","M"],"speedTilesPerS":2.0,"driverSalaryPerDay":8,"disallowedRegions":["industrial"]},
+    {"id":"van","name":"Van","unlockLevel":1,"price":1000,"capacityUnits":16,"sizes":["S","M","L"],"speedTilesPerS":2.4,"driverSalaryPerDay":15,"disallowedRegions":["industrial"]},
+    {"id":"truck","name":"Truck","unlockLevel":2,"price":1300,"capacityUnits":32,"sizes":["S","M","L","XL"],"speedTilesPerS":1.6,"driverSalaryPerDay":25,"disallowedRegions":[]}
+  ]
+}

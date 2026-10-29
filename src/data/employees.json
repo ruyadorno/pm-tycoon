@@ -1,0 +1,12 @@
+{
+  "inspector":{
+    "name":"Inspector","salaryPerDay":20,"hireFee":20,"processS":4.0,"strain":"any","pMatch":0.85,"pOther":0.85,"decoyFlag":0.15,
+    "maxPerDesk":3,"startCount":1,"startSlot":1
+  },
+  "maxDesks":1,
+  "deskPrice":0,
+  "payrollIntervalS":60,
+  "payOrder":["inspectors","drivers"],
+  "walkoutAfterUnpaidPaydays":2,
+  "rehireFeeDays":1
+}

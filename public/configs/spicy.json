@@ -1,0 +1,4 @@
+{
+  "parcels": { "malware": { "baseShare": 0.09 }, "decoyShare": 0.2 },
+  "levels": [{ "holdBayCap": 2 }, { "holdBayCap": 2 }]
+}

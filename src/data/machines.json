@@ -1,0 +1,14 @@
+{
+  "slotBufferCap":2,
+  "conveyorCapPerDock":6,
+  "checkers":[
+    {"id":"metal_detector","name":"Metal detector","unlockLevel":1,"price":150,"strain":"metal","pMatch":0.80,"pOther":0.15,"decoyFlag":0.50,"processS":1.0},
+    {"id":"shaky_shaker","name":"Shaky shaker","unlockLevel":2,"price":300,"strain":"rattle","pMatch":0.80,"pOther":0.15,"decoyFlag":0.50,"processS":1.0},
+    {"id":"battery_checker","name":"Battery checker","unlockLevel":3,"price":500,"strain":"battery","pMatch":0.80,"pOther":0.15,"decoyFlag":0.50,"processS":1.0},
+    {"id":"xray","name":"X-ray","unlockLevel":4,"price":1000,"strain":"any","pMatch":0.70,"pOther":0.70,"decoyFlag":0.25,"processS":2.0}
+  ],
+  "upgrades":[
+    {"id":"sorter_arm","name":"Sorter Arm","unlockLevel":4,"price":600,"target":"holdBay","autoTossDelayS":3}
+  ],
+  "removalRefund":0.5
+}

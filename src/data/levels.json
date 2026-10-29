@@ -1,0 +1,7 @@
+[
+  {"level":1,"title":"Scrappy","threshold":0,"unlockRegions":["highres","downtown"],"vehicles":["bike","van"],"machines":["metal_detector"],"slots":3,"holdBayCap":3,"shelfCap":30,"warehouseTier":1,"strain":"metal","ticker":"Node Heights Courier opens for business"},
+  {"level":2,"title":"Local","threshold":2000,"unlockRegions":["industrial"],"vehicles":["truck"],"machines":["shaky_shaker"],"slots":4,"holdBayCap":3,"shelfCap":45,"warehouseTier":2,"strain":"rattle","ticker":"Hoist Hill reopens - trucks on sale. Rattling parcels reported: Shaky shaker available"},
+  {"level":3,"title":"Regional","threshold":5000,"unlockRegions":["docks"],"vehicles":[],"machines":["battery_checker"],"slots":4,"holdBayCap":5,"shelfCap":60,"warehouseTier":3,"strain":"battery","ticker":"Shrinkwrap Shore customs open - overseas pays x1.5. Battery-powered parcels spotted"},
+  {"level":4,"title":"National","threshold":9000,"unlockRegions":["lowres","rural"],"vehicles":[],"machines":["xray","sorter_arm"],"slots":5,"holdBayCap":5,"shelfCap":80,"warehouseTier":4,"strain":"dense","ticker":"Semver Street and Pasture Peer Fields join the network. Gold-wrapped lookalikes seen: X-ray available"},
+  {"level":5,"title":"Tycoon","threshold":16000,"unlockRegions":["airport","civic"],"vehicles":[],"machines":[],"slots":6,"holdBayCap":5,"shelfCap":100,"warehouseTier":5,"strain":null,"ticker":"Prefetch International opens. The Golden Release awaits","ultimateQuest":{"id":"golden_release","days":5,"deliveries":60,"maxMalwareDelivered":0,"minOnTimeRate":0.9}}
+]

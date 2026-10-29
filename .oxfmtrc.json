@@ -6,7 +6,7 @@
   "printWidth": 80,
   "tabWidth": 2,
   "ignorePatterns": [
-    "src/data/**",
+    "src/data/**/*.json",
     "**/*.generated.*",
     "vlt-lock.json",
     "public/assets/**",

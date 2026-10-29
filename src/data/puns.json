@@ -1,0 +1,18 @@
+{
+  "cleanLabels":["is-odd@2.0.0","is-even@1.0.0","left-pad@1.3.0","chalk@5.3.0","express@4.19.2","moment@2.30.1","uuid@9.0.1","dotenv@16.4.5","minimist@1.2.8","semver@7.6.0","glob@10.3.10","tar@6.2.1","mkdirp@3.0.1","once@1.4.0","ms@2.1.3","qs@6.12.0","debug@4.3.4","yargs@17.7.2","react-dom@18.3.1","tiny-glob@0.2.9"],
+  "malwareLabels":{
+    "metal":["evil-lodash","l0dash","cr0ss-env","babelcli"],
+    "rattle":["colors@2.0.0-rc","faker@6.6.6","event-stream+flatmap"],
+    "battery":["ua-parser-rs","node-ipc@10.1.1","electorn"],
+    "dense":["lodahs","expresss","mongose","reqeusts"]
+  },
+  "decoyLabels":{"metal":["cookie-tin@3.2.1","paperclips-bulk"],"rattle":["marbles.jar","lego-set-42"],"battery":["laptop-charger","toy-robot"],"dense":["encyclopedia-vol-7","dumbbell-pair"]},
+  "streets":["Semver Street","Node Heights","Lockfile Lane","Registry Row","Dependency Drive","Peer Place","Tarball Terrace","Cache Court","Monorepo Mews","Workspace Way","Scope Square","Hoist Hill","Shrinkwrap Shore","Prefetch Pier","Bundle Boulevard","Transpile Turnpike"],
+  "tracks":["Semver Swing","Lockfile Lullaby","Peer Dependency Bossa","Hoisted Blues","Tarball Two-Step"],
+  "inspectorNames":["Audrey","Lin","Sem","Vera","Tarek","Cass","Pat","Reg"],
+  "driverNames":["Dee","Pax","Mo","Tam","Ivy","Rae","Kit","Jo"],
+  "companyName":"Node Heights Courier",
+  "tossHint":"Not every flag is malware — tins, marbles and chargers are harmless; typo'd package names are not",
+  "wantedTitle":"WANTED — seen so far",
+  "tickerFiller":["Local cat delivered to itself, again","Semver Savings Bank raises rates by 0.0.1","Downtown pigeons unionise"]
+}

@@ -126,18 +126,29 @@ export interface Vehicle {
   prev: TilePos
   heading: Heading
   wheel: 0 | 1
+  /** Inclusive drive-graph tiles of the current route (empty when stationary). */
   path: TileXY[]
+  /** The vehicle is on the edge path[pathIndex] → path[pathIndex + 1]. */
   pathIndex: number
+  /** Progress along that edge in 1/1000 tile (integer; systems/vehicles.ts MILLI). */
   edgeT: number
+  /** Collecting: [the current target]; delivering: every stop, nearest-neighbour order. */
   stops: Stop[]
+  /** Index in `stops` of the stop being driven to / served. */
   stopIndex: number
   /** Parcel ids aboard (picked up or loaded), in load order. */
   cargo: number[]
+  /** Capacity units of `cargo`. */
   unitsUsed: number
-  /** Parcel ids reserved for collection (still in Building.waiting). */
+  /**
+   * Parcel ids reserved for this vehicle: for collection (still in
+   * Building.waiting) or, while docked_loading, the outbound set still on
+   * the shelf (loaded 1/s in this order).
+   */
   reserved: number[]
+  /** The loading dock assigned (driving onto the bay while still `queued`) or occupied. */
   dockId: string | null
-  /** End of the current stop / dock wait; null when not waiting. */
+  /** End of the current 1.5 s stop or dock idle wait; null when not waiting. */
   waitUntilTick: Tick | null
   rushBuildingId: BuildingId | null
   collectedThisLeg: boolean
@@ -187,6 +198,12 @@ export interface Parcel {
   strain: Strain | null
   decoy: Strain | null
   magic: boolean
+  /**
+   * ADDITION to §6.4: the first scripted malware (§5.4) with
+   * firstScripted.forcedCatch — the first checker it reaches flags it with
+   * certainty (M2) and parcel:flagged carries `scripted: true`.
+   */
+  scripted: boolean
   state: ParcelState
   reservedBy: number | null
   vehicleId: number | null

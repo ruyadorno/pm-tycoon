@@ -1,10 +1,14 @@
 // Timeline formatting, event recording and the playtest-1 gate (plan.md
 // §6.9.2, spec §7). Every threshold comes from economy.pacingTargets; none
 // is hard-coded here. Pure functions over recorded runs, so Vitest (the M1+
-// policy test) can reuse them without the CLI.
+// policy test) can reuse them without the CLI. A window whose sim system is
+// not built yet (src/sim/features.ts SIM_FEATURES) is printed as
+// "informational (Mn)" and does not fail the gate.
 
 import type { PacingTargets } from '../../src/data/types.ts'
 import type { SimEventName } from '../../src/sim/events.ts'
+import type { SimFeature } from '../../src/sim/features.ts'
+import { FEATURE_MILESTONE, SIM_FEATURES } from '../../src/sim/features.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import type { MinuteRow, RunStats } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
@@ -93,9 +97,9 @@ export function clockOf(tick: number): string {
 }
 
 /**
- * The '!' lines: firsts (delivery, scripted malware flagged + tossed, first
- * malware toss, first wrong toss, first stall per reason, first short
- * payroll) and every level-up, unlock, purchase, sale, hire, walkout, life
+ * The '!' lines: firsts (pickup, shelved, delivery, malware delivered,
+ * scripted malware flagged + tossed, first malware toss, first wrong toss,
+ * first stall per reason, first short payroll) and every rush, level-up, unlock, purchase, sale, hire, walkout, life
  * lost and game over. Call in emit order, while the sim is current (purchases
  * are named from its state).
  */
@@ -113,10 +117,23 @@ export class Highlights {
     const at = `! ${clockOf(e.tick).padStart(5)}`
     const s = sim.state
     switch (e.name) {
-      case 'parcel:delivered':
-        return this.#first('delivered')
-          ? `${at} first delivery #${e.id}: $${e.paid}${e.onTime ? ' on time' : ' late'}${e.malware ? ' (MALWARE)' : ''}`
+      case 'parcel:pickedUp':
+        return this.#first('pickedUp')
+          ? `${at} first pickup #${e.id} by vehicle ${e.vehicleId}`
           : null
+      case 'parcel:shelved':
+        return this.#first('shelved')
+          ? `${at} first parcel shelved #${e.id}`
+          : null
+      case 'parcel:delivered':
+        if (this.#first('delivered')) {
+          return `${at} first delivery #${e.id}: $${e.paid}${e.onTime ? ' on time' : ' late'}${e.malware ? ' (MALWARE)' : ''}`
+        }
+        return e.malware === true && this.#first('malwareDelivered')
+          ? `${at} first malware delivered #${e.id} (paid $0)`
+          : null
+      case 'building:rushed':
+        return `${at} rush ${e.buildingId} → ${e.vehicleId === null ? 'no vehicle yet' : `vehicle ${e.vehicleId}`}`
       case 'parcel:flagged':
         if (e.scripted === true) {
           this.#scripted.push(e.id as number)
@@ -203,8 +220,38 @@ export interface GateCheck {
   metric: keyof RunMetrics
   target: string
   value: number | null
+  /** The comparison itself (meaningful only when `note` is null). */
   pass: boolean
+  /** "informational (M2)" while the window's system is not built (SIM_FEATURES); null = gated. */
+  note: string | null
 }
+
+/** Sim systems each playtest-1 window needs (none listed = active from M1). */
+export const WINDOW_NEEDS: Partial<Record<keyof PacingTargets, SimFeature[]>> =
+  {
+    firstMalwareCaughtMaxS: ['lane'],
+    maxLivesLost: ['lives'],
+    holdBayEventsPer10MinMin: ['lane'],
+    level2Min: ['levels'],
+    truckAfterLevel2MaxMin: ['levels'],
+  }
+
+export type SimFeatures = Record<SimFeature, boolean>
+
+/** null when every system the window needs is built, else "informational (Mn)". */
+export function windowNote(
+  key: keyof PacingTargets,
+  features: SimFeatures = SIM_FEATURES,
+): string | null {
+  const missing = (WINDOW_NEEDS[key] ?? []).filter((f) => !features[f])
+  const first = missing[0]
+  return first === undefined
+    ? null
+    : `informational (${FEATURE_MILESTONE[first]})`
+}
+
+/** A check counts toward the gate when gated (no note) and passing. */
+export const checkOk = (c: GateCheck): boolean => c.pass || c.note !== null
 
 const round = (x: number, d = 1): number => Math.round(x * 10 ** d) / 10 ** d
 
@@ -298,9 +345,13 @@ export interface GateInputs {
 const le = (v: number | null, max: number): boolean => v !== null && v <= max
 
 /** The seven playtest-1 windows (spec §7, plan.md §6.9.2) against economy.pacingTargets. */
-export function checkMetrics(m: GateInputs, t: PacingTargets): GateCheck[] {
+export function checkMetrics(
+  m: GateInputs,
+  t: PacingTargets,
+  features: SimFeatures = SIM_FEATURES,
+): GateCheck[] {
   const [lo, hi] = t.level2Min
-  return [
+  const checks: Omit<GateCheck, 'note'>[] = [
     {
       key: 'firstDeliveryS',
       metric: 'firstDeliveryS',
@@ -353,6 +404,7 @@ export function checkMetrics(m: GateInputs, t: PacingTargets): GateCheck[] {
         m.holdBayEventsPer10MinL1 >= t.holdBayEventsPer10MinMin,
     },
   ]
+  return checks.map((c) => ({ ...c, note: windowNote(c.key, features) }))
 }
 
 /** Median with null = "never happened" = +∞ (fails every window); returns null for ∞. */
@@ -416,6 +468,8 @@ export interface GateSummary {
   runs: SeedResult[]
   medians: MedianMetrics
   checks: GateCheck[]
+  /** SIM_FEATURES when the gate ran (which windows were gated). */
+  features: SimFeatures
   /** Printed only: hold density over the run, malware share at the end, the build-2 level windows. */
   informational: {
     key: string
@@ -430,13 +484,14 @@ export function seedResult(
   metrics: RunMetrics,
   targets: PacingTargets,
   asserts: string[],
+  features: SimFeatures = SIM_FEATURES,
 ): SeedResult {
-  const checks = checkMetrics(metrics, targets)
+  const checks = checkMetrics(metrics, targets, features)
   return {
     metrics,
     checks,
     asserts,
-    pass: asserts.length === 0 && checks.every((c) => c.pass),
+    pass: asserts.length === 0 && checks.every(checkOk),
   }
 }
 
@@ -449,10 +504,12 @@ export function summarise(
     policy: string
     minutes: number
     targets: PacingTargets
+    features?: SimFeatures
   },
 ): GateSummary {
+  const features = meta.features ?? SIM_FEATURES
   const medians = medianMetrics(runs.map((r) => r.metrics))
-  const checks = checkMetrics(medians, meta.targets)
+  const checks = checkMetrics(medians, meta.targets, features)
   const t = meta.targets
   const build2 = 'build 2 — informational'
   const informational = [
@@ -498,9 +555,9 @@ export function summarise(
     runs,
     medians,
     checks,
+    features: { ...features },
     informational,
-    pass:
-      runs.every((r) => r.asserts.length === 0) && checks.every((c) => c.pass),
+    pass: runs.every((r) => r.asserts.length === 0) && checks.every(checkOk),
   }
 }
 
@@ -576,8 +633,9 @@ export function formatGate(g: GateSummary): string[] {
     ].join(' '),
   )
   for (const c of g.checks) {
+    const word = c.note === null ? passWord(c.pass) : 'info'
     lines.push(
-      `  ${passWord(c.pass)} ${c.key}: median ${val(c.value)} (target ${c.target})`,
+      `  ${word} ${c.key}: median ${val(c.value)} (target ${c.target})${c.note === null ? '' : ` — ${c.note}`}`,
     )
   }
   for (const i of g.informational) {
@@ -592,7 +650,7 @@ export function formatGate(g: GateSummary): string[] {
 }
 
 function failures(g: GateSummary): string[] {
-  const out = g.checks.filter((c) => !c.pass).map((c) => c.key as string)
+  const out = g.checks.filter((c) => !checkOk(c)).map((c) => c.key as string)
   const bad = g.runs.filter((r) => r.asserts.length > 0)
   if (bad.length > 0) {
     out.push(`asserts on seed ${bad.map((r) => r.metrics.seed).join(',')}`)
@@ -603,7 +661,8 @@ function failures(g: GateSummary): string[] {
 /** One-run GATE line (informational outside --gate). */
 export function formatGateLine(r: SeedResult): string {
   const parts = r.checks.map(
-    (c) => `${c.key} ${val(c.value)}${c.pass ? '' : '✗'}`,
+    (c) =>
+      `${c.key} ${val(c.value)}${c.note !== null ? ' (info)' : c.pass ? '' : '✗'}`,
   )
   return `GATE seed ${r.metrics.seed} ${passWord(r.pass)}: ${parts.join(' · ')}`
 }
@@ -639,7 +698,12 @@ export function gateMarkdown(g: GateSummary, cmd: string): string {
     '| window | median | target | result |',
     '| --- | --- | --- | --- |',
     ...g.checks.map((c) =>
-      mdRow([`\`${c.key}\``, val(c.value), c.target, passWord(c.pass)]),
+      mdRow([
+        `\`${c.key}\``,
+        val(c.value),
+        c.target,
+        c.note === null ? passWord(c.pass) : c.note,
+      ]),
     ),
     ...g.informational.map((i) =>
       mdRow([`\`${i.key}\``, num(i.median, 3), i.target, i.note]),

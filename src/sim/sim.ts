@@ -20,7 +20,9 @@ import type {
   SimEventPayloads,
   SimTap,
 } from './events.ts'
+import { pathfinder, type Pathfinder } from './astar.ts'
 import { Rng, seedWord } from './rng.ts'
+import { roadGraph, type RoadGraph } from './roads.ts'
 import { runTick } from './tick.ts'
 import type {
   District,
@@ -83,15 +85,18 @@ export class Sim {
   readonly commandLog: CommandLogEntry[] = []
   /** Bumped by every tick, successful dispatch and load (view caches key on it). */
   revision = 0
-  // TODO(M1): `readonly roads: RoadGraph` and `readonly paths: Pathfinder`
-  // (src/sim/roads.ts, astar.ts) are built here from data.map; Sim.load goes
-  // through this constructor, so loads rebuild them too (never serialised).
+  /** The drive graph (avenues minus trimmed tiles + the lot), built from data.map. */
+  readonly roads: RoadGraph
+  /** Cached A* paths + road distances over `roads` (shared per GameData; never serialised). */
+  readonly paths: Pathfinder
   #emitDepth = 0
   #ticking = false
   #taps: SimTap[] = []
 
   constructor(data: GameData, seed: number) {
     this.data = data
+    this.roads = roadGraph(data)
+    this.paths = pathfinder(data)
     this.state = createStartState(data, seed)
     this.rng = new Rng(() => this.state)
   }
@@ -108,7 +113,11 @@ export class Sim {
     return sim
   }
 
-  /** Validate + apply now + log {tick, cmd} (successful commands only). */
+  /**
+   * Validate + apply now + log {tick, cmd}: successful commands, and failed
+   * ones marked `applied` (they changed state, e.g. a rush flag with no
+   * eligible vehicle), so a replay of the log reproduces the run.
+   */
   dispatch(cmd: Command): CommandResult {
     if (DEV && (this.#emitDepth > 0 || this.#ticking)) {
       const kind = isCommand(cmd) ? cmd.kind : 'invalid'
@@ -117,7 +126,7 @@ export class Sim {
       )
     }
     const res = applyCommand(this, cmd)
-    if (res.ok) {
+    if (res.ok || res.applied === true) {
       this.commandLog.push({ tick: this.state.tick, cmd: structuredClone(cmd) })
       this.revision += 1
     }
@@ -628,7 +637,71 @@ export function auditState(state: SimState, data: GameData): string[] {
       `conservation: spawned ${state.spawn.spawnedCount} ≠ live ${live} + delivered ${delivered} + tossed ${tossed}`,
     )
   }
+  const c = conservation(state)
+  if (!c.ok) add(`conservation: ${formatConservation(c)}`)
   return out
+}
+
+/** Where every spawned parcel is (plan.md §6.9.2 conservation identity). */
+export interface Conservation {
+  spawned: number
+  /** In Building.waiting (reserved or not). */
+  waiting: number
+  /** In vehicle cargo. */
+  vehicles: number
+  /** Conveyors and slot buffers / stations. */
+  lane: number
+  held: number
+  shelf: number
+  /** Handed off / clearing at an overseas hub (build 2). */
+  offMap: number
+  delivered: number
+  tossed: number
+  /** spawned = waiting + vehicles + lane + held + shelf + offMap + delivered + tossed */
+  ok: boolean
+}
+
+export function conservation(state: SimState): Conservation {
+  const lane = state.lane
+  let waiting = 0
+  for (const b of Object.values(state.buildings)) waiting += b.waiting.length
+  let vehicles = 0
+  for (const v of state.vehicles) vehicles += v.cargo.length
+  let inLane = 0
+  let held = 0
+  let shelf = 0
+  for (const n of lane.nodes) {
+    const here =
+      n.queue.length + n.stations.filter((st) => st.parcelId !== null).length
+    if (n.id === lane.holdBayNodeId) held += here
+    else if (n.id === lane.shelfNodeId) shelf += here
+    else if (n.id !== lane.binNodeId) inLane += here
+  }
+  let offMap = 0
+  for (const p of Object.values(state.parcels)) {
+    if (OFF_MAP.includes(p.state)) offMap += 1
+  }
+  const delivered = state.stats.deliveries
+  const tossed = lane.quarantine.count
+  const spawned = state.spawn.spawnedCount
+  const sum =
+    waiting + vehicles + inLane + held + shelf + offMap + delivered + tossed
+  return {
+    spawned,
+    waiting,
+    vehicles,
+    lane: inLane,
+    held,
+    shelf,
+    offMap,
+    delivered,
+    tossed,
+    ok: sum === spawned,
+  }
+}
+
+export function formatConservation(c: Conservation): string {
+  return `spawned ${c.spawned} ${c.ok ? '=' : '≠'} waiting ${c.waiting} + vehicles ${c.vehicles} + lane ${c.lane} + held ${c.held} + shelf ${c.shelf} + off-map ${c.offMap} + delivered ${c.delivered} + tossed ${c.tossed}`
 }
 
 /** Why a snapshot cannot be loaded (empty = loadable). */

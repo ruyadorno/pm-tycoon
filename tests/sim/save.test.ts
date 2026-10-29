@@ -19,6 +19,7 @@ import {
   SaveError,
   serialise,
 } from '../../src/sim/save.ts'
+import { createPolicy } from '../../src/sim/policy.ts'
 import { TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
@@ -113,6 +114,43 @@ describe('save round trip (plan.md §6.4)', () => {
     const docked = structuredClone(snap)
     if (docked.state.vehicles[0]) docked.state.vehicles[0].dockId = 'dock9'
     expect(() => Sim.load(dataFixture(), docked)).toThrow(/dock9/)
+  })
+
+  it('mid-run M1 save (vehicles mid-edge, parcels in the lane, a rush in flight, policy driving) → JSON → load → 600 ticks = the uninterrupted run', () => {
+    const live = makeSim(5)
+    const policy = createPolicy(live, 'competent')
+    for (let i = 0; i < 1800; i++) {
+      policy.step()
+      live.tick()
+    }
+    const target = Object.values(live.state.buildings).find(
+      (b) => b.waiting.length > 0 && b.rushUntilTick === null,
+    )
+    expect(target).toBeDefined()
+    live.dispatch({ kind: 'rush', buildingId: target!.id })
+    for (let i = 0; i < 7; i++) {
+      policy.step()
+      live.tick()
+    }
+    const s = live.state
+    expect(s.vehicles.some((v) => v.path.length > 0 && v.edgeT > 0)).toBe(true)
+    expect(Object.values(s.parcels).length).toBeGreaterThan(5)
+    expect(s.buildings[target!.id]?.rushUntilTick ?? null).not.toBeNull()
+    const loaded = Sim.load(
+      dataFixture(),
+      JSON.parse(JSON.stringify(live.snapshot())),
+    )
+    expect(loaded.state).toEqual(live.state)
+    const policy2 = createPolicy(loaded, 'competent')
+    for (let i = 0; i < 600; i++) {
+      policy.step()
+      live.tick()
+      policy2.step()
+      loaded.tick()
+    }
+    expect(stateHash(loaded.state)).toBe(stateHash(live.state))
+    expect(loaded.commandLog).toEqual(live.commandLog)
+    expect(auditState(loaded.state, loaded.data)).toEqual([])
   })
 
   it('seed + data + commandLog replay to the same state', () => {

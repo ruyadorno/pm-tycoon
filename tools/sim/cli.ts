@@ -12,13 +12,16 @@
 //   --quick            the check gate: seeds 1-3 × 20 min → docs/gate/quick.*
 //   --out dir          write the gate files there instead of docs/gate/
 //
-// Prints one row per in-game minute, '!' event lines, a GATE line, and the
-// tick time percentiles. Asserts every tick: finite balance ≥ 0, no vehicle
-// in one state > 120 s (idle_lot / inactive exempt); every 600 ticks:
-// auditState (no NaN / non-JSON, ids resolve, each parcel in one place, the
-// conservation identity). An assertion failure ends that seed and exits 1.
-// --json: one seed (no --gate) → {seed, rows, events, gate, pass}; otherwise
-// {runs: [{seed, rows, events, gate, pass}], summary?, pass}.
+// Prints one row per in-game minute, '!' event lines, a GATE line, the
+// conservation identity and the tick time percentiles. Asserts every tick:
+// finite balance ≥ 0, finite vehicle positions, no vehicle in one state
+// > 120 s (idle_lot / inactive exempt); every 600 ticks: auditState (no NaN /
+// non-JSON, ids resolve, each parcel in one place, the conservation identity
+// spawned = waiting + in vehicles + in lane + held + shelf + delivered +
+// tossed). An assertion failure ends that seed and exits 1. Gate windows
+// whose sim system is not built yet (src/sim/features.ts) are informational.
+// --json: one seed (no --gate) → {seed, rows, events, gate, conservation,
+// pass}; otherwise {runs: [{…the same}], summary?, pass}.
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -27,7 +30,13 @@ import { parseArgs } from 'node:util'
 import { DataError } from '../../src/data/index.ts'
 import type { GameData } from '../../src/data/types.ts'
 import type { PolicyFactory } from '../../src/sim/sim.ts'
-import { auditState, Sim } from '../../src/sim/sim.ts'
+import {
+  auditState,
+  conservation,
+  formatConservation,
+  Sim,
+} from '../../src/sim/sim.ts'
+import type { Conservation } from '../../src/sim/sim.ts'
 import type { MinuteRow, VehicleState } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
 import { loadGameData } from './load.node.ts'
@@ -172,6 +181,8 @@ export interface RunResult {
   rows: MinuteRow[]
   events: RecordedEvent[]
   result: SeedResult
+  /** Where every spawned parcel is at the end of the run. */
+  conservation: Conservation
   perf: { ticks: number; p50Ms: number; p99Ms: number; maxMs: number }
 }
 
@@ -204,6 +215,9 @@ export function runSeed(
       asserts.push(`${s.tick}: balance ${bal}`)
     }
     for (const v of s.vehicles) {
+      if (!Number.isFinite(v.pos.tx) || !Number.isFinite(v.pos.ty)) {
+        asserts.push(`${s.tick}: ${v.name} position NaN`)
+      }
       const prev = since.get(v.id)
       if (!prev || prev.state !== v.state) {
         since.set(v.id, { state: v.state, tick: s.tick })
@@ -243,6 +257,7 @@ export function runSeed(
     rows,
     events: recorder.events,
     result: seedResult(metrics, data.economy.pacingTargets, asserts),
+    conservation: conservation(sim.state),
     perf: {
       ticks: ran,
       p50Ms: pct(0.5),
@@ -300,6 +315,7 @@ async function main(argv: readonly string[]): Promise<number> {
       console.error(`ASSERT seed ${seed} @${a}`)
     if (verbose) {
       console.log(formatGateLine(run.result))
+      console.log(`# conservation: ${formatConservation(run.conservation)}`)
       console.log(
         `# perf: ${run.perf.ticks} ticks · tick p50 ${ms(run.perf.p50Ms)} ms · p99 ${ms(run.perf.p99Ms)} ms · max ${ms(run.perf.maxMs)} ms`,
       )
@@ -342,6 +358,7 @@ async function main(argv: readonly string[]): Promise<number> {
       rows: r.rows,
       events: r.events,
       gate: r.result,
+      conservation: r.conservation,
       pass: r.result.pass,
     }))
     const body =

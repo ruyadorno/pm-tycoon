@@ -3,7 +3,8 @@
 // rules and applies the change immediately, or returns a stable failure
 // reason without touching state or the rng — and logs successful commands.
 // Handlers marked TODO(Mn) validate what they can and return 'locked' until
-// that milestone wires them to src/sim/systems/*.ts.
+// that milestone wires them to src/sim/systems/*.ts. A handler that changes
+// state while reporting a failure marks it `applied` (logged for replay).
 
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import type { Sim } from './sim.ts'
@@ -15,12 +16,13 @@ import type {
   LaneNode,
   SimState,
   Tick,
-  TilePos,
   Vehicle,
   VehicleType,
   Zone,
 } from './types.ts'
 import { laneNode, ticksFromS } from './types.ts'
+import { applyRush } from './systems/dispatch.ts'
+import { parkingTile, sellVehicle } from './systems/vehicles.ts'
 
 export type Command =
   | { kind: 'buyVehicle'; type: VehicleType }
@@ -67,7 +69,15 @@ export const FAIL_REASONS = [
 ] as const
 export type FailReason = (typeof FAIL_REASONS)[number]
 
-export type CommandResult = { ok: true } | { ok: false; reason: FailReason }
+/**
+ * A command's result. Additive fields: `vehicleId` on a successful rush (the
+ * retargeted vehicle); `applied` on a failure that still changed the state
+ * and is logged for replay — a rush with no eligible vehicle keeps its flag
+ * (spec §4.1) and reports why ('trucks-only' / 'needs-van' / 'no-vehicle').
+ */
+export type CommandResult =
+  | { ok: true; vehicleId?: number }
+  | { ok: false; reason: FailReason; applied?: true }
 
 /** One replayable entry: `cmd` was dispatched while state.tick === tick. */
 export interface CommandLogEntry {
@@ -155,10 +165,8 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     ) {
       return fail('last-vehicle')
     }
-    // TODO(M1): systems/vehicles.ts sell (§4.1): refund sellRefund × price,
-    // cargo → shelf (parcel:returned, past cap), reservations + rush released,
-    // dock / dock queue freed, driver removed, vehicle:sold.
-    return fail('locked')
+    sellVehicle(sim, v)
+    return OK
   },
 
   setZone(sim, cmd) {
@@ -177,15 +185,7 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   },
 
   rush(sim, cmd) {
-    const b = sim.state.buildings[cmd.buildingId]
-    if (!b) return fail('invalid')
-    if (b.rushUntilTick !== null && b.rushUntilTick > sim.state.tick) {
-      return fail('already-rushed')
-    }
-    // TODO(M1): systems/dispatch.ts applyRush (§4.1): needs waiting parcels,
-    // the nearest eligible vehicle ('no-vehicle' / 'trucks-only' /
-    // 'needs-van' when none), rushUntilTick = tick + rushExpireS, building:rushed.
-    return fail('locked')
+    return applyRush(sim, cmd.buildingId)
   },
 
   buyMachine(sim, cmd) {
@@ -441,18 +441,6 @@ export function hireEmployee(
   return e
 }
 
-/** A lot parking tile no vehicle stands on (map.json lot.parking), else the entrance. */
-function freeParking(sim: Sim): TilePos {
-  const lot = sim.data.map.lot
-  for (const [x, y] of lot.parking) {
-    const taken = sim.state.vehicles.some(
-      (v) => Math.round(v.pos.tx) === x && Math.round(v.pos.ty) === y,
-    )
-    if (!taken) return { tx: x, ty: y }
-  }
-  return { tx: lot.entrance[0], ty: lot.entrance[1] }
-}
-
 /** §4.1 Buy: pops in on the lot, idle, home zone 'any', driver hired. */
 function createVehicle(sim: Sim, def: VehicleTypeDef): Vehicle {
   const s = sim.state
@@ -465,7 +453,8 @@ function createVehicle(sim: Sim, def: VehicleTypeDef): Vehicle {
     vehicleId: id,
     salaryPerDay: def.driverSalaryPerDay,
   })
-  const pos = freeParking(sim)
+  const tile = parkingTile(sim, id)
+  const pos = { tx: tile.x, ty: tile.y }
   const v: Vehicle = {
     id,
     type: def.id,

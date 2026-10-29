@@ -33,6 +33,7 @@ import {
   TICKS_PER_S,
   ticksFromS,
 } from './types.ts'
+import { paidValue } from './value.ts'
 
 /** What the city view reads per frame (city-view.md §2). */
 export interface VehicleSnapshot {
@@ -57,6 +58,11 @@ export interface VehicleSnapshot {
   /** Driver marked unpaid at the last payday (§7.4). */
   unpaid: boolean
   rushBuildingId: BuildingId | null
+  /** ADDITION (M1): delivery stops left incl. the current one (follow strip "Delivering · N stops"); 0 otherwise. */
+  stopsLeft: number
+  /** ADDITION (M1): capacity units aboard / of the type (§4.1). */
+  unitsUsed: number
+  capacityUnits: number
 }
 
 /** buildingAt() result: the static row + the dynamic part. */
@@ -176,7 +182,16 @@ export interface ViewSim {
   regionState(id: string): 'locked' | 'live'
   buildingAt(tx: number, ty: number): BuildingInfo | null
   waitingAt(buildingId: BuildingId): readonly Parcel[]
-  rushState(buildingId: BuildingId): { untilTick: Tick } | null
+  /** Active rush flag; `vehicleId` = the vehicle sent (null while none is eligible, §4.1). */
+  rushState(
+    buildingId: BuildingId,
+  ): { untilTick: Tick; vehicleId: number | null } | null
+  /** ADDITION (M1): one parcel by id (hidden flags included — never show them), or null. */
+  parcel(id: number): Parcel | null
+  /** ADDITION (M1): what the parcel would pay now, round(base × f(t)) (spec §5.3), or null. */
+  parcelValue(id: number): number | null
+  /** ADDITION (M1): vehicle ids in the lot's dock queue, index 0 docks next. */
+  readonly dockQueue: readonly number[]
   districtStats(id: DistrictId): DistrictStats | null
   meanSatisfaction(): number
   laneStats(): LaneStats
@@ -283,6 +298,14 @@ function snapshotVehicles(sim: Sim): VehicleSnapshot[] {
       zone: v.zone,
       unpaid: (driver?.unpaidPaydays ?? 0) > 0,
       rushBuildingId: v.rushBuildingId,
+      stopsLeft:
+        v.state === 'delivering'
+          ? Math.max(0, v.stops.length - v.stopIndex)
+          : 0,
+      unitsUsed: v.unitsUsed,
+      capacityUnits:
+        sim.data.vehicles.types.find((t) => t.id === v.type)?.capacityUnits ??
+        0,
     }
   })
 }
@@ -469,7 +492,20 @@ export function createViewSim(
     rushState(buildingId) {
       const s = st()
       const until = s.buildings[buildingId]?.rushUntilTick ?? null
-      return until !== null && until > s.tick ? { untilTick: until } : null
+      if (until === null || until <= s.tick) return null
+      const v = s.vehicles.find((x) => x.rushBuildingId === buildingId)
+      return { untilTick: until, vehicleId: v ? v.id : null }
+    },
+    parcel(id) {
+      return st().parcels[String(id)] ?? null
+    },
+    parcelValue(id) {
+      const sim = get()
+      const p = sim.state.parcels[String(id)]
+      return p ? paidValue(sim.data, p, sim.state.tick) : null
+    },
+    get dockQueue() {
+      return st().lane.dockQueue
     },
     districtStats(id) {
       const sim = get()

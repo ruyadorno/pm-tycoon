@@ -1,11 +1,20 @@
 // Shared sim test helpers (plan.md §6.9.1): makeSim, runSeconds, collect,
-// openingA, dataFixture. Node environment, no Phaser.
+// openingA, dataFixture, plus the M1 scenario helpers (quiet sims, injected
+// parcels, buying, unlocking). Node environment, no Phaser.
 
 import { applyConfig, buildGameData } from '../../src/data/index.ts'
 import type { GameData } from '../../src/data/types.ts'
 import { onSimEvent } from '../../src/sim/events.ts'
 import type { SimEventName, SimEventPayloads } from '../../src/sim/events.ts'
 import { Sim } from '../../src/sim/sim.ts'
+import type {
+  BuildingId,
+  DistrictId,
+  Parcel,
+  Size,
+  Vehicle,
+  VehicleType,
+} from '../../src/sim/types.ts'
 import { liveSlotIds, laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
 
@@ -63,4 +72,145 @@ export function openingA(sim: Sim): void {
     nodeId: slot,
   })
   if (!md.ok) throw new Error(`openingA: detector refused (${md.reason})`)
+}
+
+// M1 scenario helpers -----------------------------------------------------------
+
+/** Stop every spawn timer (scenario tests inject their own parcels). */
+export function quiet(sim: Sim): Sim {
+  for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+  return sim
+}
+
+/** A new game with no spawns. */
+export function quietSim(seed = 1, overrides?: unknown): Sim {
+  return quiet(makeSim(seed, overrides))
+}
+
+/** Buy a vehicle (topping the balance up first) and return it. */
+export function buy(sim: Sim, type: VehicleType): Vehicle {
+  const def = sim.data.vehicles.types.find((t) => t.id === type)
+  if (!def) throw new Error(`no type ${type}`)
+  if (def.unlockLevel > sim.state.level.level) {
+    sim.state.level.level = def.unlockLevel
+  }
+  if (sim.state.economy.balance < def.price) {
+    sim.state.economy.balance = def.price
+  }
+  const res = sim.dispatch({ kind: 'buyVehicle', type })
+  if (!res.ok) throw new Error(`buy ${type}: ${res.reason}`)
+  return sim.state.vehicles.at(-1) as Vehicle
+}
+
+/** Make a locked district live (scenario setup; levels are M3). */
+export function unlockDistrict(sim: Sim, id: DistrictId, spawn = false): void {
+  const d = sim.state.districts[id]
+  if (!d) throw new Error(`no district ${id}`)
+  d.live = true
+  d.nextSpawnTick = spawn ? sim.state.tick + 1 : null
+  if (!sim.state.level.unlocked.includes(id)) sim.state.level.unlocked.push(id)
+}
+
+export interface InjectOptions {
+  size?: Size
+  malware?: boolean
+  /** Spawn tick (default now); older parcels are worth less (spec §5.3). */
+  spawnedTick?: number
+}
+
+/** Put a waiting parcel at `origin` bound for `dest`, exactly like a spawn would. */
+export function injectParcel(
+  sim: Sim,
+  origin: BuildingId,
+  dest: BuildingId,
+  opts: InjectOptions = {},
+): Parcel {
+  const s = sim.state
+  const size = opts.size ?? 'S'
+  const destDef = sim.data.buildings.find((b) => b.id === dest)
+  if (!destDef) throw new Error(`no building ${dest}`)
+  const id = s.nextId.parcel
+  s.nextId.parcel += 1
+  const malware = opts.malware ?? false
+  const p: Parcel = {
+    id,
+    size,
+    baseValue: sim.data.parcels.sizes[size].value,
+    mult: 1,
+    origin,
+    dest,
+    destRegion: destDef.district,
+    spawnedTick: opts.spawnedTick ?? s.tick,
+    label: 'test@1.0.0',
+    malware,
+    strain: malware ? 'metal' : null,
+    decoy: null,
+    magic: false,
+    scripted: false,
+    state: 'waiting',
+    reservedBy: null,
+    vehicleId: null,
+    nodeId: null,
+    nodeEnterTick: null,
+    nodeDoneTick: null,
+    flaggedBy: null,
+    flaggedStrain: null,
+    lockedValue: null,
+    clearTick: null,
+    trace: [],
+  }
+  s.parcels[String(id)] = p
+  const b = s.buildings[origin]
+  if (!b) throw new Error(`no building ${origin}`)
+  b.waiting.push(id)
+  s.spawn.spawnedCount += 1
+  if (malware) s.stats.malwareSpawned += 1
+  return p
+}
+
+/** Put a parcel straight onto the shelf (as if it had come through the lane). */
+export function shelveParcel(
+  sim: Sim,
+  origin: BuildingId,
+  dest: BuildingId,
+  opts: InjectOptions = {},
+): Parcel {
+  const p = injectParcel(sim, origin, dest, opts)
+  const b = sim.state.buildings[origin] as { waiting: number[] }
+  b.waiting.splice(b.waiting.indexOf(p.id), 1)
+  const shelf = laneNode(sim.state.lane, sim.state.lane.shelfNodeId)
+  shelf?.queue.push(p.id)
+  p.state = 'on_shelf'
+  p.nodeId = sim.state.lane.shelfNodeId
+  return p
+}
+
+/** Tick until `pred` holds (checked after each tick); returns the ticks run, or -1. */
+export function runUntil(
+  sim: Sim,
+  pred: () => boolean,
+  maxTicks = 6000,
+): number {
+  for (let i = 1; i <= maxTicks; i++) {
+    sim.tick()
+    if (pred()) return i
+  }
+  return -1
+}
+
+export function vehicleById(sim: Sim, id: number): Vehicle {
+  const v = sim.state.vehicles.find((x) => x.id === id)
+  if (!v) throw new Error(`no vehicle ${id}`)
+  return v
+}
+
+/** Every event name emitted from now on, in order (with the tick). */
+export function eventLog(
+  sim: Sim,
+): { tick: number; name: string; p: unknown }[] {
+  const out: { tick: number; name: string; p: unknown }[] = []
+  sim.addTap((name, p, tick) => {
+    out.push({ tick, name, p: structuredClone(p) })
+  })
+  return out
 }

@@ -1,0 +1,936 @@
+{
+  "version": 1,
+  "dataHash": "79d84791",
+  "config": null,
+  "policy": "competent",
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "minutes": 30,
+  "targets": {
+    "firstDeliveryS": 60,
+    "firstMalwareCaughtMaxS": 300,
+    "level2Min": [
+      8,
+      15
+    ],
+    "truckAfterLevel2MaxMin": 4,
+    "maxLivesLost": 0,
+    "maxShelfStallS": 0,
+    "holdBayEventsPer10MinMin": 6,
+    "level3Min": [
+      15,
+      20
+    ],
+    "level4Min": [
+      20,
+      25
+    ],
+    "level5Min": [
+      25,
+      30
+    ]
+  },
+  "runs": [
+    {
+      "metrics": {
+        "seed": 1,
+        "minutes": 30,
+        "firstDeliveryS": 52.3,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 52.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 2,
+        "minutes": 30,
+        "firstDeliveryS": 55.9,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 55.9,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 3,
+        "minutes": 30,
+        "firstDeliveryS": 52.4,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 52.4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 4,
+        "minutes": 30,
+        "firstDeliveryS": 46.4,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 46.4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 5,
+        "minutes": 30,
+        "firstDeliveryS": 56.4,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 56.4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 6,
+        "minutes": 30,
+        "firstDeliveryS": 32.3,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 32.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 7,
+        "minutes": 30,
+        "firstDeliveryS": 28.3,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 28.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 8,
+        "minutes": 30,
+        "firstDeliveryS": 32.3,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 32.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 9,
+        "minutes": 30,
+        "firstDeliveryS": 32.3,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 32.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 10,
+        "minutes": 30,
+        "firstDeliveryS": 32.3,
+        "firstMalwareCaughtS": null,
+        "level2Min": null,
+        "truckAfterLevel2Min": null,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 0,
+        "holdBayEventsPer10Min": 0,
+        "malwareShareAtEnd": 0.03,
+        "level3Min": null,
+        "level4Min": null,
+        "level5Min": null
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 32.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": null,
+          "pass": false,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": null,
+          "pass": false,
+          "note": "informational (M3)"
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": "informational (M2)"
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 0,
+          "pass": false,
+          "note": "informational (M2)"
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    }
+  ],
+  "medians": {
+    "firstDeliveryS": 39.35,
+    "firstMalwareCaughtS": null,
+    "level2Min": null,
+    "truckAfterLevel2Min": null,
+    "livesLost": 0,
+    "shelfStallS": 0,
+    "holdBayEventsPer10MinL1": 0,
+    "holdBayEventsPer10Min": 0,
+    "malwareShareAtEnd": 0.03,
+    "level3Min": null,
+    "level4Min": null,
+    "level5Min": null
+  },
+  "checks": [
+    {
+      "key": "firstDeliveryS",
+      "metric": "firstDeliveryS",
+      "target": "< 60 s",
+      "value": 39.35,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "firstMalwareCaughtMaxS",
+      "metric": "firstMalwareCaughtS",
+      "target": "≤ 300 s",
+      "value": null,
+      "pass": false,
+      "note": "informational (M2)"
+    },
+    {
+      "key": "level2Min",
+      "metric": "level2Min",
+      "target": "8-15 min",
+      "value": null,
+      "pass": false,
+      "note": "informational (M3)"
+    },
+    {
+      "key": "truckAfterLevel2MaxMin",
+      "metric": "truckAfterLevel2Min",
+      "target": "≤ 4 min",
+      "value": null,
+      "pass": false,
+      "note": "informational (M3)"
+    },
+    {
+      "key": "maxLivesLost",
+      "metric": "livesLost",
+      "target": "≤ 0",
+      "value": 0,
+      "pass": true,
+      "note": "informational (M2)"
+    },
+    {
+      "key": "maxShelfStallS",
+      "metric": "shelfStallS",
+      "target": "≤ 0 s",
+      "value": 0,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "holdBayEventsPer10MinMin",
+      "metric": "holdBayEventsPer10MinL1",
+      "target": "≥ 6 /10 min at L1",
+      "value": 0,
+      "pass": false,
+      "note": "informational (M2)"
+    }
+  ],
+  "features": {
+    "lane": false,
+    "lives": false,
+    "levels": false,
+    "payroll": false
+  },
+  "informational": [
+    {
+      "key": "holdBayEventsPer10Min",
+      "target": "whole run",
+      "median": 0,
+      "note": "informational"
+    },
+    {
+      "key": "malwareShareAt30Min",
+      "target": "share at 30 min",
+      "median": 0.03,
+      "note": "informational"
+    },
+    {
+      "key": "level3Min",
+      "target": "15-20 min",
+      "median": null,
+      "note": "build 2 — informational"
+    },
+    {
+      "key": "level4Min",
+      "target": "20-25 min",
+      "median": null,
+      "note": "build 2 — informational"
+    },
+    {
+      "key": "level5Min",
+      "target": "25-30 min",
+      "median": null,
+      "note": "build 2 — informational"
+    }
+  ],
+  "pass": true
+}

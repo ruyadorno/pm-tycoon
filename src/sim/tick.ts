@@ -4,7 +4,14 @@
 // (keep the order — the rng stream depends on it). Commands never run inside
 // a tick: they apply immediately in Sim.dispatch.
 
+import { SIM_FEATURES } from './features.ts'
 import type { Sim } from './sim.ts'
+import { dispatchStep, LEG_HOOKS } from './systems/dispatch.ts'
+import { docksStep } from './systems/docks.ts'
+import { laneStep } from './systems/lane.ts'
+import { driftStep, waitingStep } from './systems/satisfaction.ts'
+import { spawnStep } from './systems/spawn.ts'
+import { vehiclesStep } from './systems/vehicles.ts'
 import type { MinuteRow } from './types.ts'
 import {
   laneNode,
@@ -30,30 +37,32 @@ export function clock(sim: Sim, ctx: TickContext): void {
 }
 
 /** 2. Per-district spawn timers, scripted first malware + deferral, decoys, labels. */
-export function spawn(_sim: Sim, _ctx: TickContext): void {
-  // TODO(M1): systems/spawn.ts (§5.2, §5.4; malwareShare() in types.ts).
+export function spawn(sim: Sim, _ctx: TickContext): void {
+  spawnStep(sim)
 }
 
-/** 3. Every dispatchTickS: the idle_lot pass (§4.5 step 2) + rush re-evaluation (§4.1). */
-export function dispatch(_sim: Sim, _ctx: TickContext): void {
-  // TODO(M1): systems/dispatch.ts idlePass / applyRush.
+/** 3. Every dispatchTickS: the idle_lot pass (§4.5 step 2) + rush re-evaluation (§4.1); rush expiry every tick. */
+export function dispatch(sim: Sim, _ctx: TickContext): void {
+  dispatchStep(sim)
 }
 
 /** 4. prev ← pos, movement, headings, wheel, 1.5 s stops, pickups, deliveries, hand-offs, lot entrance → queued. */
-export function vehicles(_sim: Sim, _ctx: TickContext): void {
-  // TODO(M1): systems/vehicles.ts (+ value.ts payouts, satisfaction deltas);
-  // TODO(M2): life:lost on malware delivered.
+export function vehicles(sim: Sim, _ctx: TickContext): void {
+  // Arrivals and stop ends run the §4.6 leg logic (dispatch.ts LEG_HOOKS);
+  // deliveries pay through economy.ts (TODO(M2): life:lost on malware).
+  vehiclesStep(sim, LEG_HOOKS)
 }
 
 /** 5. Dock queue → free dock, unload / outbound set / load, idle wait, depart, busyTicksThisDay. */
-export function docks(_sim: Sim, _ctx: TickContext): void {
-  // TODO(M1): systems/docks.ts (§4.3, §4.6, §6.5).
+export function docks(sim: Sim, _ctx: TickContext): void {
+  docksStep(sim)
 }
 
 /** 6. Conveyor → slots → Hold Bay / shelf, process timers, rolls, stalls. */
-export function lane(_sim: Sim, _ctx: TickContext): void {
-  // TODO(M1): systems/lane.ts pass-through lane; TODO(M2): checkers +
-  // detection.ts rolls, Hold Bay divert, lane:stalled/resumed, stallSecondsToday.
+export function lane(sim: Sim, _ctx: TickContext): void {
+  // M1: pass-through slots + shelf cap + stalls; TODO(M2, SIM_FEATURES.lane):
+  // checkers + detection.ts rolls, Hold Bay divert.
+  laneStep(sim)
 }
 
 /** 7. Sorter Arm auto-Toss timer (L4 row; no-op in playtest 1). */
@@ -67,12 +76,13 @@ export function clearance(_sim: Sim, _ctx: TickContext): void {
 }
 
 /** 9. Waiting parcels crossing 180 s unpicked → the capped satisfaction penalty (§9.1). */
-export function waiting(_sim: Sim, _ctx: TickContext): void {
-  // TODO(M1): systems/satisfaction.ts.
+export function waiting(sim: Sim, _ctx: TickContext): void {
+  waitingStep(sim)
 }
 
 /** 10. Lifetime earned vs the next threshold → level:up, unlocks, strain announce (capped at playtestMaxLevel). */
 export function levels(_sim: Sim, _ctx: TickContext): void {
+  if (!SIM_FEATURES.levels) return
   // TODO(M3): systems/levels.ts.
 }
 
@@ -84,8 +94,10 @@ export function levels(_sim: Sim, _ctx: TickContext): void {
 export function day(sim: Sim, ctx: TickContext): void {
   if (!ctx.dayBoundary) return
   const s = sim.state
-  // TODO(M3): systems/payroll.ts — payday, pay order, unpaid marks, walkouts (§7.3-§7.4).
-  // TODO(M3): systems/satisfaction.ts — drift toward 50 (§9.1).
+  if (SIM_FEATURES.payroll) {
+    // TODO(M3): systems/payroll.ts — payday, pay order, unpaid marks, walkouts (§7.3-§7.4).
+  }
+  driftStep(sim)
   // Malware escalation needs no state: malwareShare() derives it from the
   // day count and stats.levelTick (§5.4).
   for (const d of s.lane.docks) {

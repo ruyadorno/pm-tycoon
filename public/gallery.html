@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pm-tycoon art gallery</title>
+    <!--
+      Dev-only art review page (style-guide.md §5). Served by `vlr dev -- --host`
+      at /gallery.html. Reads /gallery/index.json (written by `vlr art:gallery`,
+      gitignored) and the committed atlas /assets/world.{png,json}; draws every
+      frame at 1x and 3x (integer scale, nearest neighbour), tags placeholders,
+      shows PixelLab candidates of unapproved ids side by side with their
+      rejects, and builds `vlr art:reject -- id "reason"` lines to copy.
+    -->
+    <style>
+      :root {
+        --bg: #fcf9f1;
+        --ink: #241e32;
+        --line: #b7b0a8;
+        --panel: #d9d2c4;
+        --accent: #4c7bd0;
+        --warn: #e8a526;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.4 ui-monospace,
+          Menlo,
+          Consolas,
+          monospace;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--panel);
+        border-bottom: 1px solid var(--ink);
+        padding: 8px 16px;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 6px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      nav button,
+      .tools button {
+        font: inherit;
+        border: 1px solid var(--ink);
+        background: var(--bg);
+        padding: 4px 8px;
+        cursor: pointer;
+      }
+      nav button[aria-pressed='true'] {
+        background: var(--accent);
+        color: var(--bg);
+      }
+      .tools {
+        margin-top: 6px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      main {
+        padding: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        background: #fff;
+        padding: 8px;
+        max-width: 100%;
+      }
+      .card h2 {
+        font-size: 13px;
+        margin: 0 0 4px;
+        overflow-wrap: anywhere;
+      }
+      .tag {
+        display: inline-block;
+        padding: 0 4px;
+        margin-left: 4px;
+        border: 1px solid var(--ink);
+        font-size: 11px;
+      }
+      .tag.ph {
+        background: var(--warn);
+      }
+      .tag.ok {
+        background: #6cc05a;
+      }
+      .frames {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: flex-end;
+      }
+      figure {
+        margin: 0;
+        text-align: center;
+      }
+      figcaption {
+        font-size: 11px;
+      }
+      canvas {
+        image-rendering: pixelated;
+        background: #9bdc74;
+        display: block;
+        max-width: 100%;
+      }
+      .cands {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      .cands img {
+        image-rendering: pixelated;
+        background: #9bdc74;
+        width: auto;
+        height: 96px;
+      }
+      .rejects {
+        font-size: 11px;
+        color: #8a3a1f;
+      }
+      textarea {
+        width: min(640px, 100%);
+        height: 64px;
+        font: inherit;
+      }
+      #status {
+        padding: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>pm-tycoon art gallery</h1>
+      <nav id="tabs"></nav>
+      <div class="tools">
+        <label><input type="checkbox" id="show3x" checked /> 3x</label>
+        <label><input type="checkbox" id="onlyPh" /> placeholders only</label>
+        <button id="copy">copy reject list</button>
+        <textarea
+          id="rejects"
+          placeholder="tick 'reject' on a card to build the list"
+        ></textarea>
+      </div>
+    </header>
+    <div id="status">loading /gallery/index.json …</div>
+    <main id="grid"></main>
+    <script type="module">
+      const $ = (id) => document.getElementById(id)
+      const state = { cat: null, picks: new Map() }
+      let index = null
+      let atlas = null
+      let sheet = null
+
+      async function load() {
+        try {
+          const [i, a] = await Promise.all([
+            fetch('/gallery/index.json').then((r) => r.json()),
+            fetch(`/assets/world.json`).then((r) => r.json()),
+          ])
+          index = i
+          atlas = new Map()
+          for (const t of a.textures)
+            for (const f of t.frames) atlas.set(f.filename, f)
+          sheet = new Image()
+          sheet.src = '/assets/world.png'
+          await sheet.decode()
+        } catch (err) {
+          $('status').textContent =
+            'Run `vlr art:build` (or `vlr art:gallery` + `vlr art:atlas`) first: ' +
+            err
+          return
+        }
+        $('status').textContent = ''
+        state.cat = index.categories[0]
+        tabs()
+        render()
+      }
+
+      function tabs() {
+        const nav = $('tabs')
+        nav.textContent = ''
+        for (const c of index.categories) {
+          const b = document.createElement('button')
+          b.textContent = c
+          b.setAttribute('aria-pressed', String(c === state.cat))
+          b.onclick = () => {
+            state.cat = c
+            tabs()
+            render()
+          }
+          nav.append(b)
+        }
+      }
+
+      /** draw one atlas frame at integer scale s (trim-aware) */
+      function frameCanvas(name, s) {
+        const f = atlas.get(name)
+        const c = document.createElement('canvas')
+        if (!f) {
+          c.width = c.height = 16 * s
+          return c
+        }
+        c.width = f.sourceSize.w * s
+        c.height = f.sourceSize.h * s
+        const ctx = c.getContext('2d')
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(
+          sheet,
+          f.frame.x,
+          f.frame.y,
+          f.frame.w,
+          f.frame.h,
+          f.spriteSourceSize.x * s,
+          f.spriteSourceSize.y * s,
+          f.frame.w * s,
+          f.frame.h * s,
+        )
+        return c
+      }
+
+      function render() {
+        const grid = $('grid')
+        grid.textContent = ''
+        const three = $('show3x').checked
+        for (const e of index.entries) {
+          if (e.category !== state.cat) continue
+          if ($('onlyPh').checked && !e.placeholder) continue
+          const card = document.createElement('section')
+          card.className = 'card'
+          const h = document.createElement('h2')
+          h.textContent = `${e.id} · ${e.class} · ${e.source} · ${e.priority}`
+          if (e.placeholder)
+            h.insertAdjacentHTML(
+              'beforeend',
+              '<span class="tag ph">PLACEHOLDER</span>',
+            )
+          if (e.approved)
+            h.insertAdjacentHTML(
+              'beforeend',
+              `<span class="tag ok">approved (${e.approvedBy})</span>`,
+            )
+          if (e.anchor)
+            h.insertAdjacentHTML('beforeend', '<span class="tag">anchor</span>')
+          card.append(h)
+          const frames = document.createElement('div')
+          frames.className = 'frames'
+          for (const name of e.frames) {
+            for (const s of three ? [1, 3] : [1]) {
+              const fig = document.createElement('figure')
+              fig.append(frameCanvas(name, s))
+              const cap = document.createElement('figcaption')
+              cap.textContent = `${name} ${s}x`
+              fig.append(cap)
+              frames.append(fig)
+            }
+          }
+          card.append(frames)
+          if (e.candidates.length && !e.approved) {
+            const cands = document.createElement('div')
+            cands.className = 'cands'
+            e.candidates.forEach((src, n) => {
+              const fig = document.createElement('figure')
+              const img = document.createElement('img')
+              img.src = '/gallery/' + src
+              img.alt = `${e.id}:${n}`
+              fig.append(img)
+              const cap = document.createElement('figcaption')
+              cap.textContent = `${e.id}:${n}`
+              fig.append(cap)
+              cands.append(fig)
+            })
+            card.append(cands)
+          }
+          if (e.rejects.length) {
+            const r = document.createElement('div')
+            r.className = 'rejects'
+            r.textContent = e.rejects
+              .map((x) => `#${x.candidate} ${x.by}: ${x.reason}`)
+              .join(' · ')
+            card.append(r)
+          }
+          const pick = document.createElement('label')
+          const box = document.createElement('input')
+          box.type = 'checkbox'
+          box.checked = state.picks.has(e.id)
+          box.onchange = () => {
+            if (box.checked)
+              state.picks.set(
+                e.id,
+                prompt(`reason for rejecting ${e.id}`) || 'rejected in gallery',
+              )
+            else state.picks.delete(e.id)
+            rejectList()
+          }
+          pick.append(box, ' reject')
+          card.append(pick)
+          grid.append(card)
+        }
+      }
+
+      function rejectList() {
+        $('rejects').value = [...state.picks]
+          .map(([id, why]) => `vlr art:reject -- ${id} ${JSON.stringify(why)}`)
+          .join('\n')
+      }
+
+      $('copy').onclick = () =>
+        navigator.clipboard?.writeText($('rejects').value)
+      $('show3x').onchange = render
+      $('onlyPh').onchange = render
+      load()
+    </script>
+  </body>
+</html>

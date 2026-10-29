@@ -15,3 +15,7 @@ coverage/
 .vite/
 *.log
 .DS_Store
+
+# this VM's global excludesfile (~/.gitignore) ignores *.md and CLAUDE.md; the repo tracks its docs
+!*.md
+!CLAUDE.md

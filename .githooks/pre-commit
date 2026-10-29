@@ -1,0 +1,3 @@
+#!/bin/sh
+# plan.md §6.10: the quick check (first five steps) gates every commit; the full `vlr check` is the rule.
+exec vlr check:quick

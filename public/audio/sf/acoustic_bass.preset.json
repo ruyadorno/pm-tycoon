@@ -1,0 +1,99 @@
+{
+  "meta": {
+    "name": "acoustic_bass",
+    "license": "CC-BY-3.0",
+    "source": "gleitz/midi-js-soundfonts FluidR3_GM"
+  },
+  "samples": {
+    "baseUrl": "./acoustic_bass/",
+    "formats": [
+      "mp3"
+    ]
+  },
+  "groups": [
+    {
+      "regions": [
+        {
+          "sample": "E1",
+          "pitch": 28,
+          "keyRange": [
+            27,
+            29
+          ]
+        },
+        {
+          "sample": "G1",
+          "pitch": 31,
+          "keyRange": [
+            30,
+            32
+          ]
+        },
+        {
+          "sample": "Bb1",
+          "pitch": 34,
+          "keyRange": [
+            33,
+            35
+          ]
+        },
+        {
+          "sample": "Db2",
+          "pitch": 37,
+          "keyRange": [
+            36,
+            38
+          ]
+        },
+        {
+          "sample": "E2",
+          "pitch": 40,
+          "keyRange": [
+            39,
+            41
+          ]
+        },
+        {
+          "sample": "G2",
+          "pitch": 43,
+          "keyRange": [
+            42,
+            44
+          ]
+        },
+        {
+          "sample": "Bb2",
+          "pitch": 46,
+          "keyRange": [
+            45,
+            47
+          ]
+        },
+        {
+          "sample": "Db3",
+          "pitch": 49,
+          "keyRange": [
+            48,
+            50
+          ]
+        },
+        {
+          "sample": "E3",
+          "pitch": 52,
+          "keyRange": [
+            51,
+            53
+          ]
+        },
+        {
+          "sample": "G3",
+          "pitch": 55,
+          "keyRange": [
+            54,
+            56
+          ]
+        }
+      ]
+    }
+  ]
+}

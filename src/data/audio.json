@@ -1,0 +1,49 @@
+{
+  "music": "live",
+  "defaultSheet": "semver-swing",
+  "buses": { "master": 1, "music": 0.5, "sfx": 0.8 },
+  "samplerTrimDb": 22,
+  "limiter": { "thresholdDb": -3, "kneeDb": 0, "ratio": 20, "attackS": 0.003, "releaseS": 0.1 },
+  "muteRampS": 0.05,
+  "lookAheadS": 0.15,
+  "toastSeconds": 3,
+  "resumeCheckMs": 250,
+  "instruments": {
+    "piano": { "sf": "acoustic_grand_piano", "volume": 74, "range": [36, 84], "release": 0.25, "set": "music" },
+    "bass": { "sf": "acoustic_bass", "volume": 87, "range": [28, 55], "release": 0.12, "set": "music" },
+    "vibes": { "sf": "vibraphone", "volume": 116, "range": [60, 84], "release": 0.5, "set": "music" },
+    "trumpet": { "sf": "muted_trumpet", "volume": 80, "range": [55, 84], "release": 0.12, "set": "music" },
+    "piano2": { "sf": "acoustic_grand_piano", "volume": 90, "range": [36, 84], "release": 0.3, "set": "stingers" },
+    "bass2": { "sf": "acoustic_bass", "volume": 100, "range": [28, 55], "release": 0.2, "set": "stingers" },
+    "vibes2": { "sf": "vibraphone", "volume": 95, "range": [60, 84], "release": 0.6, "set": "stingers" },
+    "trumpet2": { "sf": "muted_trumpet", "volume": 95, "range": [55, 84], "release": 0.15, "set": "stingers" }
+  },
+  "loadOrder": [["piano", "bass"], ["vibes", "trumpet"], ["piano2", "bass2", "vibes2", "trumpet2"]],
+  "brushes": { "ride": 0.12, "hat": 0.08, "override": null },
+  "sfx": {
+    "sampleRate": 44100,
+    "zzfxVolume": 0.5,
+    "scannerHissDelayMs": 150,
+    "hissLoopGain": 0.5,
+    "paydayShortRate": 0.7
+  },
+  "throttleMs": { "pickup": 150, "hiss": 4000, "honk": 3000, "stallAlarm": 8000, "grumble": 20000 },
+  "throttleSlackMs": 250,
+  "loopsMs": { "hiss": 4000, "stallAlarm": 8000, "grumble": 20000 },
+  "lifeLost": { "rampS": 0.03, "pauseBeats": 1 },
+  "stingers": {
+    "cashRollMs": 25,
+    "cashDurS": 0.6,
+    "cashVel": 70,
+    "cashVelPerSize": 20,
+    "lateVel": 55,
+    "defusedVel": 80,
+    "oopsVel": 70,
+    "levelUpVel": 90,
+    "glissMs": 30,
+    "gameOverDelayS": 0.5,
+    "gameOverTempo": 72,
+    "gameOverVel": 70,
+    "gameOverHoldS": 3
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "name": "muted_trumpet",
+    "license": "CC-BY-3.0",
+    "source": "gleitz/midi-js-soundfonts FluidR3_GM"
+  },
+  "samples": {
+    "baseUrl": "./muted_trumpet/",
+    "formats": [
+      "mp3"
+    ]
+  },
+  "groups": [
+    {
+      "regions": [
+        {
+          "sample": "G3",
+          "pitch": 55,
+          "keyRange": [
+            54,
+            56
+          ]
+        },
+        {
+          "sample": "Bb3",
+          "pitch": 58,
+          "keyRange": [
+            57,
+            59
+          ]
+        },
+        {
+          "sample": "Db4",
+          "pitch": 61,
+          "keyRange": [
+            60,
+            62
+          ]
+        },
+        {
+          "sample": "E4",
+          "pitch": 64,
+          "keyRange": [
+            63,
+            65
+          ]
+        },
+        {
+          "sample": "G4",
+          "pitch": 67,
+          "keyRange": [
+            66,
+            68
+          ]
+        },
+        {
+          "sample": "Bb4",
+          "pitch": 70,
+          "keyRange": [
+            69,
+            71
+          ]
+        },
+        {
+          "sample": "Db5",
+          "pitch": 73,
+          "keyRange": [
+            72,
+            74
+          ]
+        },
+        {
+          "sample": "E5",
+          "pitch": 76,
+          "keyRange": [
+            75,
+            77
+          ]
+        },
+        {
+          "sample": "G5",
+          "pitch": 79,
+          "keyRange": [
+            78,
+            80
+          ]
+        },
+        {
+          "sample": "Bb5",
+          "pitch": 82,
+          "keyRange": [
+            81,
+            83
+          ]
+        },
+        {
+          "sample": "C6",
+          "pitch": 84,
+          "keyRange": [
+            84,
+            85
+          ]
+        }
+      ]
+    }
+  ]
+}

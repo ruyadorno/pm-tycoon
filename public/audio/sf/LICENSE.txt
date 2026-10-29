@@ -1,0 +1,10 @@
+Instrument samples in this directory
+
+FluidR3_GM SoundFont by Frank Wen, as pre-rendered by Benjamin Gleitzman's
+midi-js-soundfonts (https://github.com/gleitz/midi-js-soundfonts), Creative Commons Attribution 3.0
+(https://creativecommons.org/licenses/by/3.0/us/). Instruments used: Acoustic Grand Piano, Acoustic Bass,
+Vibraphone, Muted Trumpet. Vendored note ranges in public/audio/sf/.
+
+Files: public/audio/sf/<instrument>/<Note>.mp3 (note names use flats, e.g. Db4) and
+public/audio/sf/<instrument>.preset.json (generated SmplrPreset, smplr 1.1.0 format) written by
+tools/audio/vendor.mjs. The samples are unmodified copies of the gleitz mp3 renders.

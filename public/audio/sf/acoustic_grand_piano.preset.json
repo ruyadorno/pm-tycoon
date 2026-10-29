@@ -1,0 +1,155 @@
+{
+  "meta": {
+    "name": "acoustic_grand_piano",
+    "license": "CC-BY-3.0",
+    "source": "gleitz/midi-js-soundfonts FluidR3_GM"
+  },
+  "samples": {
+    "baseUrl": "./acoustic_grand_piano/",
+    "formats": [
+      "mp3"
+    ]
+  },
+  "groups": [
+    {
+      "regions": [
+        {
+          "sample": "C2",
+          "pitch": 36,
+          "keyRange": [
+            35,
+            37
+          ]
+        },
+        {
+          "sample": "Eb2",
+          "pitch": 39,
+          "keyRange": [
+            38,
+            40
+          ]
+        },
+        {
+          "sample": "Gb2",
+          "pitch": 42,
+          "keyRange": [
+            41,
+            43
+          ]
+        },
+        {
+          "sample": "A2",
+          "pitch": 45,
+          "keyRange": [
+            44,
+            46
+          ]
+        },
+        {
+          "sample": "C3",
+          "pitch": 48,
+          "keyRange": [
+            47,
+            49
+          ]
+        },
+        {
+          "sample": "Eb3",
+          "pitch": 51,
+          "keyRange": [
+            50,
+            52
+          ]
+        },
+        {
+          "sample": "Gb3",
+          "pitch": 54,
+          "keyRange": [
+            53,
+            55
+          ]
+        },
+        {
+          "sample": "A3",
+          "pitch": 57,
+          "keyRange": [
+            56,
+            58
+          ]
+        },
+        {
+          "sample": "C4",
+          "pitch": 60,
+          "keyRange": [
+            59,
+            61
+          ]
+        },
+        {
+          "sample": "Eb4",
+          "pitch": 63,
+          "keyRange": [
+            62,
+            64
+          ]
+        },
+        {
+          "sample": "Gb4",
+          "pitch": 66,
+          "keyRange": [
+            65,
+            67
+          ]
+        },
+        {
+          "sample": "A4",
+          "pitch": 69,
+          "keyRange": [
+            68,
+            70
+          ]
+        },
+        {
+          "sample": "C5",
+          "pitch": 72,
+          "keyRange": [
+            71,
+            73
+          ]
+        },
+        {
+          "sample": "Eb5",
+          "pitch": 75,
+          "keyRange": [
+            74,
+            76
+          ]
+        },
+        {
+          "sample": "Gb5",
+          "pitch": 78,
+          "keyRange": [
+            77,
+            79
+          ]
+        },
+        {
+          "sample": "A5",
+          "pitch": 81,
+          "keyRange": [
+            80,
+            82
+          ]
+        },
+        {
+          "sample": "C6",
+          "pitch": 84,
+          "keyRange": [
+            83,
+            85
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "name": "vibraphone",
+    "license": "CC-BY-3.0",
+    "source": "gleitz/midi-js-soundfonts FluidR3_GM"
+  },
+  "samples": {
+    "baseUrl": "./vibraphone/",
+    "formats": [
+      "mp3"
+    ]
+  },
+  "groups": [
+    {
+      "regions": [
+        {
+          "sample": "C4",
+          "pitch": 60,
+          "keyRange": [
+            59,
+            61
+          ]
+        },
+        {
+          "sample": "Eb4",
+          "pitch": 63,
+          "keyRange": [
+            62,
+            64
+          ]
+        },
+        {
+          "sample": "Gb4",
+          "pitch": 66,
+          "keyRange": [
+            65,
+            67
+          ]
+        },
+        {
+          "sample": "A4",
+          "pitch": 69,
+          "keyRange": [
+            68,
+            70
+          ]
+        },
+        {
+          "sample": "C5",
+          "pitch": 72,
+          "keyRange": [
+            71,
+            73
+          ]
+        },
+        {
+          "sample": "Eb5",
+          "pitch": 75,
+          "keyRange": [
+            74,
+            76
+          ]
+        },
+        {
+          "sample": "Gb5",
+          "pitch": 78,
+          "keyRange": [
+            77,
+            79
+          ]
+        },
+        {
+          "sample": "A5",
+          "pitch": 81,
+          "keyRange": [
+            80,
+            82
+          ]
+        },
+        {
+          "sample": "C6",
+          "pitch": 84,
+          "keyRange": [
+            83,
+            85
+          ]
+        }
+      ]
+    }
+  ]
+}

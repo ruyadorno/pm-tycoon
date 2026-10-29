@@ -44,7 +44,9 @@
   },
   "dependencies": {
     "eventemitter3": "5.0.4",
-    "phaser": "4.2.1"
+    "phaser": "4.2.1",
+    "smplr": "1.1.0",
+    "tone": "15.1.22"
   },
   "devDependencies": {
     "@napi-rs/canvas": "1.0.13",

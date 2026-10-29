@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-zip/
+.env
+.logs/
+docs/gate/quick.*
+art/candidates/
+public/gallery/
+shots/
+test-results/
+playwright-report/
+.agents/skills/
+.claude/skills/
+coverage/
+.vite/
+*.log
+.DS_Store

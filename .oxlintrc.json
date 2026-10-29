@@ -1,0 +1,11 @@
+{
+  "plugins": ["typescript", "import", "unicorn"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "ignorePatterns": [
+    "dist",
+    "shots",
+    "art/candidates",
+    "public/assets",
+    "**/*.generated.*"
+  ]
+}

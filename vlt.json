@@ -1,0 +1,9 @@
+{
+  "config": {
+    "registries": {
+      "npm": "https://registry.npmjs.org/",
+      "main": "https://registry.npmjs.org/"
+    },
+    "allow-skills": "#phaser"
+  }
+}

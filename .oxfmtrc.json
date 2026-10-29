@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "semi": false,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "tabWidth": 2,
+  "ignorePatterns": [
+    "src/data/**",
+    "**/*.generated.*",
+    "vlt-lock.json",
+    "public/assets/**",
+    "public/audio/**",
+    "art/manifest.json",
+    "art/palette.json",
+    "docs/gate/**",
+    "tests/fixtures/**",
+    "tests/playtest/**",
+    "CHANGELOG.md"
+  ]
+}

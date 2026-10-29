@@ -4,7 +4,9 @@
 // ones), sliding in over 150 ms from 8 px above. One toast is visible at a
 // time; at most 3 wait in the queue (the oldest waiting one drops). A toast
 // whose text equals the one showing restarts its timer instead of queueing.
-// The red variant (payroll short, wrong toss, walkout) uses red0 text.
+// The red variant (payroll short, wrong toss, walkout) uses red0 text; a
+// normal toast may end in red from a character index (`Payday — payroll
+// −$28`, the amount red: city-view §9.7) through BitmapText per-char tints.
 // Not interactive: taps on the lane fall through (city-view.md §10).
 //
 // The HUD owns the single instance; with `listen: true` it also shows every
@@ -29,7 +31,12 @@ export const EV_TOAST = 'pm:toast'
 export interface ToastItem {
   text: string
   red: boolean
+  /** Characters from this index on are drawn red (null: none). */
+  redFrom?: number | null
 }
+
+/** MULTIPLY tint mode (Phaser.TintModes.MULTIPLY; Phaser is a type import here). */
+const TINT_MULTIPLY = 0
 
 /** Pure queue policy: one current item plus at most `max` waiting. */
 export class ToastQueue {
@@ -116,10 +123,13 @@ export class Toast {
     scene.events.once('shutdown', this.destroy, this)
   }
 
-  /** Queue a toast (red: the 4-s danger variant). */
-  show(text: string, red = false): void {
+  /**
+   * Queue a toast (red: the 4-s danger variant; redFrom: the characters from
+   * that index on are red in a normal toast).
+   */
+  show(text: string, red = false, redFrom: number | null = null): void {
     if (this.destroyed || !text) return
-    const r = this.queue.push({ text, red })
+    const r = this.queue.push({ text, red, redFrom })
     if (r === 'show') this.present()
     else if (r === 'restart') {
       if (this.hiding) {
@@ -194,6 +204,11 @@ export class Toast {
     this.text.setMaxWidth(maxW - 2 * TOAST_PAD_X)
     this.text.setText(item.text)
     this.text.setTint(item.red ? PALETTE.red0 : THEME.textDark)
+    // Per-character tints persist across setText: clear, then the red tail.
+    if (item.text.length > 0) this.text.setCharacterTint(0, -1)
+    const from = item.redFrom ?? null
+    if (!item.red && from !== null && from >= 0 && from < item.text.length)
+      this.text.setCharacterTint(from, -1, TINT_MULTIPLY, PALETTE.red0)
     const n = lineCount(this.text)
     const w = Math.min(maxW, Math.round(this.text.width) + 2 * TOAST_PAD_X)
     const h = TOAST_LINE_BOX + LINE_H * (n - 1)

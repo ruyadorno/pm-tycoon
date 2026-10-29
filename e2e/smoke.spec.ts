@@ -22,6 +22,16 @@
 //      Warehouse button shows the badge 1, TOSS on the Hold Bay card (real
 //      taps) sends it to the Quarantine Bin, and a pm:goto highlight while
 //      in the room opens the BuySheet — no console errors.
+//   M3 (§12.6 task 12) — L2 for real: the chips-at-360 check loads
+//      tests/fixtures/level-up.json (lifetime $1,996 under ?policy=1) and
+//      waits for the sim's own level:up {2}: Industrial live, its chip
+//      unlocked, the row still ≤ W − 12. Audio boot (?audio=1, the Title):
+//      the AudioDirector exists, nothing plays before a tap (not unlocked,
+//      Transport stopped, no note, SFX dropped as 'locked'), no console
+//      error. Headless Chromium starts every AudioContext 'running', so the
+//      plan's `ctx.state === 'suspended'` cannot be observed here
+//      (e2e/audio.spec.ts has the full contract).
+import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, test, type PmHelpers } from './fixtures.ts'
 import {
@@ -37,6 +47,9 @@ import {
 
 const BASE = '/?view=gallery&debug=1&seed=1&audio=0'
 const M1_URL = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1'
+const AUDIO_URL = '/?seed=7&debug=1&audio=1&audiolog=1'
+/** tools/fixtures/m3.ts: 3 s before the policy's level:up {2}. */
+const LEVEL_UP_FIXTURE = 'tests/fixtures/level-up.json'
 /** plan.md §6.11: draw calls per frame with HUD + city + popups. */
 const MAX_DRAW_CALLS = 8
 /** src/boot/autosave.ts SAVE_KEY. */
@@ -447,8 +460,8 @@ test.describe('M1 city smoke', () => {
     // HUD hit rects at the profile width.
     expectHudHits(await hudHits(page), `W=${info.size.w}`)
 
-    // W = 360: the chips row fits W − 12 at L1, then at L2 (the level row and
-    // Industrial patched into a snapshot; levels arrive in M3).
+    // W = 360: the chips row fits W − 12 at L1, then at L2 (the level-up
+    // fixture under the policy, the sim's own level:up {2}).
     await page.setViewportSize({ width: 360, height: 640 })
     await expect.poll(async () => (await chipRow(page)).W).toBe(360)
     await expect.poll(() => liveChipZones(page)).toBe(4)
@@ -458,25 +471,24 @@ test.describe('M1 city smoke', () => {
     expect(l1.chips).toContain('industrial🔒2')
     expect(l1.rowW).toBeLessThanOrEqual(l1.maxRowW)
     expectHudHits(await hudHits(page), 'W=360 L1')
-    await page.evaluate(() => {
+    const fx = readFileSync(LEVEL_UP_FIXTURE, 'utf8')
+    const fxHash = (JSON.parse(fx) as { dataHash: string }).dataHash
+    expect(
+      fxHash,
+      `${LEVEL_UP_FIXTURE} is stale: run \`node tools/fixtures/m3.ts\``,
+    ).toBe(await page.evaluate(() => window.__pm!.data.hash))
+    const up = await page.evaluate(async (json) => {
       const api = window.__pm!
-      const snap = api.snapshot() as unknown as {
-        state: {
-          tick: number
-          level: { level: number; unlocked: string[] }
-          districts: Record<
-            string,
-            { live: boolean; nextSpawnTick: number | null }
-          >
-        }
+      api.load(json)
+      const w = await api.waitEvent('level:up', 15_000)
+      return {
+        ok: w.ok,
+        level: w.payload?.level ?? null,
+        industrial: api.sim.regionState('industrial'),
       }
-      const st = snap.state
-      st.level.level = 2
-      st.level.unlocked.push('industrial')
-      st.districts.industrial!.live = true
-      st.districts.industrial!.nextSpawnTick = st.tick + 50
-      api.load(snap as unknown as Parameters<typeof api.load>[0])
-    })
+    }, fx)
+    console.log(`smoke: level-up fixture ${JSON.stringify(up)}`)
+    expect(up).toEqual({ ok: true, level: 2, industrial: 'live' })
     await expect
       .poll(async () => (await chipRow(page)).chips)
       .toContain('industrial')
@@ -650,6 +662,55 @@ test.describe('M2 warehouse smoke', () => {
     await pm.settle(4)
     expectRoomFits(await roomFit(page), 'W=360 H=604')
 
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M3 ------------------------------------------------------------------
+
+test.describe('M3 audio boot smoke', () => {
+  test('audio on: the director exists, nothing plays before the Title tap, no console error', async ({
+    page,
+    consoleErrors,
+  }) => {
+    await page.goto(AUDIO_URL)
+    await page.waitForFunction(
+      () => {
+        const pm = window.__pm
+        return !!pm?.audio && pm.game.scene.isActive('Title')
+      },
+      null,
+      { timeout: 45_000 },
+    )
+    // A few frames of the Title (the zzfx renders run one per macrotask).
+    await page.waitForTimeout(500)
+    const pre = await page.evaluate(() => {
+      const api = window.__pm!
+      const a = api.audio!
+      api.game.events.emit('ui:tap', { id: 'smoke' })
+      const played = a.sfx('buy')
+      const st = a.state()
+      return {
+        director: !!a.director,
+        played,
+        ctxState: st.ctxState,
+        disabled: st.disabled,
+        unlocked: st.unlocked,
+        transport: st.transport.state,
+        notes: a.log.notes().length,
+        sfx: a.log.sfxEntries().map((e) => `${e.sfx}:${e.dropped ?? ''}`),
+        errors: st.errors,
+      }
+    })
+    console.log(`smoke: audio before the tap ${JSON.stringify(pre)}`)
+    expect(pre.director).toBe(true)
+    expect(pre.disabled).toBe(false)
+    expect(pre.unlocked).toBe(false)
+    expect(pre.transport).toBe('stopped')
+    expect(pre.notes).toBe(0)
+    expect(pre.played).toBe(false)
+    expect(pre.sfx).toEqual(['tap:locked', 'buy:locked'])
+    expect(pre.errors).toEqual([])
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

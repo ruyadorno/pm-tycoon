@@ -9,7 +9,7 @@
 //   3 favoured vehicle (`Favours: bike (+1 satisfaction)`), or for a
 //     hard-rule district (Industrial) the red `Trucks only — bikes and vans
 //     never enter` and, while the player owns none of its allowed types,
-//     `No truck yet (Lv 2, $1,300)` (vehicles.json)
+//     `No truck yet (Lv 2, $1,200)` (vehicles.json)
 //   4 `Earned here: $1,240` (payouts delivered to the district)
 //   5 `Waiting parcels: 7 at 3 buildings · oldest 1:40` (age tinted by the
 //     decay phase) + per-size counts and a `Show ▸` link; tap → close +
@@ -106,7 +106,7 @@ export function vehicleRuleLine(
 }
 
 /**
- * `No truck yet (Lv 2, $1,300)` while a hard-rule district has no owned
+ * `No truck yet (Lv 2, $1,200)` while a hard-rule district has no owned
  * vehicle that may enter it (the cheapest allowed type's unlock and price).
  */
 export function missingVehicleLine(

@@ -2,18 +2,29 @@
 // data. Pins the §7.5 Vitest hooks — rects never overlap except the
 // documented pairs, every lane node id at L1 and L2 has a rect, pathBetween
 // is defined for every `next` / `divert` edge — plus the §1.1 screen fit.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   BAY_COUNT,
+  BIN_COUNTER,
   FixedLaneLayout,
   MIN_VIEW_H,
   MIN_VIEW_W,
+  PLATE_H,
+  PLATE_PAD,
+  POSTER,
+  PROPS_T2,
   RACK,
   ROOM_H,
   ROOM_W,
   roomPlacement,
+  SHELF_BADGE,
   SHELF_COLS,
   SHELF_ROWS,
+  SIGN,
+  SIGNAGE,
+  STRIP_LIGHTS,
+  TILE,
   type Point,
   type Rect,
 } from '../../src/render/warehouse/RoomLayout.ts'
@@ -225,5 +236,81 @@ describe('warehouse-view §1.1: the room fits between the HUD bands', () => {
     expect(p.readout).toEqual({ x: 20, y: 95, w: 352, h: 20 })
     expect(p.readout.y).toBeGreaterThanOrEqual(HUD_TOP_H)
     expect(fit(430, 932).roomX).toBe(39)
+  })
+})
+
+/** m5x7 advance widths from the BMFont descriptor (the plates' text width). */
+const ADVANCE = new Map<number, number>()
+for (const m of readFileSync(
+  new URL('../../public/assets/m5x7.xml', import.meta.url),
+  'utf8',
+).matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+  ADVANCE.set(Number(m[1]), Number(m[2]))
+const textW = (s: string): number =>
+  [...s].reduce((w, c) => w + (ADVANCE.get(c.codePointAt(0) ?? 0) ?? 0), 0)
+
+describe('warehouse-view §5.2: tier-2 props and signage plates', () => {
+  const plates: (Rect & { text: string })[] = SIGNAGE.map((p) => ({
+    text: p.text,
+    x: p.x,
+    y: p.y,
+    w: textW(p.text) + PLATE_PAD,
+    h: PLATE_H,
+  }))
+  const floor: Rect = {
+    x: TILE,
+    y: TILE,
+    w: ROOM_W - 2 * TILE,
+    h: ROOM_H - TILE,
+  }
+
+  it('INTAKE / HOLD / SHELF / QUARANTINE plates sit on the floor, apart', () => {
+    expect(plates.map((p) => p.text)).toEqual([
+      'INTAKE',
+      'HOLD',
+      'SHELF',
+      'QUARANTINE',
+    ])
+    for (const p of plates) {
+      expect(p.w, p.text).toBeGreaterThan(PLATE_PAD)
+      expect(p.x, p.text).toBeGreaterThanOrEqual(floor.x)
+      expect(p.x + p.w, p.text).toBeLessThanOrEqual(floor.x + floor.w)
+      expect(p.y + p.h, p.text).toBeLessThanOrEqual(ROOM_H)
+    }
+    for (let i = 0; i < plates.length; i++)
+      for (let j = i + 1; j < plates.length; j++)
+        expect(
+          overlaps(plates[i] as Rect, plates[j] as Rect),
+          `${plates[i]?.text} vs ${plates[j]?.text}`,
+        ).toBe(false)
+  })
+
+  it('the plates clear the slots-5–6 strip, the shelf badge, the rack and the bin counter', () => {
+    const avoid: [string, Rect][] = [
+      ['ext', layout.extRect()],
+      ['shelf badge', SHELF_BADGE],
+      ['rack', RACK],
+      [
+        'bin counter',
+        { x: BIN_COUNTER.x - 12, y: BIN_COUNTER.y - 8, w: 24, h: 16 },
+      ],
+    ]
+    for (const p of plates)
+      for (const [name, r] of avoid)
+        expect(overlaps(p, r), `${p.text} vs ${name}`).toBe(false)
+  })
+
+  it('the strip lights flank the north-wall sign; the shelving unit and the printed poster share the props column apart', () => {
+    for (const s of STRIP_LIGHTS) {
+      const r = { x: s.x, y: s.y, w: 64, h: 8 }
+      expect(overlaps(r, SIGN), `strip at ${s.x}`).toBe(false)
+      expect(r.x + r.w).toBeLessThanOrEqual(ROOM_W)
+    }
+    for (const p of PROPS_T2) {
+      const unit = { x: p.x, y: p.y, w: 48, h: 64 }
+      expect(overlaps(unit, POSTER)).toBe(false)
+      expect(overlaps(unit, RACK)).toBe(false)
+      expect(unit.x + unit.w).toBeLessThanOrEqual(ROOM_W - TILE)
+    }
   })
 })

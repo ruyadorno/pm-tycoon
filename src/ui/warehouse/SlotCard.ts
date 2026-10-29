@@ -11,12 +11,15 @@
 // Desk: `85% any strain · false-flag 15% · 30/min`, `Inspectors 2/3`, one
 // 44-px row per inspector (worker sprite, name, red `! unpaid` after a short
 // payday, [Fire] — instant, no refund), one row per walked-out inspector the
-// desk can seat again ([Re-hire NAME ($20)], one day's salary × rehireFeeDays;
-// disabled until the payroll system ships, SIM_FEATURES.payroll / M3), the
-// salary line `Salaries: 2 × $20 = $40/day · Payday in 0:23` (re-read every
-// 500 ms), [Hire inspector ($20)] (disabled with its reason as a caption at
-// maxPerDesk or below the hire fee), `Remove desk — N inspectors walk out,
-// no refund`, then [Move] [Remove desk] → Dialog confirm naming who walks out.
+// desk can seat again ([Re-hire NAME ($20)] → lane.rehire: the worker's daily
+// salary × rehireFeeDays, §7.4; dimmed below the fee, live on money:changed),
+// the salary line `Salaries: 2 × $20 = $40/day · Payday in 0:23` (re-read
+// every 500 ms, red while the last payday was short), [Hire inspector ($20)]
+// (disabled with its reason as a caption at maxPerDesk, while the free seats
+// are held for walked-out inspectors — the sim keeps their seat until a
+// re-hire or the desk goes — or below the hire fee), `Remove desk — N
+// inspectors walk out, no refund`, then [Move] [Remove desk] → Dialog
+// confirm naming who walks out.
 // Rows are 44 px (not the 24 px of the view doc) so every Fire / Re-hire
 // button keeps a 44-px hit box without overlapping its neighbour.
 //
@@ -150,22 +153,41 @@ export function hireLabel(fee: number): string {
   return `Hire inspector (${formatMoney(fee)})`
 }
 
-/** Why Hire is disabled, or null: the desk is full or the balance is short. */
+/** Caption while every free seat is held for a walked-out inspector. */
+export const SEAT_HELD_TEXT = 'Seat held for re-hire'
+
+/**
+ * Why Hire is disabled, or null: the desk is full, its free seats are held
+ * for `held` walked-out inspectors (the sim counts them against maxPerDesk
+ * until re-hired), or the balance is short.
+ */
 export function hireBlockReason(
   n: number,
   max: number,
   balance: number,
   fee: number,
+  held = 0,
 ): string | null {
   if (n >= max) return 'Desk full'
+  if (n + held >= max) return SEAT_HELD_TEXT
   if (balance < fee) return 'Not enough money'
   return null
 }
 
-/** One day's salary × rehireFeeDays (§7.4). */
-export function rehireFee(data: GameData): number {
-  const e = data.employees
-  return e.inspector.salaryPerDay * e.rehireFeeDays
+/**
+ * The re-hire fee (§7.4): `salary` (the worker's own salaryPerDay; default
+ * the inspector's) × employees.rehireFeeDays.
+ */
+export function rehireFee(
+  data: GameData,
+  salary = data.employees.inspector.salaryPerDay,
+): number {
+  return salary * data.employees.rehireFeeDays
+}
+
+/** Why a Re-hire is disabled, or null (the sim refuses below the fee). */
+export function rehireBlockReason(balance: number, fee: number): string | null {
+  return balance < fee ? 'Not enough money' : null
 }
 
 /** `Re-hire Lin ($20)` */
@@ -230,6 +252,7 @@ export class SlotCard extends WarehouseSheet {
   private salaryText: Phaser.GameObjects.BitmapText | null = null
   private hireBtn: Button | null = null
   private hireCaption: Phaser.GameObjects.BitmapText | null = null
+  private rehireBtns: { btn: Button; fee: number }[] = []
 
   constructor(
     scene: Phaser.Scene,
@@ -314,6 +337,7 @@ export class SlotCard extends WarehouseSheet {
     this.salaryText = null
     this.hireBtn = null
     this.hireCaption = null
+    this.rehireBtns = []
     const n = this.node ? findNode(this.vs, this.node) : null
     const f = n?.fixture
     if (!n || !f) return
@@ -428,7 +452,6 @@ export class SlotCard extends WarehouseSheet {
     y += LINE_PITCH
     this.text(PAD + 4, textTop(y, 20), inspectorsLine(seatedN, def.maxPerDesk))
     y += LINE_PITCH
-    const fee = rehireFee(data)
     for (const { e, seated } of this.personRows(f)) {
       const sprite = this.image(PAD + 4, y + 6, 'worker_s_idle_0')
       const ty = textTop(y, PERSON_ROW_H)
@@ -455,6 +478,7 @@ export class SlotCard extends WarehouseSheet {
       } else {
         sprite.setAlpha(0.4)
         this.text(PAD + 36, ty, `${e.name} walked out`, MUTED)
+        const fee = rehireFee(data, e.salaryPerDay)
         const rehire: Button = this.button(
           W - PAD - REHIRE_W,
           y + Math.floor((PERSON_ROW_H - SMALL_BTN_H) / 2),
@@ -463,11 +487,19 @@ export class SlotCard extends WarehouseSheet {
           {
             id: `slot:rehire:${e.id}`,
             label: rehireLabel(e.name, fee),
+            face: 'primary',
             onClick: () => this.rehire(e.id, rehire),
-            onDisabledTap: () => this.deny(rehire, warehouseFailText('locked')),
+            onDisabledTap: () =>
+              this.deny(
+                rehire,
+                SIM_FEATURES.payroll
+                  ? (rehireBlockReason(this.vs.money, fee) ??
+                      warehouseFailText('invalid'))
+                  : warehouseFailText('locked'),
+              ),
           },
         )
-        rehire.setEnabled(SIM_FEATURES.payroll)
+        this.rehireBtns.push({ btn: rehire, fee })
       }
       y += PERSON_ROW_H
     }
@@ -521,11 +553,17 @@ export class SlotCard extends WarehouseSheet {
       def.maxPerDesk,
       this.vs.money,
       def.hireFee,
+      f.walkedOutIds.length,
     )
   }
 
-  /** Hire button state + caption from the balance (live on money:changed). */
+  /** Hire / Re-hire state + caption from the balance (live on money:changed). */
   private update(): void {
+    for (const r of this.rehireBtns)
+      r.btn.setEnabled(
+        SIM_FEATURES.payroll &&
+          rehireBlockReason(this.vs.money, r.fee) === null,
+      )
     const b = this.hireBtn
     const cap = this.hireCaption
     if (!b || !cap) return

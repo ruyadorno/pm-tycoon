@@ -15,6 +15,19 @@
 // rebuilt from sim state (lastLostLife, daysSinceIncident) on wake / swap,
 // since sim events are not delivered while the city sleeps.
 //
+// M3 (plan.md §12.6 tasks 5, 9, 10; city-view §1.4, §2, §9.6): region:unlocked
+// crossfades the district's `_locked` buildings/props to their colour frames
+// and a second ground bake over the old one (1 s), then the lock sign pops
+// and the smoke emitters start; level:up covers the warehouse with fx_dust
+// (4 × 250 ms), swaps it to wh_ext_t<tier> on the reveal frame and floats the
+// gold "LEVEL 2 — LOCAL" stamp off the roof (the sting is the AudioDirector's
+// own level:up hook; no auto-pan). Waking after either snaps to the new state
+// (tier 2 at once). Mood overlays per building (flower boxes ≥ 80, shutters
+// < 30), the angry label + a grumble ui:sfx every 20 s while on screen, the
+// honking queue + red dock lights, docked vehicles drawn in front of bay 1
+// (cityFx.ts DOCK_POSE_CANVAS), the six Industrial smoke emitters while
+// Industrial is live, and the render-quality cut order (quality.ts, R4).
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -37,6 +50,7 @@ import {
   bindSim,
   getAlpha,
   getSim,
+  getStepper,
   getViewSim,
   REG,
 } from '../boot/simBinding.ts'
@@ -54,9 +68,27 @@ import {
   DEPTH,
   LOCKED_FILL,
   visibleRect,
-  type MoodKind,
 } from '../render/BuildingView.ts'
 import { CameraRig } from '../render/CameraRig.ts'
+import {
+  BAY_LIGHTS,
+  CONSTRUCTION_SWAP_MS,
+  DOCK_POSE_CANVAS,
+  DOCK_POSE_DEPTH,
+  dustFrame,
+  dustPoints,
+  fadeK,
+  levelStampText,
+  moodFor,
+  SMOKE_PHASE_MS,
+  SMOKE_PUFFS,
+  signCracked,
+  signDaysText,
+  smokePuff,
+  stampPose,
+  UNLOCK_FADE_MS,
+  WH_CANVAS,
+} from '../render/cityFx.ts'
 import { decayPhase } from '../render/decayPhase.ts'
 import { DistrictLabel } from '../render/DistrictLabel.ts'
 import {
@@ -66,7 +98,12 @@ import {
   SMOKE_ANCHORS,
   buildingSprite,
 } from '../render/frames.ts'
-import { bakeGround, GROUND_Y, type GroundBake } from '../render/ground.ts'
+import {
+  bakeGround,
+  GROUND_Y,
+  nextGroundKey,
+  type GroundBake,
+} from '../render/ground.ts'
 import {
   footprintAnchor,
   footprintDepth,
@@ -77,7 +114,14 @@ import {
   tileToScreen,
   worldSize,
 } from '../render/iso.ts'
-import { VehicleView } from '../render/VehicleView.ts'
+import {
+  EV_QUALITY,
+  installQuality,
+  qualityFlags,
+  type QualityController,
+  type QualityFlags,
+} from '../render/quality.ts'
+import { VehicleView, type DockPose } from '../render/VehicleView.ts'
 import type { CommandResult } from '../sim/commands.ts'
 import type { LifeLostPayload } from '../sim/events.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../sim/types.ts'
@@ -90,7 +134,7 @@ import {
 } from '../ui/BuildingTooltip.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
 import { Popups, STAMP_GOLD, STAMP_GREY, type ViewRect } from '../ui/Popups.ts'
-import { FONT_SIZE, paletteColour, THEME } from '../ui/theme.ts'
+import { FONT_SIZE, FONT_SIZE_BIG, paletteColour, THEME } from '../ui/theme.ts'
 
 // Game-event names this scene speaks (plan.md §5; the M1 cross-scene contract).
 export const EV_SELECT = 'pm:select'
@@ -140,17 +184,17 @@ const FX_BOOM_FRAMES = 6
 /** city-view §3.2-§3.3 camera shakes (duration ms, intensity). */
 const SHAKE_DEFUSED: readonly [number, number] = [120, 0.002]
 const SHAKE_LOST_LIFE: readonly [number, number] = [300, 0.004]
-const SMOKE_FPS = 4
-const SMOKE_PUFFS = 3
-const SMOKE_STEP_PX = 7
-/** Dock-bay light spots on the wh_ext canvas (256×256, bottom-centre anchor):
- *  the left posts of bays 1-3 on the visible SW face (artCity hand-off). */
-const BAY_LIGHTS: readonly (readonly [number, number])[] = [
-  [56, 170],
-  [72, 178],
-  [90, 186],
-]
-const WH_CANVAS = 256
+/** The new ground bake fades in above the old one at this depth (§1.4). */
+const GROUND_FADE_DEPTH = -0.5
+/** fx_dust puffs draw over the warehouse sprite (its depth + this). */
+const DUST_DEPTH = 0.5
+/** The level stamp: over every popup; 2-px shadow at 32 px (2× m5x7). */
+const STAMP_DEPTH = DEPTH.popup + 1
+const STAMP_SHADOW = 2
+const STAMP_PILL_H = 26
+const STAMP_PILL_PAD = 6
+/** Stamp start: this far below the exterior's visible top. */
+const STAMP_FROM_TOP = 12
 
 type Pick =
   | { kind: 'building'; view: BuildingView }
@@ -169,7 +213,33 @@ interface Fx {
 interface Smoke {
   building: string
   puffs: Phaser.GameObjects.Image[]
-  phase: number
+  /** Chimney top (world px). */
+  x: number
+  y: number
+  phaseMs: number
+}
+
+/** A crossfade (region unlock, §1.4): `ins` 0 → 1, `outs` 1 → 0 then destroyed. */
+interface Fade {
+  ins: Phaser.GameObjects.Image[]
+  outs: Phaser.GameObjects.Image[]
+  start: number
+  ms: number
+  done?: () => void
+}
+
+/** The level-up construction overlay (§9.6). */
+interface Construction {
+  start: number
+  tier: number
+  dust: Phaser.GameObjects.Image[]
+  swapped: boolean
+}
+
+interface LevelStamp {
+  start: number
+  box: Phaser.GameObjects.Container
+  y: number
 }
 
 interface PropView {
@@ -218,6 +288,15 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private props: PropView[] = []
   private smoke: Smoke[] = []
   private fx: Fx[] = []
+  private fades: Fade[] = []
+  private groundFading = false
+  private construction: Construction | null = null
+  private levelStamp: LevelStamp | null = null
+  private dockPose: DockPose | null = null
+  private qualityCtl: QualityController | null = null
+  /** Set while SHUTDOWN lands the in-flight fades (no new sprites then). */
+  private shuttingDown = false
+  private quality: QualityFlags = qualityFlags(0)
   private districts = new Map<string, DistrictDef>()
   private regionColour = new Map<string, number>()
   /** District id → fogged, as last applied to the view. */
@@ -270,6 +349,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.props = []
     this.smoke = []
     this.fx = []
+    this.fades = []
+    this.groundFading = false
+    this.construction = null
+    this.levelStamp = null
+    this.dockPose = null
+    this.shuttingDown = false
     this.lockState = new Map()
     this.dirty = new Set()
     this.popOnCreate = new Set()
@@ -302,6 +387,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     for (const r of map.regions)
       this.regionColour.set(r.id, paletteColour(r.colour))
     this.relayout()
+    // Render quality (plan.md R4): boot level from the core count + the fps
+    // sampler; idempotent, so a restarted City reuses the game's controller.
+    this.qualityCtl = installQuality(this.game)
+    this.quality = this.qualityCtl.flags
 
     this.world = this.add.layer()
     for (const d of this.gd.districts)
@@ -312,6 +401,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.world.add(this.ground.image)
     this.buildStatics()
     this.popups = new Popups(this, this.world)
+    this.popups.setCapacity(this.quality.popupPool)
     this.tooltip = new BuildingTooltip(this, this.world)
 
     const ws = worldSize(mapW, mapH)
@@ -357,12 +447,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
           this.refreshSign()
           this.refreshScorch()
         },
-        // TODO(M3): §1.4 1 s crossfade + re-baked ground crossfade + sign_pop;
-        // for now the view snaps to the new lock state.
-        'region:unlocked': () => this.applyLockState(),
-        // TODO(M3): §9.6 fx_dust construction overlay + LEVEL stamp; for now
-        // the exterior swaps to the new tier at once.
-        'level:up': () => this.refreshWarehouse(),
+        // §1.4: 1 s crossfade (sprites + a second ground bake), then sign_pop.
+        'region:unlocked': () => this.applyLockState(true),
+        // §9.6: fx_dust construction → wh_ext_t<tier> + the LEVEL stamp.
+        'level:up': (p) => this.onLevelUp(p.level),
         'life:lost': (p) => this.onLifeLost(p),
       },
       () => this.syncAll(),
@@ -397,9 +485,15 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.tooltip.hide()
     this.popups.clear()
     this.hover = null
+    // Asleep nothing animates: land every fade / the construction now, so
+    // the wake shows the new state at once (§9.6 "tier 2 at once").
+    this.finishFades()
+    this.finishConstruction()
+    this.clearLevelStamp()
   }
 
   private onShutdown(): void {
+    this.shuttingDown = true
     this.events.off(Phaser.Scenes.Events.WAKE, this.onWake, this)
     this.events.off(Phaser.Scenes.Events.SLEEP, this.onSleep, this)
     this.removeGameEvents()
@@ -411,6 +505,9 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.labels.clear()
     this.popups.destroy()
     this.tooltip.destroy()
+    this.finishFades()
+    this.finishConstruction()
+    this.clearLevelStamp()
   }
 
   /** nav.ts: the §5.3 city → warehouse exit (pan, zoom-2 snap, fade). */
@@ -491,6 +588,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.world.add(img)
       this.dockLights.push(img)
     })
+    this.dockPose = this.makeDockPose(left, top)
 
     // Props (static Images; `_locked` frame while their region is fogged).
     for (const pr of map.props) {
@@ -551,28 +649,49 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.buildSmoke()
   }
 
-  private placeProp(pv: PropView): void {
-    pv.img?.destroy()
+  /**
+   * (Re)create a prop's Image for its region's lock state. With `crossfade`
+   * the new Image starts at alpha 0 and the old one is returned (the caller
+   * fades and destroys it); otherwise the old one is destroyed.
+   */
+  private placeProp(
+    pv: PropView,
+    crossfade = false,
+  ): Phaser.GameObjects.Image | null {
+    const old = pv.img
     pv.img = null
     const locked = this.isLocked(pv.region)
     const name = lockedFrame(pv.frame, locked)
-    if (!name) return
-    const img = this.add
-      .image(pv.x, pv.y, WORLD_ATLAS, name)
-      .setOrigin(0.5, 1)
-      .setDepth(pv.depth)
-    if (locked && !name.endsWith('_locked'))
-      img.setTint(LOCKED_FILL).setTintMode(Phaser.TintModes.FILL)
-    this.world.add(img)
-    pv.img = img
+    if (name) {
+      const img = this.add
+        .image(pv.x, pv.y, WORLD_ATLAS, name)
+        .setOrigin(0.5, 1)
+        .setDepth(pv.depth)
+      if (locked && !name.endsWith('_locked'))
+        img.setTint(LOCKED_FILL).setTintMode(Phaser.TintModes.FILL)
+      this.world.add(img)
+      pv.img = img
+    }
+    if (crossfade && old && pv.img) {
+      pv.img.setAlpha(0)
+      return old
+    }
+    old?.destroy()
+    return null
   }
 
-  /** Smoke puffs over the live Industrial chimneys (manifest smokeAnchors). */
+  /**
+   * Smoke puffs over the live Industrial chimneys (manifest smokeAnchors,
+   * frames.generated SMOKE_ANCHORS): 3 puffs per emitter rising through
+   * fx_smoke_f0..3 at 4 fps, each emitter phase-offset (cityFx.smokePuff).
+   * None while the region is fogged or under quality cut 3.
+   */
   private buildSmoke(): void {
     for (const s of this.smoke) for (const p of s.puffs) p.destroy()
     this.smoke = []
-    if (!frameOrNull('fx_smoke_f0')) return
-    let phase = 0
+    if (this.shuttingDown || !this.quality.smoke || !frameOrNull('fx_smoke_f0'))
+      return
+    let emitter = 0
     for (const view of this.buildings.values()) {
       if (view.locked) continue
       const anchors = SMOKE_ANCHORS[buildingSprite(view.id)]
@@ -581,19 +700,51 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       const cw = view.image.width
       const ch = view.image.height
       for (const [ax, ay] of anchors) {
-        const x = view.anchor.x - cw / 2 + ax
-        const y = view.anchor.y - ch + ay
+        const x = Math.round(view.anchor.x - cw / 2 + ax)
+        const y = Math.round(view.anchor.y - ch + ay)
         const puffs: Phaser.GameObjects.Image[] = []
         for (let k = 0; k < SMOKE_PUFFS; k++) {
           const img = this.add
-            .image(x, y - k * SMOKE_STEP_PX, WORLD_ATLAS, 'fx_smoke_f0')
+            .image(x, y, WORLD_ATLAS, 'fx_smoke_f0')
             .setOrigin(0.5, 1)
             .setDepth(view.depth + DEPTH.smoke)
           this.world.add(img)
           puffs.push(img)
         }
-        this.smoke.push({ building: view.id, puffs, phase: phase++ })
+        this.smoke.push({
+          building: view.id,
+          puffs,
+          x,
+          y,
+          phaseMs: emitter++ * SMOKE_PHASE_MS,
+        })
       }
+    }
+    this.updateSmoke(this.time.now)
+  }
+
+  /**
+   * Where a docked vehicle is drawn: DOCK_POSE_CANVAS on the exterior canvas
+   * (top-left `left`, `top`), relative to the map's first dock tile, over
+   * the wall (art-install hand-off: the dock tiles sit on the sprite's
+   * hidden NW side).
+   */
+  private makeDockPose(left: number, top: number): DockPose | null {
+    const map = this.gd.map
+    const dock = map.lot.docks[0]
+    if (!dock) return null
+    const lotBlock = map.blocks.find((b) => b.kind === 'lot')
+    const rect = lotBlock
+      ? blockRect(map, lotBlock.block[0], lotBlock.block[1])
+      : null
+    const t = tileToScreen(dock[0], dock[1], this.ox)
+    const wh = map.lot.warehouse
+    return {
+      tile: [dock[0], dock[1]],
+      lotX0: rect ? rect[0] : map.lot.entrance[0] + 1,
+      dx: left + DOCK_POSE_CANVAS[0] - t.x,
+      dy: top + DOCK_POSE_CANVAS[1] - t.y,
+      depth: footprintDepth(wh.tile, wh.footprint) + DOCK_POSE_DEPTH,
     }
   }
 
@@ -605,10 +756,19 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     return { x: Math.round(r.centerX), y: Math.round(r.centerY) }
   }
 
-  private refreshWarehouse(): void {
+  /** The exterior tier of the sim's level (levels.json warehouseTier). */
+  private simTier(): number {
     const level = this.vs.level
-    const row = this.gd.levels.find((l) => l.level === level)
-    const tier = row?.warehouseTier ?? 1
+    return this.gd.levels.find((l) => l.level === level)?.warehouseTier ?? 1
+  }
+
+  /** Snap the exterior to the sim's tier (create, wake, sim swap). */
+  private refreshWarehouse(): void {
+    this.finishConstruction()
+    this.setWarehouseTier(this.simTier())
+  }
+
+  private setWarehouseTier(tier: number): void {
     if (tier === this.warehouseTier && this.warehouse) return
     const name = frameOrNull(`wh_ext_t${tier}`) ?? frameOrNull('wh_ext_t1')
     if (!name) return
@@ -637,12 +797,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     const t = this.signText
     if (!sign) return
     const n = this.vs.daysSinceIncident
-    const cracked = n === 0 && getSim(this)?.state.lastLostLife != null
+    const cracked = signCracked(n, getSim(this)?.state.lastLostLife != null)
     const frame =
       (cracked ? frameOrNull('sign_days_cracked') : null) ?? 'sign_days'
     if (sign.frame.name !== frame) sign.setFrame(frame)
     if (!t) return
-    t.setText(`${n} ${n === 1 ? 'day' : 'days'}`)
+    t.setText(signDaysText(n))
     const left = sign.x - sign.width / 2
     const top = sign.y - sign.height
     const f = SIGN_FACE
@@ -652,21 +812,241 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     )
   }
 
-  /** Apply region lock changes (create, wake, region:unlocked). */
-  private applyLockState(): void {
-    let changed = false
-    for (const d of this.gd.districts) {
+  /**
+   * Apply region lock changes. Snap on create / wake / sim swap; on
+   * region:unlocked (`animate`) the city-view §1.4 sequence: the colour
+   * frames fade in over 1 s while the `_locked` ones fade out, a second
+   * ground bake fades in over the old one (then the old bake is destroyed),
+   * and once the fade is done the lock sign pops (sign_pop, 300 ms) and the
+   * smoke emitters start. Mood overlays start hidden (satisfaction 60).
+   */
+  private applyLockState(animate = false): void {
+    const ins: Phaser.GameObjects.Image[] = []
+    const outs: Phaser.GameObjects.Image[] = []
+    const opened: string[] = []
+    const now = this.time.now
+    const changes = this.gd.districts.filter(
+      (d) => this.lockState.get(d.id) !== this.isLockedNow(d.id),
+    )
+    if (changes.length === 0) return
+    // A previous unlock still fading lands first (one ground fade at a time).
+    if (this.groundFading) this.finishFades()
+    for (const d of changes) {
       const locked = this.isLockedNow(d.id)
-      if (this.lockState.get(d.id) === locked) continue
       this.lockState.set(d.id, locked)
-      changed = true
-      for (const v of this.byDistrict.get(d.id) ?? []) v.setLocked(locked)
-      for (const pv of this.props) if (pv.region === d.id) this.placeProp(pv)
-      this.labels.get(d.id)?.setLocked(locked)
+      // Only an unlock animates; a re-lock (sim swap) always snaps.
+      const fade = animate && !locked
+      for (const v of this.byDistrict.get(d.id) ?? []) {
+        const { from, to } = v.setLocked(locked, fade)
+        if (from && to) {
+          outs.push(from)
+          ins.push(to)
+        }
+      }
+      for (const pv of this.props) {
+        if (pv.region !== d.id) continue
+        const old = this.placeProp(pv, fade)
+        if (old && pv.img) {
+          outs.push(old)
+          ins.push(pv.img)
+        }
+      }
+      const label = this.labels.get(d.id)
+      if (fade) label?.beginUnlock(now + UNLOCK_FADE_MS)
+      else label?.setLocked(locked)
+      if (!locked) opened.push(d.id)
     }
-    if (!changed) return
-    this.ground?.rebake((id) => this.lockState.get(id) === true)
-    this.buildSmoke()
+    for (const id of opened) {
+      const st = this.vs.districtStats(id)
+      if (st && st.kind === 'district') this.applyMood(id, st.satisfaction)
+    }
+    const isLocked = (id: string): boolean => this.lockState.get(id) === true
+    const old = this.ground
+    if (!animate || !old || ins.length + outs.length === 0) {
+      this.ground?.rebake(isLocked)
+      this.buildSmoke()
+      return
+    }
+    const next = bakeGround(this, this.gd.map, {
+      isLocked,
+      key: nextGroundKey(old.texture.key),
+      depth: GROUND_FADE_DEPTH,
+    })
+    next.image.setAlpha(0)
+    this.world.add(next.image)
+    ins.push(next.image)
+    this.ground = next
+    this.groundFading = true
+    this.addFade({
+      ins,
+      outs,
+      start: now,
+      ms: UNLOCK_FADE_MS,
+      done: () => {
+        old.destroy()
+        next.image.setDepth(-1)
+        this.groundFading = false
+        this.buildSmoke()
+      },
+    })
+  }
+
+  // ---------------------------------------------------------------- fades
+
+  private addFade(f: Fade): void {
+    this.fades.push(f)
+    this.stepFade(f, this.time.now)
+  }
+
+  /** Step one fade; true once it is over (outs destroyed, done run). */
+  private stepFade(f: Fade, now: number): boolean {
+    const k = fadeK(now - f.start, f.ms)
+    for (const o of f.ins) if (o.scene) o.setAlpha(k)
+    for (const o of f.outs) if (o.scene) o.setAlpha(1 - k)
+    if (k < 1) return false
+    for (const o of f.outs) o.destroy()
+    f.done?.()
+    return true
+  }
+
+  private updateFades(now: number): void {
+    if (this.fades.length === 0) return
+    this.fades = this.fades.filter((f) => !this.stepFade(f, now))
+  }
+
+  /** Land every fade now (sleep, sync, shutdown, a second unlock). */
+  private finishFades(): void {
+    const all = this.fades
+    this.fades = []
+    for (const f of all) this.stepFade(f, Infinity)
+    for (const l of this.labels.values()) if (l.popping) l.setLocked(l.locked)
+  }
+
+  // ---------------------------------------------------------------- level-up (§9.6)
+
+  /**
+   * level:up: fx_dust covers the exterior (4 frames × 250 ms: scaffold,
+   * dust, dust, reveal), the sprite swaps to wh_ext_t<tier> as the reveal
+   * frame starts, and the gold "LEVEL 2 — LOCAL" stamp rises 24 px over
+   * 1.2 s from the roof (a dedicated object, not the popup pool). The sting
+   * is the AudioDirector's level:up hook. No auto-pan.
+   */
+  private onLevelUp(level: number): void {
+    const row = this.gd.levels.find((l) => l.level === level)
+    this.finishConstruction()
+    this.startConstruction(row?.warehouseTier ?? this.simTier())
+    this.showLevelStamp(levelStampText(level, row?.title ?? ''))
+  }
+
+  private startConstruction(tier: number): void {
+    const img = this.warehouse
+    if (!img || !frameOrNull('fx_dust_f0')) {
+      this.setWarehouseTier(tier)
+      return
+    }
+    const r = visibleRect(img)
+    const left = img.x - img.displayOriginX
+    const top = img.y - img.displayOriginY
+    const frame = img.frame.name
+    const pts = dustPoints(
+      { x: r.x, y: r.y, w: r.width, h: r.height },
+      (x, y) =>
+        (this.textures.getPixelAlpha(
+          Math.floor(x - left),
+          Math.floor(y - top),
+          WORLD_ATLAS,
+          frame,
+        ) ?? 0) > 0,
+    )
+    const depth = img.depth + DUST_DEPTH
+    const dust = pts.map((p, i) => {
+      const d = this.add
+        .image(p.x, p.y, WORLD_ATLAS, 'fx_dust_f0')
+        .setOrigin(0.5, 0.5)
+        .setDepth(depth + i * 0.0001)
+      this.world.add(d)
+      return d
+    })
+    this.construction = { start: this.time.now, tier, dust, swapped: false }
+  }
+
+  private updateConstruction(now: number): void {
+    const c = this.construction
+    if (!c) return
+    const elapsed = now - c.start
+    if (!c.swapped && elapsed >= CONSTRUCTION_SWAP_MS) {
+      c.swapped = true
+      this.setWarehouseTier(c.tier)
+    }
+    const f = dustFrame(elapsed)
+    if (f === null) {
+      this.finishConstruction()
+      return
+    }
+    const name = `fx_dust_f${f}`
+    for (const d of c.dust)
+      if (d.frame.name !== name) d.setFrame(name, false, false)
+  }
+
+  /** End the construction now (its tier applied). */
+  private finishConstruction(): void {
+    const c = this.construction
+    if (!c) return
+    this.construction = null
+    for (const d of c.dust) d.destroy()
+    if (!c.swapped) this.setWarehouseTier(c.tier)
+  }
+
+  private showLevelStamp(label: string): void {
+    this.clearLevelStamp()
+    if (!this.hasFont) return
+    const text = this.add
+      .bitmapText(0, 0, FONT_KEY, label, FONT_SIZE_BIG)
+      .setTint(THEME.gold)
+      .setDropShadow(STAMP_SHADOW, STAMP_SHADOW, THEME.shadow, 1)
+    const w = Math.round(text.width) + STAMP_PILL_PAD * 2
+    const pill = this.add
+      .nineslice(
+        0,
+        0,
+        WORLD_ATLAS,
+        'ui_panel_dark',
+        w,
+        STAMP_PILL_H,
+        4,
+        4,
+        4,
+        4,
+      )
+      .setOrigin(0.5, 0.5)
+      .setAlpha(0.85)
+    // m5x7 at 32 px: cap top 8, cap height 14 (2× the 16-px metrics).
+    text.setPosition(-Math.round(text.width / 2), -8 - 7)
+    const img = this.warehouse
+    const y = img
+      ? Math.round(visibleRect(img).y + STAMP_FROM_TOP)
+      : this.warehouseAnchor.y - 160
+    const box = this.add
+      .container(this.warehouseAnchor.x, y, [pill, text])
+      .setDepth(STAMP_DEPTH)
+    this.world.add(box)
+    this.levelStamp = { start: this.time.now, box, y }
+  }
+
+  private updateLevelStamp(now: number): void {
+    const st = this.levelStamp
+    if (!st) return
+    const pose = stampPose(now - st.start)
+    if (!pose) {
+      this.clearLevelStamp()
+      return
+    }
+    st.box.setPosition(st.box.x, st.y + pose.dy).setAlpha(pose.alpha)
+  }
+
+  private clearLevelStamp(): void {
+    this.levelStamp?.box.destroy()
+    this.levelStamp = null
   }
 
   // ---------------------------------------------------------------- sync
@@ -674,6 +1054,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   /** Rebuild everything from sim state (create, WAKE, sim swap). */
   private syncAll(): void {
     if (!this.world) return
+    this.finishFades()
+    this.clearLevelStamp()
     this.applyLockState()
     this.refreshWarehouse()
     this.refreshSign()
@@ -691,11 +1073,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     if (this.followId !== null && !ids.has(this.followId)) this.unfollow(true)
     this.queueN = this.vs.dockQueue.length
     this.stalled = this.vs.lane.stalled !== null
-    for (const d of this.gd.districts) {
-      if (d.kind !== 'district') continue // hubs have no satisfaction (§9.1)
-      const st = this.vs.districtStats(d.id)
-      if (st) this.applyMood(d.id, st.satisfaction)
-    }
+    this.syncMoods()
     this.refreshMarkers()
   }
 
@@ -711,8 +1089,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     let oldest = Infinity
     for (const p of waiting) oldest = Math.min(oldest, p.spawnedTick)
     const ageS = waiting.length > 0 ? (this.vs.tick - oldest) / TICKS_PER_S : 0
-    view.setWaiting(waiting.length, decayPhase(ageS, this.gd.parcels))
     const rush = this.vs.rushState(view.id)
+    // Quality cut 4 (R4): badges only on rushed buildings.
+    const n = this.quality.badgesRushedOnly && !rush ? 0 : waiting.length
+    view.setWaiting(n, decayPhase(ageS, this.gd.parcels))
     if (rush) {
       const total = this.gd.vehicles.rushExpireS * TICKS_PER_S
       const left = Math.max(0, rush.untilTick - this.vs.tick)
@@ -720,14 +1100,52 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     } else view.setRush(null)
   }
 
+  /**
+   * Spec §9.2: one overlay per building from the district value (flower
+   * boxes ≥ happyAbove, shutters < loudBelow; none while fogged or under
+   * quality cut 1) and the angry label icon below loudBelow.
+   */
   private applyMood(districtId: string, value: number): void {
-    const s = this.gd.economy.satisfaction
-    const kind: MoodKind =
-      value < s.loudBelow ? 'unhappy' : value >= s.happyAbove ? 'happy' : null
+    const kind = moodFor(value, this.gd.economy.satisfaction)
     const locked = this.isLocked(districtId)
+    const show = !locked && this.quality.moodOverlays
     for (const v of this.byDistrict.get(districtId) ?? [])
-      v.setMood(locked ? null : kind)
-    this.labels.get(districtId)?.setAngry(!locked && value < s.loudBelow)
+      v.setMood(show ? kind : null)
+    this.labels.get(districtId)?.setAngry(!locked && kind === 'unhappy')
+  }
+
+  /** Re-apply every live district's mood (sync, quality change). */
+  private syncMoods(): void {
+    for (const d of this.gd.districts) {
+      if (d.kind !== 'district') continue // hubs have no satisfaction (§9.1)
+      const st = this.vs.districtStats(d.id)
+      if (st) this.applyMood(d.id, st.satisfaction)
+    }
+  }
+
+  /** quality:changed (R4 cut order): re-apply every consumer. */
+  private applyQuality(): void {
+    this.quality = this.qualityCtl?.flags ?? qualityFlags(0)
+    this.popups.setCapacity(this.quality.popupPool)
+    this.buildSmoke()
+    this.syncMoods()
+    this.refreshMarkers()
+  }
+
+  /**
+   * Spec §9.2 grumble: an angry district label on screen grumbles now, then
+   * every 20 s (DistrictLabel.tickGrumble; the director throttles overall).
+   * Quiet while the sim is paused (0× or a modal card), like the director's
+   * own loops.
+   */
+  private updateGrumble(now: number): void {
+    const st = getStepper(this)
+    if (st && (st.paused || st.speed === 0)) return
+    const view = this.cameras.main.worldView
+    let due = false
+    for (const l of this.labels.values())
+      if (l.tickGrumble(now, l.angryOnScreen(view))) due = true
+    if (due) this.emit(EV_UI_SFX, { name: 'grumble' })
   }
 
   // ---------------------------------------------------------------- update
@@ -742,6 +1160,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.popups.update(delta)
     this.tooltip.update(delta)
     this.updateFx(now)
+    this.updateFades(now)
+    this.updateConstruction(now)
+    this.updateLevelStamp(now)
+    for (const l of this.labels.values()) l.update(now)
     this.updateSmoke(now)
     this.updateDockLights(now)
     if (this.zone)
@@ -760,6 +1182,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.refreshMarkers()
       this.refreshTooltip()
       if (this.scorched.size > 0) this.refreshScorch()
+      this.updateGrumble(now)
     }
     this.updateHover(now)
   }
@@ -767,17 +1190,21 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private updateVehicles(now: number): void {
     const alpha = getAlpha(this)
     const snaps = this.vs.vehicles
+    const wv = this.cameras.main.worldView
+    const staticWheels = this.quality.staticWheels
     let seen = 0
     for (const v of snaps) {
       let view = this.vehicles.get(v.id)
       if (!view) {
-        view = new VehicleView(this, this.world, this.ox, v)
+        view = new VehicleView(this, this.world, this.ox, v, this.dockPose)
         this.vehicles.set(v.id, view)
       }
       seen++
       const colour =
         v.zone === 'any' ? null : (this.regionColour.get(v.zone) ?? null)
-      view.update(v, alpha, now, colour)
+      // On screen = last frame's position inside the view (honk bubble, §2).
+      const onScreen = wv.contains(view.x, view.y)
+      view.update(v, alpha, now, colour, { onScreen, staticWheels })
       if (this.popOnCreate.delete(v.id))
         this.playFx(view.x, view.y, 'fx_pop', FX_POP_MS, false, view.img.depth)
     }
@@ -808,11 +1235,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private updateSmoke(now: number): void {
-    const step = Math.floor((now * SMOKE_FPS) / 1000)
     for (const s of this.smoke)
       s.puffs.forEach((p, k) => {
-        const f = `fx_smoke_f${(step + s.phase + k) % 4}`
+        const puff = smokePuff(now, s.phaseMs, k)
+        const f = `fx_smoke_f${puff.frame}`
         if (p.frame.name !== f) p.setFrame(f, false, false)
+        p.setPosition(s.x + puff.dx, s.y + puff.dy)
       })
   }
 
@@ -1199,6 +1627,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     if (x !== null && y !== null) this.focusOn(x, y, 350, p.cover)
   }
 
+  private readonly onQualityEv = (): void => {
+    this.applyQuality()
+  }
+
   private readonly onResize = (): void => {
     this.relayout()
     if (this.tooltip.visible) this.tooltip.setClamp(this.clampRect())
@@ -1209,6 +1641,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     ge.on(EV_FOLLOW, this.onFollowEv)
     ge.on(EV_ZONE_PICK, this.onZonePickEv)
     ge.on(EV_PAN_TO, this.onPanToEv)
+    ge.on(EV_QUALITY, this.onQualityEv)
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize)
   }
 
@@ -1217,6 +1650,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     ge.off(EV_FOLLOW, this.onFollowEv)
     ge.off(EV_ZONE_PICK, this.onZonePickEv)
     ge.off(EV_PAN_TO, this.onPanToEv)
+    ge.off(EV_QUALITY, this.onQualityEv)
     this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize)
   }
 

@@ -67,13 +67,14 @@ describe('District panel (city-view §5.1)', () => {
     expect(dp.favouredLine(district('docks'), data)).toBeNull()
   })
 
-  it('Industrial reads "Trucks only — bikes and vans never enter" and "No truck yet (Lv 2, $1,300)" until a truck is owned', () => {
+  it('Industrial reads "Trucks only — bikes and vans never enter" and "No truck yet (Lv 2, $1,200)" until a truck is owned', () => {
     const ind = district('industrial')
     expect(dp.vehicleRuleLine(ind, data)).toBe(
       'Trucks only — bikes and vans never enter',
     )
+    const truck = data.vehicles.types.find((t) => t.id === 'truck')!
     expect(dp.missingVehicleLine(ind, data, ['bike', 'van'])).toBe(
-      'No truck yet (Lv 2, $1,300)',
+      `No truck yet (Lv 2, $${truck.price.toLocaleString('en-US')})`,
     )
     expect(dp.missingVehicleLine(ind, data, ['bike', 'truck'])).toBeNull()
     expect(dp.vehicleRuleLine(district('highres'), data)).toBeNull()

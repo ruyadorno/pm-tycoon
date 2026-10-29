@@ -192,9 +192,22 @@ export function speedSegment(paused: boolean, speed: number): 0 | 1 | 2 {
   return speed === 1 ? 1 : 2
 }
 
-/** Garage badge (§4.3): `!` while a driver is unpaid or a vehicle inactive. */
-export function garageAlert(vehicles: readonly VehicleSnapshot[]): boolean {
-  return vehicles.some((v) => v.unpaid || v.state === 'inactive')
+/**
+ * Garage badge (§4.3, §9.7): `!` while a driver is unpaid, a vehicle has no
+ * driver (inactive, or walked out and finishing its trip), or the last
+ * payday was short (`payroll().short`: an unpaid inspector also raises it,
+ * the Garage header's red payroll line says why).
+ */
+export function garageAlert(
+  vehicles: readonly Pick<VehicleSnapshot, 'unpaid' | 'state' | 'driverName'>[],
+  payrollShort = false,
+): boolean {
+  return (
+    payrollShort ||
+    vehicles.some(
+      (v) => v.unpaid || v.state === 'inactive' || v.driverName === null,
+    )
+  )
 }
 
 /**
@@ -216,6 +229,107 @@ export function newlyAffordableTypes(
         !seen.has(t.id),
     )
     .map((t) => t.id)
+}
+
+// ---- M3 ticker lines and toasts (city-view §8.1, §9.7) -----------------------
+
+/** `region` kind: `Hoist Hill is now open` (districts.json flavour). */
+export function regionOpenLine(data: GameData, district: string): string {
+  const d = data.districts.find((x) => x.id === district)
+  return `${d?.flavour ?? district} is now open`
+}
+
+/** `strain` kind: `New strain spotted: rattle` (after newStrainDelayS). */
+export function strainLine(strain: string): string {
+  return `New strain spotted: ${strain}`
+}
+
+/**
+ * `mood` kind (§9.2 thresholds, economy.satisfaction loudBelow / happyAbove):
+ * `Node Heights is grumbling` when the value drops below loudBelow,
+ * `Registry Row loves the service` when it rises to happyAbove; null when no
+ * threshold was crossed by this change.
+ */
+export function moodLine(
+  data: GameData,
+  district: string,
+  value: number,
+  delta: number,
+): string | null {
+  const s = data.economy.satisfaction
+  const d = data.districts.find((x) => x.id === district)
+  if (!d) return null
+  const prev = value - delta
+  if (prev >= s.loudBelow && value < s.loudBelow)
+    return `${d.flavour} is grumbling`
+  if (prev < s.happyAbove && value >= s.happyAbove)
+    return `${d.flavour} loves the service`
+  return null
+}
+
+/**
+ * Payday toast `Payday — payroll −$28` with the amount drawn red from
+ * `redFrom` (city-view §9.7: "number red").
+ */
+export function paydayToast(amount: number): { text: string; redFrom: number } {
+  const head = 'Payday — payroll '
+  return { text: head + formatMoney(-Math.abs(amount)), redFrom: head.length }
+}
+
+/** `Payroll short: Audrey unpaid` / `Payroll short: Audrey, Dee unpaid`. */
+export function payrollShortLine(names: readonly string[]): string {
+  return `Payroll short: ${names.join(', ')} unpaid`
+}
+
+/**
+ * Walkout line (§8.1 `payroll`): `Audrey walked out — desk short-handed` /
+ * `Dee walked out — Bike 2 has no driver`.
+ */
+export function walkoutLine(
+  name: string,
+  kind: 'inspector' | 'driver',
+  vehicleName: string | null,
+): string {
+  if (kind === 'driver')
+    return `${name} walked out — ${vehicleName ?? 'a vehicle'} has no driver`
+  return `${name} walked out — desk short-handed`
+}
+
+/** `Audrey`, `Audrey and Dee`, `Audrey, Dee and Pax`. */
+export function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/**
+ * Several walkouts on one payday make one toast and one paper:
+ * `Audrey, Dee and Pax walked out — unpaid 2 paydays running`
+ * (employees.json walkoutAfterUnpaidPaydays).
+ */
+export function walkoutGroupLine(
+  names: readonly string[],
+  paydays: number,
+): string {
+  return `${joinNames(names)} walked out — unpaid ${paydays} paydays running`
+}
+
+/** audio:nowPlaying {title} toast (audio.md §3 item 8; m5x7 has no ♪). */
+export function nowPlayingText(title: string): string {
+  return `Now playing: ${title}`
+}
+
+/** The mute button's hint while the audio waits for its first tap (skipTitle). */
+export const TAP_FOR_SOUND_TEXT = 'Tap for sound'
+
+/** The strains whose announcement delay has run out at `tick` (spec §5.4, §8). */
+export function strainsLive(
+  announced: Partial<Record<string, number>>,
+  tick: number,
+  delayTicks: number,
+): string[] {
+  return Object.entries(announced)
+    .filter(([, t]) => t !== undefined && tick >= t + delayTicks)
+    .map(([s]) => s)
 }
 
 // ---- follow strip (city-view §2, spec §4.6) ---------------------------------

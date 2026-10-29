@@ -5,8 +5,10 @@
 // `road_<mask>` from the trimmed avenue set (+ the themed one-sided edge
 // overlays), then the 2-px district kerb along every block edge that faces a
 // road or the map edge, tinted with the region's palette colour. Re-baked on
-// RESTORE_WEBGL (DynamicTexture contents die with the context) and on demand
-// (region unlock).
+// RESTORE_WEBGL (DynamicTexture contents die with the context) and on demand.
+// A region unlock (city-view §1.4) bakes the new lock state into a SECOND
+// texture (nextGroundKey: 'ground' ↔ 'ground_b') whose Image the city fades
+// in over the old one before destroying the old bake.
 import Phaser from 'phaser'
 import {
   groundAt,
@@ -43,6 +45,14 @@ const LOCKED_KERB_TINT = PALETTE.grey4
 
 /** World y of the ground image's top edge: tile (0,0)'s top vertex. */
 export const GROUND_Y = -HH
+
+/** The unlock crossfade's second texture key. */
+export const GROUND_TEXTURE_ALT = `${GROUND_TEXTURE}_b`
+
+/** The key of the next bake to crossfade to ('ground' ↔ 'ground_b'). */
+export function nextGroundKey(current: string): string {
+  return current === GROUND_TEXTURE_ALT ? GROUND_TEXTURE : GROUND_TEXTURE_ALT
+}
 
 export function roadMask(map: MapData, x: number, y: number): number {
   let m = 0

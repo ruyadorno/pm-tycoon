@@ -62,10 +62,22 @@ export function simClock(tick: number): string {
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** A 0..1 rate (or an already-percent value > 1) as a whole percent. */
+/** A 0..1 rate (or an already-percent value > 1) as a percent: whole below 99, one decimal from 99. */
 export function ratePct(r: number): number {
   const v = Number.isFinite(r) ? r : 0
-  return Math.round(v > 1 ? v : 100 * v)
+  const pct = v > 1 ? v : 100 * v
+  if (pct >= 100) return 100
+  // A checker chain never catches everything: from 99 % on the card keeps
+  // one decimal (floored, at most 99.9) so a 99.8 % lane never reads "would
+  // make it 100%", nor a stronger lane the same "99%" as a weaker one
+  // ("got through on the 0%") — UX M3 review.
+  if (pct >= 99) return Math.min(99.9, Math.floor(pct * 10) / 10)
+  return Math.round(pct)
+}
+
+/** The share that got through: 100 − ratePct, without float noise (0.6, 17). */
+export function missPct(r: number): number {
+  return Math.round((100 - ratePct(r)) * 10) / 10
 }
 
 /** `A Shaky shaker`, `An X-ray`. */
@@ -399,9 +411,8 @@ export function counterLines(
   // The rate line above already reads "Your lane's catch rate vs metal was
   // 97%"; the spec's "Your lane was at 97% — …" restated it word for word
   // on the next line (UX M2 review), so only the dice half is kept.
-  const lane = ratePct(p.laneRate)
   return [
-    `This one got through on the ${100 - lane}%`,
+    `This one got through on the ${missPct(p.laneRate)}%`,
     `${withArticle(name, true)} would make it ${to}%`,
   ]
 }

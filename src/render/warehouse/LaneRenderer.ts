@@ -13,7 +13,21 @@
 // effects state cannot show: the catch moment (§3.3) and the Toss outcomes
 // (§3.4) are queued per parcel and run before the sprite follows state again.
 // Shelf parcels are 10 × 10 minis drawn from `shelf.ids` (oldest first);
-// a sprite flying to the shelf hides its mini until it lands.
+// a sprite flying to the shelf hides its mini until it lands. Hold Bay
+// parcels sit on the sim's STABLE bay (`holdBay.items[].bay`, M3): a Toss
+// never slides the others down the rack. Draw order inside the parcel layer:
+// the newest sprite on top, except that a parcel mid-catch or dark (flagged)
+// always stays above the plain ones (a sprite acquired after the catch must
+// not cover it).
+//
+// Tiers (§5): `applyTier(t, fade)` swaps every tier-keyed frame (floor,
+// walls, wall face, sign, shelf, wanted poster) under a fading copy of the
+// old look, and fades the tier-only parts (bulb ↔ strip lights, cardboard ↔
+// shelving unit, the INTAKE / HOLD / SHELF / QUARANTINE plates, the sign
+// text tint) over the same 400 ms. A level-up while inside cross-fades, then
+// unrolls the newly live slot (§1.6: lock look out, belt tiles in top to
+// bottom 75 ms apart, then the empty outline and its "+"); waking after a
+// level-up applies the tier and the live slot at once (§5.3).
 //
 // No slot index is computed here: positions come from FixedLaneLayout by
 // node id, order from `next` edges, caps and locks from the sim / data.
@@ -37,6 +51,8 @@ import {
   DOOR_POINT,
   FixedLaneLayout,
   POSTER,
+  PLATE_H,
+  PLATE_PAD,
   PROPS_T1,
   PROPS_T2,
   RACK,
@@ -154,8 +170,10 @@ const BULB_FLICKER_EVERY_MS = 7000
 const BULB_FLICKER_MS = 120
 const CRACK_FPS = 6
 const SIGN_FADE_MS = 200
-const TIER_FADE_MS = 400
-const UNROLL_STEP_MS = 75
+export const TIER_FADE_MS = 400
+export const UNROLL_STEP_MS = 75
+/** The slot's lock look fades out this long as the unroll starts. */
+const UNLOCK_FADE_MS = 150
 const POP_MS = 150
 const UNLOAD_MS = 200
 const TOSS_MS = 250
@@ -219,6 +237,32 @@ export function readoutParts(
   }
 }
 
+/**
+ * Rack position of every held parcel: the sim's stable `bay` (M3: a parcel
+ * keeps the bay it arrived in until it leaves; gaps allowed), else — an item
+ * the facade has not reported — the lowest bay nobody holds. Parcel id → bay.
+ */
+export function holdBayPositions(
+  queue: readonly number[],
+  items: readonly { parcelId: number; bay: number }[],
+): Map<number, number> {
+  const out = new Map<number, number>()
+  const used = new Set<number>()
+  for (const it of items) {
+    if (!queue.includes(it.parcelId) || used.has(it.bay)) continue
+    out.set(it.parcelId, it.bay)
+    used.add(it.bay)
+  }
+  for (const id of queue) {
+    if (out.has(id)) continue
+    let b = 0
+    while (used.has(b)) b += 1
+    out.set(id, b)
+    used.add(b)
+  }
+  return out
+}
+
 /** A flagged-looking parcel: flagged and still in a slot or the Hold Bay. */
 function looksFlagged(p: Parcel | null): boolean {
   return (
@@ -260,6 +304,8 @@ interface PSprite {
   ringFrame: number
   /** Leaving the lane (to the shelf, the bin, the door); reconcile skips it. */
   leaving: 'shelf' | 'bin' | 'gone' | null
+  /** parcel:flagged until it turns dark: drawn above later sprites. */
+  catching: boolean
   seen: boolean
   alive: boolean
 }
@@ -282,6 +328,9 @@ interface SlotView {
   scanFps: number
   isLocked: boolean
   lifted: boolean
+  /** Unlocked, still showing the lock look until its unroll starts. */
+  unrollPending: boolean
+  unrollTimer: Phaser.Time.TimerEvent | null
 }
 
 interface Want {
@@ -538,10 +587,12 @@ export class LaneRenderer {
     )
     // Tier-2 signage plates.
     for (const s of SIGNAGE) {
-      const txt = addText(this.scene, 4, 0, s.text, { tint: THEME.textDark })
-      const w = Math.round(txt.width) + 8
-      const plate = addPanel(this.scene, 0, 0, w, 16, 'ui_tag')
-      txt.setY(textTop(0, 16))
+      const txt = addText(this.scene, PLATE_PAD / 2, 0, s.text, {
+        tint: THEME.textDark,
+      })
+      const w = Math.round(txt.width) + PLATE_PAD
+      const plate = addPanel(this.scene, 0, 0, w, PLATE_H, 'ui_tag')
+      txt.setY(textTop(0, PLATE_H))
       const box = this.scene.add.container(s.x, s.y, [plate, txt])
       this.L.badges.add(box)
       this.plates.push(box)
@@ -584,6 +635,8 @@ export class LaneRenderer {
       scanFps: MACHINE_SCAN_FPS,
       isLocked: false,
       lifted: false,
+      unrollPending: false,
+      unrollTimer: null,
     }
   }
 
@@ -642,14 +695,20 @@ export class LaneRenderer {
 
   // ================================================================ tiers
 
-  /** Tier switch hook (§5): t1 → t2 art; `fade` cross-fades 400 ms. */
+  /**
+   * Tier switch hook (§5): t1 → t2 art. `fade` = the 400 ms cross-fade of a
+   * level-up seen from inside (every tier-keyed frame under a fading copy of
+   * its old look, the tier-only parts and the sign text faded); without it
+   * the new tier shows at once (create, waking after the level-up).
+   */
   applyTier(tier: 1 | 2, fade: boolean): void {
     const prev = this.tier
     this.tier = tier
+    const cross = fade && prev !== tier
     const swap = (img: Img, frame: string): void => {
       const f = frameOrNull(frame)
       if (!f || img.frame.name === f) return
-      if (fade && prev !== tier) this.ghost(img)
+      if (cross) this.ghost(img)
       img.setFrame(f)
     }
     for (const f of this.floorImgs) swap(f.img, this.floorFrame(f.c, f.r))
@@ -658,13 +717,53 @@ export class LaneRenderer {
     swap(this.sign, `sign_t${tier}`)
     swap(this.shelfImg, `shelf_t${tier}`)
     swap(this.poster, `wanted_poster_t${tier}`)
-    this.signText.setTint(tier === 1 ? THEME.textLight : THEME.textDark)
-    this.bulb.setVisible(tier === 1)
-    for (const s of this.strips) s.setVisible(tier === 2)
-    for (const p of this.props1) p.setVisible(tier === 1)
-    for (const p of this.props2) p.setVisible(tier === 2)
-    for (const p of this.plates) p.setVisible(tier === 2)
+    const tint = tier === 1 ? THEME.textLight : THEME.textDark
+    if (cross && this.signText.tintTopLeft !== tint)
+      this.ghostText(this.signText)
+    this.signText.setTint(tint)
+    this.fadeShown(this.bulb, tier === 1, cross)
+    for (const s of this.strips) this.fadeShown(s, tier === 2, cross)
+    for (const p of this.props1) this.fadeShown(p, tier === 1, cross)
+    for (const p of this.props2) this.fadeShown(p, tier === 2, cross)
+    for (const p of this.plates) this.fadeShown(p, tier === 2, cross)
     this.refreshSign()
+  }
+
+  /** Show / hide a tier-only part, over TIER_FADE_MS when `fade`. */
+  private fadeShown(obj: Img | Box, show: boolean, fade: boolean): void {
+    this.scene.tweens.killTweensOf(obj)
+    if (!fade || obj.visible === show) {
+      obj.setVisible(show)
+      obj.setAlpha(1)
+      return
+    }
+    obj.setVisible(true)
+    obj.setAlpha(show ? 0 : 1)
+    this.scene.tweens.add({
+      targets: obj,
+      alpha: show ? 1 : 0,
+      duration: TIER_FADE_MS,
+      onComplete: () => {
+        obj.setVisible(show)
+        obj.setAlpha(1)
+      },
+    })
+  }
+
+  /** A fading copy of a BitmapText's current look above it (sign text). */
+  private ghostText(t: Txt): void {
+    const parent = t.parentContainer
+    if (!parent) return
+    const g = addText(this.scene, t.x, t.y, t.text, { tint: t.tintTopLeft })
+    parent.addAt(g, parent.getIndex(t) + 1)
+    t.setAlpha(0)
+    this.scene.tweens.add({ targets: t, alpha: 1, duration: TIER_FADE_MS })
+    this.scene.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: TIER_FADE_MS,
+      onComplete: () => g.destroy(),
+    })
   }
 
   /** A fading copy of `img`'s current look above it (the cross-fade). */
@@ -683,10 +782,16 @@ export class LaneRenderer {
     })
   }
 
+  /**
+   * level:up while inside (§5.3): the tier cross-fade, then (after it) the
+   * unroll of every slot the level opened; bays and the shelf badge follow
+   * the new caps.
+   */
   onLevelUp(): void {
     const t = visualTier(this.gd, this.vs.level)
-    if (t !== this.tier) this.applyTier(t, true)
-    this.syncSlots(true)
+    const tierUp = t !== this.tier
+    if (tierUp) this.applyTier(t, !this.instant)
+    this.syncSlots(true, tierUp ? TIER_FADE_MS : 0)
     this.syncBays()
   }
 
@@ -727,8 +832,11 @@ export class LaneRenderer {
 
   // ================================================================ slots
 
-  /** Re-read every slot's lock / fixture (`unroll` animates new unlocks). */
-  syncSlots(unroll = false): void {
+  /**
+   * Re-read every slot's lock / fixture; with `unroll` a slot that just
+   * went live unrolls (§1.6), `delay` ms from now.
+   */
+  syncSlots(unroll = false, delay = 0): void {
     for (const node of this.vs.lane.nodes()) {
       const v = this.slots.get(node.id)
       if (!v) continue
@@ -737,9 +845,10 @@ export class LaneRenderer {
       v.isLocked = isLocked
       if (isLocked) this.lockedSlots.add(node.id)
       else this.lockedSlots.delete(node.id)
+      if (isLocked) this.cancelUnroll(v)
       this.syncFixture(v, node)
-      this.syncSlotLook(v, node)
-      if (unroll && wasLocked && !isLocked) this.unroll(v)
+      if (unroll && wasLocked && !isLocked) this.unroll(v, node, delay)
+      else this.syncSlotLook(v, node)
     }
     // Extension strip: slots past the belt column (§6).
     const extLocked = this.vs.lane
@@ -754,20 +863,30 @@ export class LaneRenderer {
 
   private syncSlotLook(v: SlotView, node: LaneNode): void {
     const hasFixture = node.fixture !== null && !v.lifted
-    v.locked.setVisible(v.isLocked)
-    v.lock.setVisible(v.isLocked)
-    v.lockText.setVisible(v.isLocked)
+    // An unlocked slot keeps its lock look until its unroll starts.
+    const lockLook = v.isLocked || v.unrollPending
+    v.locked.setVisible(lockLook)
+    v.lock.setVisible(lockLook)
+    v.lockText.setVisible(lockLook)
     if (v.isLocked) {
       v.lockText.setText(`Lv${node.locked?.level ?? ''}`)
       v.lockText.setX(Math.round(v.rect.x + 32 - v.lockText.width / 2))
     }
-    v.empty.setVisible(!v.isLocked && !hasFixture)
-    v.plus.setVisible(!v.isLocked && !hasFixture)
+    v.empty.setVisible(!lockLook && !hasFixture)
+    v.plus.setVisible(!lockLook && !hasFixture)
     for (const b of v.belts) {
       if (!this.scene.tweens.isTweening(b))
-        b.setAlpha(v.isLocked ? LOCKED_BELT_ALPHA : 1)
+        b.setAlpha(lockLook ? LOCKED_BELT_ALPHA : 1)
     }
-    v.outlet?.setAlpha(v.isLocked ? LOCKED_BELT_ALPHA : 1)
+    v.outlet?.setAlpha(lockLook ? LOCKED_BELT_ALPHA : 1)
+  }
+
+  /** Belts of a locked (or not yet unrolled) slot stay on frame 0. */
+  private beltFrozen(nodeId: string): boolean {
+    return (
+      this.lockedSlots.has(nodeId) ||
+      this.slots.get(nodeId)?.unrollPending === true
+    )
   }
 
   private fixtureKey(node: LaneNode): string {
@@ -801,24 +920,90 @@ export class LaneRenderer {
     if (at) v.machine = this.img(this.L.machines, at.x, at.y, v.idleFrame)
   }
 
-  /** §1.6 level-up unroll: belt tiles fade in top to bottom, 75 ms apart. */
-  private unroll(v: SlotView): void {
-    v.belts.forEach((b, i) => {
-      b.setAlpha(0)
-      this.scene.tweens.add({
-        targets: b,
-        alpha: 1,
-        delay: i * UNROLL_STEP_MS,
-        duration: UNROLL_STEP_MS * 2,
+  /**
+   * §1.6 level-up unroll, `delay` ms from now (after the tier cross-fade):
+   * the lock look fades out, the belt tiles fade in top to bottom 75 ms
+   * apart, then the empty outline and its "+" fade in (≈ 300 ms in all).
+   * The slot is live in the sim at once; until the unroll starts it keeps
+   * the lock look and its belts stay still.
+   */
+  private unroll(v: SlotView, node: LaneNode, delay: number): void {
+    this.cancelUnroll(v)
+    v.unrollPending = true
+    this.syncSlotLook(v, node)
+    const start = (): void => {
+      v.unrollTimer = null
+      v.unrollPending = false
+      if (!v.empty.scene) return
+      const fresh = this.vs.lane.nodes().find((n) => n.id === v.nodeId)
+      if (!fresh || fresh.locked) return
+      const ghosts: [Img | Txt, number][] = [
+        [v.locked, LOCKED_ALPHA],
+        [v.lock, 1],
+        [v.lockText, 1],
+      ]
+      this.syncSlotLook(v, fresh)
+      for (const [o, rest] of ghosts) {
+        o.setVisible(true).setAlpha(rest)
+        this.scene.tweens.add({
+          targets: o,
+          alpha: 0,
+          duration: UNLOCK_FADE_MS,
+          onComplete: () => {
+            o.setVisible(v.isLocked)
+            o.setAlpha(rest)
+          },
+        })
+      }
+      v.belts.forEach((b, i) => {
+        this.scene.tweens.killTweensOf(b)
+        b.setAlpha(0)
+        this.scene.tweens.add({
+          targets: b,
+          alpha: 1,
+          delay: i * UNROLL_STEP_MS,
+          duration: UNROLL_STEP_MS * 2,
+        })
       })
-    })
-    v.empty.setAlpha(0)
-    this.scene.tweens.add({
-      targets: v.empty,
-      alpha: EMPTY_OUTLINE_ALPHA,
-      delay: v.belts.length * UNROLL_STEP_MS,
-      duration: UNROLL_STEP_MS * 2,
-    })
+      const after = v.belts.length * UNROLL_STEP_MS
+      for (const [o, to] of [
+        [v.empty, EMPTY_OUTLINE_ALPHA],
+        [v.plus, 1],
+      ] as const) {
+        o.setAlpha(0)
+        this.scene.tweens.add({
+          targets: o,
+          alpha: to,
+          delay: after,
+          duration: UNROLL_STEP_MS * 2,
+        })
+      }
+    }
+    if (delay > 0) v.unrollTimer = this.scene.time.delayedCall(delay, start)
+    else start()
+  }
+
+  private cancelUnroll(v: SlotView): void {
+    v.unrollTimer?.remove(false)
+    v.unrollTimer = null
+    v.unrollPending = false
+  }
+
+  /** Drop a running unroll and restore the resting alphas (syncAll). */
+  private resetSlotTweens(v: SlotView): void {
+    this.cancelUnroll(v)
+    const rest: [Img | Txt, number][] = [
+      [v.locked, LOCKED_ALPHA],
+      [v.lock, 1],
+      [v.lockText, 1],
+      [v.empty, EMPTY_OUTLINE_ALPHA],
+      [v.plus, 1],
+    ]
+    for (const [o, a] of rest) {
+      this.scene.tweens.killTweensOf(o)
+      o.setAlpha(a)
+    }
+    for (const b of v.belts) this.scene.tweens.killTweensOf(b)
   }
 
   /** §2.1: the fixture pops in (alpha 0 → 1, y + 8 → y, 150 ms). */
@@ -1052,9 +1237,21 @@ export class LaneRenderer {
       return null
     }
     img.setActive(true).setVisible(true).setAlpha(1)
-    // Re-append so the newest parcel draws on top of older ones.
+    // Re-append so the newest parcel draws on top of older ones — but never
+    // over a parcel mid-catch or flagged dark (the next parcel can reach the
+    // station while the catch moment still plays on it).
     this.L.parcels.bringToTop(img)
+    for (const rec of this.sprites.values())
+      if (rec.alive && (rec.catching || rec.dark)) this.raise(rec)
     return img
+  }
+
+  /** Draw a parcel (with its ring, strain / check badge) above the others. */
+  private raise(rec: PSprite): void {
+    this.L.parcels.bringToTop(rec.img)
+    if (rec.ring) this.L.parcels.bringToTop(rec.ring)
+    if (rec.icon) this.L.parcels.bringToTop(rec.icon)
+    if (rec.check) this.L.parcels.bringToTop(rec.check)
   }
 
   private spawn(id: number, at: Point, node: string | null): PSprite | null {
@@ -1081,6 +1278,7 @@ export class LaneRenderer {
       ring: null,
       ringFrame: -1,
       leaving: null,
+      catching: false,
       seen: true,
       alive: true,
     }
@@ -1090,6 +1288,7 @@ export class LaneRenderer {
 
   private release(rec: PSprite): void {
     rec.alive = false
+    rec.catching = false
     rec.actions = []
     rec.tween?.stop()
     rec.tween = null
@@ -1179,6 +1378,7 @@ export class LaneRenderer {
 
   private setDark(rec: PSprite, dark: boolean, strain: Strain | null): void {
     rec.dark = dark
+    rec.catching = false
     rec.strain = dark ? strain : null
     rec.img.setFrame(parcelFrame(rec.size, dark))
     if (dark && strain) {
@@ -1227,7 +1427,11 @@ export class LaneRenderer {
     return shownTrait(f?.checker ?? null)
   }
 
-  /** Desired anchor of every parcel inside the lane (not the shelf). */
+  /**
+   * Desired anchor of every parcel inside the lane (not the shelf). Hold Bay
+   * parcels take the sim's stable bay (holdBayPositions), never their index
+   * in the queue, so a Toss leaves the other bays where they are.
+   */
   private collectWants(): void {
     this.wants.clear()
     const lay = this.layout
@@ -1241,13 +1445,17 @@ export class LaneRenderer {
         continue
       const a = lay.anchorsFor(node.id)
       const isHold = node.kind === 'holdBay'
+      const bays = isHold
+        ? holdBayPositions(node.queue, this.vs.holdBay.items)
+        : null
       node.queue.forEach((id, i) => {
-        const p = a.buffer[Math.min(i, a.buffer.length - 1)]
+        const pos = bays?.get(id) ?? i
+        const p = a.buffer[Math.min(pos, a.buffer.length - 1)]
         if (p)
           this.wants.set(id, {
             nodeId: node.id,
             point: p,
-            bay: isHold ? i : null,
+            bay: isHold ? pos : null,
           })
       })
       node.stations.forEach((st, j) => {
@@ -1375,9 +1583,10 @@ export class LaneRenderer {
     if (r) this.fx.sweep(r)
     if (rec) {
       // The sim is ahead of the animation: the next parcel may already sit
-      // on this station, so the catch draws above it.
-      this.L.parcels.bringToTop(rec.img)
-      if (rec.icon) this.L.parcels.bringToTop(rec.icon)
+      // on this station, so the catch draws above it — and stays above any
+      // sprite acquired while it plays (acquire re-raises it).
+      rec.catching = true
+      this.raise(rec)
     }
     if (!rec) {
       this.scene.time.delayedCall(250, onJump)
@@ -1494,6 +1703,7 @@ export class LaneRenderer {
     }
     const t = visualTier(this.gd, this.vs.level)
     if (t !== this.tier) this.applyTier(t, false)
+    for (const v of this.slots.values()) this.resetSlotTweens(v)
     this.lockedSlots.clear()
     for (const n of this.vs.lane.nodes())
       if (n.locked) this.lockedSlots.add(n.id)
@@ -1508,6 +1718,11 @@ export class LaneRenderer {
     this.reconcile()
     this.syncShelf()
     this.instant = false
+    // The outline is not an Fx-tracked effect (sleep's fx.clear() keeps it),
+    // so a stall that ended while the room slept must drop it here, or the
+    // next updateStall(null) sees '' === '' and the red box pulses forever.
+    this.stallBox?.destroy()
+    this.stallBox = null
     this.stallKey = ''
     this.refreshReadout(true)
   }
@@ -1526,7 +1741,7 @@ export class LaneRenderer {
     if (bf !== this.beltFrame || stalled) {
       this.beltFrame = bf
       for (const b of this.beltImgs) {
-        const f = this.lockedSlots.has(b.tile.nodeId) ? 0 : bf
+        const f = this.beltFrozen(b.tile.nodeId) ? 0 : bf
         if (f === b.frame) continue
         b.frame = f
         b.img.setFrame(`${b.tile.stem}_${f}`)
@@ -1657,6 +1872,7 @@ export class LaneRenderer {
 
   destroy(): void {
     for (const rec of this.sprites.values()) this.release(rec)
+    for (const v of this.slots.values()) this.cancelUnroll(v)
     this.lidTimer?.remove(false)
   }
 }

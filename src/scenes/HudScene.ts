@@ -30,6 +30,21 @@
 // the bouncing arrow over the button and the 10-s follow-up (§9.2); the
 // first Toss of a run shows puns.json tossHint once.
 //
+// M3 (city-view §4.1, §4.3-§4.4, §8, §9.6-§9.7; plan.md §12.6 task 7): the
+// level bar refills on level:up (a short full-then-grow sweep) and reads
+// `$3,410 / $5,000 · Lv 3 coming soon` at the playtest cap; the Newspaper
+// (level / region papers once the level-up moment's stamp has played —
+// STAMP_MS after level:up, §9.6 step 3 — the walkout paper, the
+// incident paper once the lost-life card closes) waits while a modal card,
+// sheet or the Paused card is up; ticker lines the HUD writes (level,
+// region, strain, payroll, worker, mood, daily, incident, defused, stall)
+// are flushed once per frame after the tick that caused them and dropped
+// for any kind the sim announces itself through ticker:news (no doubled
+// lines whichever side ships a kind); payday / payroll-short / walkout
+// toasts; the Garage `!` also covers a short payday; the sax mute button
+// drives the AudioDirector (registry 'audio') and shows `Tap for sound`
+// while the audio waits for its first gesture (?skipTitle=1).
+//
 // Sim events come through bindSim (attached while awake — always — and moved
 // on a Sim swap, with syncAll on WAKE / swap). The autosave timer runs from
 // update(); HIDDEN and pagehide save immediately. Keyboard: Space, 1, 2, 4
@@ -58,10 +73,15 @@ import type { GameData } from '../data/types.ts'
 import { mountOverlay } from '../debug/overlay.ts'
 import { debugEnabled, params } from '../debug/params.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
+import { STAMP_MS } from '../render/cityFx.ts'
 import { buildingSprite } from '../render/frames.ts'
 import { footprintAnchor, originX } from '../render/iso.ts'
 import { roomPlacement } from '../render/warehouse/RoomLayout.ts'
-import type { LifeLostPayload, SimEventPayloads } from '../sim/events.ts'
+import type {
+  LifeLostPayload,
+  SimEventPayloads,
+  TickerKind,
+} from '../sim/events.ts'
 import type { OnboardingSave } from '../sim/save.ts'
 import type { VehicleType } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
@@ -81,12 +101,22 @@ import {
   lockedRegionText,
   moneyTapText,
   moodFace,
+  moodLine,
   newlyAffordableTypes,
   nextUnlockLine,
+  nowPlayingText,
+  paydayToast,
+  payrollShortLine,
+  regionOpenLine,
   setZoneRect,
   speedSegment,
+  strainLine,
+  strainsLive,
+  TAP_FOR_SOUND_TEXT,
   TAP_PX,
   trendGlyph,
+  walkoutGroupLine,
+  walkoutLine,
   type ChipEntry,
 } from '../ui/hudKit.ts'
 import { GameOverCard, gameOverModel } from '../ui/GameOverCard.ts'
@@ -97,6 +127,14 @@ import {
   type Rect,
 } from '../ui/layout.ts'
 import { LivesRow } from '../ui/LivesRow.ts'
+import {
+  Newspaper,
+  newsPicture,
+  PAPER_DEPTH,
+  PAPER_SFX,
+  type NewsItem,
+  type NewsKind,
+} from '../ui/Newspaper.ts'
 import {
   LOST_LIFE_DELAY_MS,
   LostLifeCard,
@@ -116,6 +154,7 @@ import {
   step2Text,
 } from '../ui/Onboarding.ts'
 import { addBar, addPanel, BAR_H, setBarFill } from '../ui/Panel.ts'
+import { TICKS_PER_S } from '../sim/types.ts'
 import { PausedCard } from '../ui/PausedCard.ts'
 import { RotateCard, wantsRotateCard } from '../ui/RotateCard.ts'
 import {
@@ -151,6 +190,7 @@ export const EV_FOLLOW = 'pm:follow'
 export const EV_PAN_TO = 'pm:panTo'
 export const EV_TOOLTIP = 'pm:tooltip'
 export const EV_AUDIO_MUTED = 'audio:muted'
+export const EV_AUDIO_NOW_PLAYING = 'audio:nowPlaying'
 
 type SelectPayload = {
   kind: 'district' | 'locked' | 'building' | 'vehicle'
@@ -162,8 +202,27 @@ type TooltipPayload = { text: string; x: number; y: number }
 /** The parts of the M3 AudioDirector (registry 'audio') the HUD calls. */
 interface AudioDirectorLike {
   setMuted?(muted: boolean, persist?: boolean): void
+  toggleMuted?(): boolean
   isMuted?(): boolean
   resumeAfterPause?(): unknown
+  unlock?(): unknown
+  state?(): { unlocked?: boolean; disabled?: boolean; muted?: boolean }
+}
+
+/** A ticker line waiting for the end-of-tick flush (see flushLines). */
+interface PendingLine {
+  text: string
+  kind: TickerKind
+  /** 'sim' = ticker:news (always shown); 'hud' = dropped if the sim owns the kind. */
+  src: 'sim' | 'hud'
+}
+
+/** A paper waiting for the end-of-tick flush (the level one may take the sim's text). */
+interface PendingPaper {
+  kind: NewsKind
+  headline: string
+  level: number
+  district?: string
 }
 
 export const MONEY_TWEEN_MS = 300
@@ -184,6 +243,9 @@ const TOP_ALPHA = 0.94
 const BOTTOM_ALPHA = 0.92
 const MOOD_ROW_H = 30
 const MOOD_POP_W = 200
+/** Level-up refill (§9.6 step 4): the bar shows full, then grows from 0. */
+export const LEVEL_FULL_MS = 250
+export const LEVEL_REFILL_MS = 600
 
 // M2 (city-view §3.3, §9.2).
 /** Full-screen red flash on life:lost: alpha 0.25 → 0 over 200 ms. */
@@ -221,6 +283,8 @@ const D = {
   // bar's top padding (layout.ts chip.hitY/hitH), where the bar's
   // tap-swallowing background would otherwise win the top-only hit test.
   chips: 32,
+  paper: PAPER_DEPTH,
+  audioHint: 36,
   floats: 40,
   popScrim: 6999,
   pop: 7000,
@@ -325,7 +389,6 @@ export class HudScene extends Phaser.Scene {
   private dayDelivered = 0
   private dayEarned = 0
   private dayPayroll = 0
-  private simDaily = false
   /** Step 3 is due but waits for an on-screen building with waiting parcels. */
   private step3Armed = false
 
@@ -353,6 +416,39 @@ export class HudScene extends Phaser.Scene {
   private saveSoon: 'save' | 'final' | null = null
   /** Labels of flagged / held parcels (a tossed parcel may be gone from state). */
   private heldLabels = new Map<number, string>()
+
+  // M3
+  private paper!: Newspaper
+  /** Ticker lines of this tick, flushed from update() (see flushLines). */
+  private pendingLines: PendingLine[] = []
+  private pendingPapers: PendingPaper[] = []
+  /**
+   * Papers held while the level-up moment plays (city-view §9.6: the dust,
+   * tier swap and LEVEL stamp first, then step 3's ticker + newspaper);
+   * `paperHoldMs` counts down on the HUD clock (frozen-clock safe).
+   */
+  private heldPapers: NewsItem[] = []
+  private paperHoldMs = 0
+  /** Ticker kinds the sim emits itself (ticker:news): the HUD stops writing them. */
+  private simKinds = new Set<string>()
+  /** day:ended seen this tick: the daily line is built at the flush. */
+  private dailyDay: number | null = null
+  /** Incident papers waiting for the lost-life card to close (§8.2). */
+  private incidentPapers: NewsItem[] = []
+  /** Strains whose `New strain spotted` line ran (or predates this session). */
+  private strainsTold = new Set<string>()
+  /** Last in-game day a mood line ran, per district (once per day, §8.1). */
+  private moodDay = new Map<string, number>()
+  /** Level-bar refill sweep (ms since level:up), or null. */
+  private levelAnim: number | null = null
+  private levelTarget = 0
+  private audioHint: Phaser.GameObjects.Container | null = null
+  /** The last `Now playing` title toasted (once per title). */
+  private lastTitle: string | null = null
+  /** The current gesture began on `Tap for sound`: its tap never mutes. */
+  private hintGesture = false
+  /** This tick's walkouts: one toast + one paper for the lot (flushLines). */
+  private pendingWalkouts: { name: string; text: string }[] = []
 
   constructor() {
     super('HUD')
@@ -386,7 +482,6 @@ export class HudScene extends Phaser.Scene {
     this.dayDelivered = 0
     this.dayEarned = 0
     this.dayPayroll = 0
-    this.simDaily = false
     this.step3Armed = false
     this.district = null
     this.shield = null
@@ -402,6 +497,21 @@ export class HudScene extends Phaser.Scene {
     this.step2Timer = null
     this.saveSoon = null
     this.heldLabels = new Map()
+    this.pendingLines = []
+    this.pendingPapers = []
+    this.heldPapers = []
+    this.paperHoldMs = 0
+    this.simKinds = new Set()
+    this.dailyDay = null
+    this.incidentPapers = []
+    this.strainsTold = new Set()
+    this.moodDay = new Map()
+    this.levelAnim = null
+    this.levelTarget = 0
+    this.audioHint = null
+    this.pendingWalkouts = []
+    this.hintGesture = false
+    this.lastTitle = null
   }
 
   create(): void {
@@ -472,6 +582,11 @@ export class HudScene extends Phaser.Scene {
         ? () => this.continueWithOneLife()
         : null,
     })
+    this.paper = new Newspaper(this, this.L, {
+      companyName: this.gd.puns.companyName,
+      depth: D.paper,
+      onShown: () => this.game.events.emit('ui:sfx', { name: PAPER_SFX }),
+    })
 
     this.autosave = new Autosave({
       getSim: () => getSim(this) ?? null,
@@ -492,7 +607,7 @@ export class HudScene extends Phaser.Scene {
 
     // A fresh game starts with the opening ticker line (levels.json L1).
     if (this.vs.tick < 10 && this.vs.level === 1)
-      this.ticker.push(this.gd.levels[0]?.ticker ?? '', 'level')
+      this.queueLine(this.gd.levels[0]?.ticker ?? '', 'level')
     const pending = this.registry.get(REG_PENDING_TOAST) as string | undefined
     if (pending) {
       this.registry.remove(REG_PENDING_TOAST)
@@ -504,6 +619,10 @@ export class HudScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     const vs = this.vs
     const st = this.stepper
+    // Lines and papers queued by the last tick's events (all of them have
+    // fired by now, whatever their order inside the tick).
+    this.flushLines()
+    this.releaseHeldPapers(delta)
     if (this.chipsDirty) this.rebuildChips()
     // Re-read an open mood popover, never in the frame it was built (see
     // refreshChips on same-frame create + destroy of interactive objects).
@@ -531,6 +650,8 @@ export class HudScene extends Phaser.Scene {
       this.refreshWarehouseBtn()
       this.refreshChipActive()
       this.pollStep3()
+      this.pollStrains()
+      this.refreshAudioHint()
       if (this.flagHint && this.vs.holdBay.count === 0) this.endFlagHint(false)
       // pm:view is the contract; this catches a world scene that woke
       // without emitting it (e.g. the M0 Warehouse stub).
@@ -548,10 +669,16 @@ export class HudScene extends Phaser.Scene {
     // do they sit on the city's building tooltip (M1 polish).
     // The onboarding cards are city steps (garage, buildings): in the
     // warehouse they sat on the lane readout and the sign (UX M2 review).
+    this.paper.update(delta, this.paperSuppressed())
     this.onboarding.setSuppressed(
-      modalCount() > 0 || this.view !== 'city' || this.overlapsCityTooltip(),
+      modalCount() > 0 ||
+        this.view !== 'city' ||
+        this.overlapsCityTooltip() ||
+        this.paper.isVisible() ||
+        this.audioHint !== null,
     )
     this.onboarding.update(time)
+    this.updateLevelAnim(delta)
     this.updateFlash(time)
     this.updateTopShake(time)
     this.updateFlagArrow(time)
@@ -677,15 +804,21 @@ export class HudScene extends Phaser.Scene {
         until: this.time.now + TOP_SHAKE_MS,
         base: this.topParts().map((o) => o.x),
       }
-    this.ticker.push(
-      incidentLine(this.buildingName(p.destBuildingId), left),
-      'incident',
-    )
+    const headline = incidentLine(this.buildingName(p.destBuildingId), left)
+    this.queueLine(headline, 'incident')
     addWanted(getOnboarding(this.registry), p.label)
     // Persist the loss and the revealed label right after this tick (a
     // reload must not replay the delivery or forget the label).
     if (this.saveSoon !== 'final') this.saveSoon = 'save'
     if (left <= 0 || this.vs.gameOver) return // game:over takes over
+    // The day's paper for the incident comes once the card closes (§8.2).
+    this.incidentPapers.push({
+      kind: 'incident',
+      headline,
+      day: this.vs.day + 1,
+      level: this.vs.level,
+      picture: newsPicture('incident', this.gd),
+    })
     this.lostQueue.push(p)
     this.scheduleLostCard()
   }
@@ -743,13 +876,16 @@ export class HudScene extends Phaser.Scene {
       })
   }
 
-  /** TODO(M3): the incident newspaper (city-view §8.2) after the card closes. */
-  private queueIncidentPaper(): void {}
-
   /** game:over (city-view §9.4): hold now, the screen after the effects. */
   private onGameOver(): void {
     this.hold('gameOver')
     this.lostQueue = []
+    this.incidentPapers = []
+    this.pendingPapers = []
+    this.heldPapers = []
+    this.paperHoldMs = 0
+    this.pendingWalkouts = []
+    this.paper.clear()
     this.lostTimer?.remove(false)
     this.lostTimer = null
     if (this.lostCard.isOpen()) {
@@ -791,6 +927,7 @@ export class HudScene extends Phaser.Scene {
 
   /** New game: clear the autosave and restart through the Title (§9.4). */
   private newGame(): void {
+    this.paper.clear()
     this.saveSoon = null
     this.autosave.enabled = false
     discardSave()
@@ -862,7 +999,7 @@ export class HudScene extends Phaser.Scene {
     this.heldLabels.delete(p.id)
     if (p.wasMalware) {
       if (label) {
-        this.ticker.push(defusedLine(label), 'incident')
+        this.queueLine(defusedLine(label), 'defused')
         addWanted(ob, label)
       }
     }
@@ -922,6 +1059,329 @@ export class HudScene extends Phaser.Scene {
     )
   }
 
+  // ---------------------------------------------------------------- M3: ticker + papers
+
+  /** A HUD-written ticker line, shown at the end-of-tick flush. */
+  private queueLine(text: string, kind: TickerKind): void {
+    if (text) this.pendingLines.push({ text, kind, src: 'hud' })
+  }
+
+  /** A newspaper for this tick's event (city-view §8.2), shown at the flush. */
+  private queuePaper(p: PendingPaper): void {
+    this.pendingPapers.push(p)
+  }
+
+  /**
+   * Once per frame, after the tick(s) that queued them: the daily summary
+   * (built now so the same-tick payday is in it), then the ticker lines —
+   * a HUD line is dropped when the sim writes that kind itself
+   * (ticker:news; the payroll / worker kinds count as one) — then the papers
+   * (the level paper's headline is the sim's level line when there is one).
+   */
+  private flushLines(): void {
+    if (this.dailyDay !== null) {
+      const day = this.dailyDay
+      this.dailyDay = null
+      this.queueLine(
+        dailyLine(day, this.dayDelivered, this.dayEarned, this.dayPayroll),
+        'daily',
+      )
+      this.dayDelivered = 0
+      this.dayEarned = 0
+      this.dayPayroll = 0
+    }
+    this.flushWalkouts()
+    const lines = this.pendingLines
+    const papers = this.pendingPapers
+    if (lines.length === 0 && papers.length === 0) return
+    this.pendingLines = []
+    this.pendingPapers = []
+    for (const l of lines) {
+      if (l.src === 'hud' && this.simOwns(l.kind)) continue
+      this.ticker.push(l.text, l.kind)
+    }
+    for (const p of papers) {
+      const sim =
+        p.kind === 'level'
+          ? lines.find((l) => l.src === 'sim' && l.kind === 'level')
+          : undefined
+      const item: NewsItem = {
+        kind: p.kind,
+        headline: sim?.text ?? p.headline,
+        day: this.vs.day + 1,
+        level: p.level,
+        picture: newsPicture(p.kind, this.gd, {
+          level: p.level,
+          ...(p.district ? { district: p.district } : {}),
+        }),
+      }
+      if (this.paperHoldMs > 0) this.heldPapers.push(item)
+      else this.paper.push(item)
+    }
+  }
+
+  /** Count the level-up hold down; then the held papers show, in order. */
+  private releaseHeldPapers(delta: number): void {
+    if (this.paperHoldMs <= 0) return
+    this.paperHoldMs = Math.max(0, this.paperHoldMs - delta)
+    if (this.paperHoldMs > 0) return
+    const items = this.heldPapers
+    this.heldPapers = []
+    for (const it of items) this.paper.push(it)
+  }
+
+  /**
+   * The walkouts of one payday: one red toast, one ticker line and one
+   * `walkout` paper (a single name keeps its own line, several are grouped:
+   * five 40-px/s lines kept "X walked out" scrolling for over a minute after
+   * the re-hires — UX M3 review).
+   */
+  private flushWalkouts(): void {
+    const w = this.pendingWalkouts
+    if (w.length === 0) return
+    this.pendingWalkouts = []
+    const text =
+      w.length === 1
+        ? (w[0]?.text ?? '')
+        : walkoutGroupLine(
+            w.map((x) => x.name),
+            this.gd.employees.walkoutAfterUnpaidPaydays,
+          )
+    this.queueLine(text, 'worker')
+    this.toast.show(text, true)
+    this.queuePaper({ kind: 'walkout', headline: text, level: this.vs.level })
+  }
+
+  /** The sim writes this ticker kind itself (payroll and worker are one family). */
+  private simOwns(kind: TickerKind): boolean {
+    if (this.simKinds.has(kind)) return true
+    if (kind === 'payroll' || kind === 'worker')
+      return this.simKinds.has('payroll') || this.simKinds.has('worker')
+    return false
+  }
+
+  /**
+   * The newspaper waits (hidden, clock stopped) under anything modal: the
+   * lost-life / game-over cards (and their 600-ms lead-in), the Paused and
+   * rotate cards, a sheet, popover or dialog.
+   */
+  private paperSuppressed(): boolean {
+    return (
+      this.holds.size > 0 ||
+      this.paused.isOpen() ||
+      this.rotate.isOpen() ||
+      modalCount() > 0 ||
+      this.lostTimer !== null ||
+      this.overTimer !== null ||
+      this.lostCard.isOpen() ||
+      this.overCard.isOpen()
+    )
+  }
+
+  /** The incident papers of the lost lives, once the card has closed (§8.2). */
+  private queueIncidentPaper(): void {
+    const items = this.incidentPapers
+    this.incidentPapers = []
+    for (const it of items) this.paper.push(it)
+  }
+
+  /**
+   * `strain` kind: `New strain spotted: rattle` the tick a strain announced
+   * after the start enters the spawn pool (announced + newStrainDelayS) —
+   * unless the sim writes the line itself (ticker:news 'strain').
+   */
+  private pollStrains(): void {
+    for (const strain of this.liveStrains()) {
+      if (this.strainsTold.has(strain)) continue
+      this.strainsTold.add(strain)
+      this.queueLine(strainLine(strain), 'strain')
+    }
+  }
+
+  private liveStrains(): string[] {
+    const s = getSim(this)?.state
+    if (!s) return []
+    const later: Partial<Record<string, number>> = {}
+    for (const [k, t] of Object.entries(s.level.announced))
+      if (t !== undefined && t > 0) later[k] = t
+    return strainsLive(
+      later,
+      s.tick,
+      Math.round(this.gd.parcels.malware.newStrainDelayS * TICKS_PER_S),
+    )
+  }
+
+  /** satisfaction:changed → `mood` line on a 30 / 80 crossing, once per district per day. */
+  private onSatisfaction(p: SimEventPayloads['satisfaction:changed']): void {
+    this.refreshMood()
+    this.refreshDistrict()
+    const line = moodLine(this.gd, p.district, p.value, p.delta)
+    if (!line) return
+    const day = this.vs.day
+    if (this.moodDay.get(p.district) === day) return
+    this.moodDay.set(p.district, day)
+    this.queueLine(line, 'mood')
+  }
+
+  /** level:up (city-view §9.6, HUD side). */
+  private onLevelUp(p: SimEventPayloads['level:up']): void {
+    // Step 4: the bar shows full, then refills from 0 toward the next threshold.
+    this.levelAnim = reducedMotion() ? null : 0
+    this.refreshLevel()
+    this.refreshShield()
+    this.refreshChips()
+    this.refreshGarageBadge()
+    const row = this.gd.levels.find((l) => l.level === p.level)
+    if (!row) return
+    this.queueLine(row.ticker, 'level')
+    // Step 3 after steps 1-2: the papers wait for the city's stamp to end.
+    this.paperHoldMs = reducedMotion() ? 0 : STAMP_MS
+    this.queuePaper({ kind: 'level', headline: row.ticker, level: p.level })
+  }
+
+  /** region:unlocked: the chip with its NEW badge, the region line and paper. */
+  private onRegionUnlocked(p: SimEventPayloads['region:unlocked']): void {
+    this.newChips.add(p.district)
+    this.refreshChips()
+    this.refreshMood()
+    this.refreshDistrict()
+    const line = regionOpenLine(this.gd, p.district)
+    this.queueLine(line, 'region')
+    this.queuePaper({
+      kind: 'region',
+      headline: line,
+      level: this.vs.level,
+      district: p.district,
+    })
+  }
+
+  private onPayrollPaid(p: SimEventPayloads['payroll:paid']): void {
+    this.dayPayroll += p.amount
+    if (p.amount > 0) {
+      const t = paydayToast(p.amount)
+      this.toast.show(t.text, false, t.redFrom)
+    }
+    this.refreshGarageBadge()
+  }
+
+  private onPayrollShort(p: SimEventPayloads['payroll:short']): void {
+    const text = payrollShortLine(this.employeeNames(p.employeeIds))
+    this.toast.show(text, true)
+    this.queueLine(text, 'payroll')
+    this.refreshGarageBadge()
+  }
+
+  private onWalkedOut(p: SimEventPayloads['worker:walkedOut']): void {
+    const [name = `#${p.employeeId}`] = this.employeeNames([p.employeeId])
+    const v =
+      p.kind === 'driver'
+        ? getSim(this).state.vehicles.find((x) => x.driverId === p.employeeId)
+        : undefined
+    const text = walkoutLine(name, p.kind, v?.name ?? null)
+    // the ticker line is queued by flushWalkouts (one per payday)
+    this.pendingWalkouts.push({ name, text })
+    this.refreshGarageBadge()
+    this.refreshShield()
+  }
+
+  /** The level bar's refill sweep after level:up (see LEVEL_FULL_MS). */
+  private updateLevelAnim(delta: number): void {
+    if (this.levelAnim === null) return
+    this.levelAnim += Math.max(0, Math.min(delta, 100))
+    const t = this.levelAnim
+    let f: number
+    if (t < LEVEL_FULL_MS) f = 1
+    else if (t < LEVEL_FULL_MS + LEVEL_REFILL_MS)
+      f = this.levelTarget * ((t - LEVEL_FULL_MS) / LEVEL_REFILL_MS)
+    else {
+      this.levelAnim = null
+      f = this.levelTarget
+    }
+    this.levelFrac = f
+    setBarFill(this.levelFill, this.L.levelBar.w, f)
+  }
+
+  // ---------------------------------------------------------------- M3: audio
+
+  /** The director's state, or null (absent, or it threw). */
+  private audioState(): {
+    unlocked?: boolean
+    disabled?: boolean
+    muted?: boolean
+  } | null {
+    try {
+      return this.director()?.state?.() ?? null
+    } catch {
+      return null
+    }
+  }
+
+  /** Audio is on but waits for its first gesture (?skipTitle=1, no Title tap). */
+  private audioLocked(): boolean {
+    const st = this.audioState()
+    return !!st && st.disabled !== true && st.unlocked === false
+  }
+
+  /** In the tap's own handler: the director's unlock (resume inside the gesture). */
+  private unlockAudio(): void {
+    try {
+      void this.director()?.unlock?.()
+    } catch {
+      // audio never blocks the game
+    }
+  }
+
+  /** `Tap for sound` over the sax while the audio waits for its first tap. */
+  private refreshAudioHint(): void {
+    const want =
+      !this.muted &&
+      this.audioLocked() &&
+      this.holds.size === 0 &&
+      !this.paused.isOpen()
+    if (want === (this.audioHint !== null)) return
+    if (!want) {
+      this.audioHint?.destroy()
+      this.audioHint = null
+      return
+    }
+    const L = this.L
+    const t = addText(this, 4, 0, TAP_FOR_SOUND_TEXT)
+    const w = Math.round(t.width) + 8
+    const h = 18
+    t.setY(textTop(0, h))
+    const bg = addPanel(this, 0, 0, w, h, 'ui_tag')
+    const r = L.mute.rect
+    const x = Math.round(
+      Math.min(L.W - 4 - w, Math.max(4, r.x + r.w / 2 - w / 2)),
+    )
+    const y = L.bottomBar.y - h - 2
+    // A ≥ 44-px hit band around the tag that stops where the bar's buttons
+    // start (smoke: HUD hit rects ≥ 44 / zoom, none overlapping the bar's).
+    const hitW = Math.max(w, L.minHit)
+    const hitBottom = L.mute.rect.y - y
+    const hit = addTapZone(
+      this,
+      {
+        x: Math.floor((w - hitW) / 2),
+        y: hitBottom - L.minHit,
+        w: hitW,
+        h: L.minHit,
+      },
+      () => this.unlockAudio(),
+      'audio:tapForSound',
+    )
+    this.audioHint = this.add
+      .container(x, y, [bg, t, hit])
+      .setDepth(D.audioHint)
+  }
+
+  /** The director appeared (or changed) in the registry: follow its mute state. */
+  private syncMuteFromDirector(): void {
+    const m = this.director()?.isMuted?.()
+    if (typeof m === 'boolean' && m !== this.muted) this.setMutedIcon(m)
+    this.refreshAudioHint()
+  }
+
   // ---------------------------------------------------------------- layout
 
   private computeL(): Layout {
@@ -952,6 +1412,10 @@ export class HudScene extends Phaser.Scene {
     this.shield?.relayout(L)
     this.lostCard.relayout(L)
     this.overCard.relayout(L)
+    this.paper.relayout(L)
+    this.audioHint?.destroy()
+    this.audioHint = null
+    this.refreshAudioHint()
     this.flash.setSize(L.W, L.H)
     this.closeMood()
     this.hideTooltip()
@@ -1102,8 +1566,12 @@ export class HudScene extends Phaser.Scene {
     })
   }
 
-  /** `+$12` / `−$28` rising next to the money cell (city-view §3.1). */
-  private floatMoney(delta: number, gold: boolean): void {
+  /**
+   * `+$12` / `−$28` rising next to the money cell (city-view §3.1), placed
+   * after the balance it counts to (the cell is still mid-tween: placed after
+   * the shorter old text, `+$29` sat on `$1,445`).
+   */
+  private floatMoney(delta: number, gold: boolean, balance: number): void {
     if (delta === 0) return
     let f = this.floats.find((x) => x.tween === null)
     if (!f) {
@@ -1120,7 +1588,12 @@ export class HudScene extends Phaser.Scene {
     }
     const float = f
     const L = this.L
-    const x = Math.round(this.moneyText.x + this.moneyText.width + 6)
+    const shown = this.moneyText.text
+    const finalW = this.moneyText.setText(formatMoney(balance)).width
+    this.moneyText.setText(shown)
+    const x = Math.round(
+      this.moneyText.x + Math.max(finalW, this.moneyText.width) + 6,
+    )
     const y0 = textTop(L.safeTop, L.rowA.h)
     // Rise at most to 1 px under the screen top: with no safe-area inset the
     // full FLOAT_RISE would carry the glyphs off the canvas.
@@ -1172,7 +1645,9 @@ export class HudScene extends Phaser.Scene {
     )
     this.levelText.setText(levelLabel(this.gd, vs.level))
     const bar = this.L.levelBar
-    if (p.frac !== this.levelFrac) {
+    this.levelTarget = p.frac
+    // The level-up sweep owns the fill until it ends (updateLevelAnim).
+    if (this.levelAnim === null && p.frac !== this.levelFrac) {
       this.levelFrac = p.frac
       setBarFill(this.levelFill, bar.w, p.frac)
     }
@@ -1578,12 +2053,33 @@ export class HudScene extends Phaser.Scene {
     else st.speed = 0
   }
 
+  /**
+   * The sax: toggles the AudioDirector's master mute (it persists
+   * pm.settings.v1 and emits audio:muted). While `Tap for sound` is up the
+   * tap is the unlock gesture instead (it must not mute the sound it starts).
+   */
   private toggleMute(): void {
-    const next = !this.muted
     const dir = this.director()
-    if (dir?.setMuted) dir.setMuted(next)
-    writeSettings({ muted: next })
+    if (
+      this.hintGesture ||
+      this.audioHint ||
+      (!this.muted && this.audioLocked())
+    ) {
+      this.unlockAudio()
+      this.audioHint?.destroy()
+      this.audioHint = null
+      return
+    }
+    let next = !this.muted
+    try {
+      if (dir?.toggleMuted) next = dir.toggleMuted()
+      else if (dir?.setMuted) dir.setMuted(next)
+      else writeSettings({ muted: next })
+    } catch {
+      writeSettings({ muted: next })
+    }
     this.setMutedIcon(next)
+    this.refreshAudioHint()
   }
 
   private setMutedIcon(muted: boolean): void {
@@ -1634,7 +2130,8 @@ export class HudScene extends Phaser.Scene {
       for (const t of fresh) this.seenTypes.add(t)
       this.plusPending = true
     }
-    if (garageAlert(vs.vehicles)) this.garageBtn.setBadge('!', 'red')
+    if (garageAlert(vs.vehicles, vs.payroll().short))
+      this.garageBtn.setBadge('!', 'red')
     else if (this.plusPending) this.garageBtn.setBadge('+', 'green')
     else this.garageBtn.setBadge(null)
   }
@@ -1896,35 +2393,18 @@ export class HudScene extends Phaser.Scene {
           const neg = p.delta < 0
           this.setMoney(p.balance, true)
           if (neg) this.flashMoneyRed()
-          this.floatMoney(p.delta, floatsGold(p.reason))
+          this.floatMoney(p.delta, floatsGold(p.reason), p.balance)
           if (isEarned(p.reason)) this.dayEarned += p.delta
           this.refreshLevel()
           this.refreshGarageBadge()
         },
-        'satisfaction:changed': () => {
-          this.refreshMood()
-          this.refreshDistrict()
-        },
+        'satisfaction:changed': (p) => this.onSatisfaction(p),
         'parcel:spawned': () => this.refreshDistrict(),
-        'level:up': (p) => {
-          this.refreshLevel()
-          this.refreshShield()
-          this.refreshChips()
-          this.refreshGarageBadge()
-          const row = this.gd.levels.find((l) => l.level === p.level)
-          if (row) this.ticker.push(row.ticker, 'level')
-        },
-        'region:unlocked': (p) => {
-          this.newChips.add(p.district)
-          this.refreshChips()
-          this.refreshMood()
-          this.refreshDistrict()
-          const d = this.gd.districts.find((x) => x.id === p.district)
-          if (d) this.ticker.push(`${d.flavour} is now open`, 'region')
-        },
+        'level:up': (p) => this.onLevelUp(p),
+        'region:unlocked': (p) => this.onRegionUnlocked(p),
         'lane:stalled': (p) => {
           this.refreshWarehouseBtn()
-          this.ticker.push(stallLine(p.reason), 'stall')
+          this.queueLine(stallLine(p.reason), 'stall')
         },
         'lane:resumed': () => this.refreshWarehouseBtn(),
         'parcel:flagged': (p) => this.onFlagged(p),
@@ -1951,31 +2431,9 @@ export class HudScene extends Phaser.Scene {
         'building:rushed': () => {
           if (this.onboarding.activeStep === 3) this.onboarding.complete(3)
         },
-        'payroll:paid': (p) => {
-          this.dayPayroll += p.amount
-          this.toast.show(`Payday — payroll ${formatMoney(-p.amount)}`)
-        },
-        'payroll:short': (p) => {
-          const names = this.employeeNames(p.employeeIds)
-          const text = `Payroll short: ${names} unpaid`
-          this.toast.show(text, true)
-          this.ticker.push(text, 'payroll')
-          this.refreshGarageBadge()
-        },
-        'worker:walkedOut': (p) => {
-          const name = this.employeeNames([p.employeeId])
-          let text = `${name} walked out — desk short-handed`
-          if (p.kind === 'driver') {
-            const v = getSim(this).state.vehicles.find(
-              (x) => x.driverId === p.employeeId,
-            )
-            text = `${name} walked out — ${v?.name ?? 'a vehicle'} has no driver`
-          }
-          this.toast.show(text, true)
-          this.ticker.push(text, 'worker')
-          this.refreshGarageBadge()
-          this.refreshShield()
-        },
+        'payroll:paid': (p) => this.onPayrollPaid(p),
+        'payroll:short': (p) => this.onPayrollShort(p),
+        'worker:walkedOut': (p) => this.onWalkedOut(p),
         'worker:hired': () => {
           this.refreshGarageBadge()
           this.refreshShield()
@@ -1994,24 +2452,14 @@ export class HudScene extends Phaser.Scene {
         'vehicle:inactive': () => this.refreshGarageBadge(),
         'life:lost': (p) => this.onLifeLost(p),
         'game:over': () => this.onGameOver(),
+        // The daily line is built at the flush, after this tick's payday.
         'day:ended': (p) => {
-          if (!this.simDaily)
-            this.ticker.push(
-              dailyLine(
-                p.day,
-                this.dayDelivered,
-                this.dayEarned,
-                this.dayPayroll,
-              ),
-              'daily',
-            )
-          this.dayDelivered = 0
-          this.dayEarned = 0
-          this.dayPayroll = 0
+          this.dailyDay = p.day
+          this.refreshGarageBadge()
         },
         'ticker:news': (p) => {
-          if (p.kind === 'daily') this.simDaily = true
-          this.ticker.push(p.text, p.kind)
+          this.simKinds.add(p.kind)
+          this.pendingLines.push({ text: p.text, kind: p.kind, src: 'sim' })
         },
       },
       () => this.syncAll(),
@@ -2042,8 +2490,25 @@ export class HudScene extends Phaser.Scene {
       this.plusPending = false
       this.refreshGarageBadge()
     }
-    const onMuted = (p: { muted?: boolean }): void =>
+    const onMuted = (p: { muted?: boolean }): void => {
       this.setMutedIcon(!!p?.muted)
+      this.refreshAudioHint()
+    }
+    // audio.md §3 item 8: `Now playing: Semver Swing` for toastSeconds —
+    // once per title (the director re-announces every pass of the loop; with
+    // one tune in playtest 1 that was a toast every ~2 min).
+    const onNowPlaying = (p: { title?: string; seconds?: number }): void => {
+      if (!p?.title || this.muted || p.title === this.lastTitle) return
+      this.lastTitle = p.title
+      this.longToast(
+        nowPlayingText(p.title),
+        false,
+        Math.max(0, p.seconds ?? 3) * 1000,
+      )
+    }
+    const onAudioReg = (_parent: unknown, key?: string): void => {
+      if (key === 'audio') this.syncMuteFromDirector()
+    }
     const onHidden = (): void => this.onHidden()
     const onVisible = (): void => this.onVisible()
     const onPageHide = (): void => this.onHidden()
@@ -2057,6 +2522,7 @@ export class HudScene extends Phaser.Scene {
     ge.on(EV_TOOLTIP, onTooltip)
     ge.on('ui:sheetOpen', onSheetOpen)
     ge.on(EV_AUDIO_MUTED, onMuted)
+    ge.on(EV_AUDIO_NOW_PLAYING, onNowPlaying)
     ge.on(Phaser.Core.Events.HIDDEN, onHidden)
     ge.on(Phaser.Core.Events.VISIBLE, onVisible)
     window.addEventListener('pagehide', onPageHide)
@@ -2065,13 +2531,25 @@ export class HudScene extends Phaser.Scene {
     reg.on(`changedata-${REG.safeTop}`, onSafe)
     reg.on(`changedata-${REG.safeBottom}`, onSafe)
     reg.on(`changedata-${REG.buildStamp}`, onStamp)
+    reg.on(Phaser.Data.Events.SET_DATA, onAudioReg)
+    reg.on(Phaser.Data.Events.CHANGE_DATA, onAudioReg)
 
     this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this)
+    // Scene-level pointerup runs after the game objects' own (the sax's).
     this.input.on(Phaser.Input.Events.POINTER_UP, () => {
       this.chipDrag = null
+      this.hintGesture = false
     })
     this.input.on(Phaser.Input.Events.POINTER_DOWN, () => {
       if (this.tip) this.hideTooltip()
+      // Any first tap starts the sound under `Tap for sound` (inside the
+      // gesture; Boot's unlockOnFirstGesture does the same on document).
+      if (this.audioHint) {
+        this.hintGesture = true
+        this.unlockAudio()
+        this.audioHint.destroy()
+        this.audioHint = null
+      }
     })
     this.input.keyboard?.on('keydown', this.onKey, this)
 
@@ -2082,6 +2560,7 @@ export class HudScene extends Phaser.Scene {
       ge.off(EV_TOOLTIP, onTooltip)
       ge.off('ui:sheetOpen', onSheetOpen)
       ge.off(EV_AUDIO_MUTED, onMuted)
+      ge.off(EV_AUDIO_NOW_PLAYING, onNowPlaying)
       ge.off(Phaser.Core.Events.HIDDEN, onHidden)
       ge.off(Phaser.Core.Events.VISIBLE, onVisible)
       window.removeEventListener('pagehide', onPageHide)
@@ -2089,6 +2568,8 @@ export class HudScene extends Phaser.Scene {
       reg.off(`changedata-${REG.safeTop}`, onSafe)
       reg.off(`changedata-${REG.safeBottom}`, onSafe)
       reg.off(`changedata-${REG.buildStamp}`, onStamp)
+      reg.off(Phaser.Data.Events.SET_DATA, onAudioReg)
+      reg.off(Phaser.Data.Events.CHANGE_DATA, onAudioReg)
       this.input.keyboard?.off('keydown', this.onKey, this)
       this.closeMood()
       this.hideTooltip()
@@ -2103,12 +2584,9 @@ export class HudScene extends Phaser.Scene {
     })
   }
 
-  private employeeNames(ids: readonly number[]): string {
+  private employeeNames(ids: readonly number[]): string[] {
     const emps = getSim(this).state.employees
-    const names = ids.map(
-      (id) => emps.find((e) => e.id === id)?.name ?? `#${id}`,
-    )
-    return names.join(', ')
+    return ids.map((id) => emps.find((e) => e.id === id)?.name ?? `#${id}`)
   }
 
   /** Rebuild every readout from sim state (create, WAKE, Sim swap). */
@@ -2124,9 +2602,14 @@ export class HudScene extends Phaser.Scene {
     this.refreshShield()
     this.ticker.setDay(vs.day + 1)
     this.refreshChips(true)
-    if (this.seenTypes.size === 0)
-      for (const t of this.gd.vehicles.types)
-        if (t.unlockLevel <= vs.level) this.seenTypes.add(t.id)
+    // The Garage `+` announces a type unlocked after Lv 1 once it becomes
+    // affordable: the types the fleet already owns need no announcement
+    // (a reload at Lv 2 with no truck yet still gets its `+`).
+    this.seenTypes = new Set(vs.vehicles.map((v) => v.type))
+    // Strains already in the spawn pool were announced before this session.
+    this.strainsTold = new Set(this.liveStrains())
+    this.moodDay.clear()
+    this.levelAnim = null
     this.refreshWarehouseBtn()
     this.refreshGarageBadge()
     if (

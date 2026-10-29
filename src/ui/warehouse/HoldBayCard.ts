@@ -13,9 +13,11 @@
 //           spec §5.3: the value keeps decaying while held; `drops in 0:42`
 //           inside the grace window, `floor` at the floor)
 //   line 6  `Inspector Audrey` (desk flags only)
-//   TOSS (left, red, 160×48) / CLEAR (right, 160×48) → holdBay.toss / clear;
-//           CLEAR is disabled with the caption `Shelf full` while the shelf
-//           is at cap (Q35); TOSS is always enabled.
+//   TOSS (left, red, 160×48) / CLEAR (right, green `ui_btn_green` face,
+//           160×48) → holdBay.toss / clear; CLEAR is disabled with the
+//           caption `Shelf full` while the shelf is at cap (Q35); TOSS is
+//           always enabled. The header's `Bay N` is the sim's stable bay
+//           (M3: a parcel keeps its bay until it leaves the rack).
 // The card never says whether the parcel is malware (§5.4): the trait shown
 // is the flagging machine's own strain (a specialised machine only
 // false-flags decoys of its own strain, so the parcel's strain would give a
@@ -37,7 +39,8 @@ import type {
 } from '../../sim/types.ts'
 import { ageS, paidValue, valueAt } from '../../sim/value.ts'
 import type { ViewSim } from '../../sim/view-api.ts'
-import type { Button } from '../Button.ts'
+import type { Button, ButtonVisual } from '../Button.ts'
+import { addPanel } from '../Panel.ts'
 import { formatClock, formatMoney, textTop } from '../text.ts'
 import { PALETTE, THEME } from '../theme.ts'
 import {
@@ -73,6 +76,9 @@ export const VALUE_TINT: Record<ValuePhase, number> = {
 }
 /** Frames of the decay coin ring (ring_0 full … ring_8 empty, manifest `ring`). */
 export const RING_FRAMES = 9
+/** CLEAR's confirm face (art/STYLE.md §7 green button, manifest ui_btn_green). */
+export const GREEN_UP = 'ui_btn_green'
+export const GREEN_DOWN = 'ui_btn_green_down'
 
 // ---- pure helpers ----------------------------------------------------------------
 
@@ -156,6 +162,37 @@ export function ringIndex(
   return Math.min(RING_FRAMES - 1, Math.max(0, i))
 }
 
+/**
+ * The green face over a button in `visual` state: up / pressed frames, or
+ * null (disabled and the red stall look keep the kit's own frame).
+ */
+export function greenFace(visual: ButtonVisual): string | null {
+  if (visual === 'down') return GREEN_DOWN
+  if (visual === 'normal' || visual === 'glow') return GREEN_UP
+  return null
+}
+
+/**
+ * Give a kit Button the green confirm face: a `ui_btn_green` nine-slice
+ * just above its own face (under the label), following the button's state
+ * on every pointer event and on `sync()` (call it after setEnabled). The
+ * kit's face stays the hit target; the overlay is not interactive.
+ */
+export function useGreenFace(btn: Button): { sync: () => void } {
+  const face = addPanel(btn.scene, 0, 0, btn.btnWidth, btn.btnHeight, GREEN_UP)
+  btn.addAt(face, 1)
+  const sync = (): void => {
+    if (!face.scene) return
+    const f = frameOrNull(greenFace(btn.visual) ?? '')
+    face.setVisible(f !== null)
+    if (f && face.frame.name !== f) face.setFrame(f)
+  }
+  for (const ev of ['pointerdown', 'pointerup', 'pointerout'])
+    btn.bg.on(ev, sync)
+  sync()
+  return { sync }
+}
+
 /** Why CLEAR is disabled (Q35: the shelf is at cap), or null. */
 export function clearBlockReason(
   shelfCount: number,
@@ -198,6 +235,7 @@ export class HoldBayCard extends WarehouseSheet {
   private valueText: Phaser.GameObjects.BitmapText | null = null
   private ring: Phaser.GameObjects.Image | null = null
   private clearBtn: Button | null = null
+  private clearFace: { sync: () => void } | null = null
   private caption: Phaser.GameObjects.BitmapText | null = null
   private bayText: Phaser.GameObjects.BitmapText | null = null
 
@@ -260,6 +298,7 @@ export class HoldBayCard extends WarehouseSheet {
     this.valueText = null
     this.ring = null
     this.clearBtn = null
+    this.clearFace = null
     this.caption = null
     this.bayText = null
     const id = this.pid
@@ -338,6 +377,7 @@ export class HoldBayCard extends WarehouseSheet {
       onDisabledTap: () => this.deny(clear, this.clearReason() ?? 'Shelf full'),
     })
     this.clearBtn = clear
+    this.clearFace = useGreenFace(clear)
     this.caption = this.text(0, CAPTION_Y, '', RED_TEXT)
     this.updateActions()
   }
@@ -371,6 +411,7 @@ export class HoldBayCard extends WarehouseSheet {
     if (!b || !cap) return
     const why = this.clearReason()
     b.setEnabled(why === null)
+    this.clearFace?.sync()
     const s = why ?? ''
     if (cap.text !== s) cap.setText(s)
     cap.setX(Math.round(b.x + (ACTION_W - cap.width) / 2))

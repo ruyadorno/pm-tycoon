@@ -76,7 +76,7 @@ import type { ViewSim } from '../sim/view-api.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
 import { addPanel } from '../ui/Panel.ts'
 import { claimKey } from '../ui/Sheet.ts'
-import { strainRows, TONE_TEXT } from '../ui/ShieldPopover.ts'
+import { laneReadout, strainRows, TONE_TEXT } from '../ui/ShieldPopover.ts'
 import { addText, textTop } from '../ui/text.ts'
 import { PALETTE, THEME } from '../ui/theme.ts'
 import { BuySheet, warehouseFailText } from '../ui/warehouse/BuySheet.ts'
@@ -995,7 +995,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     const rr = this.lane.readoutRect()
     const w = 240
     const at = this.toScreen(rr.x + (ROOM_W - w) / 2, rr.y + rr.h + 2)
-    this.showPopover(`Lane ${stats.ratePerMin}/min · Detection`, out, at, w)
+    // The city shield popover's header (`Lane 15/min · Detection 97%`): the
+    // bare `… · Detection` read as a cut-off title (UX M3 review).
+    this.showPopover(laneReadout(stats), out, at, w)
   }
 
   /** Wanted poster tap (§5.1): malware labels revealed so far, by strain. */

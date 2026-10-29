@@ -81,8 +81,8 @@ describe('Garage sheet geometry (city-view §7, §7.2-§7.3)', () => {
       const c = garage.rowColumns(W)
       expect(c.nameX + c.nameW).toBeLessThanOrEqual(c.statusX)
       expect(c.statusX + c.statusW).toBeLessThanOrEqual(c.zoneX)
-      expect(c.zoneX + 74).toBeLessThanOrEqual(c.sellX)
-      expect(c.sellX + 64).toBeLessThanOrEqual(W - 12)
+      expect(c.zoneX + garage.ZONE_W).toBeLessThanOrEqual(c.sellX)
+      expect(c.sellX + garage.SELL_W).toBeLessThanOrEqual(W - 12)
       expect(c.nameW).toBeGreaterThanOrEqual(64) // `Dee · $8/day`
       expect(c.statusW).toBeGreaterThanOrEqual(60)
     }
@@ -90,10 +90,13 @@ describe('Garage sheet geometry (city-view §7, §7.2-§7.3)', () => {
 })
 
 describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)', () => {
-  it('sell refund = vehicles.json price × economy.sellRefund (bike $100, van $500, truck $650)', () => {
+  it('sell refund = vehicles.json price × economy.sellRefund (bike $100, van $500, truck $600)', () => {
     expect(garage.sellRefund(data, 'bike')).toBe(100)
     expect(garage.sellRefund(data, 'van')).toBe(500)
-    expect(garage.sellRefund(data, 'truck')).toBe(650)
+    const truck = data.vehicles.types.find((t) => t.id === 'truck')!
+    expect(garage.sellRefund(data, 'truck')).toBe(
+      Math.round(truck.price * data.economy.sellRefund),
+    )
   })
 
   it('the last vehicle cannot be sold: Sell disabled with "Keep at least one vehicle"', () => {
@@ -178,6 +181,45 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     expect(garage.driverLine(snap({ driverName: null }), data).text).toBe(
       'No driver',
     )
+    // with the walked-out driver's name: who the Re-hire button brings back
+    expect(garage.driverLine(snap({ driverName: null }), data, 'Dee')).toEqual({
+      text: 'Dee left',
+      red: true,
+    })
+  })
+
+  it('the longest Sell / Re-hire and zone-chip labels keep Button.CONTENT_PAD of air in m5x7 (UX M3: `Re-hire $25` touched its 64-px face)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const xml = readFileSync(
+      new URL('../../public/assets/m5x7.xml', import.meta.url),
+      'utf8',
+    )
+    const adv = new Map<number, number>()
+    for (const m of xml.matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+      adv.set(Number(m[1]), Number(m[2]))
+    const width = (s: string): number =>
+      [...s].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
+    const { CONTENT_PAD } = await import('../../src/ui/Button.ts')
+    const actions = data.vehicles.types.flatMap((t) => [
+      garage.rowAction(
+        { state: 'inactive', type: t.id, driverName: null },
+        data,
+        3,
+        true,
+      ).label,
+      garage.rowAction({ state: 'idle_lot', type: t.id }, data, 3, true).label,
+    ])
+    for (const label of actions)
+      expect(width(label), label).toBeLessThanOrEqual(
+        garage.SELL_W - 2 * CONTENT_PAD,
+      )
+    const chips = ['any', 'highres', 'downtown', 'industrial'].map((z) =>
+      zp.zoneChipText(data, data.map, z as never),
+    )
+    for (const label of chips)
+      expect(width(label), label).toBeLessThanOrEqual(
+        garage.ZONE_W - 2 * CONTENT_PAD,
+      )
   })
 
   it('header strings: fleet size, payday countdown from ticksToPayday, payroll per day', () => {

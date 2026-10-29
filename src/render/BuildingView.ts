@@ -6,10 +6,13 @@
 // the lost-life scorch (`mood_scorch_<class>`, city-view §3.3: one in-game
 // day on the destination of a delivered malware parcel; the scene times it).
 // Everything is a plain Image / BitmapText in the CityScene world Layer; the
-// scene drives it (no sim access here, no per-frame work while idle).
+// scene drives it (no sim access here, no per-frame work while idle). On a
+// region unlock (§1.4) setLocked(false, true) hands the old `_locked` Image
+// back with the new colour one at alpha 0 so the scene crossfades them.
 import Phaser from 'phaser'
 import type { BuildingDef } from '../data/index.ts'
 import { FONT_KEY, WORLD_ATLAS } from './atlases.ts'
+import type { MoodKind } from './cityFx.ts'
 import type { DecayPhase } from './decayPhase.ts'
 import { buildingSprite, frameOrNull, lockedFrame } from './frames.ts'
 import { footprintAnchor, footprintDepth, tileToScreen } from './iso.ts'
@@ -45,7 +48,7 @@ export const PHASE_TINT: Record<DecayPhase, number> = {
   red: THEME.danger,
 }
 
-export type MoodKind = 'happy' | 'unhappy' | null
+export type { MoodKind } from './cityFx.ts'
 
 const BADGE_ICON = 'ic_parcel_m'
 /** m5x7 metrics (public/assets/m5x7.xml): cap top 4, cap height 7. */
@@ -151,10 +154,10 @@ export class BuildingView {
     return this.topY - BELL_LIFT - BELL_H
   }
 
-  private buildImage(): void {
+  private buildImage(): Phaser.GameObjects.Image | null {
     const name = lockedFrame(this.stem, this.locked)
     const fill = this.locked && name !== null && !name.endsWith('_locked')
-    if (!name) return
+    if (!name) return null
     const img = this.scene.add
       .image(this.anchor.x, this.anchor.y, WORLD_ATLAS, name)
       .setOrigin(0.5, 1)
@@ -162,21 +165,39 @@ export class BuildingView {
     if (fill) img.setTint(LOCKED_FILL).setTintMode(Phaser.TintModes.FILL)
     this.layer.add(img)
     this.image = img
+    return img
   }
 
-  /** Swap between the fogged and colour sprite (TODO(M3): 1 s crossfade, §1.4). */
-  setLocked(locked: boolean): void {
-    if (locked === this.locked) return
+  /**
+   * Swap between the fogged and colour sprite. With `crossfade` the new
+   * Image starts at alpha 0 and the old one is NOT destroyed: both come back
+   * in `{from, to}` and the caller fades `to` in, `from` out over 1 s and
+   * then destroys `from` (§1.4, the only alpha tweens on world objects).
+   */
+  setLocked(
+    locked: boolean,
+    crossfade = false,
+  ): {
+    from: Phaser.GameObjects.Image | null
+    to: Phaser.GameObjects.Image | null
+  } {
+    if (locked === this.locked) return { from: null, to: null }
     this.locked = locked
-    this.image?.destroy()
+    const old = this.image
     this.image = null
-    this.buildImage()
+    const img = this.buildImage()
     if (locked) {
       this.setScorch(false)
       this.setMood(null)
       this.setWaiting(0, 'plain')
       this.setRush(null)
     }
+    if (!crossfade || !old || !img) {
+      old?.destroy()
+      return { from: null, to: img }
+    }
+    img.setAlpha(0)
+    return { from: old, to: img }
   }
 
   /** Mood overlay from the district value (spec §9.2); never on fogged buildings. */

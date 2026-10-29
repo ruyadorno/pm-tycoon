@@ -217,8 +217,9 @@ describe('city-view §4.3: bottom bar state', () => {
   it('Garage "+" once, when a newly unlocked type becomes affordable', () => {
     const seen = new Set<VehicleType>(['bike', 'van'])
     expect(newlyAffordableTypes(data, 1, 5000, seen)).toEqual([])
-    expect(newlyAffordableTypes(data, 2, 1299, seen)).toEqual([])
-    expect(newlyAffordableTypes(data, 2, 1300, seen)).toEqual(['truck'])
+    const truck = data.vehicles.types.find((t) => t.id === 'truck')!.price
+    expect(newlyAffordableTypes(data, 2, truck - 1, seen)).toEqual([])
+    expect(newlyAffordableTypes(data, 2, truck, seen)).toEqual(['truck'])
     seen.add('truck')
     expect(newlyAffordableTypes(data, 2, 9999, seen)).toEqual([])
   })

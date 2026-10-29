@@ -9,10 +9,16 @@
 // sprites — a new id walks in from the dock door (64 px/s along
 // layout.walkPath), a missing one walks back out and is destroyed (a
 // walked-out inspector carries `ic_alert`), a moved desk makes everyone walk
-// to the new stand points. idle (1 fps) while the desk has no parcel, scan
-// (4 fps, all together: one shared roll, §6.3) while any station is busy,
-// `jump` for 300 ms on any lane flag. Name tags show for 1.5 s after a hire
-// and while the desk's SlotCard is open. Nothing here changes sim timing.
+// to the new stand points. A payroll walkout (§7.4: `worker:walkedOut`, the
+// sim moves the id to the desk's walkedOutIds and drops a station) walks the
+// inspector back out through the dock door at 64 px/s carrying `ic_alert`; a
+// re-hire (`worker:hired`) walks them back in. `ic_alert` also sits over the
+// desk while any seated inspector carries an unpaid mark (§1.6: from
+// `payroll:short` until a paid payday clears it). idle (1 fps) while the
+// desk has no parcel, scan (4 fps, all together: one shared roll, §6.3)
+// while any station is busy, `jump` for 300 ms on any lane flag. Name tags
+// show for 1.5 s after a hire and while the desk's SlotCard is open.
+// Nothing here changes sim timing.
 import type Phaser from 'phaser'
 import type { Employee, LaneNode } from '../../sim/types.ts'
 import type { ViewSim } from '../../sim/view-api.ts'
@@ -102,12 +108,18 @@ export class WorkerSprites {
   syncAll(): void {
     for (const w of this.workers.values()) this.destroyWorker(w)
     this.workers.clear()
+    this.walkedOut.clear()
     this.reconcile(true)
   }
 
   /** worker:walkedOut — the sprite leaves carrying the alert icon. */
   onWalkedOut(employeeId: number): void {
-    this.walkedOut.add(employeeId)
+    if (this.workers.has(employeeId)) this.walkedOut.add(employeeId)
+  }
+
+  /** True while the sprite of `employeeId` is on its way out (tests / e2e). */
+  isLeaving(employeeId: number): boolean {
+    return this.workers.get(employeeId)?.leaving === true
   }
 
   /** Any lane flag: everyone jumps for 300 ms (§3.3, fun addition). */

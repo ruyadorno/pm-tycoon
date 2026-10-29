@@ -246,6 +246,26 @@ describe('§9.3: the lane rate and the counter lines', () => {
     ])
   })
 
+  it('a rate below 1 never rounds up to 100%: from 99% the card keeps one decimal (UX M3: "Another Metal detector would make it 100%")', () => {
+    const p = payload({
+      counterOwned: true,
+      laneRate: 0.994,
+      counterRate: 0.9988,
+    })
+    expect(card.counterLines(p, data)).toEqual([
+      'This one got through on the 0.6%',
+      'Another Shaky shaker would make it 99.8%',
+    ])
+    expect(card.rateLine('metal', 0.994)).toBe(
+      "Your lane's catch rate vs metal was 99.4%",
+    )
+    expect(card.ratePct(0.99999)).toBe(99.9)
+    expect(card.ratePct(0.985)).toBe(99)
+    expect(card.ratePct(0.83)).toBe(83)
+    expect(card.ratePct(1)).toBe(100)
+    expect(card.missPct(0.83)).toBe(17)
+  })
+
   it('cleared by the player: `Cleared by you at 11:58` replaces the counter', () => {
     const p = payload({ clearedByPlayerAt: s(11 * 60 + 58) })
     expect(card.counterLines(p, data)).toEqual(['Cleared by you at 11:58'])

@@ -31,6 +31,26 @@
 //   game-over          fixture one-life.json + advance to the third loss
 // The M2 fixtures come from `node tools/fixtures/warehouse.ts` (same
 // staleness rule; tests/data/shot-fixtures.test.ts pins their scenarios).
+//
+// M3 (plan.md §12.6 task 12; city-view.md §1.4, §5.3, §8.2, §9.6-§9.7;
+// warehouse-view.md §5, §7.5), fixtures from `node tools/fixtures/m3.ts`:
+//   level-up            level-up.json + policy, camera on the warehouse,
+//                       frozen on dust frame 2 of the construction overlay
+//                       (500-749 ms after level:up) with the LEVEL stamp
+//   industrial-unlocked level-up.json + policy, camera on Hoist Hill, after
+//                       the 1-s fog cross-fade (sign popped, chip NEW)
+//   newspaper           level-up.json + policy: the level paper, which slides
+//                       up once the stamp has played (STAMP_MS, §9.6 step 3)
+//   shield-popover      level-up.json + policy, past the level-up: the real
+//                       shield tap → metal + rattle rows, "→ Shaky shaker"
+//   payroll-short       payroll-short.json WITHOUT the policy: $0 at the
+//                       day-4 payday → red toast + the Garage "!"
+//   city-10min          seed 7, ?policy=1&fastForward=600 (t = 600 s)
+//   warehouse-tier2     level-up.json + policy in the room: level:up while
+//                       inside → tier-2 cross-fade + slot-4 unroll, settled
+//   warehouse-l2        l2-lane.json + policy: L2 in play, 4 slots, the
+//                       Shaky shaker in slot 4 (+ `-360x604`)
+// The two warehouse shots also run at the 360×604 profile.
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, test, type PmHelpers } from './fixtures.ts'
@@ -113,6 +133,38 @@ function buildingCentre(page: Page, id: string): Promise<Pt> {
   }, id)
 }
 
+/**
+ * A world point that the City's own tap pick (opaque sprite pixels front to
+ * back, then the footprint) resolves to building `id`: its visual centre
+ * when that shows, else the visible pixel nearest to it — a taller sprite
+ * in front may cover a small building's middle.
+ */
+async function tapPointOf(page: Page, id: string): Promise<Pt> {
+  const c = await buildingCentre(page, id)
+  const p = await page.evaluate(
+    ([bid, cx, cy]) => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        buildings: Map<string, { anchor: Pt; topY: number }>
+        pick(x: number, y: number): { kind: string; view?: { id: string } }
+      }
+      const b = city.buildings.get(bid as string)!
+      const hits = (x: number, y: number): boolean =>
+        city.pick(x, y).view?.id === bid
+      let best: (Pt & { d: number }) | null = null
+      for (let y = b.topY; y <= b.anchor.y; y += 2)
+        for (let x = b.anchor.x - 96; x <= b.anchor.x + 96; x += 2) {
+          if (!hits(x, y)) continue
+          const d = Math.hypot(x - (cx as number), y - (cy as number))
+          if (!best || d < best.d) best = { x, y, d }
+        }
+      return best
+    },
+    [id, c.x, c.y] as const,
+  )
+  expect(p, `a visible pixel of ${id}`).not.toBeNull()
+  return { x: p!.x, y: p!.y }
+}
+
 /** Centre the City camera on a world point now (City's own focus rule). */
 async function focusCity(page: Page, w: Pt): Promise<void> {
   await page.evaluate((p) => {
@@ -135,7 +187,7 @@ function emit(page: Page, name: string, payload: unknown): Promise<void> {
 /** The HUD's layout rect of a fixed target (layout.ts). */
 function hudRect(
   page: Page,
-  name: 'warehouse' | 'garage',
+  name: 'warehouse' | 'garage' | 'shield',
 ): Promise<{ x: number; y: number; w: number; h: number }> {
   return page.evaluate((n) => {
     const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
@@ -344,7 +396,7 @@ test.describe('M1 shots', () => {
     // Hold the sim (❚❚) while the camera settles so the vehicle stays free.
     await page.evaluate(() => window.__pm!.speed(0))
     await pm.settle(64)
-    const centre = await buildingCentre(page, target!)
+    const centre = await tapPointOf(page, target!)
     await focusCity(page, centre)
     await pm.settle(4)
     const s = await cityScreen(page, centre)
@@ -769,6 +821,256 @@ test.describe('M2 shots', () => {
     await pm.shot(shotName('game-over'), 30)
     const st = await hudCards(page)
     expect(st).toEqual({ lost: false, over: true })
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M3 ------------------------------------------------------------------
+
+/** City's own warehouse-sprite centre (world px). */
+function warehouseCentre(page: Page): Promise<Pt> {
+  return page.evaluate(() => {
+    const city = window.__pm!.game.scene.getScene('City') as unknown as {
+      warehouseCentre(): Pt
+    }
+    return city.warehouseCentre()
+  })
+}
+
+/**
+ * level-up.json under ?policy=1 (3 s before its level:up), the camera on
+ * `focus`, then real 16-ms frames at 1× until level:up fires (as in play:
+ * the money floats and toasts of the lead-in come and go in their own time
+ * instead of landing together, as a sim-only wait would make them). Every
+ * timeline the level-up starts (City dust + stamp, region fade, the HUD's
+ * paper hold) runs from that frame, so a shot's settle frames are 16-ms
+ * steps after level:up.
+ */
+async function levelUpAt(
+  page: Page,
+  pm: PmHelpers,
+  url: string,
+  focus: 'warehouse' | 'industrial' | null,
+): Promise<void> {
+  await pm.open(url)
+  const { fixture } = await loadFixture(page, pm, 'level-up')
+  await pm.settle(5)
+  if (focus === 'warehouse') await focusCity(page, await warehouseCentre(page))
+  else if (focus === 'industrial') {
+    // The chip's own pan (pm:panTo), one frame per 16 ms until it lands.
+    await emit(page, 'pm:panTo', { regionId: 'industrial' })
+    await pm.settle(40)
+  }
+  await pm.freeze()
+  const capFrames = Math.ceil(
+    (((fixture.levelUpInS as number) + 10) * 1000) / 16,
+  )
+  const w = await page.evaluate((cap) => {
+    const api = window.__pm!
+    const ev = api.core.events as unknown as {
+      on(n: string, f: (p: { level: number }) => void): unknown
+      off(n: string, f: (p: { level: number }) => void): unknown
+    }
+    const got: { level: number | null } = { level: null }
+    const fn = (p: { level: number }): void => {
+      got.level ??= p.level
+    }
+    ev.on('level:up', fn)
+    let frames = 0
+    while (got.level === null && frames < cap) {
+      api.step(16)
+      frames++
+    }
+    ev.off('level:up', fn)
+    return { level: got.level, frames }
+  }, capFrames)
+  console.log(`shots: level:up after ${w.frames} frames`)
+  expect(w.level, 'the fixture levels up to 2').toBe(2)
+}
+
+/** The HUD newspaper: the paper on screen (kind) and whether it shows. */
+function paperState(
+  page: Page,
+): Promise<{ kind: string | null; visible: boolean; headline: string }> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      paper: {
+        current(): { kind: string; headline: string } | null
+        isVisible(): boolean
+      }
+    }
+    const c = hud.paper.current()
+    return {
+      kind: c?.kind ?? null,
+      visible: hud.paper.isVisible(),
+      headline: c?.headline ?? '',
+    }
+  })
+}
+
+test.describe('M3 shots', () => {
+  test('level-up', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, 'warehouse')
+    // 38 frames = 608 ms: dust frame 2 (500-749 ms), the stamp rising.
+    await pm.shot('level-up', 38)
+    const st = await page.evaluate(() => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        construction: { start: number } | null
+        time: { now: number }
+      }
+      const c = city.construction
+      return { ms: c ? city.time.now - c.start : null }
+    })
+    console.log(`shots: construction at ${JSON.stringify(st)}`)
+    expect(st.ms, 'the construction overlay is up').not.toBeNull()
+    expect(st.ms!).toBeGreaterThanOrEqual(500)
+    expect(st.ms!).toBeLessThan(750)
+    expect((await paperState(page)).visible, 'no paper over the moment').toBe(
+      false,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('industrial-unlocked', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, 'industrial')
+    // 100 frames = 1.6 s: the 1-s fog cross-fade and the sign pop are done.
+    await pm.shot('industrial-unlocked', 100)
+    const st = await page.evaluate(() => ({
+      region: window.__pm!.sim.regionState('industrial'),
+      chips: (
+        window.__pm!.game.scene.getScene('HUD') as unknown as {
+          chips: { entry: { id: string; lockLevel: number | null } }[]
+        }
+      ).chips.map((c) => `${c.entry.id}:${c.entry.lockLevel ?? ''}`),
+    }))
+    console.log(`shots: industrial ${JSON.stringify(st)}`)
+    expect(st.region).toBe('live')
+    expect(st.chips).toContain('industrial:')
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('newspaper', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, 'warehouse')
+    // The paper waits for the stamp (2.4 s), then slides up for 300 ms.
+    expect(
+      await settleUntil(page, pm, async () => (await paperState(page)).visible),
+      'the level paper comes up',
+    ).toBe(true)
+    await pm.shot('newspaper', 30)
+    const p = await paperState(page)
+    console.log(`shots: paper ${JSON.stringify(p)}`)
+    expect(p).toMatchObject({ kind: 'level', visible: true })
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('shield-popover', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, null)
+    // Past the stamp; rattle counts in the Detection % from the level-up tick.
+    await pm.settle(150)
+    const r = await hudRect(page, 'shield')
+    await pm.tap(r.x + Math.floor(r.w / 2), r.y + Math.floor(r.h / 2))
+    await pm.settle(20)
+    const open = await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        shield: { isOpen(): boolean } | null
+      }
+      return hud.shield?.isOpen() ?? false
+    })
+    expect(open, 'the shield popover is open').toBe(true)
+    await pm.shot('shield-popover', 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('payroll-short', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // No policy: it would earn money before the payday.
+    await pm.open(CITY)
+    const { fixture } = await loadFixture(page, pm, 'payroll-short')
+    await pm.settle(5)
+    const capMs = ((fixture.paydayInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('payroll:short', cap),
+      capMs,
+    )
+    expect(w.ok, 'the $0 payday runs short').toBe(true)
+    expect(w.payload!.employeeIds).toEqual(fixture.unpaid)
+    await pm.shot('payroll-short', 30)
+    const toast = await page.evaluate(
+      () =>
+        (
+          window.__pm!.game.scene.getScene('HUD') as unknown as {
+            toast: { currentText(): string | null }
+          }
+        ).toast.currentText() ?? '',
+    )
+    console.log(`shots: payroll toast "${toast}"`)
+    expect(toast).toMatch(/^Payroll short: .+ unpaid$/)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('city-10min', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(180_000)
+    // ?fastForward=600 runs the policy before the first render (plan.md
+    // §6.8), so no toast, popup or float of the first ten minutes is queued
+    // up on the first frames as a sim-only __pm.advance would leave them.
+    await pm.open(`${POLICY}&fastForward=600`)
+    await pm.freeze()
+    await pm.shot('city-10min', 64)
+    const m = await page.evaluate(() => window.__pm!.metrics())
+    console.log(
+      `shots: city-10min tick ${m.tick} $${m.money} lifetime $${m.lifetimeEarned} lv ${m.level} deliveries ${m.deliveries}`,
+    )
+    // t = 600 s, plus the settle frames the shot renders at 1×.
+    expect(m.tick).toBeGreaterThanOrEqual(6000)
+    expect(m.tick).toBeLessThan(6100)
+    expect(m.deliveries).toBeGreaterThan(20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-tier2', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await levelUpAt(page, pm, WH_POLICY, null)
+    // 64 frames ≈ 1 s: the 400-ms cross-fade, then the slot-4 unroll.
+    await pm.shot(shotName('warehouse-tier2'), 64)
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      return {
+        warehouse: api.game.scene.isActive('Warehouse'),
+        slots: api.sim.lane
+          .nodes()
+          .filter((n) => n.kind === 'slot' && !n.locked)
+          .map((n) => n.id),
+      }
+    })
+    expect(st.warehouse).toBe(true)
+    expect(st.slots).toEqual(['slot1', 'slot2', 'slot3', 'slot4'])
+    expect((await paperState(page)).visible, 'no paper over the room').toBe(
+      false,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-l2', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(WH_POLICY)
+    const { fixture } = await loadFixture(page, pm, 'l2-lane')
+    await pm.settle(64)
+    const st = await page.evaluate((slot) => {
+      const api = window.__pm!
+      const f = api.sim.lane.nodes().find((n) => n.id === slot)?.fixture
+      return {
+        warehouse: api.game.scene.isActive('Warehouse'),
+        level: api.sim.level,
+        shaker: f?.kind === 'machine' ? f.checker.defId : null,
+      }
+    }, fixture.shakerSlot as string)
+    expect(st).toEqual({ warehouse: true, level: 2, shaker: 'shaky_shaker' })
+    await pm.shot(shotName('warehouse-l2'))
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

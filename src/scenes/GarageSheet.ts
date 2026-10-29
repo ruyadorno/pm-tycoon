@@ -6,11 +6,13 @@
 //                `Payroll $44/day` (red after a short payday) ·
 //                `Lane 15/min · Detection 97%` (the % in the §6.3 colours)
 //   fleet list   clipped by the Sheet's list camera, 56-px rows: type icon,
-//                `Bike 1` over `Dee · $8/day` (`! unpaid` in red, `No
-//                driver` after a walkout), the §4.6 state text + units
+//                `Bike 1` over `Dee · $8/day` (`! unpaid` in red, red `Dee
+//                left` after a walkout), the §4.6 state text + units
 //                `3/4`, the zone chip `Any ▾` (→ ZonePicker), `Sell $100`
 //                (→ Dialog; disabled on the last vehicle with the tip `Keep
-//                at least one vehicle`) or `Re-hire $8` on an inactive row;
+//                at least one vehicle`) or `Re-hire $8` once the driver has
+//                walked out (→ rehireDriver, toast `Dee is back — Bike 2 on
+//                the road`);
 //                row tap → pm:panTo {vehicleId}, double-tap → pm:follow +
 //                close; empty state `Buy your first vehicle below`
 //   buy cards    one per vehicles.json type: sprite, name, price (red when
@@ -24,7 +26,7 @@
 // `toggleGarage(from)` is the one entry point (HUD button, G key, the
 // district panel's `Garage ▸`).
 import Phaser from 'phaser'
-import { bindSim, getViewSim, REG } from '../boot/simBinding.ts'
+import { bindSim, getSim, getViewSim, REG } from '../boot/simBinding.ts'
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import { DOUBLE_TAP_MS, DOUBLE_TAP_PX } from '../input/GestureClassifier.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
@@ -165,12 +167,21 @@ export function statusLines(
   return [ellipsize(state, maxW, measure), units]
 }
 
-/** Driver line: `Dee · $8/day`, red `Dee · ! unpaid`, or `No driver`. */
+/**
+ * Driver line: `Dee · $8/day`, red `Dee · ! unpaid` after a short payday, red
+ * `Dee left` after a walkout (the row's alert state, like the `!` badge;
+ * `No driver` when the name is unknown). The status column already reads
+ * `No driver` for a parked inactive vehicle, so naming who left says who
+ * the `Re-hire` button brings back instead of repeating it (UX M3 review;
+ * `Dee walked out` is 79 px, wider than the 74-px name column).
+ */
 export function driverLine(
   v: Pick<VehicleSnapshot, 'driverName' | 'unpaid' | 'type'>,
   data: GameData,
+  walkedOut: string | null = null,
 ): { text: string; red: boolean } {
-  if (v.driverName === null) return { text: 'No driver', red: false }
+  if (v.driverName === null)
+    return { text: walkedOut ? `${walkedOut} left` : 'No driver', red: true }
   if (v.unpaid) return { text: `${v.driverName} · ! unpaid`, red: true }
   const pay = typeDef(data, v.type)?.driverSalaryPerDay ?? 0
   return { text: `${v.driverName} · ${formatMoney(pay)}/day`, red: false }
@@ -185,17 +196,19 @@ export interface RowAction {
 }
 
 /**
- * The row's button: `Re-hire $8` on an inactive vehicle (enabled once the
- * payroll system ships), else `Sell $100`, disabled on the last vehicle
- * while vehicles.json lastVehicleUnsellable.
+ * The row's button: `Re-hire $8` on a vehicle without a driver — inactive on
+ * the lot, or walked out and still finishing its trip (spec §7.4: re-hire is
+ * immediate) — enabled once the payroll system ships; else `Sell $100`,
+ * disabled on the last vehicle while vehicles.json lastVehicleUnsellable.
  */
 export function rowAction(
-  v: Pick<VehicleSnapshot, 'state' | 'type'>,
+  v: Pick<VehicleSnapshot, 'state' | 'type'> &
+    Partial<Pick<VehicleSnapshot, 'driverName'>>,
   data: GameData,
   fleetSize: number,
   rehireEnabled: boolean,
 ): RowAction {
-  if (v.state === 'inactive') {
+  if (v.state === 'inactive' || v.driverName === null) {
     return {
       kind: 'rehire',
       label: `Re-hire ${formatMoney(rehireCost(data, v.type))}`,
@@ -313,6 +326,13 @@ export function boughtToast(name: string, driverName: string | null): string {
   return driverName ? `${name} bought — ${driverName} hired` : `${name} bought`
 }
 
+/** `Dee is back — Bike 2 on the road` after a re-hire (spec §7.4). */
+export function rehiredToast(name: string, driverName: string | null): string {
+  return driverName
+    ? `${driverName} is back — ${name} on the road`
+    : `${name} re-hired`
+}
+
 /** The disabled buy card's toast. */
 export function buyDeniedToast(card: BuyCardModel): string {
   if (card.locked) return `${card.name} — unlocks at Lv ${card.unlockLevel}`
@@ -387,8 +407,13 @@ const ROW_PAD_R = 6
 const ICON_X = 20
 const NAME_X = 42
 const STATUS_X = 120
-const SELL_W = 64
-const ZONE_W = 74
+/**
+ * Row button widths: the longest labels (`Re-hire $25`, 61 px in m5x7;
+ * `Downtown ▾`, 60 px) need Button.CONTENT_PAD (5) of air on each side —
+ * at 64 px `Re-hire $25` touched both edges of its face (UX M3 review).
+ */
+export const SELL_W = 72
+export const ZONE_W = 70
 const ZONE_H = 28
 const LINE1 = 9
 const LINE2 = 29
@@ -504,6 +529,7 @@ export class GarageSheet extends Phaser.Scene {
         'payroll:short': mark,
         'worker:walkedOut': mark,
         'worker:hired': mark,
+        'worker:fired': mark,
         'day:ended': mark,
         'region:unlocked': mark,
       },
@@ -867,7 +893,7 @@ export class GarageSheet extends Phaser.Scene {
     const col = rowColumns(this.W)
     const m = this.measure()
     setTextIf(row.name, ellipsize(v.name, col.nameW, m))
-    const d = driverLine(v, data)
+    const d = driverLine(v, data, this.walkedOutName(v))
     setTextIf(row.driver, ellipsize(d.text, col.nameW, m))
     row.driver.setTint(d.red ? RED : MUTED)
     const [l1, l2] = statusLines(v, col.statusW, m)
@@ -881,6 +907,16 @@ export class GarageSheet extends Phaser.Scene {
     if (row.action.getData('label') !== a.label) row.action.setLabel(a.label)
     row.action.setEnabled(a.enabled)
     row.icon.setAlpha(v.state === 'inactive' ? 0.5 : 1)
+  }
+
+  /** The walked-out driver's name (the facade only reports active ones). */
+  private walkedOutName(v: VehicleSnapshot): string | null {
+    if (v.driverName !== null) return null
+    const st = getSim(this)?.state
+    const e = st?.employees.findLast(
+      (x) => x.kind === 'driver' && x.vehicleId === v.id && !x.active,
+    )
+    return e?.name ?? null
   }
 
   private measure(): (s: string) => number {
@@ -948,6 +984,10 @@ export class GarageSheet extends Phaser.Scene {
     if (row.actionKind === 'rehire') {
       const res = this.vs.rehireDriver(v.id)
       if (!res.ok) this.deny(failText(res.reason))
+      else {
+        const now = this.vs.vehicles.find((x) => x.id === v.id)
+        this.toast(rehiredToast(v.name, now?.driverName ?? null))
+      }
       this.dirty = true
       return
     }

@@ -149,13 +149,20 @@ export const PROPS_T1: readonly Point[] = [
 export const PROPS_T2: readonly Point[] = [{ x: 264, y: 112 }]
 export const POSTER = { x: 272, y: 200, w: 32, h: 32 } as const
 export const POSTER_HIT = { x: 266, y: 194, w: 44, h: 44 } as const
-/** Tier-2 signage plates (§5.2): text + top-left. */
+/**
+ * Tier-2 signage plates (§5.2): text + top-left; each plate is the m5x7 text
+ * width + 8 px wide and 16 px tall (`ui_tag`). SHELF sits at x 32 (§5.2
+ * says 36): its 38-px plate must end west of the ext strip at x 72.
+ */
 export const SIGNAGE: readonly { text: string; x: number; y: number }[] = [
   { text: 'INTAKE', x: 40, y: 34 },
   { text: 'HOLD', x: 200, y: 80 },
-  { text: 'SHELF', x: 36, y: 370 },
+  { text: 'SHELF', x: 32, y: 370 },
   { text: 'QUARANTINE', x: 252, y: 368 },
 ]
+/** Signage plate height and the padding around its text (§5.2). */
+export const PLATE_H = 16
+export const PLATE_PAD = 8
 /** CLOSE CALL! banner spot (§3.4). */
 export const BANNER = { x: 16, y: 40, w: 320, h: 32 } as const
 

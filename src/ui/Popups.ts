@@ -12,7 +12,9 @@
 // full, a new popup merges into the nearest alive popup of the same kind, or
 // recycles the oldest — never dropped silently. Offscreen popups are not
 // spawned. Animation runs in update(delta) on the scene clock (frozen-clock
-// friendly); nothing here touches the sim.
+// friendly); nothing here touches the sim. setCapacity(n) (render quality
+// cut 2, plan.md R4: the pool halved) limits new popups to the first n
+// slots; popups alive beyond them finish their animation.
 import Phaser from 'phaser'
 import { FONT_KEY, WORLD_ATLAS } from '../render/atlases.ts'
 import { capTop, DEPTH } from '../render/BuildingView.ts'
@@ -75,6 +77,7 @@ export class Popups {
   private readonly scene: Phaser.Scene
   private readonly slots: Slot[] = []
   private readonly hasFont: boolean
+  private capacity = POOL_SIZE
 
   constructor(scene: Phaser.Scene, layer: Phaser.GameObjects.Layer) {
     this.scene = scene
@@ -124,6 +127,24 @@ export class Popups {
   /** Number of live slots (tests / overlay). */
   get alive(): number {
     return this.slots.filter((s) => s.kind !== null).length
+  }
+
+  /** Slots new popups may use (1..POOL_SIZE; quality cut 2 halves it). */
+  setCapacity(n: number): void {
+    this.capacity = Math.max(1, Math.min(POOL_SIZE, Math.floor(n)))
+  }
+
+  get size(): number {
+    return this.capacity
+  }
+
+  /** A free slot within the capacity, or undefined. */
+  private freeSlot(): Slot | undefined {
+    for (let i = 0; i < this.capacity; i++) {
+      const s = this.slots[i]
+      if (s && s.kind === null) return s
+    }
+    return undefined
   }
 
   /** Pickup popup: ic_parcel_<size> ×N over a building door. */
@@ -181,7 +202,7 @@ export class Popups {
     frame: string,
   ): void {
     if (!view.contains(x0, y0) && !view.contains(x1, y1)) return
-    const s = this.slots.find((q) => q.kind === null)
+    const s = this.freeSlot()
     if (!s) return
     s.kind = 'hop'
     s.key = ''
@@ -220,7 +241,7 @@ export class Popups {
       this.render(same)
       return
     }
-    let s = this.slots.find((q) => q.kind === null)
+    let s = this.freeSlot()
     if (!s) {
       // Pool full: merge into the nearest live popup of this kind…
       let best: Slot | null = null
@@ -240,15 +261,17 @@ export class Popups {
         return
       }
       // …else recycle the oldest slot (a hop first: hops are cosmetic).
-      s = this.slots.reduce((a, b) =>
-        (a.kind === 'hop') !== (b.kind === 'hop')
-          ? a.kind === 'hop'
-            ? a
-            : b
-          : a.age >= b.age
-            ? a
-            : b,
-      )
+      s = this.slots
+        .slice(0, this.capacity)
+        .reduce((a, b) =>
+          (a.kind === 'hop') !== (b.kind === 'hop')
+            ? a.kind === 'hop'
+              ? a
+              : b
+            : a.age >= b.age
+              ? a
+              : b,
+        )
     }
     s.kind = kind
     s.key = key

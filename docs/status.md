@@ -2,35 +2,45 @@
 
 Filled in place by the playtest-1 run (format: plans/pm-tycoon/status.md); newest checkpoint entry first; copied back to plans/pm-tycoon/status.md as the last M4 step.
 
-Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: <pending M3> — current head: <updated per checkpoint>
+Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: <updated per checkpoint>
 
 ## Milestone checklist
 
 - [x] M0 scaffold + tooling + data tables + sim skeleton + procedural art + Gallery scene (commit `M0: …`)
 - [x] M1 city loop: spawn → collect → pass-through warehouse → deliver → money; Garage sheet; autosave (commit `M1: …`)
 - [x] M2 warehouse loop: fixed lane, checkers, Hold Bay, Toss/Clear, lives, lost-life card, game over (commit `M2: …`)
-- [ ] M3 levels 1→2, Industrial + truck + Shaky shaker, payroll and walkouts, audio, polish (commit `M3: …`)
+- [x] M3 levels 1→2, Industrial + truck + Shaky shaker, payroll and walkouts, audio, polish (commit `M3: …`)
 - [ ] M4 playtest instrumentation, summary card, build, screenshots, report, hand-off (commit `M4: …`)
 
 ## Gate results
 
-Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at 63af110 (M2); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
+Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M3 commit (data 2112987b); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
 
-| Gate                                                          | Window           | Median  | Min / max     | Pass                              |
-| ------------------------------------------------------------- | ---------------- | ------- | ------------- | --------------------------------- |
-| first delivery                                                | < 60 s           | 44.0 s  | 33.3 / 60.8   | PASS                              |
-| first malware caught (scripted, flagged + tossed)             | present, ≤ 300 s | 261.4 s | 196.5 / 473.1 | PASS (median; 4/10 seeds > 300 s) |
-| level 2                                                       | 8–15 min         | —       | —             | informational until M3            |
-| truck bought after L2                                         | ≤ 4 min          | —       | —             | informational until M3            |
-| lives lost (Toss-everything policy)                           | 0                | 0       | 0 / 1         | PASS                              |
-| shelf stall                                                   | 0 s              | 0 s     | 0 / 0         | PASS                              |
-| Hold Bay events per 10 min at L1 (`holdBayEventsPer10MinMin`) | ≥ 6              | 7.67    | 5.00 / 11.67  | PASS                              |
-| malware share at 30 min (informational, post-cap escalation)  | —                | 5.0 %   | 5.0 / 5.0     | n/a                               |
+| Gate                                                          | Window           | Median    | Min / max     | Pass                        |
+| ------------------------------------------------------------- | ---------------- | --------- | ------------- | --------------------------- |
+| first delivery                                                | < 60 s           | 44.0 s    | 33.3 / 60.8   | PASS                        |
+| first malware caught (scripted, flagged + tossed)             | present, ≤ 300 s | 174.3 s   | 154.4 / 197.7 | PASS (10/10 seeds)          |
+| level 2                                                       | 8–15 min         | 13.05 min | 10.93 / 16.23 | PASS                        |
+| truck bought after L2                                         | ≤ 4 min          | 2.10 min  | 0.92 / 5.11   | PASS                        |
+| lives lost (Toss-everything policy)                           | 0                | 0         | 0 / 1         | PASS (seeds 3, 10 lose one) |
+| shelf stall                                                   | 0 s              | 0 s       | 0 / 0         | PASS                        |
+| Hold Bay events per 10 min at L1 (`holdBayEventsPer10MinMin`) | ≥ 6              | 7.15      | 4.31 / 9.20   | PASS                        |
+| malware share at 30 min (informational, post-cap escalation)  | —                | 20.0 %    | 20.0 / 20.0   | n/a                         |
 
-JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 and `parcels.decoyShare` 0.10 → 0.20 — gate row `holdBayEventsPer10MinMin` (plan Q-R2 levers, after values in the §7.6 order) — 63af110; `economy.satisfaction.waitingPenaltyAfterS` 180 added (Q-RUN2, the spec §9.1 value moved into data, not a retune)
-L3–L5 informational rows (build 2): <level 3 at <> min, level 4 at <> min, level 5 at <> min, or "counter capped at 2 — not measured">
+JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 and `parcels.decoyShare` 0.10 → 0.20 (M2, row `holdBayEventsPer10MinMin`), then `decoyShare` 0.20 → 0.22 (M3, same row, quick gate 5.97 → 7.87); `vehicles.truck.price` 1300 → 1200 (M3, row `truckAfterLevel2MaxMin`, §7.6 truck rule, quick gate +5.18 → +3.86 min); `economy.satisfaction.waitingPenaltyAfterS` 180 added (Q-RUN2, the spec value moved into data). Policy extensions COUNTERS + REHIRE (docs/decisions.md).
+L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `level:up {3}` in any 30-min run).
 
 ## Checkpoint entries (newest first)
+
+## M3 — levels/economy/audio/polish — 2026-10-29 14:35 UTC — DONE at the `M3:` commit
+
+Built: levels 1→2 with the playtestMaxLevel cap (bar keeps counting, "Lv 3 coming soon"), the Industrial unlock (region live, spawns 5 s later at satisfaction 60, slot 4, Hold Bay/shelf caps, tier 2, strain announcement then rattle after newStrainDelayS), post-cap malware escalation, payroll with unpaid marks, walkouts and re-hire, the full competent policy (+ COUNTERS/REHIRE extensions), Q-RUN3 scripted-origin rule, stable Hold Bay bays; PixelLab art installed (63 generated sprites, 3 procedural kept, one 2048² atlas at 53 %); audio wired (director in Boot, sample preload, Title tap unlock, mute, visibility, sim hooks, Credits card, e2e audio + offline render specs); city flourishes (unlock fade + ground re-bake, level-up dust/stamp/tier-2 swap, mood overlays, angry labels + grumble, honking queue, dock lights, smoke emitters, days-since sign, quality flags); warehouse tier 2 (cross-fade, slot-4 unroll, plates, poster), walkout/re-hire in the room; HUD level bar, newspaper, payroll toasts, Garage payroll header + No driver/Re-hire rows, mute wiring.
+Gate: every playtest-1 window passes by median over seeds 1–10 (first delivery 44.0 s, scripted catch 174.3 s on 10/10 seeds, L2 13.05 min, truck +2.10 min, lives 0, shelf stall 0 s, Hold Bay 7.15/10 min at L1); per seed 5/10 miss at least one window (seeds 3, 10 lose a life; seed 3 truck +5.1; seed 5 first delivery 60.8 s; seeds 6, 8 Hold Bay < 6; seed 6 L2 16.2 min). No `level:up {3}` in 30 min. Malware share 20 % at 30 min.
+Tests: 950 (vitest, 54 files: 949 passed, 1 todo); e2e: PASS — smoke (M0–M3 + audio boot), shots 38 PNG tests, audio.spec 4/4 (34 notes at 126 BPM after the tap, tape-stop, minor tag, hide/resume), audio-render (8 bars: peak 0.324, bar RMS −24.3…−22.9 dBFS; full pass tail −120 dBFS); `vlr check` 44 s.
+Shots (new): `level-up` — dust frame 2, gold "LEVEL 2 — LOCAL" stamp, Industrial mid-fade, Hoist Hill chip NEW, bar "$2,015 / $5,000 · Lv 3 coming soon"; `industrial-unlocked` — colour Industrial, smoke on the chimneys; `newspaper` — THE NODE HEIGHTS GAZETTE, Day 13 / Lv 2, tier-2 photo; `shield-popover` — metal 99 %, rattle 89 % → Shaky shaker $300; `payroll-short` — $0, red "Payroll short: Audrey, Dee unpaid", Garage "!"; `city-10min` — L1 at 10:00, mood 29 (angry); `warehouse-tier2` / `warehouse-l2` (+360×604) — tier-2 room, slot 4 live, shaker in slot 4, Detection 99 %. M1/M2 shots regenerated with the PixelLab art. All in the STYLE.md look; fx_dust reads as a field of puffs rather than a cloud (art note).
+Deviations from spec-core.md: Q-RUN3 scripted origin; policy extensions COUNTERS, REHIRE and the dock-blocked inspector rule; walkout "finishes its trip" interpretation (docs/decisions.md). Retunes: decoyShare 0.22, truck $1,200.
+Open for the author: the lives window is dice (~19–29 % of 80 seeds lose one life in 30 min at D ≈ 0.97–0.99); mean satisfaction drifts angry under the policy during L2 (balance note, not tuned); the L1 stretch 7–13 min has nothing new to buy besides the van (fun-bar item 4 risk); the music is unheard on this VM.
+Next: M4 playtest build
 
 ## M2 — warehouse loop — 2026-10-29 12:55 UTC — DONE at the `M2:` commit (sim part 63af110)
 

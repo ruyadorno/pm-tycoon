@@ -1,7 +1,8 @@
 // Playwright (plan.md §6.3, §6.9.3): Chromium under SwiftShader for every
 // project (WebKit headless WebGL on Linux is not a target, phaser4-notes.md
 // §10). `vlr preview` serves the last `vite build`, which every e2e script
-// runs first.
+// runs first — so every project runs against the production bundle; the
+// `dist` project holds the specs about the build itself (e2e/dist.spec.ts).
 import { defineConfig, devices } from '@playwright/test'
 
 export const BASE_URL = 'http://127.0.0.1:4173'
@@ -35,6 +36,14 @@ export default defineConfig({
   projects: [
     {
       name: 'iphone16',
+      testIgnore: /dist\.spec\.ts/,
+      use: { ...phone, browserName: 'chromium' },
+    },
+    {
+      // The playtest build as served (plan.md §12.7 acceptance): the same
+      // preview of dist/, the iPhone 16 profile, e2e/dist.spec.ts only.
+      name: 'dist',
+      testMatch: /dist\.spec\.ts/,
       use: { ...phone, browserName: 'chromium' },
     },
     {

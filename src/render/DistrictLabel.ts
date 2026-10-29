@@ -252,6 +252,28 @@ export class DistrictLabel {
   }
 
   /**
+   * World point on the name plate or the lock board — both draw over every
+   * building (depth 9500), so a tap there means this district, not whatever
+   * building or road lies under it (M4: the pick resolves what the player
+   * sees).
+   */
+  hit(wx: number, wy: number): boolean {
+    const r = this.tagRect
+    if (r.w > 0 && wx >= r.x && wx < r.x + r.w && wy >= r.y && wy < r.y + r.h)
+      return true
+    const s = this.sign
+    if (!s || !s.visible || s.alpha <= 0) return false
+    const left = s.x - s.displayOriginX
+    const top = s.y - s.displayOriginY
+    return (
+      wx >= left &&
+      wx < left + s.displayWidth &&
+      wy >= top &&
+      wy < top + s.displayHeight
+    )
+  }
+
+  /**
    * Grumble timer (spec §9.2): true when this angry, on-screen label is due
    * its grumble — the first time it is seen angry, then every `everyMs`.
    */

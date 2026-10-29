@@ -310,6 +310,60 @@ describe('unpaid marks and walkouts (spec §7.4)', () => {
     expect(v.state).toBe('inactive')
     expect(auditState(sim.state, data)).toEqual([])
   })
+  it('a driver walking out while the vehicle waits in the dock with nothing aboard (the idle wait for its own parcels to clear the lane) parks inactive at once — it never loads a new outbound set and never leaves on a delivery trip', () => {
+    const sim = quietSim(1)
+    const bike = buy(sim, 'bike')
+    sim.state.economy.balance = 10_000
+    injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    const v = sim.state.vehicles[0]!
+    // Collect, return, unload: then the dock idle wait (its parcel is in the lane).
+    expect(
+      runUntil(
+        sim,
+        () => v.state === 'docked_loading' && v.waitUntilTick !== null,
+        3000,
+      ),
+    ).toBeGreaterThan(0)
+    expect(v.cargo).toEqual([])
+    const log = eventLog(sim)
+    walkOut(sim, driverOf(sim, bike))
+    expect(v.state).toBe('inactive')
+    expect(sim.state.lane.docks[0]!.vehicleId).toBeNull()
+    runTicks(sim, 600)
+    const mine = log
+      .filter(
+        (e) =>
+          e.name.startsWith('vehicle:') && (e.p as { id: number }).id === v.id,
+      )
+      .map((e) => e.name)
+    expect(mine).toEqual(['vehicle:inactive'])
+    expect(v.state).toBe('inactive')
+    expect(sim.state.stats.deliveries).toBe(0)
+    // The parcel cleared the lane and waits on the shelf for a driven vehicle.
+    expect(laneNode(sim.state.lane, 'shelf')!.queue).toHaveLength(1)
+    expect(auditState(sim.state, data)).toEqual([])
+  })
+
+  it('…and one whose driver walks out between the idle-wait timer and the recompute (no walkout hook ran) leaves the dock inactive instead of loading', () => {
+    const sim = quietSim(1)
+    const bike = buy(sim, 'bike')
+    sim.state.economy.balance = 10_000
+    injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    const v = sim.state.vehicles[0]!
+    expect(
+      runUntil(
+        sim,
+        () => v.state === 'docked_loading' && v.waitUntilTick !== null,
+        3000,
+      ),
+    ).toBeGreaterThan(0)
+    // An older save: the driver already out, the vehicle still waiting.
+    driverOf(sim, bike).active = false
+    runTicks(sim, 600)
+    expect(v.state).toBe('inactive')
+    expect(sim.state.stats.deliveries).toBe(0)
+    expect(auditState(sim.state, data)).toEqual([])
+  })
 })
 
 describe('re-hire (spec §7.4) and the desk seats', () => {

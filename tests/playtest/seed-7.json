@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "buildStamp": "77061cd 2026-10-29",
+  "seed": 7,
+  "startedAt": "2026-10-29T16:24:10Z",
+  "device": {
+    "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
+    "cssW": 393,
+    "cssH": 659,
+    "dpr": 3,
+    "zoom": 1,
+    "maxTexture": 8192
+  },
+  "elapsedS": 183.8,
+  "simS": 720.1,
+  "pausedS": 0.9,
+  "firstDeliveryS": 33.3,
+  "firstMalware": {
+    "spawnedS": 140.8,
+    "caughtS": 191,
+    "by": "inspector",
+    "tossedS": 191
+  },
+  "level2AtS": null,
+  "truckBoughtS": null,
+  "deliveries": {
+    "total": 73,
+    "onTime": 46,
+    "late": 27,
+    "byType": {
+      "bike": 73,
+      "van": 0,
+      "truck": 0
+    }
+  },
+  "moneyPerMin": [
+    20,
+    65,
+    35,
+    138,
+    83,
+    144,
+    213,
+    172,
+    248,
+    108,
+    281,
+    220
+  ],
+  "lifetimeEarned": 1727,
+  "balanceEnd": 729,
+  "malware": {
+    "spawned": 5,
+    "caught": 3,
+    "missed": 0,
+    "tossedClean": 4,
+    "cleared": 0
+  },
+  "livesLost": [],
+  "vehiclesBought": [
+    {
+      "type": "bike",
+      "atS": 0
+    },
+    {
+      "type": "bike",
+      "atS": 273.9
+    },
+    {
+      "type": "bike",
+      "atS": 403.7
+    }
+  ],
+  "inspectorsHired": 0,
+  "machinesBought": [
+    {
+      "id": "metal_detector",
+      "atS": 0
+    },
+    {
+      "id": "metal_detector",
+      "atS": 446.3
+    }
+  ],
+  "taps": 3,
+  "tapsPerMin": 1,
+  "rushTaps": 0,
+  "viewSwitches": 2,
+  "warehouseS": 59.4,
+  "fps": {
+    "p50": 60,
+    "p5": 60,
+    "min": 57,
+    "samples": 183
+  },
+  "holdBayEvents": 7,
+  "holdBayEventsPer10Min": 5.8,
+  "stalls": {
+    "count": 0,
+    "totalS": 0
+  },
+  "payroll": {
+    "paid": 12,
+    "short": 0,
+    "walkouts": 0
+  },
+  "satisfactionEnd": {
+    "highres": 36,
+    "downtown": 15
+  }
+}

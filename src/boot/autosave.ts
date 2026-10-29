@@ -5,12 +5,19 @@
 //                    commandLog, onboarding} via src/sim/save.ts
 //   pm.settings.v1  {muted, speed} (merged: the AudioDirector writes `muted`
 //                    through its own store and keeps `speed`; we keep `muted`)
-//   pm.playtest.v1  the metrics object (M4); Reset clears all three.
+//   pm.playtest.v1  the playtest profile + its `restore` accumulators
+//                   (src/metrics/playtest.ts, M4); Reset clears all three.
 //
 // The HUD drives `Autosave`: tick(delta) from its update every 10 s of real
 // time, save('hidden') on Phaser HIDDEN and save('pagehide') on window
 // pagehide; a failed write (quota, blocked storage) reports once through
-// onError (a one-line toast) and is retried next cycle. The Title reads the
+// onError (a one-line toast) and is retried next cycle. Every save also
+// writes pm.playtest.v1 (deps.getPlaytest), so the profile and the run it
+// describes stay in step; while the sim is held tickPlaytest(delta) keeps
+// the 10-s cadence (a full save while saves are on, else the profile alone —
+// e.g. after the game-over save), and a disabled autosave still writes the
+// profile on hide. readPlaytest() hands the stored profile to the recorder,
+// which resumes it only for the same run. The Title reads the
 // save header (`Day 7 · $1,240 · Lv 2`) and offers Continue only for a
 // version-1 payload whose dataHash matches the running tables; anything else
 // is discarded with the toast "Save from an older build was reset" (R9: no
@@ -127,6 +134,28 @@ function remove(store: KeyValueStore | null, key: string): void {
 /** Drop the save only (stale save, New game). */
 export function discardSave(store = browserStorage()): void {
   remove(store, SAVE_KEY)
+}
+
+/**
+ * The run pm.save.v1 holds — its seed and tick — without validating the
+ * whole payload (the HUD asks whether the running sim is that run before
+ * resuming the playtest profile); null when absent or unreadable.
+ */
+export function savedRun(
+  store = browserStorage(),
+): { seed: number; tick: number } | null {
+  const o = parseObject(getText(store, SAVE_KEY))
+  const state = o.state as { tick?: unknown } | undefined
+  const tick = state?.tick
+  return typeof o.seed === 'number' && typeof tick === 'number'
+    ? { seed: o.seed, tick }
+    : null
+}
+
+/** pm.playtest.v1 parsed (an object), or null (absent, unreadable). */
+export function readPlaytest(store = browserStorage()): unknown {
+  const o = parseObject(getText(store, PLAYTEST_KEY))
+  return Object.keys(o).length > 0 ? o : null
 }
 
 /** Reset: clear every pm.* key (save, settings, playtest). */
@@ -290,6 +319,8 @@ export interface AutosaveDeps {
   store?: KeyValueStore | null
   /** Called once per failure streak (the HUD shows a one-line toast). */
   onError?: (message: string, reason: SaveReason) => void
+  /** The playtest profile to store under pm.playtest.v1 (M4); absent = none. */
+  getPlaytest?: () => unknown
 }
 
 export class Autosave {
@@ -299,6 +330,9 @@ export class Autosave {
   elapsed = 0
   lastSavedAt: number | null = null
   failures = 0
+  /** Real ms held (paused) toward the next pm.playtest.v1 write. */
+  playtestElapsed = 0
+  private playtestFailed = false
   private deps: AutosaveDeps
 
   constructor(deps: AutosaveDeps) {
@@ -309,9 +343,15 @@ export class Autosave {
     return this.deps.store === undefined ? browserStorage() : this.deps.store
   }
 
-  /** Write pm.save.v1 now. Returns true on success. */
+  /**
+   * Write pm.save.v1 now (and pm.playtest.v1 with it). Returns true on
+   * success. While disabled only the playtest profile is written.
+   */
   save(reason: SaveReason = 'manual'): boolean {
-    if (!this.enabled) return false
+    if (!this.enabled) {
+      this.savePlaytest()
+      return false
+    }
     const sim = this.deps.getSim()
     if (!sim) return false
     try {
@@ -327,6 +367,7 @@ export class Autosave {
       this.lastSavedAt = savedAt
       this.failures = 0
       this.elapsed = 0
+      this.savePlaytest()
       return true
     } catch (err) {
       this.failures++
@@ -346,5 +387,43 @@ export class Autosave {
     this.elapsed += Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0)
     if (this.elapsed < AUTOSAVE_MS) return false
     return this.save('timer')
+  }
+
+  /**
+   * Write pm.playtest.v1 now (no-op without deps.getPlaytest). A failed
+   * write is logged once and retried on the next call.
+   */
+  savePlaytest(): boolean {
+    this.playtestElapsed = 0
+    const get = this.deps.getPlaytest
+    if (!get) return false
+    try {
+      const obj = get()
+      if (obj === null || obj === undefined) return false
+      const store = this.store
+      if (!store) throw new Error('localStorage unavailable')
+      store.setItem(PLAYTEST_KEY, JSON.stringify(obj))
+      this.playtestFailed = false
+      return true
+    } catch (err) {
+      if (!this.playtestFailed) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`playtest profile write failed: ${msg}`)
+      }
+      this.playtestFailed = true
+      return false
+    }
+  }
+
+  /**
+   * The 10-s cadence while the sim is held (tick() does not run then): a
+   * full save while saves are on — the sim may have moved since the last
+   * one, and the two keys stay in step — else the profile alone.
+   */
+  tickPlaytest(deltaMs: number): boolean {
+    this.playtestElapsed += Math.max(0, Number.isFinite(deltaMs) ? deltaMs : 0)
+    if (this.playtestElapsed < AUTOSAVE_MS) return false
+    this.playtestElapsed = 0
+    return this.enabled ? this.save('timer') : this.savePlaytest()
   }
 }

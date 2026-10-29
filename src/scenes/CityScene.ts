@@ -28,6 +28,14 @@
 // (cityFx.ts DOCK_POSE_CANVAS), the six Industrial smoke emitters while
 // Industrial is live, and the render-quality cut order (quality.ts, R4).
 //
+// M4 bug hunt: vehicles in front of a multi-tile footprint sort above it
+// (vehicleDepth.ts — along the back of a 3×3 face the wall clipped them); a
+// vehicle hidden behind a building neither swallows the tap meant for that
+// building nor gets followed by a double-tap there, and a district plate or
+// lock board (drawn over everything) picks its district (the pick resolves
+// what the player sees); the ground bake's texture is removed on SHUTDOWN
+// (a New game after a region unlock left the 3072×1536 'ground_b' behind).
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -121,6 +129,11 @@ import {
   type QualityController,
   type QualityFlags,
 } from '../render/quality.ts'
+import {
+  sortDepth,
+  type Occluder,
+  type SpriteRect,
+} from '../render/vehicleDepth.ts'
 import { VehicleView, type DockPose } from '../render/VehicleView.ts'
 import type { CommandResult } from '../sim/commands.ts'
 import type { LifeLostPayload } from '../sim/events.ts'
@@ -286,6 +299,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private vehicles = new Map<number, VehicleView>()
   private labels = new Map<string, DistrictLabel>()
   private props: PropView[] = []
+  /** Multi-tile footprints a vehicle can pass in front of (vehicleDepth.ts). */
+  private occluders: Occluder[] = []
   private smoke: Smoke[] = []
   private fx: Fx[] = []
   private fades: Fade[] = []
@@ -347,6 +362,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.vehicles = new Map()
     this.labels = new Map()
     this.props = []
+    this.occluders = []
     this.smoke = []
     this.fx = []
     this.fades = []
@@ -508,6 +524,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.finishFades()
     this.finishConstruction()
     this.clearLevelStamp()
+    // The DynamicTexture outlives the scene (TextureManager): a restarted
+    // City (New game) bakes 'ground' again, so an unlock's 'ground_b' would
+    // stay behind as a 3072×1536 orphan.
+    this.ground?.destroy()
+    this.ground = null
+    this.occluders = []
   }
 
   /** nav.ts: the §5.3 city → warehouse exit (pan, zoom-2 snap, fade). */
@@ -647,7 +669,47 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.labels.set(d.id, label)
     }
     this.buildSmoke()
+    this.refreshOccluders()
   }
+
+  /**
+   * The multi-tile footprints (buildings ≥ 2×2 and the warehouse) with their
+   * sprites' opaque rects, for sortDepth (create, lock swaps, tier swaps).
+   */
+  private refreshOccluders(): void {
+    const out: Occluder[] = []
+    const add = (
+      tile: readonly [number, number],
+      fp: readonly [number, number],
+      img: Phaser.GameObjects.Image | null,
+    ): void => {
+      if (!img || fp[0] < 2 || fp[1] < 2) return
+      const r = visibleRect(img)
+      out.push({
+        x0: tile[0],
+        y0: tile[1],
+        x1: tile[0] + fp[0] - 1,
+        y1: tile[1] + fp[1] - 1,
+        depth: footprintDepth(tile, fp),
+        left: r.x,
+        top: r.y,
+        right: r.right,
+        bottom: r.bottom,
+      })
+    }
+    for (const v of this.buildings.values())
+      add(v.def.tile, v.def.footprint, v.image)
+    const wh = this.gd.map.lot.warehouse
+    add(wh.tile, wh.footprint, this.warehouse)
+    this.occluders = out
+  }
+
+  private readonly sortVehicle = (
+    tx: number,
+    ty: number,
+    base: number,
+    rect: SpriteRect,
+  ): number => sortDepth(tx, ty, base, rect, this.occluders)
 
   /**
    * (Re)create a prop's Image for its region's lock state. With `crossfade`
@@ -786,6 +848,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         .setDepth(footprintDepth(wh.tile, wh.footprint))
       this.world.add(this.warehouse)
     } else this.warehouse.setFrame(name)
+    this.refreshOccluders()
   }
 
   /**
@@ -860,6 +923,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       const st = this.vs.districtStats(id)
       if (st && st.kind === 'district') this.applyMood(id, st.satisfaction)
     }
+    this.refreshOccluders()
     const isLocked = (id: string): boolean => this.lockState.get(id) === true
     const old = this.ground
     if (!animate || !old || ins.length + outs.length === 0) {
@@ -1204,7 +1268,11 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         v.zone === 'any' ? null : (this.regionColour.get(v.zone) ?? null)
       // On screen = last frame's position inside the view (honk bubble, §2).
       const onScreen = wv.contains(view.x, view.y)
-      view.update(v, alpha, now, colour, { onScreen, staticWheels })
+      view.update(v, alpha, now, colour, {
+        onScreen,
+        staticWheels,
+        sortDepth: this.sortVehicle,
+      })
       if (this.popOnCreate.delete(v.id))
         this.playFx(view.x, view.y, 'fx_pop', FX_POP_MS, false, view.img.depth)
     }
@@ -1567,12 +1635,18 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.world.add(g)
     this.zone = g
     const label = this.labels.get(d.id)
-    if (label) this.focusOn(label.at.x, label.at.y, 350, 0.6)
+    if (label && !this.transitioning)
+      this.focusOn(label.at.x, label.at.y, 350, 0.6)
   }
 
   // ---------------------------------------------------------------- game events
 
+  // While the City plays its exit (transitionOut), nothing else may move the
+  // camera: CameraRig.panTo replaces the exit pan and its completion
+  // callback, and the switch then waited for nav's 2-s timeout with the
+  // City ignoring input (M4: a chip tap during the 200-ms pan).
   private readonly onFollowEv = (p: FollowPayload): void => {
+    if (this.transitioning) return
     if (!p || p.vehicleId === null) {
       if (this.followId !== null) this.unfollow(false)
       return
@@ -1585,7 +1659,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private readonly onPanToEv = (p: PanToPayload): void => {
-    if (!p) return
+    if (!p || this.transitioning) return
     if (this.followId !== null) this.unfollow(true)
     let x: number | null = null
     let y: number | null = null
@@ -1726,12 +1800,17 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     return this.cameras.main.getWorldPoint(sx, sy)
   }
 
-  /** Vehicle whose grown sprite bounds contain the world point (nearest first). */
+  /**
+   * Vehicle whose grown sprite bounds contain the world point (nearest
+   * first), unless a building drawn over it covers that point: a vehicle
+   * hidden behind a tower (or parked behind the warehouse) is not what the
+   * player tapped.
+   */
   private vehicleAt(wx: number, wy: number): VehicleView | null {
     let best: VehicleView | null = null
     let bestD = Infinity
     for (const v of this.vehicles.values()) {
-      if (!v.contains(wx, wy)) continue
+      if (!v.contains(wx, wy) || this.coveredAt(wx, wy, v.img.depth)) continue
       const d = (v.x - wx) ** 2 + (v.y - 8 - wy) ** 2
       if (d < bestD) {
         bestD = d
@@ -1741,24 +1820,44 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     return best
   }
 
+  /** An opaque pixel of the warehouse exterior at world (wx, wy). */
+  private warehouseHit(wx: number, wy: number): boolean {
+    const img = this.warehouse
+    return (
+      img !== null &&
+      visibleRect(img).contains(wx, wy) &&
+      (this.textures.getPixelAlpha(
+        Math.floor(wx - (img.x - img.displayOriginX)),
+        Math.floor(wy - (img.y - img.displayOriginY)),
+        WORLD_ATLAS,
+        img.frame.name,
+      ) ?? 0) > 0
+    )
+  }
+
+  /** A building or the warehouse drawn above `depth` covers world (wx, wy). */
+  private coveredAt(wx: number, wy: number, depth: number): boolean {
+    for (const b of this.buildings.values())
+      if (b.depth > depth && b.hit(wx, wy)) return true
+    const wh = this.warehouse
+    return wh !== null && wh.depth > depth && this.warehouseHit(wx, wy)
+  }
+
   /** City pick order (city-view §6.1, §10): what is under world (wx, wy). */
   private pick(wx: number, wy: number): Pick {
-    // What you see is what you tap: opaque sprite pixels front-to-back first
-    // (tall buildings overlap the tiles behind them), then the footprint.
+    // What you see is what you tap: the district plates and lock boards draw
+    // over everything, then opaque sprite pixels front-to-back (tall
+    // buildings overlap the tiles behind them), then the footprint.
+    for (const l of this.labels.values())
+      if (l.hit(wx, wy))
+        return l.locked
+          ? { kind: 'locked', district: l.id }
+          : { kind: 'district', district: l.id }
     let top: BuildingView | null = null
     for (const v of this.buildings.values())
       if ((!top || v.depth > top.depth) && v.hit(wx, wy)) top = v
-    const whImg = this.warehouse
-    const whDepth = whImg?.depth ?? -1
-    const whHit =
-      whImg !== null &&
-      visibleRect(whImg).contains(wx, wy) &&
-      (this.textures.getPixelAlpha(
-        Math.floor(wx - (whImg.x - whImg.displayOriginX)),
-        Math.floor(wy - (whImg.y - whImg.displayOriginY)),
-        WORLD_ATLAS,
-        whImg.frame.name,
-      ) ?? 0) > 0
+    const whDepth = this.warehouse?.depth ?? -1
+    const whHit = this.warehouseHit(wx, wy)
     if (whHit && (!top || whDepth > top.depth)) return { kind: 'warehouse' }
     if (top) return { kind: 'building', view: top }
 

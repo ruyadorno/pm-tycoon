@@ -23,7 +23,9 @@ import type {
 import { pathfinder, type Pathfinder } from './astar.ts'
 import { Rng, seedWord } from './rng.ts'
 import { roadGraph, type RoadGraph } from './roads.ts'
+import { isSoldInbound } from './systems/lane.ts'
 import { runTick } from './tick.ts'
+import { stateShapeProblems } from './validate.ts'
 import type {
   District,
   Building,
@@ -545,17 +547,17 @@ export function auditState(state: SimState, data: GameData): string[] {
     }
     // A slot's buffer may sit above its cap by the parcels a fixture change
     // sent back from its stations (lane.ts reseat, Q31) — at most a full
-    // desk; a conveyor by a sold vehicle's inbound cargo (vehicles.ts
-    // sellVehicle) — at most the largest vehicle's capacity in parcels.
-    const biggest = Math.max(
-      0,
-      ...data.vehicles.types.map((t) => t.capacityUnits),
-    )
+    // desk; a conveyor by the inbound cargo of sold vehicles (vehicles.ts
+    // sellVehicle → lane.ts returnToConveyor, §4.1), however many were sold
+    // — a dock unload needs room, so the rest never exceed the cap.
     const slack =
       n.kind === 'slot'
         ? data.employees.inspector.maxPerDesk
         : n.kind === 'conveyor'
-          ? biggest
+          ? n.queue.filter((id) => {
+              const p = state.parcels[String(id)]
+              return p !== undefined && isSoldInbound(p)
+            }).length
           : 0
     const capped = n.kind === 'conveyor' || n.kind === 'slot'
     if (capped && n.cap !== null && n.queue.length > n.cap + slack) {
@@ -759,6 +761,10 @@ export function snapshotProblems(
     Array.isArray(st.vehicles) &&
     Array.isArray(st.employees)
   if (!shaped) return [...out, 'state: missing top-level fields']
+  // Field types, enums and data ids first (validate.ts): auditState and the
+  // systems assume them.
+  const shape = stateShapeProblems(st, data)
+  if (shape.length > 0) return [...out, ...shape]
   try {
     out.push(...auditState(st as unknown as SimState, data))
   } catch (err) {

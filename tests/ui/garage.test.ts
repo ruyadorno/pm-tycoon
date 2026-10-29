@@ -236,7 +236,7 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     )
     expect(garage.boughtToast('Bike 2', null)).toBe('Bike 2 bought')
     expect(garage.sellPrompt('Bike 2', 100)).toBe(
-      'Sell Bike 2 for $100? Its parcels return to the shelf.',
+      'Sell Bike 2 for $100? Its parcels go back to the warehouse.',
     )
     expect(garage.footerText(data)).toBe(
       'Sold vehicles refund 50%. Drivers are paid every day (60 s).',

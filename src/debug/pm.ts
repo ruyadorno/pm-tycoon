@@ -16,16 +16,27 @@
 // director before this API exists; disabled under ?audio=0, still present).
 // `ready` flips after Core READY + the CREATE of the world scene ?view=
 // selects (City by default, Warehouse, Gallery).
+// M4 (plan.md §12.7 task 1, §12.9): playtest() is the live playtest profile
+// (the HUD's PlaytestRecorder, registry REG_PLAYTEST; null before the HUD
+// exists), downloadPlaytest() saves it as playtest.json (the summary card's
+// Blob + <a download>), and metrics().playtest carries its live counters.
 import Phaser from 'phaser'
 import type { AudioDebugApi, AudioDirector } from '../audio/director.ts'
 import type { Stepper } from '../boot/stepper.ts'
 import { REG, setSim } from '../boot/simBinding.ts'
 import { EV_GOTO, type WorldView } from '../boot/nav.ts'
 import type { GameData } from '../data/index.ts'
+import {
+  PLAYTEST_FILE,
+  REG_PLAYTEST,
+  type Playtest,
+  type PlaytestRecorder,
+} from '../metrics/playtest.ts'
 import type { Command, CommandResult } from '../sim/commands.ts'
 import type { SimEventName, SimEventPayloads } from '../sim/events.ts'
 import { replay, Sim, stateHash, type SimSnapshot } from '../sim/sim.ts'
 import type { ViewSim } from '../sim/view-api.ts'
+import { downloadJson } from '../ui/SummaryCard.ts'
 import { installDrawCallCounter, overlayStats, REG_OVERLAY } from './overlay.ts'
 import { type Params, worldSceneKey } from './params.ts'
 
@@ -50,6 +61,17 @@ export interface PmMetrics {
   deliveries: number
   malware: { spawned: number; caught: number; missed: number }
   minutes: unknown[]
+  /** The playtest profile's live counters (null before the HUD exists). */
+  playtest: {
+    elapsedS: number
+    simS: number
+    pausedS: number
+    taps: number
+    tapsPerMin: number
+    viewSwitches: number
+    warehouseS: number
+    fps: Playtest['fps']
+  } | null
 }
 
 export interface ReplayResult {
@@ -93,14 +115,30 @@ export interface PmApi {
   speed(s: 0 | 1 | 2 | 4): void
   /** The AudioDirector's debug API (audio.md §9.2); undefined only before Boot made the director. */
   readonly audio: AudioDebugApi | undefined
-  /** Added by later modules (src/metrics/playtest.ts). */
-  playtest?: () => unknown
-  downloadPlaytest?: () => void
+  /** The live playtest profile (plan.md §12.9); null before the HUD exists. */
+  playtest(): Playtest | null
+  /** Save the live profile as playtest.json; false when there is none or it failed. */
+  downloadPlaytest(): boolean
 }
 
 declare global {
   interface Window {
     __pm?: PmApi
+  }
+}
+
+/** metrics().playtest: the profile's live counters. */
+function playtestCounters(pt: Playtest | null): PmMetrics['playtest'] {
+  if (!pt) return null
+  return {
+    elapsedS: pt.elapsedS,
+    simS: pt.simS,
+    pausedS: pt.pausedS,
+    taps: pt.taps,
+    tapsPerMin: pt.tapsPerMin,
+    viewSwitches: pt.viewSwitches,
+    warehouseS: pt.warehouseS,
+    fps: pt.fps,
   }
 }
 
@@ -140,6 +178,8 @@ export function installDebugApi(
   installDrawCallCounter(game)
   const tweenClock = installTweenClock(loop)
   let audioApi: { of: AudioDirector; api: AudioDebugApi } | null = null
+  const recorder = (): PlaytestRecorder | null =>
+    (game.registry.get(REG_PLAYTEST) as PlaytestRecorder | undefined) ?? null
 
   const pm: PmApi = {
     game,
@@ -251,6 +291,7 @@ export function installDebugApi(
           missed: st.stats.malwareMissed,
         },
         minutes: st.stats.minutes,
+        playtest: playtestCounters(recorder()?.snapshot() ?? null),
       }
     },
     dispatch(cmd: Command) {
@@ -281,6 +322,13 @@ export function installDebugApi(
     },
     speed(s) {
       stepper.speed = s
+    },
+    playtest() {
+      return recorder()?.snapshot() ?? null
+    },
+    downloadPlaytest() {
+      const pt = recorder()?.snapshot() ?? null
+      return pt ? downloadJson(PLAYTEST_FILE, pt) : false
     },
   }
   window.__pm = pm

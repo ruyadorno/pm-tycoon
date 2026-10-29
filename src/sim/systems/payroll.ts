@@ -23,7 +23,8 @@
 //   - driver: the vehicle finishes its trip (dispatch.ts: a driverless
 //     vehicle starts no new collect leg or target) and parks `inactive`
 //     right after its next unload (docks.ts) — at once when it is idle on the
-//     lot or queued with nothing aboard. An inactive vehicle is never
+//     lot, queued with nothing aboard, or in the dock with nothing aboard (it
+//     would load a new trip; M4). An inactive vehicle is never
 //     dispatched, never in a dock, and has no payroll line.
 // Re-hire (the `rehire` command): employees.rehireFeeDays × the worker's
 // daily salary ('hire'), immediate; the mark is cleared, the inspector takes
@@ -151,10 +152,14 @@ export function walkOut(sim: Sim, e: Employee): void {
     nodeId: null,
   })
   const v = vehicleOf(sim, e)
-  // Nothing left of the trip: parked on the lot, or queued with nothing to unload.
+  // Nothing left of the trip: parked on the lot, queued with nothing to
+  // unload, or in the dock with nothing aboard (unloaded, waiting for or
+  // starting to load an outbound set — a new trip; M4 hunt).
+  const empty = v !== null && v.cargo.length === 0
   if (
     v &&
-    (v.state === 'idle_lot' || (v.state === 'queued' && v.cargo.length === 0))
+    (v.state === 'idle_lot' ||
+      (empty && (v.state === 'queued' || v.state === 'docked_loading')))
   ) {
     goInactive(sim, v)
   }

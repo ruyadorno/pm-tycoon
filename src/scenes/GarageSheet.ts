@@ -339,9 +339,9 @@ export function buyDeniedToast(card: BuyCardModel): string {
   return `Not enough money — ${card.name} costs ${card.priceText}`
 }
 
-/** `Sell Bike 2 for $100? Its parcels return to the shelf.` */
+/** `Sell Bike 2 for $100? Its parcels go back to the warehouse.` (outbound cargo to the shelf, uninspected cargo through the lane — docs/decisions.md) */
 export function sellPrompt(name: string, refund: number): string {
-  return `Sell ${name} for ${formatMoney(refund)}? Its parcels return to the shelf.`
+  return `Sell ${name} for ${formatMoney(refund)}? Its parcels go back to the warehouse.`
 }
 
 /** `Sold vehicles refund 50%. Drivers are paid every day (60 s).` */

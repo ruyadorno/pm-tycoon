@@ -393,7 +393,7 @@ describe('§4.5 step 2 — the idle pass, and the dock idle wait (§4.6)', () =>
       }
       expect(stateHash(loaded.state)).toBe(stateHash(sim.state))
     }
-  })
+  }, 30_000) // ~4 s alone
 
   it('Q-RUN1 (c) relief needs a docked vehicle that can carry a shelf parcel: a full shelf nobody can carry keeps the lane stalled (the player must act) and the shelf at its cap', () => {
     const sim = quietSim(3)

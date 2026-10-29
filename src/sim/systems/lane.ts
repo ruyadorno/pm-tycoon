@@ -255,6 +255,17 @@ export function returnToConveyor(
   sim.emit('parcel:unloaded', { id: p.id, dockId: dock.id })
 }
 
+/**
+ * The parcel's latest 'unloaded' hop is returnToConveyor's (a sold vehicle's
+ * cargo, taken past the conveyor's cap) — the only 'unloaded' entry that
+ * stores its card line (it names the vehicle); a dock unload stores none
+ * (docks.ts unloadTick). auditState bounds a conveyor by its cap plus these.
+ */
+export function isSoldInbound(p: Parcel): boolean {
+  const t = p.trace.findLast((x) => x.what === 'unloaded')
+  return t !== undefined && t.text !== undefined
+}
+
 /** Remove a parcel id from a node's queue (no-op when absent). */
 export function takeFrom(node: LaneNode, id: number): void {
   const i = node.queue.indexOf(id)

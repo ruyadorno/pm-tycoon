@@ -13,7 +13,8 @@
 // warehouse sprite's hidden NW side, so near it (cityFx.dockBlend) the
 // vehicle is drawn toward the pose in front of bay 1's open door, over the
 // wall, nose in (`_ne_`) while docked. Quality (src/render/quality.ts) cut 5
-// pins the wheel frame to 0.
+// pins the wheel frame to 0. The scene's `sortDepth` (vehicleDepth.ts) lifts
+// a vehicle over the multi-tile footprints it is in front of (M4).
 import Phaser from 'phaser'
 import type { VehicleSnapshot } from '../sim/view-api.ts'
 import { WORLD_ATLAS } from './atlases.ts'
@@ -21,6 +22,7 @@ import { DEPTH } from './BuildingView.ts'
 import { dockBlend, honkShown } from './cityFx.ts'
 import { VEHICLE_FOOT, vehicleFrame } from './frames.ts'
 import { tileToScreen } from './iso.ts'
+import type { SpriteRect } from './vehicleDepth.ts'
 
 /** Fallback origin y (Q24) for a type the manifest has no foot point for. */
 export const VEHICLE_ORIGIN_Y = 0.75
@@ -51,6 +53,12 @@ export interface VehicleDrawOpts {
   onScreen: boolean
   /** Quality cut 5: wheel frame pinned to 0. */
   staticWheels: boolean
+  /**
+   * Depth from the fractional tile, its tx + ty and the drawn sprite rect
+   * (CityScene: vehicleDepth.sortDepth over the multi-tile footprints).
+   * The dock pose still wins near the dock.
+   */
+  sortDepth?: (tx: number, ty: number, base: number, rect: SpriteRect) => number
 }
 
 const DOCKED = new Set(['docked_unloading', 'docked_loading'])
@@ -70,6 +78,7 @@ export class VehicleView {
   private type: VehicleSnapshot['type']
   private readonly pose: DockPose | null
   private readonly pt = { x: 0, y: 0 }
+  private readonly rect: SpriteRect = { left: 0, top: 0, right: 0, bottom: 0 }
   /** Interpolated tile position of the last update. */
   tx = 0
   ty = 0
@@ -136,7 +145,6 @@ export class VehicleView {
     if (pose && w > 0) {
       this.pt.x += pose.dx * w
       this.pt.y += pose.dy * w
-      depth = Math.max(depth, pose.depth)
     }
     const bob = v.stopAt !== null && nowMs % BOB_PERIOD_MS < BOB_UP_MS ? -1 : 0
     const x = Math.round(this.pt.x)
@@ -151,6 +159,15 @@ export class VehicleView {
       this.frameName = name
       this.img.setFrame(name, false, false)
     }
+    if (opts.sortDepth) {
+      const r = this.rect
+      r.left = x - this.img.displayOriginX
+      r.top = y - this.img.displayOriginY
+      r.right = r.left + this.img.width
+      r.bottom = r.top + this.img.height
+      depth = opts.sortDepth(this.tx, this.ty, depth, r)
+    }
+    if (pose && w > 0) depth = Math.max(depth, pose.depth)
     this.img.setPosition(x, y).setDepth(depth)
     const inactive = v.state === 'inactive'
     this.img.setAlpha(inactive ? 0.5 : 1)

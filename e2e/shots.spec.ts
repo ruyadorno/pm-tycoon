@@ -51,7 +51,22 @@
 //   warehouse-l2        l2-lane.json + policy: L2 in play, 4 slots, the
 //                       Shaky shaker in slot 4 (+ `-360x604`)
 // The two warehouse shots also run at the 360×604 profile.
-import { readFileSync } from 'node:fs'
+//
+// M4 (plan.md §12.7 tasks 1-2, §12.9):
+//   playtest-12min  iPhone 16: the 12-minute automated run (seed 7, policy)
+//                   in real time at 4× — the recorder's wall clock, fps
+//                   sampler and pause clock see a real session; 5:00-6:00 in
+//                   the Warehouse — then ❚❚, ❚❚ again (the pause menu) and
+//                   `End run — show summary` by real taps: the `summary-card`
+//                   shot, and the profile written to tests/playtest/seed-7.json
+//                   (the committed format example; tests/metrics/
+//                   playtest-schema.test.ts validates it)
+//   summary-card    360×604 (`-360x604`): policy 10 min frozen, the same taps
+//   summary-over    iPhone 16 (no PNG): one-life.json to game over, the
+//                   game-over card's `Run summary` → the card in `Back` mode
+//                   → Back returns to the game-over card
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, test, type PmHelpers } from './fixtures.ts'
 import {
@@ -59,8 +74,10 @@ import {
   openSheet,
   policyOff,
   roomLayout,
+  sceneTarget,
   settleUntil,
   tapRoomRect,
+  tapTarget,
 } from './warehouse.ts'
 
 const BASE = '/?seed=7&debug=1&mute=1'
@@ -1071,6 +1088,191 @@ test.describe('M3 shots', () => {
     }, fixture.shakerSlot as string)
     expect(st).toEqual({ warehouse: true, level: 2, shaker: 'shaky_shaker' })
     await pm.shot(shotName('warehouse-l2'))
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M4 ------------------------------------------------------------------
+
+/** The committed playtest.json format example (plan.md §12.7 task 1). */
+const PLAYTEST_EXAMPLE = 'tests/playtest/seed-7.json'
+/** The automated run's length in sim seconds (12 minutes). */
+const PLAYTEST_RUN_S = 720
+
+interface SummaryState {
+  open: boolean
+  mode: string | null
+  title: string | null
+  checks: { n: number; state: string; detail: string }[]
+  paused: boolean
+  overOpen: boolean
+}
+
+/** The HUD's summary card as the player sees it. */
+function summaryState(page: Page): Promise<SummaryState> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      summary: {
+        isOpen(): boolean
+        currentMode: string
+        current: { seed: number; elapsedS: number } | null
+        checks(): { n: number; state: string; detail: string }[] | null
+        text(): string | null
+      }
+      overCard: { isOpen(): boolean }
+    }
+    const sc = hud.summary
+    return {
+      open: sc.isOpen(),
+      mode: sc.isOpen() ? sc.currentMode : null,
+      title: sc.text()?.split('\n')[0] ?? null,
+      checks: sc.checks() ?? [],
+      paused: window.__pm!.stepper.paused,
+      overOpen: hud.overCard.isOpen(),
+    }
+  })
+}
+
+/** Wait (real time) until the sim reaches `s` sim seconds. */
+async function untilSimS(
+  page: Page,
+  s: number,
+  timeout: number,
+): Promise<void> {
+  await page.waitForFunction((t) => window.__pm!.core.state.tick >= t * 10, s, {
+    timeout,
+    polling: 100,
+  })
+}
+
+/**
+ * ❚❚ (pause), ❚❚ again (the pause menu: the Paused card), then `End run —
+ * show summary` — real taps; `settle` lets the frames run between them.
+ */
+async function openSummaryByTaps(
+  page: Page,
+  pm: PmHelpers,
+  settle: () => Promise<void>,
+): Promise<void> {
+  await tapTarget(page, pm, 'HUD', 'speed:0')
+  await settle()
+  await tapTarget(page, pm, 'HUD', 'speed:0')
+  await settle()
+  const menu = await page.evaluate(() =>
+    (
+      window.__pm!.game.scene.getScene('HUD') as unknown as {
+        paused: { isOpen(): boolean }
+      }
+    ).paused.isOpen(),
+  )
+  expect(menu, '❚❚ while paused opens the pause menu').toBe(true)
+  await tapTarget(page, pm, 'HUD', 'paused:summary')
+  await settle()
+  const st = await summaryState(page)
+  expect(st.open, '`End run — show summary` opens the card').toBe(true)
+  expect(st.paused, 'the summary card holds the sim').toBe(true)
+}
+
+test.describe('M4 shots', () => {
+  test('playtest-12min', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(420_000)
+    await pm.open(POLICY)
+    // Real time at 4× (debug speed): 12 sim minutes in ~3 wall minutes.
+    await page.evaluate(() => window.__pm!.speed(4))
+    await untilSimS(page, 300, 150_000)
+    await page.evaluate(() => window.__pm!.goto('warehouse'))
+    await untilSimS(page, 360, 60_000)
+    await page.evaluate(() => window.__pm!.goto('city'))
+    await untilSimS(page, PLAYTEST_RUN_S - 4, 150_000)
+    await page.evaluate(() => window.__pm!.speed(1))
+    await untilSimS(page, PLAYTEST_RUN_S, 30_000)
+    await openSummaryByTaps(page, pm, () => page.waitForTimeout(250))
+    const pt = await page.evaluate(() => window.__pm!.playtest())
+    expect(pt, '__pm.playtest() returns the live profile').not.toBeNull()
+    mkdirSync(dirname(PLAYTEST_EXAMPLE), { recursive: true })
+    writeFileSync(PLAYTEST_EXAMPLE, JSON.stringify(pt, null, 2) + '\n')
+    const p = pt!
+    console.log(
+      `shots: playtest seed ${p.seed} simS ${p.simS} elapsedS ${p.elapsedS} pausedS ${p.pausedS} ` +
+        `fps p50 ${p.fps.p50} p5 ${p.fps.p5} min ${p.fps.min} (${p.fps.samples}) taps ${p.taps} ` +
+        `views ${p.viewSwitches} warehouseS ${p.warehouseS} deliveries ${p.deliveries.total} ` +
+        `firstDelivery ${p.firstDeliveryS} caught ${p.firstMalware.caughtS} by ${p.firstMalware.by}`,
+    )
+    expect(p.seed).toBe(7)
+    expect(p.simS).toBeGreaterThanOrEqual(PLAYTEST_RUN_S)
+    expect(p.moneyPerMin.length).toBe(Math.floor(p.simS / 60))
+    expect(p.viewSwitches).toBeGreaterThanOrEqual(2)
+    expect(p.warehouseS).toBeGreaterThanOrEqual(50)
+    expect(p.warehouseS).toBeLessThanOrEqual(80)
+    expect(p.taps).toBeGreaterThanOrEqual(3)
+    expect(p.fps.samples).toBeGreaterThan(30)
+    expect(p.firstDeliveryS).not.toBeNull()
+    const st = await summaryState(page)
+    expect(st.title).toBe(
+      `Run summary — seed 7 — ${Math.floor(p.elapsedS / 60)}:${String(Math.floor(p.elapsedS % 60)).padStart(2, '0')} played`,
+    )
+    expect(st.checks.map((c) => c.n)).toEqual([1, 2, 3, 4, 5])
+    await pm.shot('summary-card', 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('summary-card', async ({ page, pm, consoleErrors }) => {
+    test.skip(!isMinFit(), 'the iPhone shot comes from playtest-12min')
+    await pm.open(POLICY)
+    await runFor(page, pm, 600_000)
+    await openSummaryByTaps(page, pm, () => pm.settle(8))
+    await pm.shot(shotName('summary-card'), 20)
+    // Fits 360×604: every button live and inside the canvas.
+    const L = await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        L: { W: number; H: number }
+      }
+      return { W: hud.L.W, H: hud.L.H }
+    })
+    expect(L).toEqual({ W: 360, H: 604 })
+    for (const id of [
+      'summary:download',
+      'summary:copy',
+      'summary:keep',
+      'summary:newGame',
+    ]) {
+      const r = await sceneTarget(page, 'HUD', id)
+      expect(r, `${id} is live`).not.toBeNull()
+      expect(r!.x, `${id} x`).toBeGreaterThanOrEqual(0)
+      expect(r!.y, `${id} y`).toBeGreaterThanOrEqual(0)
+      expect(r!.x + r!.w, `${id} right`).toBeLessThanOrEqual(L.W)
+      expect(r!.y + r!.h, `${id} bottom`).toBeLessThanOrEqual(L.H)
+    }
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('summary-over', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'one-life')
+    await pm.settle(5)
+    const capMs = ((fixture.gameOverInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('game:over', cap),
+      capMs,
+    )
+    expect(w.ok, 'the third malware delivery ends the game').toBe(true)
+    expect(
+      await settleUntil(page, pm, async () => (await hudCards(page)).over),
+      'the game-over screen opens',
+    ).toBe(true)
+    await pm.settle(4)
+    await tapTarget(page, pm, 'HUD', 'gameOver:summary')
+    await pm.settle(8)
+    let st = await summaryState(page)
+    expect(st).toMatchObject({ open: true, mode: 'over', overOpen: false })
+    const pt = await page.evaluate(() => window.__pm!.playtest())
+    expect(pt!.livesLost.length).toBeGreaterThanOrEqual(1)
+    await tapTarget(page, pm, 'HUD', 'summary:back')
+    await pm.settle(8)
+    st = await summaryState(page)
+    expect(st).toMatchObject({ open: false, overOpen: true, paused: true })
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

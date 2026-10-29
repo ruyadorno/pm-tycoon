@@ -45,6 +45,20 @@
 // drives the AudioDirector (registry 'audio') and shows `Tap for sound`
 // while the audio waits for its first gesture (?skipTitle=1).
 //
+// M4 (plan.md §12.7 tasks 1-2, §12.9): the PlaytestRecorder
+// (src/metrics/playtest.ts) follows the sim from create (resumed from
+// pm.playtest.v1 when this is the same run as the save, a fresh profile
+// otherwise and on every Sim swap), counts canvas pointerdowns, samples
+// game.loop.actualFps and the view, and is stored with every autosave (and
+// every 10 s while the sim is held); registry REG_PLAYTEST hands it to
+// __pm. The SummaryCard ('summary' hold) opens from the Paused card's
+// `End run — show summary` — the Paused card is also the pause menu: ❚❚
+// tapped while already paused opens it (the first pause toasts the hint) —
+// from the game-over card's `Run summary` (its `Back` returns there), and is
+// offered once at 20:00 of sim time by a ticker line + toast (Q55). `Keep
+// playing` resumes at the last running speed; `New game` asks first during
+// a live run.
+//
 // Sim events come through bindSim (attached while awake — always — and moved
 // on a Sim swap, with syncAll on WAKE / swap). The autosave timer runs from
 // update(); HIDDEN and pagehide save immediately. Keyboard: Space, 1, 2, 4
@@ -54,9 +68,11 @@ import {
   Autosave,
   discardSave,
   getOnboarding,
+  readPlaytest,
   readSettings,
   REG_ONBOARDING,
   REG_PENDING_TOAST,
+  savedRun,
   writeSettings,
 } from '../boot/autosave.ts'
 import { EV_GOTO, EV_VIEW, type WorldView } from '../boot/nav.ts'
@@ -67,11 +83,18 @@ import {
   getStepper,
   getViewSim,
   REG,
+  SIM_REPLACED,
 } from '../boot/simBinding.ts'
 import type { Stepper } from '../boot/stepper.ts'
 import type { GameData } from '../data/types.ts'
 import { mountOverlay } from '../debug/overlay.ts'
 import { debugEnabled, params } from '../debug/params.ts'
+import {
+  PlaytestRecorder,
+  REG_PLAYTEST,
+  SUMMARY_OFFER_S,
+  type PlaytestDevice,
+} from '../metrics/playtest.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { STAMP_MS } from '../render/cityFx.ts'
 import { buildingSprite } from '../render/frames.ts'
@@ -83,9 +106,11 @@ import type {
   TickerKind,
 } from '../sim/events.ts'
 import type { OnboardingSave } from '../sim/save.ts'
+import type { Sim } from '../sim/sim.ts'
 import type { VehicleType } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
 import { Button } from '../ui/Button.ts'
+import { Dialog } from '../ui/Dialog.ts'
 import { DistrictPanel } from '../ui/DistrictPanel.ts'
 import { FollowStrip } from '../ui/FollowStrip.ts'
 import {
@@ -165,6 +190,7 @@ import {
   pushModal,
 } from '../ui/Sheet.ts'
 import { ShieldPopover } from '../ui/ShieldPopover.ts'
+import { SummaryCard, type SummaryMode } from '../ui/SummaryCard.ts'
 import {
   addText,
   CAP_TOP,
@@ -261,7 +287,18 @@ export const FLAG_FOLLOW_MS = 10_000
 /** The bouncing arrow over the Warehouse button: 1-px bob every 300 ms. */
 const FLAG_ARROW_BOB_MS = 300
 
-type Hold = 'lostLife' | 'gameOver' | 'hidden' | 'rotate'
+// M4 (plan.md §12.7 task 2, §12.9, Q55).
+/** The 20:00 offer (ticker line + toast), once per run. */
+export const SUMMARY_OFFER_LINE =
+  '20:00 on the clock — tap pause twice to see your run summary'
+export const SUMMARY_OFFER_TOAST =
+  'Twenty minutes in! Tap pause twice for your run summary'
+/** The first ❚❚ of a session: where the pause menu lives. */
+export const PAUSE_MENU_HINT_TEXT = 'Paused — tap pause again for the menu'
+export const NEW_GAME_CONFIRM_TITLE = 'Start a new game?'
+export const NEW_GAME_CONFIRM_TEXT = 'This run and its save will be lost.'
+
+type Hold = 'lostLife' | 'gameOver' | 'hidden' | 'rotate' | 'summary'
 
 function reducedMotion(): boolean {
   try {
@@ -450,6 +487,17 @@ export class HudScene extends Phaser.Scene {
   /** This tick's walkouts: one toast + one paper for the lot (flushLines). */
   private pendingWalkouts: { name: string; text: string }[] = []
 
+  // M4
+  private recorder!: PlaytestRecorder
+  private summary!: SummaryCard
+  /** Canvas pointerdowns this session (the recorder's `taps`). */
+  private tapCount = 0
+  /** The Paused card is up as the pause menu (❚❚ while paused), not auto-pause. */
+  private pauseMenu = false
+  /** The first-pause hint toast ran this session. */
+  private pauseHinted = false
+  private newGameDialog: Dialog | null = null
+
   constructor() {
     super('HUD')
   }
@@ -512,6 +560,10 @@ export class HudScene extends Phaser.Scene {
     this.pendingWalkouts = []
     this.hintGesture = false
     this.lastTitle = null
+    this.tapCount = 0
+    this.pauseMenu = false
+    this.pauseHinted = false
+    this.newGameDialog = null
   }
 
   create(): void {
@@ -558,6 +610,7 @@ export class HudScene extends Phaser.Scene {
         }
       },
       onResume: () => this.resumeFromCard(),
+      onSummary: () => this.openSummary('run'),
     })
     this.rotate = new RotateCard(this, this.L.W, this.L.H)
     this.district = new DistrictPanel(this, this.L, this.vs)
@@ -581,6 +634,13 @@ export class HudScene extends Phaser.Scene {
       onContinue: this.gd.economy.continueWithOneLife
         ? () => this.continueWithOneLife()
         : null,
+      onSummary: () => this.openSummary('over'),
+    })
+    this.summary = new SummaryCard(this, this.L, {
+      data: this.gd,
+      onClose: (mode) => this.closeSummary(mode),
+      onNewGame: (mode) => this.summaryNewGame(mode),
+      current: () => this.recorder.snapshot(),
     })
     this.paper = new Newspaper(this, this.L, {
       companyName: this.gd.puns.companyName,
@@ -596,7 +656,9 @@ export class HudScene extends Phaser.Scene {
       build: String(this.registry.get(REG.buildStamp) ?? __BUILD_STAMP__),
       now: () => Date.now(),
       onError: (msg) => this.toast.show(msg, true),
+      getPlaytest: () => this.recorder?.persisted() ?? null,
     })
+    this.startRecorder()
 
     if (debugEnabled())
       mountOverlay(this, 2, this.L.toast.y + this.L.toast.h + 2)
@@ -619,6 +681,7 @@ export class HudScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     const vs = this.vs
     const st = this.stepper
+    this.recorder.update()
     // Lines and papers queued by the last tick's events (all of them have
     // fired by now, whatever their order inside the tick).
     this.flushLines()
@@ -652,6 +715,7 @@ export class HudScene extends Phaser.Scene {
       this.pollStep3()
       this.pollStrains()
       this.refreshAudioHint()
+      this.pollSummaryOffer()
       if (this.flagHint && this.vs.holdBay.count === 0) this.endFlagHint(false)
       // pm:view is the contract; this catches a world scene that woke
       // without emitting it (e.g. the M0 Warehouse stub).
@@ -688,6 +752,7 @@ export class HudScene extends Phaser.Scene {
       this.autosave.save('manual')
       if (final) this.autosave.enabled = false
     } else if (!st.paused) this.autosave.tick(delta)
+    else this.autosave.tickPlaytest(delta)
   }
 
   // ---------------------------------------------------------------- M2 effects
@@ -767,7 +832,8 @@ export class HudScene extends Phaser.Scene {
       this.view === 'city' &&
       modalCount() === 0 &&
       !this.lostCard.isOpen() &&
-      !this.overCard.isOpen()
+      !this.overCard.isOpen() &&
+      !this.summary.isOpen()
     this.flagArrow.setVisible(show)
     if (!show) return
     const r = this.L.warehouse.rect
@@ -929,9 +995,151 @@ export class HudScene extends Phaser.Scene {
   private newGame(): void {
     this.paper.clear()
     this.saveSoon = null
+    // The ended run's profile stays in pm.playtest.v1 until the next run's
+    // first autosave replaces it.
+    this.autosave.savePlaytest()
     this.autosave.enabled = false
     discardSave()
     this.scene.start('Title', { fresh: true })
+  }
+
+  // ---------------------------------------------------------------- M4: playtest + summary
+
+  /** The device facts of the profile (plan.md §12.9 `device`). */
+  private deviceInfo(): PlaytestDevice {
+    let maxTexture = 0
+    try {
+      const r = this.game.renderer as { getMaxTextureSize?: () => number }
+      maxTexture = r.getMaxTextureSize?.() ?? 0
+    } catch {
+      maxTexture = 0
+    }
+    return {
+      ua: navigator.userAgent,
+      cssW: window.innerWidth,
+      cssH: window.innerHeight,
+      dpr: window.devicePixelRatio || 1,
+      zoom: this.scale.zoom,
+      maxTexture,
+    }
+  }
+
+  /**
+   * The recorder for this HUD: it resumes pm.playtest.v1 only when the
+   * running sim is the run the autosave holds (Continue, a reload) and the
+   * stored profile matches it; a New game starts a fresh profile.
+   */
+  private startRecorder(): void {
+    this.recorder = new PlaytestRecorder({
+      buildStamp: String(this.registry.get(REG.buildStamp) ?? __BUILD_STAMP__),
+      device: () => this.deviceInfo(),
+      now: () => Date.now(),
+      fps: () => this.game.loop.actualFps,
+      pointerDowns: () => this.tapCount,
+      isPaused: () => this.stepper.paused || this.stepper.speed === 0,
+    })
+    const sim = getSim(this)
+    this.recorder.attach(sim, this.resumesSave(sim) ? readPlaytest() : null)
+    this.recorder.setView(this.view)
+    this.registry.set(REG_PLAYTEST, this.recorder)
+  }
+
+  /** The sim is the autosave's run (same seed, within 5 s of its tick). */
+  private resumesSave(sim: Sim): boolean {
+    const run = savedRun()
+    return (
+      run !== null &&
+      run.seed === sim.state.seed &&
+      Math.abs(run.tick - sim.state.tick) <= 5 * TICKS_PER_S
+    )
+  }
+
+  /** Q55: once per run at 20:00 of sim time, a ticker line + toast offer. */
+  private pollSummaryOffer(): void {
+    const r = this.recorder
+    if (r.offered || this.vs.gameOver || this.summary.isOpen()) return
+    if (this.vs.tick < SUMMARY_OFFER_S * TICKS_PER_S) return
+    r.markOffered()
+    this.ticker.push(SUMMARY_OFFER_LINE, 'daily')
+    this.longToast(SUMMARY_OFFER_TOAST, false, HINT_TOAST_MS)
+  }
+
+  /** ❚❚ while paused: the Paused card as the pause menu. */
+  private openPauseMenu(): void {
+    if (this.paused.isOpen() || this.holds.size > 0 || this.summary.isOpen())
+      return
+    this.prepareModal()
+    this.pauseMenu = true
+    this.paused.show()
+    // The first-pause hint has done its job once the menu is up.
+    if (
+      this.toast.currentText() === PAUSE_MENU_HINT_TEXT &&
+      this.toast.pending() === 0
+    )
+      this.toast.clear()
+  }
+
+  /** `End run — show summary` (run) / the game-over card's `Run summary` (over). */
+  private openSummary(mode: SummaryMode): void {
+    if (this.summary.isOpen()) return
+    this.prepareModal()
+    // Held by the card before any other hold lets go (no frame of play).
+    this.hold('summary')
+    if (this.paused.isOpen()) {
+      this.paused.hide()
+      this.pauseMenu = false
+      if (this.autoPaused) {
+        this.autoPaused = false
+        this.release('hidden')
+      }
+    }
+    if (mode === 'over') this.overCard.close()
+    this.recorder.noteSummaryOpened()
+    this.summary.open(
+      this.recorder.snapshot(),
+      mode,
+      this.recorder.summaryOpenedS,
+    )
+    // Store the profile with its first opening (fun bar 4) right away.
+    this.autosave.savePlaytest()
+  }
+
+  /** `Keep playing` (the last running speed) / `Back` (the game-over card). */
+  private closeSummary(mode: SummaryMode): void {
+    if (!this.summary.isOpen()) return
+    this.newGameDialog?.destroy()
+    this.newGameDialog = null
+    this.summary.close()
+    this.release('summary')
+    if (mode === 'over' || this.vs.gameOver) {
+      if (!this.overCard.isOpen()) this.openGameOver()
+      return
+    }
+    if (this.stepper.speed === 0) this.stepper.speed = this.lastRunSpeed
+  }
+
+  /** `New game` on the summary: straight after a game over, else confirmed. */
+  private summaryNewGame(mode: SummaryMode): void {
+    if (mode === 'over' || this.vs.gameOver) {
+      this.newGame()
+      return
+    }
+    if (this.newGameDialog) return
+    this.newGameDialog = new Dialog(this, {
+      title: NEW_GAME_CONFIRM_TITLE,
+      text: NEW_GAME_CONFIRM_TEXT,
+      action: 'New game',
+      destructive: true,
+      minHit: this.L.minHit,
+      id: 'summary:confirmNewGame',
+      onConfirm: () => {
+        this.newGameDialog = null
+        this.newGame()
+      },
+      onCancel: () => {
+        this.newGameDialog = null
+      },
+    })
   }
 
   /** economy.continueWithOneLife (playtest flag): grantLife, resume. */
@@ -1413,6 +1621,7 @@ export class HudScene extends Phaser.Scene {
     this.lostCard.relayout(L)
     this.overCard.relayout(L)
     this.paper.relayout(L)
+    this.summary.relayout(L)
     this.audioHint?.destroy()
     this.audioHint = null
     this.refreshAudioHint()
@@ -2028,12 +2237,24 @@ export class HudScene extends Phaser.Scene {
     )
   }
 
-  /** ❚❚ | 1× | 2×: stepper.speed (0 holds the sim), never game.pause(). */
+  /**
+   * ❚❚ | 1× | 2×: stepper.speed (0 holds the sim), never game.pause().
+   * ❚❚ while already paused opens the pause menu (the Paused card with
+   * `End run — show summary`); the session's first pause says so.
+   */
   private setSegment(i: number): void {
     const st = this.stepper
     if (this.paused.isOpen()) this.resumeFromCard()
     if (i === 0) {
+      if (st.speed === 0 && !st.paused) {
+        this.openPauseMenu()
+        return
+      }
       st.speed = 0
+      if (!this.pauseHinted) {
+        this.pauseHinted = true
+        this.toast.show(PAUSE_MENU_HINT_TEXT)
+      }
     } else {
       const speed = i === 1 ? 1 : 2
       st.speed = speed
@@ -2140,6 +2361,7 @@ export class HudScene extends Phaser.Scene {
 
   private setView(name: WorldView): void {
     this.view = name
+    this.recorder?.setView(name)
     this.toast.relayout({ W: this.L.W, toast: this.toastLane() })
     this.chipsRoot.setVisible(name === 'city')
     if (name !== 'city') {
@@ -2340,14 +2562,20 @@ export class HudScene extends Phaser.Scene {
       this.hold('hidden')
       this.autoPaused = true
     }
+    // Hidden time is not play time (elapsedS); the save writes the profile.
+    this.recorder.hidden()
     this.autosave.save('hidden')
   }
 
   private onVisible(): void {
     if (!this.autoPaused || this.paused.isOpen()) return
-    // A lost-life / game-over card already holds the sim and asks for a
-    // tap: no Paused card on top of it.
-    if (this.lostCard.isOpen() || this.overCard.isOpen()) {
+    // A lost-life / game-over / summary card already holds the sim and
+    // asks for a tap: no Paused card on top of it.
+    if (
+      this.lostCard.isOpen() ||
+      this.overCard.isOpen() ||
+      this.summary.isOpen()
+    ) {
       this.autoPaused = false
       this.release('hidden')
       return
@@ -2362,6 +2590,11 @@ export class HudScene extends Phaser.Scene {
     if (this.autoPaused) {
       this.autoPaused = false
       this.release('hidden')
+    }
+    // The pause menu closes back into play at the last running speed.
+    if (this.pauseMenu) {
+      this.pauseMenu = false
+      if (this.stepper.speed === 0) this.stepper.speed = this.lastRunSpeed
     }
   }
 
@@ -2515,8 +2748,34 @@ export class HudScene extends Phaser.Scene {
     const onResize = (): void => this.relayout()
     const onSafe = (): void => this.relayout()
     const onStamp = (): void => this.layoutStamp()
+    // A swapped-in Sim (__pm.load, a fixture) is another run: a fresh profile.
+    const onSimReplaced = (e: { sim?: Sim }): void => {
+      if (e?.sim) this.recorder.attach(e.sim, null)
+      if (this.summary.isOpen()) {
+        const over = this.summary.currentMode === 'over'
+        this.summary.close()
+        this.release('summary')
+        if (this.vs.gameOver) {
+          if (!this.overCard.isOpen() && !this.overTimer) this.openGameOver()
+        } else if (over) {
+          // syncAll released nothing: the game-over card was closed under us.
+          this.autosave.enabled = true
+          this.release('gameOver')
+        }
+      }
+    }
+    // taps (plan.md §12.9): every pointerdown on the canvas.
+    const canvas = this.game.canvas as HTMLCanvasElement | null
+    const onCanvasDown = (): void => {
+      this.tapCount += 1
+    }
+    canvas?.addEventListener('pointerdown', onCanvasDown, {
+      capture: true,
+      passive: true,
+    })
 
     ge.on(EV_VIEW, onView)
+    ge.on(SIM_REPLACED, onSimReplaced)
     ge.on(EV_SELECT, onSelect)
     ge.on(EV_FOLLOW, onFollow)
     ge.on(EV_TOOLTIP, onTooltip)
@@ -2555,6 +2814,16 @@ export class HudScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       ge.off(EV_VIEW, onView)
+      ge.off(SIM_REPLACED, onSimReplaced)
+      canvas?.removeEventListener('pointerdown', onCanvasDown, {
+        capture: true,
+      })
+      this.recorder.detach()
+      if (this.registry.get(REG_PLAYTEST) === this.recorder)
+        this.registry.remove(REG_PLAYTEST)
+      this.newGameDialog?.destroy()
+      this.newGameDialog = null
+      this.summary.destroy()
       ge.off(EV_SELECT, onSelect)
       ge.off(EV_FOLLOW, onFollow)
       ge.off(EV_TOOLTIP, onTooltip)
@@ -2627,7 +2896,8 @@ export class HudScene extends Phaser.Scene {
     // Cards follow the sim: a game-over state (a reload, __pm.load of a
     // fixture) shows its screen; a live one closes a stale screen.
     if (vs.gameOver) {
-      if (!this.overCard.isOpen() && !this.overTimer) this.openGameOver()
+      if (!this.overCard.isOpen() && !this.overTimer && !this.summary?.isOpen())
+        this.openGameOver()
     } else if (this.overCard.isOpen()) {
       this.overCard.close()
       this.autosave.enabled = true
@@ -2687,5 +2957,15 @@ export class HudScene extends Phaser.Scene {
   private garageOpen(): boolean {
     const sm = this.scene
     return sm.isActive('Garage') && !sm.isSleeping('Garage')
+  }
+
+  /**
+   * Depth of the shared modal stack (src/ui/Sheet.ts) — e2e/lifecycle.spec.ts
+   * checks that no sheet, card or popover is left on it after view storms,
+   * fixture swaps and a New game (a leaked entry silently mutes Esc/G/W and
+   * keeps the onboarding cards hidden).
+   */
+  modalDepth(): number {
+    return modalCount()
   }
 }

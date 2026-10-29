@@ -10,7 +10,11 @@
 // own full-screen camera added last (so it covers a Sheet's list camera);
 // every other camera ignores it and its camera ignores everything else.
 // `new Dialog(scene, opts)` opens immediately; it destroys itself (objects,
-// camera, listeners) when it closes.
+// camera, listeners) when it closes. Its scene going to sleep cancels it (as
+// the ZonePicker closes): the HUD sleeps the Garage under a lost-life,
+// game-over or Paused card, and a dialog left open in a sleeping scene stayed
+// on the modal stack — every HUD shortcut and onboarding card waited on it,
+// and the stale question came back when the Garage reopened.
 import type Phaser from 'phaser'
 import { Button } from './Button.ts'
 import { addPanel } from './Panel.ts'
@@ -128,6 +132,7 @@ export class Dialog {
     pushModal(this)
     scene.input.keyboard?.on('keydown', this.onKey, this)
     scene.events.once('shutdown', this.destroy, this)
+    scene.events.once('sleep', this.cancel, this)
   }
 
   isOpen(): boolean {
@@ -162,6 +167,7 @@ export class Dialog {
     popModal(this)
     this.scene.input?.keyboard?.off('keydown', this.onKey, this)
     this.scene.events.off('shutdown', this.destroy, this)
+    this.scene.events.off('sleep', this.cancel, this)
     this.root.destroy()
     this.scene.cameras.remove(this.cam, true)
   }

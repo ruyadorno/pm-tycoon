@@ -11,6 +11,8 @@ const PHASER_FREE = [
   'src/render/decayPhase.ts',
   'src/render/cityFx.ts',
   'src/render/quality.ts',
+  'src/render/vehicleDepth.ts',
+  'src/input/GestureClassifier.ts',
   'src/audio/chords.ts',
   'src/audio/leadsheet.ts',
   'src/audio/arranger.ts',

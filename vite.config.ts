@@ -23,6 +23,8 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    // the phaser chunk is ~1.4 MB raw (~350 KB gz) by design (plan.md §6.11); don't warn on every build
+    chunkSizeWarningLimit: 1600,
     assetsInlineLimit: 0,
     rollupOptions: {
       output: {

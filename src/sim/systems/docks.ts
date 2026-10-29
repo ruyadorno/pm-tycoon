@@ -205,6 +205,13 @@ function yieldDock(sim: Sim, v: Vehicle): void {
 
 function loadTick(sim: Sim, dock: LoadingDock, v: Vehicle): void {
   const s = sim.state
+  if (!hasDriver(sim, v) && v.cargo.length === 0) {
+    // §7.4: a walked-out driver starts no new trip — nothing aboard, so it
+    // parks `inactive` (payroll.ts walkOut does this at once; this covers a
+    // state saved before it did).
+    goInactive(sim, v)
+    return
+  }
   if (v.reserved.length > 0) {
     if (dock.nextTransferTick !== null && s.tick < dock.nextTransferTick) return
     const id = v.reserved.shift() as number

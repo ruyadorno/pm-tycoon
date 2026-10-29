@@ -10,7 +10,7 @@ Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 �
 - [x] M1 city loop: spawn → collect → pass-through warehouse → deliver → money; Garage sheet; autosave (commit `M1: …`)
 - [x] M2 warehouse loop: fixed lane, checkers, Hold Bay, Toss/Clear, lives, lost-life card, game over (commit `M2: …`)
 - [x] M3 levels 1→2, Industrial + truck + Shaky shaker, payroll and walkouts, audio, polish (commit `M3: …`)
-- [ ] M4 playtest instrumentation, summary card, build, screenshots, report, hand-off (commit `M4: …`)
+- [x] M4 playtest instrumentation, summary card, build, screenshots, report, hand-off (commit `M4: …`)
 
 ## Gate results
 
@@ -32,7 +32,18 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M3 — levels/economy/audio/polish — 2026-10-29 14:35 UTC — DONE at the `M3:` commit
+## M4 — playtest build — 2026-10-29 16:55 UTC — DONE at the `M4:` commit (sha in the hand-off commit after it)
+
+Built: the §12.9 playtest recorder (`src/metrics/playtest.ts`, 32 keys, `pm.playtest.v1` every 10 s and on hide, resumes after a reload of the same run) + `__pm.playtest()`/`downloadPlaytest()`; the SummaryCard (fun-bar ticks, Download playtest.json, Copy summary, Keep playing / New game) from the pause menu (❚❚ twice), the Game Over card and a one-time 20:00 offer; `tests/playtest/seed-7.json` from a 12-minute automated run; the build checks (`tools/check-dist.mjs`, `e2e/dist.spec.ts`: `__pm` absent without `?debug=1`), `public/playtest-README.txt`, docs/playtest.md, docs/phone-checklist.md, docs/art-todo.md, README "How to play" + "How to serve on a phone", CREDITS complete, the inert Pages workflow (committed last); three adversarial review passes fixed 3 sim bugs (unloadable save after large sales, damaged saves crashing after Continue → `src/sim/validate.ts`, a driverless vehicle loading a trip), 5 scene bugs (pan freeze on a HUD tap, a leaked 19 MB ground texture after New game, taps on hidden vehicles, a 2 s view-switch stall, vehicles clipped by multi-tile buildings) and 6 mobile/UI issues; new robustness sweeps and `e2e/lifecycle.spec.ts`.
+Gate: unchanged from M3 (no balance change in M4): every window passes by median (first delivery 44.05 s, scripted catch 174.3 s, L2 13.05 min, truck +2.10 min, lives 0, shelf stall 0 s, Hold Bay 7.15/10 min); 5/10 seeds pass every window; no `level:up {3}`.
+Tests: 1,082 (vitest, 64 files: 1,081 passed, 1 todo); e2e: `vlr e2e` 65 passed / 49 project-skipped / 0 failed (smoke, dist, lifecycle, audio, audio-render, shots); `vlr check` 83.0 s; cold install in a scratch copy: `vlt install` + `vlr check:quick` PASS in 27.3 s; AI-attribution grep over the history: 0.
+Shots: 44 PNGs regenerated at the final tree, 44/44 PASS (one line each in docs/report-playtest1.md §3) — new: `summary-card` (+360×604), `paused` with "End run — show summary", `game-over` with "Run summary".
+Dist: 4.88 MB transfer (~3.2 MB gzip) of the 6 MB budget; sourcemaps (14.6 MB) excluded from the budget and kept; the dev gallery removed before the hand-off build.
+Deviations from spec-core.md: none new in M4 (decisions.md "Run decisions (M4)": save validation, walked-out driver at the dock, picking/depth rules, samples preloaded before the Title tap per audio.md).
+Open for the author: everything in docs/report-playtest1.md §6–§9 (balance notes, desktop pause-menu keys, ticker pacing, unverified iOS-only behaviours, art approvals G1–G3, the music verdict).
+Next: author playtest (20 minutes cold on the iPhone 16 + desktop devtools) + the Pages workflow run
+
+## M3 — levels/economy/audio/polish — 2026-10-29 14:32 UTC — DONE at 77061cd
 
 Built: levels 1→2 with the playtestMaxLevel cap (bar keeps counting, "Lv 3 coming soon"), the Industrial unlock (region live, spawns 5 s later at satisfaction 60, slot 4, Hold Bay/shelf caps, tier 2, strain announcement then rattle after newStrainDelayS), post-cap malware escalation, payroll with unpaid marks, walkouts and re-hire, the full competent policy (+ COUNTERS/REHIRE extensions), Q-RUN3 scripted-origin rule, stable Hold Bay bays; PixelLab art installed (63 generated sprites, 3 procedural kept, one 2048² atlas at 53 %); audio wired (director in Boot, sample preload, Title tap unlock, mute, visibility, sim hooks, Credits card, e2e audio + offline render specs); city flourishes (unlock fade + ground re-bake, level-up dust/stamp/tier-2 swap, mood overlays, angry labels + grumble, honking queue, dock lights, smoke emitters, days-since sign, quality flags); warehouse tier 2 (cross-fade, slot-4 unroll, plates, poster), walkout/re-hire in the room; HUD level bar, newspaper, payroll toasts, Garage payroll header + No driver/Re-hire rows, mute wiring.
 Gate: every playtest-1 window passes by median over seeds 1–10 (first delivery 44.0 s, scripted catch 174.3 s on 10/10 seeds, L2 13.05 min, truck +2.10 min, lives 0, shelf stall 0 s, Hold Bay 7.15/10 min at L1); per seed 5/10 miss at least one window (seeds 3, 10 lose a life; seed 3 truck +5.1; seed 5 first delivery 60.8 s; seeds 6, 8 Hold Bay < 6; seed 6 L2 16.2 min). No `level:up {3}` in 30 min. Malware share 20 % at 30 min.
@@ -42,7 +53,7 @@ Deviations from spec-core.md: Q-RUN3 scripted origin; policy extensions COUNTERS
 Open for the author: the lives window is dice (~19–29 % of 80 seeds lose one life in 30 min at D ≈ 0.97–0.99); mean satisfaction drifts angry under the policy during L2 (balance note, not tuned); the L1 stretch 7–13 min has nothing new to buy besides the van (fun-bar item 4 risk); the music is unheard on this VM.
 Next: M4 playtest build
 
-## M2 — warehouse loop — 2026-10-29 12:55 UTC — DONE at the `M2:` commit (sim part 63af110)
+## M2 — warehouse loop — 2026-10-29 12:15 UTC — DONE at 820e4f4 (sim part 63af110)
 
 Built: the spec §6 lane (conveyor cap 6 → slots with buffers cap 2 → Hold Bay cap 3 → shelf; checkers with process timers, stations sharing one desk roll, the §6.3 roll cases, D(s) compounding, rate/detection readouts; stall propagation), the scripted first malware with forced catch + deferral, Toss/Clear with bounty/fee/satisfaction, fixtures buy/move/swap/remove + desk, hire/fire inspectors, lives + game over with the full life:lost trace, Q-RUN1 dock deadlock rules (yield, stall preference, relief) + soak test; WarehouseScene (RoomLayout + tests, lane renderer with the parcel pool and event tweens, dock view, workers, catch moment, Toss/Clear outcomes, stall visuals, readout + strain popover, wanted poster), BuySheet/SlotCard/HoldBayCard, drag-to-move fixtures; HUD bomb slots, Warehouse button pulse/red, first-flag funnel + scripted toast + toss hint + wanted list, LostLifeCard, GameOverCard, city catch/lost-life effects.
 Gate: first delivery median 44.0 s; scripted malware flagged by the first checker and tossed on 10/10 seeds, firstMalwareCaught median 261.4 s (4/10 seeds > 300 s: the §4.5 nearest-first pickup tail leaves the scripted parcel waiting — Q-RUN3, M3); lives lost median 0 (seeds 1, 3 lose one at D = 0.97); shelf stall 0 s; Hold Bay events median 7.67/10 min at L1; wrong tosses 10.5/30 min.
@@ -52,7 +63,7 @@ Deviations from spec-core.md: Q-RUN1 dock relief (shelf past cap only to end a s
 Open for the author: Q-RUN1 (dock relief rule), the retuned shares, the first-flag funnel; Hold Bay bays compact after a Toss (a quick second tap can open the neighbour's card — the label is shown, nothing irreversible).
 Next: PixelLab install, then M3
 
-## M1 — city loop — 2026-10-29 08:40 UTC — DONE at the `M1:` commit (parent ecfc695)
+## M1 — city loop — 2026-10-29 08:33 UTC — DONE at 460e515
 
 Built: the spec §3–§5/§6.4–§6.5/§7.3/§9 world sim (trimmed road graph + cached A*, spawn with hidden malware/decoys and the scripted first malware, the §4.6 vehicle state machine + §4.5 greedy dispatcher with reservations, rush and home zones, one loading dock with the FIFO lot queue and idle-wait rule, the generic lane with pass-through slots, payouts with decay, satisfaction with both daily caps and drift), the competent policy (opening A) and the gate with `SIM_FEATURES` gating M2/M3 windows; CityScene (ground bake, buildings, fog + signs, interpolated vehicles, waiting badges tinted by decay phase, popups, tooltip, tap/double-tap/drag/pinch/long-press + desktop parity, follow, zone highlight, nav to the warehouse stub); the UI kit (Button, Sheet, Dialog, Toast, Panel); HudScene (top bar, ticker, toasts, chips, speed/mute/Warehouse/Garage, follow strip, paused/rotate cards, onboarding steps 1+3); GarageSheet + ZonePicker + DistrictPanel + ShieldPopover; autosave + Title Continue/New/Reset. The audio track (lead sheet, arranger, director, SFX, vendored samples) landed alongside, integration in M3.
 Gate: first delivery median 39.4 s over seeds 1–10 (min 28.3 / max 56.4 s), shelf stall 0 s on every seed; malware/lives/Hold Bay windows informational until M2, L2/truck until M3. Deliveries/min at minute 10: median 9. Seed-1 30-min run: 240 deliveries, conservation holds, tick p99 0.09 ms.
@@ -62,7 +73,7 @@ Deviations from spec-core.md: none in rules or numbers. View-level: `map.json lo
 Open for the author: Q-RUN1 single-dock deadlock with a full shelf (decided in M2, see below); the Garage header/money toast show payroll copy before payroll exists (M3 makes it real).
 Next: M2 warehouse loop
 
-## M0 — scaffold + gallery — 2026-10-29 07:15 UTC — DONE at the `M0:` commit (parent d9f78d4)
+## M0 — scaffold + gallery — 2026-10-29 06:37 UTC — DONE at 5bce619
 
 Built: scaffold + `vlr check` tooling (8 steps, SKIPPED rules of plan §6.10), AGENTS.md/CLAUDE.md; the nine spec §12 tables byte-identical + `map.json` (avenues, trimmed/themed roads, blocks, lot, regions, 53 props, door offsets) + `schema.ts` validator; sim skeleton (Rng, typed events, §7.1 start state with the generic LaneNode chain, 12-step tick order with clock/day:ended, ViewSim facade, save/load, `vlr sim` CLI + gate report); procedural art pipeline (palette, STYLE.md, manifest, generators, normalize→…→atlas, lint A01–A14) → one 2048² `world` atlas (440 frames, 44 % fill) + m5x7 glyph sheet; boot chain (WebGL gate, shared AudioContext, Scale.NONE integer zoom, stepper, `__pm` debug API, Boot/Preload/Title), iso render core (iso.ts, ground bake, CameraRig, GestureClassifier, layout.ts) and the dev Gallery (palette, frames, full 48×48 map, HUD mock).
 Gate: n/a — sim skeleton (sim:gate SKIPPED until src/sim/policy.ts exists, §6.10). `vlr sim -- --minutes 1 --seed 1` prints one row under plain Node (tick p99 0.026 ms).

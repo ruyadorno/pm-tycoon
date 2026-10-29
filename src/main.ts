@@ -139,6 +139,9 @@ function start(): void {
     pending = 0
     const next = measure(el)
     const cur = game.scale
+    // The insets first: scale.resize emits RESIZE synchronously and the
+    // City (camera bounds) reads registry safeTop/safeBottom in its handler.
+    setSafe(next.zoom)
     if (
       next.width !== cur.width ||
       next.height !== cur.height ||
@@ -147,7 +150,6 @@ function start(): void {
       cur.resize(next.width, next.height)
       cur.setZoom(next.zoom)
     }
-    setSafe(next.zoom)
   }
   const schedule = (): void => {
     if (!pending) pending = requestAnimationFrame(relayout)
@@ -155,6 +157,25 @@ function start(): void {
   window.addEventListener('resize', schedule)
   window.addEventListener('orientationchange', schedule)
   window.visualViewport?.addEventListener('resize', schedule)
+  screen.orientation?.addEventListener?.('change', schedule)
+  blockPageGestures()
+}
+
+/**
+ * phaser4-notes §4: Safari ignores `user-scalable=no`, and Phaser only
+ * preventDefaults touches that start on the canvas. iOS still pinch-zooms
+ * the page from its WebKit gesture events (a pinch that starts on the
+ * landscape margins, the HTML cards, or the summary's copy box), and a page
+ * zoomed in stays zoomed with the canvas half off-screen. touch-action: none
+ * covers the rest (index.html).
+ */
+function blockPageGestures(): void {
+  for (const name of ['gesturestart', 'gesturechange', 'gestureend'])
+    document.addEventListener(name, preventDefault, { passive: false })
+}
+
+function preventDefault(e: Event): void {
+  e.preventDefault()
 }
 
 start()

@@ -152,6 +152,38 @@ overrules any line by number.
   headless Chromium (contexts start running), so e2e asserts the director's stronger guarantee: not unlocked, Transport
   stopped, no notes, SFX dropped as 'locked'.
 
+## Run decisions (M4)
+
+- **`src/sim/validate.ts`**: `Sim.load` validates the state's shape, ids and bounds before ticking, so a damaged save
+  with a matching data hash is discarded with the toast instead of crashing after Continue (fuzzed: 23,000 cases, 0
+  crashes; ~1.4 ms on a 112 KB save). The conveyor audit bound counts sold-vehicle inbound parcels separately (a large
+  sale past a full conveyor made the save unloadable).
+- **A walked-out driver's vehicle waiting at the dock with nothing aboard parks inactive at once** (it never loads a new
+  trip; §7.4 refinement).
+- **City picking and depth**: a vehicle hidden behind a building drawn over it is not tappable (the tap goes to what
+  the player sees); district name plates and lock boards are pickable; vehicles are lifted above multi-tile footprints
+  they are strictly in front of (`src/render/vehicleDepth.ts`); the gesture classifier tracks pointers by id, so a HUD
+  finger never pinches or flings the city; pan/follow requests are ignored during the City's exit transition.
+- **Dialogs cancel when their scene sleeps** (onCancel runs) — a Dialog left open in the Warehouse no longer survives a
+  view switch; the rotate card covers every scene; iOS page pinch-zoom is also blocked through WebKit `gesture*` events.
+- **Sold-vehicle prompt** reads "Its parcels go back to the warehouse." (outbound cargo to the shelf, uninspected cargo
+  through the lane — M2 rule).
+- **Samples preload before the Title tap** (audio.md §3/§8: piano + bass first so music starts on the tap) — plan.md
+  §12.7 task 3 says "load after the Title tap"; nothing sounds before the tap either way (asserted by e2e/audio.spec and
+  dist.spec). Author to choose; the switch is one call in `PreloadScene`.
+- **Pause menu**: tapping ❚❚ while paused opens the Paused card as the pause menu ("End run — show summary"); the first
+  pause shows a one-time hint toast. The summary card is offered once at 20:00 sim time by a ticker line + toast (Q55).
+- **Dist budget** excludes `*.map` (14.6 MB of sourcemaps stay in dist/ for debugging; not transferred unless devtools
+  open) and the dev-only gallery (`public/gallery/` is removed before the hand-off build). Transfer: 4.88 MB raw /
+  ~3.2 MB gzip (budget 6 MB).
+- **Long robustness sweeps** (`tests/sim/*.long.test.ts`) run in the full `vlr check` only, like the policy gate test.
+- **`vlr check` e2e step** runs the smoke and the dist specs (`__pm` absent without `?debug=1`, present with it).
+
+## Defaults taken (plan.md §14)
+
+Every §14 question (Q1–Q79) is listed with the shipped default and where it is coded in `docs/report-playtest1.md`
+§7/§9; the run's own decisions (Q-RUN1…Q-RUN3, policy extensions, retunes) are the sections above.
+
 ## Runtime dependencies
 
 - `phaser@4.2.1` — the engine (MIT). ~1.2 MB min / ~0.3 MB gz in its own chunk.
@@ -204,7 +236,3 @@ overrules any line by number.
     - the only cross-part unison is the written trumpet + vibes unison of chorus 2.
   - Verdict: "unheard on this VM — author to judge".
 - **Q52 — Credits.** CREDITS.md audio section (text supplied) plus the Title-screen Credits card, which the integration adds.
-
-## Defaults taken (plan.md §14)
-
-Filled in as each is coded; the complete list is in the final report.

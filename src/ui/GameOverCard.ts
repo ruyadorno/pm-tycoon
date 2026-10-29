@@ -7,6 +7,10 @@
 // `economy.continueWithOneLife` (false for the author's playtest, Q40) —
 // `Continue with one life` (`viewSim.grantLife()`, resume).
 //
+// M4 (plan.md §12.7 task 2): with `onSummary` a `Run summary` button under
+// `New game` opens the playtest summary card (HudScene closes this card and
+// reopens it on the summary's `Back`).
+//
 // Like the lost-life card it draws through its own full-screen camera over
 // an off-screen origin so nothing in the HUD covers it, and it swallows every
 // tap. The stats are pure (tests/ui/game-over-card.test.ts); Phaser is a
@@ -22,6 +26,7 @@ import { addText, formatInt, formatMoney, lineCount, LINE_H } from './text.ts'
 import { PALETTE, THEME } from './theme.ts'
 
 export const GAME_OVER_TITLE = 'GAME OVER'
+export const RUN_SUMMARY_TEXT = 'Run summary'
 const PAD = 16
 const BTN_H = 44
 const ROW_H = 20
@@ -118,6 +123,8 @@ export interface GameOverCardOptions {
   onNewGame(): void
   /** `Continue with one life`; shown only when set. */
   onContinue?: (() => void) | null
+  /** `Run summary` (the playtest summary card); shown only when set. */
+  onSummary?: (() => void) | null
 }
 
 export class GameOverCard {
@@ -212,7 +219,8 @@ export class GameOverCard {
     })
     const headH = lineCount(head) * LINE_H
     const cont = this.opts.onContinue ?? null
-    const btnCount = cont ? 2 : 1
+    const summary = this.opts.onSummary ?? null
+    const btnCount = 1 + (cont ? 1 : 0) + (summary ? 1 : 0)
     const blockH =
       28 +
       12 +
@@ -265,6 +273,21 @@ export class GameOverCard {
           minHit: L.minHit,
           id: 'gameOver:continue',
           onClick: () => cont(),
+        }),
+      )
+    }
+    if (summary) {
+      y += BTN_H + 8
+      this.buttons.push(
+        new Button(scene, {
+          x: bx,
+          y,
+          w: bw,
+          h: BTN_H,
+          label: RUN_SUMMARY_TEXT,
+          minHit: L.minHit,
+          id: 'gameOver:summary',
+          onClick: () => summary(),
         }),
       )
     }

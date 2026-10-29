@@ -1,5 +1,6 @@
 // vlr check / check:quick (plan.md §6.10): ordered steps, stop at the first failure, one PASS/FAIL/SKIPPED line
-// with wall time per step. SKIPPED only under the §6.10 rules.
+// with wall time per step. SKIPPED only under the §6.10 rules. --quick also skips the [long] sim sweeps
+// (tests/sim/*.long.test.ts, like policy.test.ts); e2e:smoke includes the dist project (plan.md §12.7).
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
@@ -22,6 +23,8 @@ const steps = [
           '--passWithNoTests',
           '--exclude',
           'tests/sim/policy.test.ts',
+          '--exclude',
+          'tests/sim/*.long.test.ts',
         ]
       : [bin('vitest'), 'run', '--passWithNoTests'],
   },
@@ -48,7 +51,7 @@ const steps = [
     cmd: [
       'sh',
       '-c',
-      `${bin('vite')} build && ${bin('playwright')} test e2e/smoke.spec.ts`,
+      `${bin('vite')} build && ${bin('playwright')} test e2e/smoke.spec.ts e2e/dist.spec.ts`,
     ],
     env: { PM_E2E_OPTIONAL: '1' },
   },

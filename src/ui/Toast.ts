@@ -62,7 +62,13 @@ export class ToastQueue {
     if (this.waiting.some((w) => w.text === item.text && w.red === item.red))
       return 'queued'
     this.waiting.push(item)
-    while (this.waiting.length > this.max) this.waiting.shift()
+    // Older ones drop (city-view §4.2) — the oldest plain one first: a burst
+    // (payday + mood + `Now playing`) must not push out the red payroll-short
+    // or walkout toast queued before it.
+    while (this.waiting.length > this.max) {
+      const plain = this.waiting.findIndex((w) => !w.red)
+      this.waiting.splice(plain >= 0 ? plain : 0, 1)
+    }
     return 'queued'
   }
 

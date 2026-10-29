@@ -312,7 +312,7 @@ describe('§5.4 the scripted first malware', () => {
       )
       expect(flagged.length).toBeGreaterThan(scripted.length) // ordinary flags: scripted false
     }
-  })
+  }, 30_000) // ~2.6 s alone
 
   it('no checker when it is due: deferred; a checker placed within deferUntilCheckerS → the forced, scripted spawn', () => {
     const fs = data.parcels.malware.firstScripted

@@ -303,13 +303,13 @@ describe('save round trip (plan.md §6.4)', () => {
     }
     expect(midProcess).toBeGreaterThan(0)
     expect(heldAtSave).toBeGreaterThan(0)
-  })
+  }, 30_000) // ~3 s alone; over vitest's 5 s default under a loaded `vlr check`
 
   it('seed + data + commandLog replay to the same state', () => {
     const sim = playedSim(3)
     const again = replay(sim.data, 3, sim.commandLog, sim.state.tick)
     expect(stateHash(again.state)).toBe(stateHash(sim.state))
-  })
+  }, 30_000)
 })
 
 describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {

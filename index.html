@@ -30,6 +30,8 @@
       }
       #game {
         width: min(100vw, 430px);
+        /* 100vh first: Safari before 15.4 has no dvh units. */
+        height: 100vh;
         height: 100dvh;
         margin: 0 auto;
         padding: 0;

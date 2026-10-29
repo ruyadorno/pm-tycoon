@@ -3,8 +3,13 @@
 // BitmapText.ParseFromAtlas so text batches with the sprites; a progress bar;
 // then Title, or straight to the ?view= world scene (skipTitle / view).
 // map.json is not loaded here: it reaches the game through GameData.map
-// (static import in src/data/load.browser.ts). Audio preload lands in M3.
+// (static import in src/data/load.browser.ts). Once the atlas is in, the
+// AudioDirector starts fetching its samples (audio.md §3.2, §8.2: piano + bass,
+// then vibes + trumpet, then the stinger set; never awaited — the Title shows
+// "tuning up…" until 'audio:ready' lists piano + bass). Under ?audio=0 the
+// director is disabled and fetches nothing.
 import Phaser from 'phaser'
+import type { AudioDirector } from '../audio/director.ts'
 import { startWorld } from '../boot/nav.ts'
 import { params, worldSceneKey } from '../debug/params.ts'
 import {
@@ -17,7 +22,7 @@ import {
   WORLD_ATLAS_PNG,
 } from '../render/atlases.ts'
 import { THEME } from '../ui/theme.ts'
-import { showCard } from './BootScene.ts'
+import { REG_AUDIO, showCard } from './BootScene.ts'
 
 export class PreloadScene extends Phaser.Scene {
   private failed: string[] = []
@@ -64,9 +69,21 @@ export class PreloadScene extends Phaser.Scene {
     // smoothPixelArt experiment cannot silently change the atlas.
     this.textures.get(WORLD_ATLAS).setFilter(Phaser.Textures.FilterMode.NEAREST)
     this.registerFont()
+    this.preloadAudio()
     const p = params()
     if (p.view || p.skipTitle) startWorld(this, worldSceneKey(p))
     else this.scene.start('Title')
+  }
+
+  /** Kick off the sample fetch + decode (after the atlas, so the first paint never waits on audio). */
+  private preloadAudio(): void {
+    const dir = this.registry.get(REG_AUDIO) as AudioDirector | undefined
+    try {
+      void dir?.preload()
+    } catch (err) {
+      // the director never throws; a missing or broken one must not block the Title
+      console.warn('preload: audio preload failed', err)
+    }
   }
 
   private registerFont(): void {

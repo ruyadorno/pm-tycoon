@@ -259,6 +259,31 @@ describe('AudioDirector: mute (audio.md §3.5, pm.settings.v1)', () => {
   })
 })
 
+describe('AudioDirector: boot cost (audio.md §3.1: zzfx renders < 5 ms at boot)', () => {
+  it('renders no zzfx buffer in the constructor: one per macrotask afterwards, or on demand', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { d } = make()
+    expect(d.sfx.names()).toEqual([])
+    vi.advanceTimersByTime(0)
+    expect(d.sfx.names()).toHaveLength(1)
+    // a sound played before its turn renders on demand (still gated on the unlock)
+    void d.unlock()
+    expect(d.playNamed('levelUp')).toBe(false) // context still resuming
+    vi.runAllTimers()
+    expect(d.sfx.pending()).toEqual([])
+    expect(d.sfx.names()).toHaveLength(18)
+    expect(d.state().sfxRenderMs).toBeGreaterThanOrEqual(0)
+    expect(d.state().errors).toEqual([])
+  })
+
+  it('a disabled director renders nothing and schedules nothing', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const { d } = make(new FakeAudioContext(), { params: { disabled: true } })
+    expect(vi.getTimerCount()).toBe(0)
+    expect(d.sfx.names()).toEqual([])
+  })
+})
+
 describe('AudioDirector: unlock', () => {
   it('plays nothing before the unlock gesture, even when the context already runs', () => {
     const ctx = new FakeAudioContext()
@@ -282,6 +307,19 @@ describe('AudioDirector: unlock', () => {
     await p
     expect(d.state().unlocked).toBe(true)
     expect(d.state().ctxState).toBe('running')
+  })
+
+  it('emits audio:unlocked once, when the unlock gesture has resumed the context (HUD "tap for sound")', async () => {
+    const { d, game } = make()
+    const seen: unknown[] = []
+    game.on('audio:unlocked', (p) => seen.push(p))
+    expect(d.state().unlocked).toBe(false)
+    const p = d.unlock()
+    expect(seen).toHaveLength(0) // the resume has not resolved yet
+    await p
+    expect(seen).toEqual([{}])
+    await d.unlock() // Title shown again (game over → New game): no second event
+    expect(seen).toHaveLength(1)
   })
 })
 

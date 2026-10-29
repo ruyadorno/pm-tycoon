@@ -212,6 +212,7 @@ export class AudioDirector {
   #musicReady: Promise<boolean> | null = null
   #preloading: Promise<void> | null = null
   #tapeTimer: ReturnType<typeof setTimeout> | null = null
+  #sfxTimer: ReturnType<typeof setTimeout> | null = null
   #unwatch: (() => void) | null = null
   #detach: (() => void)[] = []
   #sim: Emitter | null = null
@@ -272,6 +273,7 @@ export class AudioDirector {
     }
     this.disabled = disabled
     this.sfx = sfx
+    if (!disabled) this.#renderSfxInSlices()
     this.stingers = new Stingers({
       ctx,
       bank: () => this.bank,
@@ -323,12 +325,8 @@ export class AudioDirector {
     const stingerSamplers = ctx.createGain()
     stingerSamplers.gain.value = samplerGain(this.config)
     stingerSamplers.connect(sfxBus)
+    // the zzfx buffers render after construction, one per macrotask (#renderSfxInSlices)
     const sfx = new Sfx({ ctx, bus: sfxBus, ...sfxDeps })
-    const ms = sfx.render()
-    for (const e of sfx.errors) this.#fail('sfx render', e)
-    this.log.info(
-      `sfx rendered ${sfx.names().length} buffers in ${ms.toFixed(1)} ms`,
-    )
     const bank = new InstrumentBank({
       ctx,
       loader: SampleLoader(ctx),
@@ -390,6 +388,29 @@ export class AudioDirector {
     return { sfx, bank, band }
   }
 
+  /**
+   * audio.md §3.1 budgets < 5 ms for the 18 zzfx renders; they take ~50 ms in headless SwiftShader, which would
+   * all land in Boot. Instead each buffer renders in its own macrotask (~3 ms) right after construction, and a
+   * sound played before its turn renders on demand (Sfx.play). Render errors show in state().errors.
+   */
+  #renderSfxInSlices(): void {
+    const sfx = this.sfx
+    const queue = sfx.pending()
+    const step = () => {
+      this.#sfxTimer = null
+      const name = queue.shift()
+      if (name === undefined) {
+        this.log.info(
+          `sfx rendered ${sfx.names().length} buffers in ${sfx.renderMs.toFixed(1)} ms`,
+        )
+        return
+      }
+      this.#guard('sfx render', () => sfx.renderOne(name))
+      this.#sfxTimer = setTimeout(step, 0)
+    }
+    this.#sfxTimer = setTimeout(step, 0)
+  }
+
   // ---------------------------------------------------------------- lifecycle
 
   /** Starts fetching piano + bass, then vibes + trumpet, then the stinger set (never awaited by the game). */
@@ -446,7 +467,7 @@ export class AudioDirector {
     void this.preload()
     return resumed
       .then(() => {
-        this.#unlocked = true
+        this.#markUnlocked()
         this.log.info(`unlocked (context ${ctx.state})`, ctx.currentTime)
         if (this.config.music === 'live')
           this.startMusic(this.#wantSheet ?? this.config.defaultSheet)
@@ -918,7 +939,7 @@ export class AudioDirector {
     if (this.#hidden || this.ctx?.state !== 'running') return
     this.#unwatch?.()
     this.#unwatch = null
-    if (this.#armed) this.#unlocked = true
+    if (this.#armed) this.#markUnlocked()
     if (this.#resumeBand) {
       this.#resumeBand = false
       this.band?.resume()
@@ -926,6 +947,16 @@ export class AudioDirector {
     }
     if (this.#unlocked && this.#wantSheet && this.band?.state === 'stopped')
       this.startMusic(this.#wantSheet)
+  }
+
+  /**
+   * The context runs after the unlock gesture. The first time, emits 'audio:unlocked' on game.events so the HUD
+   * can drop its "tap for sound" hint (?skipTitle=1 flows, or an iOS Title tap whose resume needed a retry).
+   */
+  #markUnlocked(): void {
+    if (this.#unlocked) return
+    this.#unlocked = true
+    this.#emit('audio:unlocked', {})
   }
 
   /** 250 ms after a resume: if the context is still not running (iOS 'interrupted'), retry on the next tap. */
@@ -1047,7 +1078,11 @@ export class AudioDirector {
       dropped: this.#dropped,
       skipped: this.band?.skipped ?? 0,
       sfxRenderMs: Math.round(this.sfx.renderMs * 10) / 10,
-      errors: [...this.#errors, ...(this.bank?.errors ?? [])],
+      errors: [
+        ...this.#errors,
+        ...this.sfx.errors.map((e) => `sfx render: ${e}`),
+        ...(this.bank?.errors ?? []),
+      ],
     }
   }
 
@@ -1106,6 +1141,8 @@ export class AudioDirector {
     for (const off of this.#detach.splice(0)) off()
     this.#unwatch?.()
     this.#unwatch = null
+    if (this.#sfxTimer !== null) clearTimeout(this.#sfxTimer)
+    this.#sfxTimer = null
     this.#stopLoops()
     this.#guard('destroy', () => {
       this.#cancelTapeStop()
@@ -1146,7 +1183,9 @@ export function createAudioDirector(o: AudioDirectorOptions): AudioDirector {
  *                  const audio = createAudioDirector({ ctx, params: readAudioParams(), events: game.events,
  *                    registry: game.registry })
  *                  audio.attachSim(sim.events, { holdBayCount, isPaused, vehicleType, parcelSize })
- *                with ?skipTitle=1 (no Title tap) also audio.unlockOnFirstGesture()
+ *                with ?skipTitle=1 (no Title tap) also audio.unlockOnFirstGesture(); 'audio:unlocked' {} on
+ *                game.events tells the HUD when the "tap for sound" hint can go
+ *                (done: installAudio in src/scenes/BootScene.ts, which re-attaches on SIM_REPLACED)
  *   Preload      void audio.preload()        Title shows "tuning up…" until 'audio:ready' lists piano + bass
  *   Title        pointerdown → audio.unlock() synchronously (no await before it), then the scene switch
  *   HUD          mute button → audio.toggleMuted(); listen 'audio:muted' {muted}; toast on 'audio:nowPlaying'

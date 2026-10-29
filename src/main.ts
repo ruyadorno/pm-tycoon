@@ -1,13 +1,23 @@
-// Entry point (plan.md §6.5, phaser4-notes.md §1, §4, §6): WebGL gate, one
-// shared AudioContext created before the game (Phaser, Tone and smplr all use
-// it), the portrait pixel-art config — Scale.NONE with an integer zoom derived
-// from #game (the only scale mode that honours zoom), pixelArt + roundPixels —
-// and the resize/orientation handler (scale.resize + setZoom). Nothing is
+// Entry point (plan.md §6.5, phaser4-notes.md §1, §4, §6): WebGL gate, the
+// ONE shared AudioContext created before the game (audio.md §2: Phaser gets it
+// through `audio.context`, the AudioDirector hands it to Tone and smplr; null
+// for ?audio=0, which also gives Phaser its no-audio manager), the portrait
+// pixel-art config — Scale.NONE with an integer zoom derived from #game (the
+// only scale mode that honours zoom), pixelArt + roundPixels — and the
+// resize/orientation handler (scale.resize + setZoom). The audio chunk's import
+// starts here too (registry 'audioModule'); Boot creates the director from it
+// and registry 'audioContext' (and sets pauseOnBlur = false). Nothing is
 // exposed globally here; window.__pm comes from src/debug/pm.ts.
 import Phaser from 'phaser'
+import { createSharedContext } from './audio/context.ts'
 import { REG } from './boot/simBinding.ts'
 import { params } from './debug/params.ts'
-import { BootScene, showCard } from './scenes/BootScene.ts'
+import {
+  BootScene,
+  importAudio,
+  REG_AUDIO_MODULE,
+  showCard,
+} from './scenes/BootScene.ts'
 import { CityScene } from './scenes/CityScene.ts'
 import { GalleryScene } from './scenes/GalleryScene.ts'
 import { GarageSheet } from './scenes/GarageSheet.ts'
@@ -59,18 +69,6 @@ function hasWebGL(): boolean {
   }
 }
 
-function createAudioContext(): AudioContext | null {
-  try {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext
-    return Ctor ? new Ctor() : null
-  } catch {
-    return null
-  }
-}
-
 function start(): void {
   if (!hasWebGL()) {
     showCard('WebGL is required', [
@@ -81,7 +79,11 @@ function start(): void {
   const p = params()
   const el = document.getElementById('game')
   if (!el) throw new Error('#game is missing from index.html')
-  const audioContext = p.audio ? createAudioContext() : null
+  // The only `new AudioContext` of the game (src/audio/context.ts).
+  const audioContext = p.audio ? createSharedContext() : null
+  // The audio chunk (Tone's Transport, smplr, the director) loads while
+  // Phaser boots; Boot awaits it (a disabled director under ?audio=0).
+  const audioModule = importAudio()
   const size = measure(el)
 
   const config: Phaser.Types.Core.GameConfig = {
@@ -124,18 +126,13 @@ function start(): void {
 
   const game = new Phaser.Game(config)
   game.registry.set(REG.audioContext, audioContext)
+  game.registry.set(REG_AUDIO_MODULE, audioModule)
   const setSafe = (zoom: number): void => {
     const s = readSafeInsets(zoom)
     game.registry.set(REG.safeTop, s.top)
     game.registry.set(REG.safeBottom, s.bottom)
   }
   setSafe(size.zoom)
-  // The AudioDirector (M3) owns blur/focus; Phaser must not suspend the
-  // shared context on its own (notes §6).
-  game.events.once(Phaser.Core.Events.READY, () => {
-    const sound = game.sound as { pauseOnBlur?: boolean } | undefined
-    if (sound && 'pauseOnBlur' in sound) sound.pauseOnBlur = false
-  })
 
   let pending = 0
   const relayout = (): void => {

@@ -1,6 +1,9 @@
-// One-shot SFX (audio.md §7): every sfx.json entry rendered once to an AudioBuffer at boot (works while the
-// context is suspended) and played on the sfx bus. Gated on the unlock gesture and ctx.state === 'running' and
-// never queued: a sound that cannot play now is dropped and logged. Throttles per audio.json throttleMs.
+// One-shot SFX (audio.md §7): every sfx.json entry rendered once to an AudioBuffer (works while the context is
+// suspended) and played on the sfx bus. Gated on the unlock gesture and ctx.state === 'running' and never
+// queued: a sound that cannot play now is dropped and logged. Throttles per audio.json throttleMs.
+// Rendering is lazy: the director renders the buffers one per macrotask after boot (renderOne), and a sound
+// played before its turn renders on demand. Each name keeps the seed of its table position, so the buffers are
+// bit-identical whatever the order.
 import { playBuffer, renderZzfx } from './brushes.ts'
 import type { AudioConfig, SfxTable } from './data.ts'
 import { BRUSH_NAMES } from './data.ts'
@@ -49,6 +52,10 @@ export interface SfxDeps {
 export class Sfx {
   #d: SfxDeps
   #buffers = new Map<string, AudioBuffer>()
+  /** one-shot name -> zzfx seed (7, 8, … in table order, ride/hat excluded) */
+  #seeds = new Map<string, number>()
+  /** names whose render threw (tried once) */
+  #failed = new Set<string>()
   #last = new Map<string, number>()
   #live = new Set<AudioBufferSourceNode>()
   #renderMs = 0
@@ -56,30 +63,58 @@ export class Sfx {
 
   constructor(deps: SfxDeps) {
     this.#d = deps
-  }
-
-  /** Renders every one-shot entry (not ride/hat). Returns the time it took in ms. */
-  render(): number {
-    const { ctx, table, config } = this.#d
-    if (!ctx || !this.#d.enabled()) return 0
-    const t0 = performance.now()
     let seed = 7
-    for (const [name, params] of Object.entries(table)) {
+    for (const name of Object.keys(deps.table)) {
       if ((BRUSH_NAMES as readonly string[]).includes(name)) continue
-      try {
-        this.#buffers.set(
-          name,
-          renderZzfx(ctx, params, config.sfx.sampleRate, seed++),
-        )
-      } catch (err) {
-        // one bad parameter array costs that sound only
-        this.errors.push(`sfx ${name}: ${(err as Error)?.message ?? err}`)
-      }
+      this.#seeds.set(name, seed++)
     }
-    this.#renderMs = performance.now() - t0
-    return this.#renderMs
   }
 
+  /** Renders every one-shot entry not rendered yet (not ride/hat). Returns the time this call took in ms. */
+  render(): number {
+    if (!this.#d.ctx || !this.#d.enabled()) return 0
+    const t0 = performance.now()
+    for (const name of this.pending()) this.renderOne(name)
+    return performance.now() - t0
+  }
+
+  /** One-shot names neither rendered nor failed yet. */
+  pending(): string[] {
+    return [...this.#seeds.keys()].filter(
+      (n) => !this.#buffers.has(n) && !this.#failed.has(n),
+    )
+  }
+
+  /** Renders `name` if it is a one-shot not rendered yet; returns its buffer (undefined: unknown or broken). */
+  renderOne(name: string): AudioBuffer | undefined {
+    const done = this.#buffers.get(name)
+    if (done) return done
+    const { ctx, table, config } = this.#d
+    const seed = this.#seeds.get(name)
+    if (!ctx || !this.#d.enabled() || seed === undefined) return undefined
+    if (this.#failed.has(name)) return undefined
+    const t0 = performance.now()
+    try {
+      // a broken entry (not an array) throws here and is recorded below
+      const buf = renderZzfx(
+        ctx,
+        table[name] as number[],
+        config.sfx.sampleRate,
+        seed,
+      )
+      this.#buffers.set(name, buf)
+      return buf
+    } catch (err) {
+      // one bad parameter array costs that sound only
+      this.#failed.add(name)
+      this.errors.push(`sfx ${name}: ${(err as Error)?.message ?? err}`)
+      return undefined
+    } finally {
+      this.#renderMs += performance.now() - t0
+    }
+  }
+
+  /** Total render time so far (ms). */
   get renderMs(): number {
     return this.#renderMs
   }
@@ -106,7 +141,7 @@ export class Sfx {
       return false
     }
     if (!this.#d.enabled() || !ctx || !bus) return drop('disabled', false)
-    const buf = this.#buffers.get(name)
+    const buf = this.renderOne(name)
     if (!buf) return drop('unknown', true)
     if (!this.#d.armed()) return drop('locked', false)
     if (ctx.state !== 'running')

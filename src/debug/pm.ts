@@ -10,9 +10,14 @@
 //   advance(ms) = stepper.advance(ms): sim only, no render, uncapped
 // `sim` is the ViewSim facade (what scenes use: rush, debug.*), `core` the
 // raw Sim (state, commandLog, dispatch). Both follow setSim() swaps.
+// `audio` is the AudioDirector's debug surface (audio.md §9.2: state(), log,
+// unlock(), sfx(name), hook(event, payload), chord(), renderWav(bars, parts?,
+// fromBar?), mute(m?), director), read from registry 'audio' (Boot creates the
+// director before this API exists; disabled under ?audio=0, still present).
 // `ready` flips after Core READY + the CREATE of the world scene ?view=
 // selects (City by default, Warehouse, Gallery).
 import Phaser from 'phaser'
+import type { AudioDebugApi, AudioDirector } from '../audio/director.ts'
 import type { Stepper } from '../boot/stepper.ts'
 import { REG, setSim } from '../boot/simBinding.ts'
 import { EV_GOTO, type WorldView } from '../boot/nav.ts'
@@ -86,10 +91,11 @@ export interface PmApi {
   overlay(on?: boolean): boolean
   /** Set the stepper speed (0, 1, 2, 4). */
   speed(s: 0 | 1 | 2 | 4): void
-  /** Added by later modules (src/metrics/playtest.ts, src/audio/*). */
+  /** The AudioDirector's debug API (audio.md §9.2); undefined only before Boot made the director. */
+  readonly audio: AudioDebugApi | undefined
+  /** Added by later modules (src/metrics/playtest.ts). */
   playtest?: () => unknown
   downloadPlaytest?: () => void
-  audio?: unknown
 }
 
 declare global {
@@ -133,6 +139,7 @@ export function installDebugApi(
   const data = (): GameData => game.registry.get(REG.data) as GameData
   installDrawCallCounter(game)
   const tweenClock = installTweenClock(loop)
+  let audioApi: { of: AudioDirector; api: AudioDebugApi } | null = null
 
   const pm: PmApi = {
     game,
@@ -153,6 +160,13 @@ export function installDebugApi(
     },
     get params() {
       return p
+    },
+    get audio() {
+      // registry 'audio' = BootScene REG_AUDIO (not imported: Boot imports this module)
+      const dir = game.registry.get('audio') as AudioDirector | undefined
+      if (!dir?.debugApi) return undefined
+      if (audioApi?.of !== dir) audioApi = { of: dir, api: dir.debugApi() }
+      return audioApi.api
     },
     ready: false,
     freeze() {

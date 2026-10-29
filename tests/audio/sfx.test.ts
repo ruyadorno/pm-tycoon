@@ -7,7 +7,13 @@ import { asContext, FakeAudioContext, FakeNode } from './fake-audio.ts'
 
 const data = defaultAudioData()
 
-function setup(o: { armed?: boolean; table?: Record<string, number[]> } = {}) {
+function setup(
+  o: {
+    armed?: boolean
+    table?: Record<string, number[]>
+    render?: boolean
+  } = {},
+) {
   const ctx = new FakeAudioContext()
   ctx.state = 'running'
   let now = 0
@@ -26,7 +32,7 @@ function setup(o: { armed?: boolean; table?: Record<string, number[]> } = {}) {
     onDropped: () => dropped++,
     now: () => now,
   })
-  sfx.render()
+  if (o.render !== false) sfx.render()
   return {
     ctx,
     sfx,
@@ -107,6 +113,28 @@ describe('Sfx', () => {
     expect(t.dropped()).toBe(1)
   })
 
+  it('renders lazily: a sound played before render() renders on demand, bit-identical to the eager render', () => {
+    const eager = setup()
+    const lazy = setup({ render: false })
+    expect(lazy.sfx.names()).toEqual([])
+    expect(lazy.sfx.pending()).toHaveLength(SFX_NAMES.length)
+    expect(lazy.sfx.play('buy')).toBe(true)
+    expect(lazy.sfx.names()).toEqual(['buy'])
+    lazy.sfx.render()
+    expect(lazy.sfx.pending()).toEqual([])
+    expect(lazy.sfx.names().toSorted()).toEqual(eager.sfx.names().toSorted())
+    // each name keeps its table-order seed, so the render order never changes a sample
+    for (const name of SFX_NAMES) {
+      const a = eager.sfx.buffer(name)!.getChannelData(0)
+      const b = lazy.sfx.buffer(name)!.getChannelData(0)
+      expect(b.length, name).toBe(a.length)
+      expect(Buffer.from(b.buffer).equals(Buffer.from(a.buffer)), name).toBe(
+        true,
+      )
+    }
+    expect(lazy.sfx.renderMs).toBeGreaterThan(0)
+  })
+
   it('a broken entry costs that sound only (render errors are collected, nothing throws)', () => {
     const table = { ...data.sfx, deny: null as unknown as number[] }
     const t = setup({ table })
@@ -114,5 +142,9 @@ describe('Sfx', () => {
     expect(t.sfx.errors[0]).toMatch(/^sfx deny:/)
     expect(t.sfx.has('deny')).toBe(false)
     expect(t.sfx.play('tap')).toBe(true)
+    // tried once: playing it again neither re-renders nor adds an error
+    expect(t.sfx.play('deny')).toBe(false)
+    expect(t.sfx.errors).toHaveLength(1)
+    expect(t.sfx.pending()).toEqual([])
   })
 })

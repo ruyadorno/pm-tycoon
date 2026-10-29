@@ -11,13 +11,19 @@
 // older build was reset". The sim is held (stepper.paused) while the Title is
 // up; Continue / New game install the game's Sim with setSim, put its
 // onboarding object in the registry for the HUD, and start City + HUD
-// (nav.ts startWorld). The first tap anywhere is the audio unlock: the M3
-// AudioDirector's unlock() when present (registry 'audio'), else a resume of
-// the shared AudioContext, synchronously inside the pointerdown. Footer: the
-// build stamp bottom-right (registry 'buildStamp', pinned by __pm.stamp), the
-// seed bottom-left in debug builds. A phone in landscape gets the rotate card
-// instead of the buttons.
+// (nav.ts startWorld) and (re)start the music (startMusic is idempotent; it
+// matters after game over → New game, where game:over stopped it). The first
+// tap anywhere is the audio unlock: the AudioDirector's unlock() (registry
+// 'audio', audio.md §3.3), called synchronously inside the pointerdown with
+// nothing awaited before it, retried once in the same tap's pointerup if the
+// context is still not running (on touch screens only pointerup / touchend
+// are activation-triggering). Under the buttons a muted "tuning up…" line
+// stays until the first 'audio:ready' (piano + bass decoded, or failed).
+// Footer: the build stamp bottom-right (registry 'buildStamp', pinned by
+// __pm.stamp), the seed bottom-left in debug builds. A phone in landscape gets
+// the rotate card instead of the buttons.
 import Phaser from 'phaser'
+import type { AudioDirector } from '../audio/director.ts'
 import {
   clearAllKeys,
   discardSave,
@@ -33,6 +39,7 @@ import { startWorld } from '../boot/nav.ts'
 import { getData, getStepper, REG, setSim } from '../boot/simBinding.ts'
 import { debugEnabled, params } from '../debug/params.ts'
 import { WORLD_ATLAS } from '../render/atlases.ts'
+import { REG_AUDIO } from './BootScene.ts'
 import { visibleRect } from '../render/BuildingView.ts'
 import { Button } from '../ui/Button.ts'
 import { Dialog } from '../ui/Dialog.ts'
@@ -54,14 +61,22 @@ export const RESET_TITLE = 'Reset everything?'
 export const RESET_TEXT = 'Clear save, settings and tutorial progress?'
 export const TUNING_TEXT = 'tuning up…'
 
-/** audio.md §10: the Credits card shows the first two bullets. */
+/**
+ * audio.md §10 / CREDITS.md (Q52): the card shows the two Music bullets — the
+ * CC BY 3.0 attribution of the samples in full (author, pre-renderer, licence)
+ * — then the audio code, the font and the engine. One screen, ≤ 36 chars a
+ * line (fits the 300-px card at W = 360).
+ */
 export const CREDITS_LINES: readonly string[] = [
   'Package Management Tycoon',
   '',
-  'Music: "Semver Swing" — original, MIT',
-  'Samples: FluidR3_GM SoundFont by Frank',
-  'Wen, via gleitz/midi-js-soundfonts,',
+  'Music: "Semver Swing" — original',
+  'composition, MIT',
+  'Samples: FluidR3_GM SoundFont by',
+  'Frank Wen, pre-rendered by Benjamin',
+  'Gleitzman (midi-js-soundfonts),',
   'CC BY 3.0',
+  'Audio: Tone.js, smplr, ZzFX (MIT)',
   'Font: m5x7 by Daniel Linssen (CC0)',
   'Engine: Phaser 4',
   '',
@@ -83,15 +98,6 @@ const SKYLINE = [
 /** sign_title is 48 tall (centred on signY); the title's 2nd line ends ~88 below. */
 const SIGN_HALF_H = 24
 const TITLE_BLOCK_H = 112
-
-/** The M3 AudioDirector surface the Title touches (registry 'audio'). */
-interface TitleAudio {
-  unlock?(): unknown
-  setMuted?(muted: boolean, persist?: boolean): void
-  debugApi?(): {
-    state?(): { loaded?: Record<string, boolean | undefined> }
-  }
-}
 
 export class TitleScene extends Phaser.Scene {
   private unlocked = false
@@ -277,19 +283,33 @@ export class TitleScene extends Phaser.Scene {
     return btn
   }
 
-  /** "tuning up…" under the buttons until piano + bass are loaded (M3). */
+  private director(): AudioDirector | undefined {
+    return this.registry.get(REG_AUDIO) as AudioDirector | undefined
+  }
+
+  /**
+   * "tuning up…" under the buttons until piano + bass are decoded (audio.md
+   * §3.2). The first 'audio:ready' marks the end of that group whether it
+   * loaded or failed (then there is nothing left to wait for). Nothing under
+   * ?audio=0 (disabled director).
+   */
   private tuningLine(last: Target): void {
-    const dir = this.registry.get('audio') as TitleAudio | undefined
+    const dir = this.director()
     if (!dir || !hasFont(this)) return
-    const loaded = dir.debugApi?.().state?.().loaded
-    if (loaded?.piano && loaded?.bass) return
+    let st: ReturnType<AudioDirector['state']>
+    try {
+      st = dir.state()
+    } catch {
+      return
+    }
+    if (st.disabled || (st.loaded.piano && st.loaded.bass)) return
     const t = addText(this, 0, last.rect.y + last.rect.h + 6, TUNING_TEXT, {
       tint: THEME.textMuted,
     })
     t.setX(Math.round((this.scale.width - t.width) / 2))
-    const onReady = (p: { parts?: readonly string[] }): void => {
-      const parts = p?.parts ?? []
-      if (parts.includes('piano') && parts.includes('bass')) t.setVisible(false)
+    t.setData('id', 'title:tuning')
+    const onReady = (): void => {
+      t.setVisible(false)
     }
     this.game.events.on('audio:ready', onReady)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>
@@ -348,9 +368,8 @@ export class TitleScene extends Phaser.Scene {
           onConfirm: () => {
             this.dialog = null
             clearAllKeys()
-            const dir = this.registry.get('audio') as TitleAudio | undefined
             try {
-              dir?.setMuted?.(false, false)
+              this.director()?.setMuted(false, false)
             } catch {
               // audio never blocks a reset
             }
@@ -380,6 +399,13 @@ export class TitleScene extends Phaser.Scene {
     setSim(this.game, game.sim)
     this.registry.set(REG_ONBOARDING, game.onboarding)
     getStepper(this).paused = false
+    try {
+      // Idempotent; deferred until the unlock. Restarts from bar 0 after a
+      // game over (game:over stopped the band).
+      this.director()?.startMusic()
+    } catch {
+      // audio never blocks a game start
+    }
     startWorld(this, 'City')
   }
 
@@ -404,20 +430,31 @@ export class TitleScene extends Phaser.Scene {
     panel.on(Phaser.Input.Events.POINTER_UP, () => this.toggleCredits())
   }
 
+  /**
+   * The audio unlock (audio.md §3.3): director.unlock() synchronously inside
+   * the first pointerdown — it resumes the shared context and Tone in the
+   * gesture and starts the music once piano + bass are decoded; nothing
+   * sounds before it. If the context still is not running when that tap's
+   * pointerup arrives (iOS: touchstart is not activation-triggering,
+   * touchend is), unlock() runs once more inside the pointerup.
+   */
   private unlockAudio(): void {
     if (this.unlocked) return
     this.unlocked = true
-    if (!params().audio) return
-    const dir = this.registry.get('audio') as TitleAudio | undefined
+    const dir = this.director()
+    if (!dir) return
     try {
-      if (dir?.unlock) {
-        void dir.unlock()
-        return
-      }
+      void dir.unlock()
     } catch {
-      // fall back to the bare context resume
+      // the director never throws; audio never blocks the Title
     }
-    const ctx = this.registry.get(REG.audioContext) as AudioContext | null
-    if (ctx && ctx.state !== 'running') void ctx.resume().catch(() => {})
+    this.input.once(Phaser.Input.Events.POINTER_UP, () => {
+      try {
+        const st = dir.state()
+        if (!st.disabled && st.ctxState !== 'running') void dir.unlock()
+      } catch {
+        // same
+      }
+    })
   }
 }

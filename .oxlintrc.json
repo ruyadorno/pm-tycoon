@@ -1,11 +1,23 @@
 {
   "plugins": ["typescript", "import", "unicorn"],
-  "categories": { "correctness": "error", "suspicious": "warn" },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
   "ignorePatterns": [
     "dist",
     "shots",
     "art/candidates",
     "public/assets",
     "**/*.generated.*"
-  ]
+  ],
+  "rules": {
+    "import/no-named-as-default-member": "off",
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["__pm", "__BUILD_STAMP__"]
+      }
+    ]
+  }
 }

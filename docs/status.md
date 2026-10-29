@@ -6,7 +6,7 @@ Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 �
 
 ## Milestone checklist
 
-- [ ] M0 scaffold + tooling + data tables + sim skeleton + procedural art + Gallery scene (commit `M0: …`)
+- [x] M0 scaffold + tooling + data tables + sim skeleton + procedural art + Gallery scene (commit `M0: …`)
 - [ ] M1 city loop: spawn → collect → pass-through warehouse → deliver → money; Garage sheet; autosave (commit `M1: …`)
 - [ ] M2 warehouse loop: fixed lane, checkers, Hold Bay, Toss/Clear, lives, lost-life card, game over (commit `M2: …`)
 - [ ] M3 levels 1→2, Industrial + truck + Shaky shaker, payroll and walkouts, audio, polish (commit `M3: …`)
@@ -32,6 +32,16 @@ L3–L5 informational rows (build 2): <level 3 at <> min, level 4 at <> min, lev
 
 ## Checkpoint entries (newest first)
 
+## M0 — scaffold + gallery — 2026-10-29 07:15 UTC — DONE at the `M0:` commit (parent d9f78d4)
+
+Built: scaffold + `vlr check` tooling (8 steps, SKIPPED rules of plan §6.10), AGENTS.md/CLAUDE.md; the nine spec §12 tables byte-identical + `map.json` (avenues, trimmed/themed roads, blocks, lot, regions, 53 props, door offsets) + `schema.ts` validator; sim skeleton (Rng, typed events, §7.1 start state with the generic LaneNode chain, 12-step tick order with clock/day:ended, ViewSim facade, save/load, `vlr sim` CLI + gate report); procedural art pipeline (palette, STYLE.md, manifest, generators, normalize→…→atlas, lint A01–A14) → one 2048² `world` atlas (440 frames, 44 % fill) + m5x7 glyph sheet; boot chain (WebGL gate, shared AudioContext, Scale.NONE integer zoom, stepper, `__pm` debug API, Boot/Preload/Title), iso render core (iso.ts, ground bake, CameraRig, GestureClassifier, layout.ts) and the dev Gallery (palette, frames, full 48×48 map, HUD mock).
+Gate: n/a — sim skeleton (sim:gate SKIPPED until src/sim/policy.ts exists, §6.10). `vlr sim -- --minutes 1 --seed 1` prints one row under plain Node (tick p99 0.026 ms).
+Tests: 430 passing (vitest, 11 files incl. the audio track in progress); e2e: PASS (smoke, Chrome for Testing 156, SwiftShader, iPhone 16 profile); `vlr check` 15.5 s.
+Shots: `shots/m0-map.png` — PASS: bright sunny palette, crisp 3× pixels, 1-px outlined readable silhouettes, correct iso depth, Hoist Hill fogged with its "Unlocks at Lv 2 / Trucks only" sign; `shots/m0-gallery.png` — PASS: every frame 1× over 2× on iso grass, m5x7 labels readable; `shots/m0-palette.png` — PASS: 15 ramps, reserved mal/gold marked; `shots/m0-hud.png` — PASS: nine-slices, icons, chips row, bottom bar with hit boxes. `world.png` sha256 ea92d45c… identical across two `vlr art:build` runs.
+Deviations from spec-core.md: none in mechanics or numbers. Plan-level: `sign_locked`/`sign_pop` drawn 96×52 (city-view §1.4 says 48×32) so "Unlocks at Lv N" + "Trucks only" fit in m5x7; red is reserved for danger, so the red barn/roofs/bike of style-guide §4.2–4.3 are orange; Command union discriminant is `kind`; snapshots also carry `commandLog` (replay after reload); map `regions[].labelTile` nudged off avenues/footprints; zoom 2 is unreachable while `#game` is capped at 430 CSS px (code paths covered by tests).
+Open for the author: the 48×1 `art/palette.png` + `art/contact/palette-ramps@4x.png` (G1, non-blocking); 66 procedural placeholders until the PixelLab pass; A12 warnings on 16 multi-material sprites (> 16 colours).
+Next: M1 city loop (+ PixelLab anchor pass in parallel)
+
 ## M<n> — <name> — <YYYY-MM-DD HH:MM UTC> — <DONE | PARTIAL> at <short sha>
 
 Built: <3–6 lines: scenes, sim modules, data touched>
@@ -51,7 +61,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Art approvals pending
 
-- G1 palette + STYLE.md: <not sent | sent <date> | approved | changes requested: …> — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
+- G1 palette + STYLE.md: drawn 2026-10-29 (M0), presented in the end-of-run report — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
 - G2 anchor sheet: <not run | provisional (agent-approved ids: …, scores) | author-confirmed ids: … | rejected ids: …> — `art/contact/anchors@4x.png`
 - G3 category sheets: <none | buildings-downtown <status>, buildings-highres <status>, buildings-industrial <status>, vehicles <status>, warehouse-interior <status>, procedural <status>>
 - Placeholders still in use: <count from `vlr art:lint` warning A12> — ids listed in `docs/art-todo.md`

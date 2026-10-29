@@ -510,8 +510,8 @@ Provenance per batch (time, tool, ids, balance before/after) is in `art/manifest
   hand-off commit), always `git push origin main`, no PR.
 - `.github/workflows/pages.yml` is inert: `workflow_dispatch` only. It installs with `vlt ci`, runs `vlr check`
   (e2e is SKIPPED on the runner), `vlr build` and `tools/check-dist.mjs`, then deploys with `actions/deploy-pages@v4`.
-  It is committed last because the app token may lack **Workflows: write**; if GitHub refuses it, push that commit
-  from your machine or grant the permission.
+  It was committed last (d6e3ee1) in case the app token lacked **Workflows: write**; the push went through, so the
+  workflow is on `main` and runnable.
 - Pages is enabled with source "GitHub Actions" and a custom domain: `https://ruyadorno.github.io/pm-tycoon/` answers
   301 → `https://ruyadorno.com/pm-tycoon/`, which returns 404 until the first deploy.
 - To deploy: Actions → **Pages** → **Run workflow**. To deploy on every push, uncomment the `push: branches: [main]`

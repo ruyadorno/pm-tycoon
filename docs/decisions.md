@@ -13,7 +13,7 @@ overrules any line by number.
   AGENTS.md's git-auth paragraph was updated to say so (the template predates the repo).
 - **`.github/workflows/pages.yml` is committed last.** Whether the app token has Workflows: write cannot be checked
   without pushing a workflow file; holding it until the final commit means a refusal cannot block the checkpoint
-  pushes. (plan.md §6.12 / Q58.)
+  pushes. (plan.md §6.12 / Q58.) Outcome: pushed at d6e3ee1 without a refusal.
 - **PixelLab MCP already visible from the repo.** The author's registration covers both `~/agents/main` and this
   repo path at local scope, so the user-scope re-registration of plan.md §10 step (2) was skipped; the token was
   copied into the gitignored `.env` for the REST client without being printed. `GET /v2/balance`: Tier 2, 5,000

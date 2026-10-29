@@ -83,9 +83,14 @@ export interface StrainRow {
   counter: { machineId: string; text: string } | null
 }
 
-/** One row per active strain; the weakest (first on ties) carries the counter. */
+/**
+ * One row per active strain; the weakest (first on ties) carries the counter
+ * — unless the lane already holds that machine (`stats.suggest.owned`):
+ * "metal 97% → Metal detector $150" right after buying one read as an
+ * advert for the machine on screen (UX M2 review).
+ */
 export function strainRows(
-  stats: Pick<LaneStats, 'byStrain'>,
+  stats: Pick<LaneStats, 'byStrain'> & Partial<Pick<LaneStats, 'suggest'>>,
   data: GameData,
 ): StrainRow[] {
   let weakest = -1
@@ -93,8 +98,10 @@ export function strainRows(
     if (weakest < 0 || s.pct < (stats.byStrain[weakest]?.pct ?? 101))
       weakest = i
   })
+  const owned = stats.suggest?.owned === true ? stats.suggest.counter : null
   return stats.byStrain.map((s, i) => {
-    const text = i === weakest ? counterText(data, s.counter) : null
+    const text =
+      i === weakest && s.counter !== owned ? counterText(data, s.counter) : null
     return {
       strain: s.strain,
       text: `${s.strain} ${formatPct(s.pct)}`,

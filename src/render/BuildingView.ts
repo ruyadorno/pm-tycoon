@@ -1,8 +1,10 @@
 // One city building (city-view.md §1.3, §1.4, §6.1; spec-core.md §3.5, §9.2):
 // the static sprite (`_locked` frame while its region is fogged, flat-fill
 // tint fallback), the mood overlay (live only, from the district value), the
-// rush bell + draining ring, and the waiting badge (ic_parcel + count at the
-// doorstep, the count tinted by the oldest waiting parcel's decay phase).
+// rush bell + draining ring, the waiting badge (ic_parcel + count at the
+// doorstep, the count tinted by the oldest waiting parcel's decay phase) and
+// the lost-life scorch (`mood_scorch_<class>`, city-view §3.3: one in-game
+// day on the destination of a delivered malware parcel; the scene times it).
 // Everything is a plain Image / BitmapText in the CityScene world Layer; the
 // scene drives it (no sim access here, no per-frame work while idle).
 import Phaser from 'phaser'
@@ -96,6 +98,7 @@ export class BuildingView {
   locked: boolean
   private mood: Phaser.GameObjects.Image | null = null
   private moodKind: MoodKind = null
+  private scorch: Phaser.GameObjects.Image | null = null
   private bell: Phaser.GameObjects.Image | null = null
   private ring: Phaser.GameObjects.Image | null = null
   private badgeBg: Phaser.GameObjects.NineSlice | null = null
@@ -169,6 +172,7 @@ export class BuildingView {
     this.image = null
     this.buildImage()
     if (locked) {
+      this.setScorch(false)
       this.setMood(null)
       this.setWaiting(0, 'plain')
       this.setRush(null)
@@ -190,6 +194,26 @@ export class BuildingView {
       .setOrigin(0.5, 1)
       .setDepth(this.depth + DEPTH.mood)
     this.layer.add(this.mood)
+  }
+
+  /** Lost-life scorch overlay (city-view §3.3) over the sprite, at depth + 0.015. */
+  setScorch(on: boolean): void {
+    const want = on && !this.locked
+    if (want === (this.scorch !== null)) return
+    this.scorch?.destroy()
+    this.scorch = null
+    if (!want) return
+    const name = frameOrNull(`mood_scorch_${this.footprintClass}`)
+    if (!name) return
+    this.scorch = this.scene.add
+      .image(this.anchor.x, this.anchor.y, WORLD_ATLAS, name)
+      .setOrigin(0.5, 1)
+      .setDepth(this.depth + DEPTH.scorch)
+    this.layer.add(this.scorch)
+  }
+
+  get scorched(): boolean {
+    return this.scorch !== null
   }
 
   /** Waiting badge: hidden at 0; count tinted by the oldest parcel's phase. */
@@ -290,6 +314,7 @@ export class BuildingView {
     for (const o of [
       this.image,
       this.mood,
+      this.scorch,
       this.bell,
       this.ring,
       this.badgeBg,
@@ -299,6 +324,7 @@ export class BuildingView {
       o?.destroy()
     this.image = null
     this.mood = null
+    this.scorch = null
     this.bell = null
     this.ring = null
     this.badgeBg = null

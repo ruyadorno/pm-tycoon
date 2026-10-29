@@ -15,7 +15,20 @@
 //                Warehouse/City (pm:goto) with hold badge / pulse / red,
 //                Garage (toggleGarage) with the ! / + badges, build stamp
 //   cards        Paused card (auto-pause on HIDDEN / pagehide), rotate card,
-//                Onboarding steps 1 + 3, DistrictPanel (pm:select district)
+//                Onboarding steps 1-3, DistrictPanel (pm:select district),
+//                LostLifeCard and GameOverCard (M2)
+//
+// M2 (city-view §3.3, §4.1, §4.3, §9.2-§9.4): life:lost fuses the rightmost
+// lit bomb slot, flashes the screen red (200 ms), shakes the top bar 2 px,
+// tickers the incident, appends the label to onboarding.wanted and opens
+// the lost-life card LOST_LIFE_DELAY_MS later; game:over opens the game-over
+// screen instead (a life:lost while it is open is dropped). Modal cards hold
+// the sim through `holds` (stepper.paused = any hold: lostLife, gameOver,
+// hidden, rotate) so one card closing never resumes under another. The
+// Warehouse button's badge / pulse / red are derived from sim state on every
+// relevant event and at 2 Hz; the scripted first flag gets the red toast,
+// the bouncing arrow over the button and the 10-s follow-up (§9.2); the
+// first Toss of a run shows puns.json tossHint once.
 //
 // Sim events come through bindSim (attached while awake — always — and moved
 // on a Sim swap, with syncAll on WAKE / swap). The autosave timer runs from
@@ -24,6 +37,8 @@
 import Phaser from 'phaser'
 import {
   Autosave,
+  discardSave,
+  getOnboarding,
   readSettings,
   REG_ONBOARDING,
   REG_PENDING_TOAST,
@@ -45,7 +60,8 @@ import { debugEnabled, params } from '../debug/params.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { buildingSprite } from '../render/frames.ts'
 import { footprintAnchor, originX } from '../render/iso.ts'
-import type { SimEventPayloads } from '../sim/events.ts'
+import { roomPlacement } from '../render/warehouse/RoomLayout.ts'
+import type { LifeLostPayload, SimEventPayloads } from '../sim/events.ts'
 import type { OnboardingSave } from '../sim/save.ts'
 import type { VehicleType } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
@@ -73,9 +89,32 @@ import {
   trendGlyph,
   type ChipEntry,
 } from '../ui/hudKit.ts'
-import { computeLayout, type Layout } from '../ui/layout.ts'
+import { GameOverCard, gameOverModel } from '../ui/GameOverCard.ts'
+import {
+  computeLayout,
+  overlaps,
+  type Layout,
+  type Rect,
+} from '../ui/layout.ts'
 import { LivesRow } from '../ui/LivesRow.ts'
-import { normaliseOnboarding, Onboarding } from '../ui/Onboarding.ts'
+import {
+  LOST_LIFE_DELAY_MS,
+  LostLifeCard,
+  lostLifeModel,
+} from '../ui/LostLifeCard.ts'
+import {
+  addWanted,
+  FIRST_FLAG_CITY_TEXT,
+  FIRST_FLAG_ROOM_TEXT,
+  FLAG_FOLLOW_TEXT,
+  firstFlagText,
+  isFlagFunnelText,
+  normaliseOnboarding,
+  Onboarding,
+  STEP2_DELAY_MS,
+  step2Model,
+  step2Text,
+} from '../ui/Onboarding.ts'
 import { addBar, addPanel, BAR_H, setBarFill } from '../ui/Panel.ts'
 import { PausedCard } from '../ui/PausedCard.ts'
 import { RotateCard, wantsRotateCard } from '../ui/RotateCard.ts'
@@ -96,8 +135,14 @@ import {
   textTop,
 } from '../ui/text.ts'
 import { PALETTE, THEME } from '../ui/theme.ts'
-import { dailyLine, Ticker } from '../ui/Ticker.ts'
-import { Toast } from '../ui/Toast.ts'
+import {
+  dailyLine,
+  defusedLine,
+  incidentLine,
+  stallLine,
+  Ticker,
+} from '../ui/Ticker.ts'
+import { Toast, toastDuration } from '../ui/Toast.ts'
 import { GARAGE_SHEET_ID, toggleGarage } from './GarageSheet.ts'
 
 // Game events (plan.md §5; the M1 cross-scene contract).
@@ -140,10 +185,35 @@ const BOTTOM_ALPHA = 0.92
 const MOOD_ROW_H = 30
 const MOOD_POP_W = 200
 
+// M2 (city-view §3.3, §9.2).
+/** Full-screen red flash on life:lost: alpha 0.25 → 0 over 200 ms. */
+export const FLASH_MS = 200
+export const FLASH_ALPHA = 0.25
+/** The top bar shakes 2 px for 200 ms on life:lost. */
+export const TOP_SHAKE_MS = 200
+export const TOP_SHAKE_PX = 2
+/** The scripted-flag toast and the tossHint toast stay up 6 s. */
+export const HINT_TOAST_MS = 6000
+/** Follow-up toast if the warehouse was not opened 10 s after the first flag. */
+export const FLAG_FOLLOW_MS = 10_000
+/** The bouncing arrow over the Warehouse button: 1-px bob every 300 ms. */
+const FLAG_ARROW_BOB_MS = 300
+
+type Hold = 'lostLife' | 'gameOver' | 'hidden' | 'rotate'
+
+function reducedMotion(): boolean {
+  try {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  } catch {
+    return false
+  }
+}
+
 /** Depth bands inside the HUD scene. */
 const D = {
   bar: 10,
   barContent: 11,
+  flagArrow: 33,
   follow: 25,
   bottom: 30,
   bottomContent: 31,
@@ -155,6 +225,7 @@ const D = {
   popScrim: 6999,
   pop: 7000,
   tooltip: 9500,
+  flash: 19000,
 } as const
 
 interface Chip {
@@ -212,6 +283,8 @@ export class HudScene extends Phaser.Scene {
   private autosave!: Autosave
   private district: DistrictPanel | null = null
   private shield: ShieldPopover | null = null
+  private lostCard!: LostLifeCard
+  private overCard!: GameOverCard
 
   // chips
   private chipsRoot!: Phaser.GameObjects.Container
@@ -256,6 +329,31 @@ export class HudScene extends Phaser.Scene {
   /** Step 3 is due but waits for an on-screen building with waiting parcels. */
   private step3Armed = false
 
+  // M2
+  /** Why the sim is held (stepper.paused = holds.size > 0). */
+  private holds = new Set<Hold>()
+  private lostQueue: LifeLostPayload[] = []
+  private lostTimer: Phaser.Time.TimerEvent | null = null
+  private overTimer: Phaser.Time.TimerEvent | null = null
+  private flash!: Phaser.GameObjects.Rectangle
+  private flashUntil = 0
+  private topShake: { until: number; base: number[] } | null = null
+  /** Last applied Warehouse button state (city|held|red). */
+  private whKey = ''
+  private flagArrow!: Phaser.GameObjects.Image
+  /** The scripted-flag hint is up (arrow over the Warehouse button). */
+  private flagHint = false
+  private flagFollow: Phaser.Time.TimerEvent | null = null
+  private step2Timer: Phaser.Time.TimerEvent | null = null
+  /**
+   * A save requested from a sim event handler, run from update() after the
+   * tick ('final' = the game-over save, after which autosave stops): a
+   * snapshot taken inside tick() would catch half-updated state.
+   */
+  private saveSoon: 'save' | 'final' | null = null
+  /** Labels of flagged / held parcels (a tossed parcel may be gone from state). */
+  private heldLabels = new Map<number, string>()
+
   constructor() {
     super('HUD')
   }
@@ -292,6 +390,18 @@ export class HudScene extends Phaser.Scene {
     this.step3Armed = false
     this.district = null
     this.shield = null
+    this.holds = new Set()
+    this.lostQueue = []
+    this.lostTimer = null
+    this.overTimer = null
+    this.flashUntil = 0
+    this.topShake = null
+    this.whKey = ''
+    this.flagHint = false
+    this.flagFollow = null
+    this.step2Timer = null
+    this.saveSoon = null
+    this.heldLabels = new Map()
   }
 
   create(): void {
@@ -318,7 +428,7 @@ export class HudScene extends Phaser.Scene {
       fillers: this.gd.puns.tickerFiller,
     })
     this.ticker.setDepth(D.bar)
-    this.toast = new Toast(this, { lane: this.L.toast, listen: true })
+    this.toast = new Toast(this, { lane: this.toastLane(), listen: true })
     this.buildChips()
     this.buildBottomBar()
     this.follow = new FollowStrip(this, this.L, {
@@ -342,6 +452,26 @@ export class HudScene extends Phaser.Scene {
     this.rotate = new RotateCard(this, this.L.W, this.L.H)
     this.district = new DistrictPanel(this, this.L, this.vs)
     this.shield = new ShieldPopover(this, this.L, this.vs)
+    this.flash = this.add
+      .rectangle(0, 0, this.L.W, this.L.H, THEME.danger, 1)
+      .setOrigin(0, 0)
+      .setDepth(D.flash)
+      .setVisible(false)
+    this.flagArrow = this.add
+      .image(0, 0, UI_ATLAS, 'arrow')
+      .setOrigin(0, 0)
+      .setDepth(D.flagArrow)
+      .setVisible(false)
+    this.lostCard = new LostLifeCard(this, this.L, {
+      onOpenWarehouse: (highlight) => this.onLostCardClosed(highlight, true),
+      onContinue: () => this.onLostCardClosed(null, false),
+    })
+    this.overCard = new GameOverCard(this, this.L, {
+      onNewGame: () => this.newGame(),
+      onContinue: this.gd.economy.continueWithOneLife
+        ? () => this.continueWithOneLife()
+        : null,
+    })
 
     this.autosave = new Autosave({
       getSim: () => getSim(this) ?? null,
@@ -398,8 +528,10 @@ export class HudScene extends Phaser.Scene {
     if (time >= this.pollAt) {
       this.pollAt = time + POLL_MS
       this.refreshShield()
+      this.refreshWarehouseBtn()
       this.refreshChipActive()
       this.pollStep3()
+      if (this.flagHint && this.vs.holdBay.count === 0) this.endFlagHint(false)
       // pm:view is the contract; this catches a world scene that woke
       // without emitting it (e.g. the M0 Warehouse stub).
       const awake = this.awakeView()
@@ -412,10 +544,382 @@ export class HudScene extends Phaser.Scene {
       else this.follow.hide()
     }
     // Cards never cover a sheet / popover / dialog (district panel, Garage,
-    // mood or shield popover, Sell dialog): they wait until it closes.
-    this.onboarding.setSuppressed(modalCount() > 0)
+    // mood or shield popover, Sell dialog): they wait until it closes. Nor
+    // do they sit on the city's building tooltip (M1 polish).
+    // The onboarding cards are city steps (garage, buildings): in the
+    // warehouse they sat on the lane readout and the sign (UX M2 review).
+    this.onboarding.setSuppressed(
+      modalCount() > 0 || this.view !== 'city' || this.overlapsCityTooltip(),
+    )
     this.onboarding.update(time)
-    if (!st.paused) this.autosave.tick(delta)
+    this.updateFlash(time)
+    this.updateTopShake(time)
+    this.updateFlagArrow(time)
+    if (this.saveSoon) {
+      const final = this.saveSoon === 'final'
+      this.saveSoon = null
+      this.autosave.save('manual')
+      if (final) this.autosave.enabled = false
+    } else if (!st.paused) this.autosave.tick(delta)
+  }
+
+  // ---------------------------------------------------------------- M2 effects
+
+  /** Hold the sim for `why` (modal cards, auto-pause, rotate). */
+  private hold(why: Hold): void {
+    this.holds.add(why)
+    this.stepper.paused = true
+  }
+
+  /** Drop a hold; the sim resumes (at its speed) once nothing holds it. */
+  private release(why: Hold): void {
+    if (!this.holds.delete(why)) return
+    if (this.holds.size === 0) this.stepper.paused = false
+  }
+
+  /** The onboarding card would cover the city's building tooltip. */
+  private overlapsCityTooltip(): boolean {
+    const b = this.onboarding.bounds()
+    if (!b || this.view !== 'city') return false
+    const city = this.scene.get('City') as
+      | { tooltipScreenRect?: () => Rect | null }
+      | undefined
+    const tip = this.cityAwake() ? (city?.tooltipScreenRect?.() ?? null) : null
+    return tip !== null && overlaps(tip, b)
+  }
+
+  private cityAwake(): boolean {
+    const sm = this.scene
+    return sm.isActive('City') && !sm.isSleeping('City')
+  }
+
+  private updateFlash(now: number): void {
+    if (!this.flash.visible) return
+    const left = this.flashUntil - now
+    if (left <= 0) {
+      this.flash.setVisible(false)
+      return
+    }
+    this.flash.setAlpha((FLASH_ALPHA * left) / FLASH_MS)
+  }
+
+  /** The top-bar parts the life:lost shake moves. */
+  private topParts(): { x: number; setX(x: number): unknown }[] {
+    return [
+      this.topBg,
+      this.moneyIcon,
+      this.moneyText,
+      this.lives.root,
+      this.moodText,
+      this.moodIcon,
+      this.levelText,
+      this.levelTrack,
+      this.levelFill,
+      this.levelBarText,
+      this.shieldIcon,
+      this.shieldText,
+    ]
+  }
+
+  private updateTopShake(now: number): void {
+    const sh = this.topShake
+    if (!sh) return
+    if (now >= sh.until) {
+      this.topShake = null
+      this.layoutTopBar()
+      return
+    }
+    const dx = Math.floor(now / 50) % 2 === 0 ? TOP_SHAKE_PX : -TOP_SHAKE_PX
+    this.topParts().forEach((o, i) => o.setX((sh.base[i] ?? o.x) + dx))
+  }
+
+  /** §9.2: the arrow bobs over the Warehouse button while the hint is up. */
+  private updateFlagArrow(now: number): void {
+    const show =
+      this.flagHint &&
+      this.view === 'city' &&
+      modalCount() === 0 &&
+      !this.lostCard.isOpen() &&
+      !this.overCard.isOpen()
+    this.flagArrow.setVisible(show)
+    if (!show) return
+    const r = this.L.warehouse.rect
+    const bob = Math.floor(now / FLAG_ARROW_BOB_MS) % 2
+    // The 8x8 glyph's tip is at row 12 of the 16x16 frame: touch the button.
+    this.flagArrow.setPosition(Math.round(r.x + r.w / 2 - 8), r.y - 13 - bob)
+  }
+
+  /** A toast that stays up `ms` (the kit's are 2.5 / 4 s): re-show = restart. */
+  private longToast(text: string, red: boolean, ms: number): void {
+    this.toast.show(text, red)
+    const extra = ms - toastDuration(red)
+    if (extra <= 0) return
+    this.time.delayedCall(extra, () => {
+      if (this.toast.currentText() === text) this.toast.show(text, red)
+    })
+  }
+
+  private buildingName(id: string): string {
+    return this.gd.buildings.find((b) => b.id === id)?.name ?? id
+  }
+
+  /** life:lost (city-view §3.3, HUD side). */
+  private onLifeLost(p: LifeLostPayload): void {
+    // A loss while the game-over screen is up is dropped (§9.4).
+    if (this.overCard.isOpen()) return
+    const left = p.report?.livesLeft ?? this.vs.lives
+    this.lives.loseLife(left)
+    this.flashUntil = this.time.now + FLASH_MS
+    this.flash.setSize(this.L.W, this.L.H).setAlpha(FLASH_ALPHA)
+    this.flash.setVisible(true)
+    if (!reducedMotion())
+      this.topShake = {
+        until: this.time.now + TOP_SHAKE_MS,
+        base: this.topParts().map((o) => o.x),
+      }
+    this.ticker.push(
+      incidentLine(this.buildingName(p.destBuildingId), left),
+      'incident',
+    )
+    addWanted(getOnboarding(this.registry), p.label)
+    // Persist the loss and the revealed label right after this tick (a
+    // reload must not replay the delivery or forget the label).
+    if (this.saveSoon !== 'final') this.saveSoon = 'save'
+    if (left <= 0 || this.vs.gameOver) return // game:over takes over
+    this.lostQueue.push(p)
+    this.scheduleLostCard()
+  }
+
+  private scheduleLostCard(): void {
+    if (this.lostTimer || this.lostCard.isOpen()) return
+    this.lostTimer = this.time.delayedCall(LOST_LIFE_DELAY_MS, () => {
+      this.lostTimer = null
+      this.openNextLostCard()
+    })
+  }
+
+  /** Close the panels a modal card must not sit under; sleep the Garage. */
+  private prepareModal(): void {
+    if (this.garageOpen()) this.scene.sleep('Garage')
+    this.closeMood()
+    this.shield?.close()
+    if (this.district?.isOpen()) this.district.close()
+    this.hideTooltip()
+  }
+
+  private openNextLostCard(): void {
+    if (this.overCard.isOpen() || this.vs.gameOver) {
+      this.lostQueue = []
+      return
+    }
+    const p = this.lostQueue.shift()
+    if (!p) return
+    this.prepareModal()
+    const sim = getSim(this)
+    this.lostCard.open(
+      lostLifeModel(p, {
+        data: this.gd,
+        vehicleName: (id) =>
+          sim.state.vehicles.find((v) => v.id === id)?.name ?? null,
+        nodes: this.vs.lane.nodes(),
+        lives: p.report?.livesLeft ?? this.vs.lives,
+      }),
+    )
+    this.hold('lostLife')
+  }
+
+  /** The lost-life card closed (Open warehouse or Continue). */
+  private onLostCardClosed(highlight: string | null, warehouse: boolean): void {
+    if (this.lostQueue.length > 0) {
+      this.openNextLostCard()
+      return
+    }
+    this.release('lostLife')
+    this.queueIncidentPaper()
+    if (warehouse)
+      this.game.events.emit(EV_GOTO, {
+        view: 'warehouse',
+        ...(highlight ? { highlight } : {}),
+      })
+  }
+
+  /** TODO(M3): the incident newspaper (city-view §8.2) after the card closes. */
+  private queueIncidentPaper(): void {}
+
+  /** game:over (city-view §9.4): hold now, the screen after the effects. */
+  private onGameOver(): void {
+    this.hold('gameOver')
+    this.lostQueue = []
+    this.lostTimer?.remove(false)
+    this.lostTimer = null
+    if (this.lostCard.isOpen()) {
+      this.lostCard.close()
+      this.release('lostLife')
+    }
+    // Saved with gameOver set (after this tick), then autosave stops: a
+    // reload comes back to this screen.
+    this.saveSoon = 'final'
+    if (this.overTimer || this.overCard.isOpen()) return
+    this.overTimer = this.time.delayedCall(LOST_LIFE_DELAY_MS, () => {
+      this.overTimer = null
+      this.openGameOver()
+    })
+  }
+
+  private openGameOver(): void {
+    if (this.overCard.isOpen()) return
+    this.prepareModal()
+    this.flagHint = false
+    const s = getSim(this).state
+    this.overCard.open(
+      gameOverModel(
+        {
+          day: s.day,
+          lifetimeEarned: s.economy.lifetimeEarned,
+          deliveries: s.stats.deliveries,
+          malwareMissed: s.stats.malwareMissed,
+          defused: s.lane.quarantine.malware,
+          level: s.level.level,
+          rows: s.stats.minutes,
+        },
+        this.gd,
+      ),
+    )
+    this.hold('gameOver')
+    if (this.saveSoon !== 'final') this.autosave.enabled = false
+  }
+
+  /** New game: clear the autosave and restart through the Title (§9.4). */
+  private newGame(): void {
+    this.saveSoon = null
+    this.autosave.enabled = false
+    discardSave()
+    this.scene.start('Title', { fresh: true })
+  }
+
+  /** economy.continueWithOneLife (playtest flag): grantLife, resume. */
+  private continueWithOneLife(): void {
+    const res = this.vs.grantLife()
+    if (!res.ok) {
+      this.toast.show('Cannot continue', true)
+      return
+    }
+    this.overCard.close()
+    this.lives.set(this.vs.lives)
+    this.autosave.enabled = true
+    this.release('gameOver')
+  }
+
+  /**
+   * parcel:flagged: the §9.2 funnel. The scripted first malware gets its red
+   * `A parcel flagged — Toss it. Lives: 3` toast; the first flag of the run
+   * gets the funnel (toast, arrow, follow-up) even when it is not the
+   * scripted parcel (UX M2 review: on most seeds a decoy is flagged first,
+   * and a cold player saw only a pulsing button), with neutral wording.
+   */
+  private onFlagged(p: SimEventPayloads['parcel:flagged']): void {
+    this.rememberLabel(p.id)
+    this.refreshWarehouseBtn()
+    const ob = getOnboarding(this.registry)
+    const first = !ob.sawFirstFlag
+    if (!p.scripted && !first) return
+    const room = this.view === 'warehouse'
+    if (p.scripted)
+      this.longToast(firstFlagText(this.vs.lives), true, HINT_TOAST_MS)
+    else
+      this.longToast(
+        room ? FIRST_FLAG_ROOM_TEXT : FIRST_FLAG_CITY_TEXT,
+        false,
+        HINT_TOAST_MS,
+      )
+    if (room) {
+      ob.sawFirstFlag = true
+      return
+    }
+    if (!first) return
+    this.flagHint = true
+    this.flagFollow?.remove(false)
+    this.flagFollow = this.time.delayedCall(FLAG_FOLLOW_MS, () => {
+      this.flagFollow = null
+      if (this.flagHint && this.view === 'city' && this.vs.holdBay.count > 0)
+        this.toast.show(FLAG_FOLLOW_TEXT, true)
+    })
+  }
+
+  /** The player followed the hint (or it lapsed): stop the funnel. */
+  private endFlagHint(seen: boolean): void {
+    if (seen && this.flagHint) getOnboarding(this.registry).sawFirstFlag = true
+    this.flagHint = false
+    this.flagFollow?.remove(false)
+    this.flagFollow = null
+  }
+
+  /** parcel:tossed: DEFUSED ticker + wanted label; the one-time tossHint. */
+  private onTossed(p: SimEventPayloads['parcel:tossed']): void {
+    this.refreshWarehouseBtn()
+    const ob = getOnboarding(this.registry)
+    const label = this.vs.parcel(p.id)?.label ?? this.heldLabels.get(p.id)
+    this.heldLabels.delete(p.id)
+    if (p.wasMalware) {
+      if (label) {
+        this.ticker.push(defusedLine(label), 'incident')
+        addWanted(ob, label)
+      }
+    }
+    if (this.flagHint) this.endFlagHint(true)
+    if (!ob.sawTossHint) {
+      ob.sawTossHint = true
+      // The flag funnel's toasts are moot once a parcel is tossed.
+      if (isFlagFunnelText(this.toast.currentText(), this.vs.lives))
+        this.toast.clear()
+      this.longToast(this.gd.puns.tossHint, false, HINT_TOAST_MS)
+    }
+  }
+
+  private rememberLabel(id: number): void {
+    const label = this.vs.parcel(id)?.label
+    if (label) this.heldLabels.set(id, label)
+  }
+
+  // ---------------------------------------------------------------- step 2
+
+  /** The lane already holds step 2's machine (the hint would be moot). */
+  private step2Moot(): boolean {
+    const m = step2Model(this.gd)
+    if (!m) return true
+    return this.vs.lane
+      .nodes()
+      .some((n) => n.fixture?.checker.defId === m.machineId)
+  }
+
+  private scheduleStep2(delay = STEP2_DELAY_MS): void {
+    if (this.step2Timer || !this.onboarding.eligible(2)) return
+    this.step2Timer = this.time.delayedCall(delay, () => {
+      this.step2Timer = null
+      this.showStep2()
+    })
+  }
+
+  /** city-view §9.1 step 2: arrow at the Warehouse button. */
+  private showStep2(): void {
+    if (!this.onboarding.eligible(2)) return
+    if (this.step2Moot() || this.view === 'warehouse') {
+      this.onboarding.complete(2)
+      return
+    }
+    // Another card is up (or a sheet): try again shortly.
+    if (this.onboarding.activeStep !== null || modalCount() > 0) {
+      this.scheduleStep2(1000)
+      return
+    }
+    this.onboarding.show(
+      2,
+      () => {
+        const r = this.L.warehouse.rect
+        return { x: Math.round(r.x + r.w / 2), y: r.y }
+      },
+      step2Text(this.gd),
+    )
   }
 
   // ---------------------------------------------------------------- layout
@@ -437,7 +941,7 @@ export class HudScene extends Phaser.Scene {
     this.L = L
     this.layoutTopBar()
     this.ticker.relayout(L)
-    this.toast.relayout(L)
+    this.toast.relayout({ W: L.W, toast: this.toastLane() })
     this.refreshChips(true)
     this.layoutBottomBar()
     this.follow.relayout(L)
@@ -446,6 +950,9 @@ export class HudScene extends Phaser.Scene {
     this.rotate.relayout(L.W, L.H)
     this.district?.relayout(L)
     this.shield?.relayout(L)
+    this.lostCard.relayout(L)
+    this.overCard.relayout(L)
+    this.flash.setSize(L.W, L.H)
     this.closeMood()
     this.hideTooltip()
     this.updateRotate()
@@ -1101,12 +1608,17 @@ export class HudScene extends Phaser.Scene {
   /** Warehouse button: hold badge, pulse while held > 0, red while stalled. */
   private refreshWarehouseBtn(): void {
     const city = this.view === 'city'
+    const held = city ? this.vs.holdBay.count : 0
+    const red = city && this.vs.lane.stalled !== null
+    const key = `${city}|${held}|${red}`
+    if (key === this.whKey) return
+    this.whKey = key
     this.whBtn.setIcon(city ? 'ic_warehouse' : 'ic_city')
     this.whBtn.setLabel(city ? 'Warehouse' : 'City')
-    const held = city ? this.vs.holdBay.count : 0
     this.whBtn.setBadge(held > 0 ? String(held) : null)
+    // Pulse while anything is held; red (stalled) wins over the glow.
     this.whBtn.setPulse(held > 0)
-    this.whBtn.setRed(city && this.vs.lane.stalled !== null)
+    this.whBtn.setRed(red)
   }
 
   /** Garage: `!` (unpaid / inactive) wins over the one-shot `+`. */
@@ -1131,12 +1643,41 @@ export class HudScene extends Phaser.Scene {
 
   private setView(name: WorldView): void {
     this.view = name
+    this.toast.relayout({ W: this.L.W, toast: this.toastLane() })
     this.chipsRoot.setVisible(name === 'city')
     if (name !== 'city') {
       this.follow.hide()
       this.closeMood()
     }
+    if (name === 'warehouse') {
+      // §9.1 step 2 clears on entering the warehouse; §9.2 the flag funnel.
+      this.step2Timer?.remove(false)
+      this.step2Timer = null
+      if (this.onboarding.eligible(2)) this.onboarding.complete(2)
+      if (this.flagHint) {
+        // The player followed the funnel: point at the bays next.
+        this.endFlagHint(true)
+        if (this.vs.holdBay.count > 0) {
+          if (isFlagFunnelText(this.toast.currentText(), this.vs.lives))
+            this.toast.clear()
+          this.longToast(FIRST_FLAG_ROOM_TEXT, false, HINT_TOAST_MS)
+        }
+      }
+    }
     this.refreshWarehouseBtn()
+  }
+
+  /**
+   * The toast lane for the current view: L.toast in the city; in the
+   * warehouse it moves onto the room's north wall (over the decorative
+   * incident sign), because L.toast covers the lane readout strip — exactly
+   * at 360 × 604, and with any two-line toast at 393 × 659 (UX M2 review).
+   */
+  private toastLane(): Layout['toast'] {
+    const L = this.L
+    if (this.view !== 'warehouse') return L.toast
+    const room = roomPlacement(L.W, L.ticker.y + L.ticker.h, L.bottomBar.y)
+    return { ...L.toast, y: room.roomY + 4 }
   }
 
   /** Re-read the open district panel (city-view §5.1 refresh events). */
@@ -1192,8 +1733,10 @@ export class HudScene extends Phaser.Scene {
     // has already done step 1's job.
     if (this.vs.vehicles.length > 0 && this.onboarding.eligible(1)) {
       this.onboarding.complete(1)
+      this.scheduleStep2()
       return
     }
+    this.scheduleStep2()
     if (this.onboarding.eligible(1)) {
       this.onboarding.show(1, () => {
         const g = this.L.garage.rect
@@ -1296,26 +1839,32 @@ export class HudScene extends Phaser.Scene {
 
   /** HIDDEN / pagehide: auto-pause (modal) and save now. */
   private onHidden(): void {
-    if (!this.stepper.paused) {
-      this.stepper.paused = true
+    if (!this.holds.has('hidden')) {
+      this.hold('hidden')
       this.autoPaused = true
     }
     this.autosave.save('hidden')
   }
 
   private onVisible(): void {
-    if (this.autoPaused && !this.paused.isOpen()) {
-      // A modal card never renders under the sheet (plan.md §6.7).
-      if (this.garageOpen()) this.scene.sleep('Garage')
-      this.paused.show()
+    if (!this.autoPaused || this.paused.isOpen()) return
+    // A lost-life / game-over card already holds the sim and asks for a
+    // tap: no Paused card on top of it.
+    if (this.lostCard.isOpen() || this.overCard.isOpen()) {
+      this.autoPaused = false
+      this.release('hidden')
+      return
     }
+    // A modal card never renders under the sheet (plan.md §6.7).
+    if (this.garageOpen()) this.scene.sleep('Garage')
+    this.paused.show()
   }
 
   private resumeFromCard(): void {
     this.paused.hide()
     if (this.autoPaused) {
       this.autoPaused = false
-      if (!this.rotate.isOpen()) this.stepper.paused = false
+      this.release('hidden')
     }
   }
 
@@ -1329,13 +1878,11 @@ export class HudScene extends Phaser.Scene {
     if (want === this.rotate.isOpen()) return
     this.rotate.setOpen(want)
     if (want) {
-      if (!this.stepper.paused) {
-        this.stepper.paused = true
-        this.rotatePaused = true
-      }
+      this.hold('rotate')
+      this.rotatePaused = true
     } else if (this.rotatePaused) {
       this.rotatePaused = false
-      if (!this.paused.isOpen()) this.stepper.paused = false
+      this.release('rotate')
     }
   }
 
@@ -1361,6 +1908,7 @@ export class HudScene extends Phaser.Scene {
         'parcel:spawned': () => this.refreshDistrict(),
         'level:up': (p) => {
           this.refreshLevel()
+          this.refreshShield()
           this.refreshChips()
           this.refreshGarageBadge()
           const row = this.gd.levels.find((l) => l.level === p.level)
@@ -1376,17 +1924,23 @@ export class HudScene extends Phaser.Scene {
         },
         'lane:stalled': (p) => {
           this.refreshWarehouseBtn()
-          this.ticker.push(
-            p.reason === 'shelfFull'
-              ? 'Warehouse backed up — shelf full'
-              : 'Warehouse backed up — Hold Bay full',
-            'stall',
-          )
+          this.ticker.push(stallLine(p.reason), 'stall')
         },
         'lane:resumed': () => this.refreshWarehouseBtn(),
-        'parcel:held': () => this.refreshWarehouseBtn(),
-        'parcel:tossed': () => this.refreshWarehouseBtn(),
-        'parcel:cleared_by_player': () => this.refreshWarehouseBtn(),
+        'parcel:flagged': (p) => this.onFlagged(p),
+        'parcel:held': (p) => {
+          this.rememberLabel(p.id)
+          this.refreshWarehouseBtn()
+        },
+        'parcel:tossed': (p) => this.onTossed(p),
+        'parcel:cleared_by_player': (p) => {
+          this.heldLabels.delete(p.id)
+          this.refreshWarehouseBtn()
+        },
+        'lane:fixturePlaced': () => this.refreshShield(),
+        'lane:fixtureMoved': () => this.refreshShield(),
+        'lane:fixtureRemoved': () => this.refreshShield(),
+        'worker:fired': () => this.refreshShield(),
         'parcel:delivered': () => {
           this.dayDelivered++
         },
@@ -1420,10 +1974,15 @@ export class HudScene extends Phaser.Scene {
           this.toast.show(text, true)
           this.ticker.push(text, 'worker')
           this.refreshGarageBadge()
+          this.refreshShield()
         },
-        'worker:hired': () => this.refreshGarageBadge(),
+        'worker:hired': () => {
+          this.refreshGarageBadge()
+          this.refreshShield()
+        },
         'vehicle:bought': () => {
           this.onboarding.complete(1)
+          this.scheduleStep2()
           this.refreshGarageBadge()
           this.refreshDistrict()
         },
@@ -1433,7 +1992,8 @@ export class HudScene extends Phaser.Scene {
           this.refreshDistrict()
         },
         'vehicle:inactive': () => this.refreshGarageBadge(),
-        'life:lost': () => this.lives.set(this.vs.lives),
+        'life:lost': (p) => this.onLifeLost(p),
+        'game:over': () => this.onGameOver(),
         'day:ended': (p) => {
           if (!this.simDaily)
             this.ticker.push(
@@ -1535,6 +2095,11 @@ export class HudScene extends Phaser.Scene {
       this.moneyTween?.stop()
       for (const f of this.floats) f.tween?.stop()
       this.onboarding.destroy()
+      // The cards sit on the shared modal stack: pop them with the scene.
+      this.lostCard.destroy()
+      this.overCard.destroy()
+      this.lostTimer = null
+      this.overTimer = null
     })
   }
 
@@ -1573,6 +2138,18 @@ export class HudScene extends Phaser.Scene {
     // save) has done step 1's job, as startTour() rules for a policy run.
     if (vs.vehicles.length > 0 && this.onboarding?.eligible(1))
       this.onboarding.complete(1)
+    if (vs.vehicles.length > 0) this.scheduleStep2()
+    this.heldLabels.clear()
+    for (const it of vs.holdBay.items) this.rememberLabel(it.parcelId)
+    // Cards follow the sim: a game-over state (a reload, __pm.load of a
+    // fixture) shows its screen; a live one closes a stale screen.
+    if (vs.gameOver) {
+      if (!this.overCard.isOpen() && !this.overTimer) this.openGameOver()
+    } else if (this.overCard.isOpen()) {
+      this.overCard.close()
+      this.autosave.enabled = true
+      this.release('gameOver')
+    }
   }
 
   // ---------------------------------------------------------------- keyboard

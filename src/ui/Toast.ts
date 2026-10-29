@@ -157,12 +157,20 @@ export class Toast {
   relayout(L: { W: number; toast: ToastOptions['lane'] }): void {
     this.lane = { ...L.toast }
     this.W = Math.round(L.W)
-    if (this.queue.current) {
-      this.tween?.stop()
-      this.tween = null
-      this.fit()
-      this.root.setY(this.lane.y)
+    if (!this.queue.current) return
+    this.tween?.stop()
+    this.tween = null
+    if (this.hiding) {
+      // A stopped fade-out never reaches its onComplete: finish it here, or
+      // the lane would keep a half-faded toast and never show the queue
+      // (the HUD re-lays the lane on every city ↔ warehouse switch).
+      this.hiding = false
+      this.root.setVisible(false).setAlpha(1)
+      if (this.queue.next()) this.present()
+      return
     }
+    this.fit()
+    this.root.setY(this.lane.y)
   }
 
   destroy(): void {

@@ -6,6 +6,15 @@
 // the CameraRig + GestureClassifier, the zone highlight, follow mode and the
 // city side of the city → warehouse transition (nav.ts WorldTransition).
 //
+// M2 (city-view §3.2-§3.3): parcel:flagged pings the warehouse roof; a Toss
+// stamps DEFUSED +$50 (gold, 2-px shake) or OOPS −$25 (grey) over it; a lost
+// life shakes the camera (300 ms, 0.004), plays fx_boom on the destination
+// and scorches it for one in-game day, and cracks the days-since-incident
+// sign (sign_days_cracked while the counter is 0 after a loss, Q33). The
+// shakes are skipped under prefers-reduced-motion. Scorch and sign are also
+// rebuilt from sim state (lastLostLife, daysSinceIncident) on wake / swap,
+// since sim events are not delivered while the city sleeps.
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -24,7 +33,13 @@ import {
   type WorldTransition,
   type WorldView,
 } from '../boot/nav.ts'
-import { bindSim, getAlpha, getViewSim, REG } from '../boot/simBinding.ts'
+import {
+  bindSim,
+  getAlpha,
+  getSim,
+  getViewSim,
+  REG,
+} from '../boot/simBinding.ts'
 import {
   blockRect,
   mapBlockAt,
@@ -64,7 +79,8 @@ import {
 } from '../render/iso.ts'
 import { VehicleView } from '../render/VehicleView.ts'
 import type { CommandResult } from '../sim/commands.ts'
-import { TICKS_PER_S } from '../sim/types.ts'
+import type { LifeLostPayload } from '../sim/events.ts'
+import { TICKS_PER_DAY, TICKS_PER_S } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
 import {
   BuildingTooltip,
@@ -118,6 +134,12 @@ const POPUP_LIFT = 30
 /** fx strips (4 frames each). */
 const FX_POP_MS = 250
 const FX_PING_MS = 300
+/** city-view §3.3: fx_boom is 6 frames over 480 ms. */
+const FX_BOOM_MS = 480
+const FX_BOOM_FRAMES = 6
+/** city-view §3.2-§3.3 camera shakes (duration ms, intensity). */
+const SHAKE_DEFUSED: readonly [number, number] = [120, 0.002]
+const SHAKE_LOST_LIFE: readonly [number, number] = [300, 0.004]
 const SMOKE_FPS = 4
 const SMOKE_PUFFS = 3
 const SMOKE_STEP_PX = 7
@@ -207,6 +229,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private dockLights: Phaser.GameObjects.Image[] = []
   private signText: Phaser.GameObjects.BitmapText | null = null
   private sign: Phaser.GameObjects.Image | null = null
+  /** Scorched building id → the tick its one-day scorch ends (§3.3). */
+  private scorched = new Map<string, number>()
   private zone: Phaser.GameObjects.Graphics | null = null
   private zoneDistrict: string | null = null
 
@@ -254,6 +278,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.warehouseTier = 0
     this.sign = null
     this.signText = null
+    this.scorched = new Map()
     this.zone = null
     this.zoneDistrict = null
     this.ground = null
@@ -328,16 +353,17 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         },
         'vehicle:bought': (p) => this.popOnCreate.add(p.id),
         'vehicle:sold': (p) => this.onSold(p.id),
-        'day:ended': () => this.refreshSign(),
+        'day:ended': () => {
+          this.refreshSign()
+          this.refreshScorch()
+        },
         // TODO(M3): §1.4 1 s crossfade + re-baked ground crossfade + sign_pop;
         // for now the view snaps to the new lock state.
         'region:unlocked': () => this.applyLockState(),
         // TODO(M3): §9.6 fx_dust construction overlay + LEVEL stamp; for now
         // the exterior swaps to the new tier at once.
         'level:up': () => this.refreshWarehouse(),
-        // TODO(M2): §3.3 fx_boom + one-day scorch overlay on the destination,
-        // cam.shake(300, 0.004), cracked sign; for now the counter resets.
-        'life:lost': () => this.refreshSign(),
+        'life:lost': (p) => this.onLifeLost(p),
       },
       () => this.syncAll(),
     )
@@ -602,11 +628,20 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     } else this.warehouse.setFrame(name)
   }
 
+  /**
+   * The days-since-last-incident counter, on the cracked board while it reads
+   * 0 after a lost life (cracks on life:lost, replaced at 1 again, Q33).
+   */
   private refreshSign(): void {
     const sign = this.sign
     const t = this.signText
-    if (!sign || !t) return
+    if (!sign) return
     const n = this.vs.daysSinceIncident
+    const cracked = n === 0 && getSim(this)?.state.lastLostLife != null
+    const frame =
+      (cracked ? frameOrNull('sign_days_cracked') : null) ?? 'sign_days'
+    if (sign.frame.name !== frame) sign.setFrame(frame)
+    if (!t) return
     t.setText(`${n} ${n === 1 ? 'day' : 'days'}`)
     const left = sign.x - sign.width / 2
     const top = sign.y - sign.height
@@ -642,6 +677,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.applyLockState()
     this.refreshWarehouse()
     this.refreshSign()
+    this.syncScorch()
     this.popups?.clear()
     this.tooltip?.hide()
     this.tipRush = null
@@ -723,6 +759,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.refreshAcc = 0
       this.refreshMarkers()
       this.refreshTooltip()
+      if (this.scorched.size > 0) this.refreshScorch()
     }
     this.updateHover(now)
   }
@@ -786,8 +823,9 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     ms: number,
     reverse: boolean,
     depth: number,
+    count = 4,
   ): void {
-    const frames = [0, 1, 2, 3].map((i) => `${stem}_f${i}`)
+    const frames = Array.from({ length: count }, (_, i) => `${stem}_f${i}`)
     if (reverse) frames.reverse()
     if (!frames.every((f) => frameOrNull(f))) return
     const img = this.add
@@ -892,7 +930,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         `DEFUSED +$${bounty}`,
         STAMP_GOLD,
       )
-      if (!reducedMotion()) this.cameras.main.shake(120, 0.002)
+      this.shake(SHAKE_DEFUSED)
     } else {
       this.popups.stamp(
         this.viewRect,
@@ -902,6 +940,82 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         `OOPS −$${this.gd.economy.wrongTossFee}`,
         STAMP_GREY,
       )
+    }
+  }
+
+  /** Camera shake (city-view §3.2-§3.3), skipped under prefers-reduced-motion. */
+  private shake([ms, intensity]: readonly [number, number]): void {
+    if (reducedMotion() || !this.scene.isActive()) return
+    this.cameras.main.shake(ms, intensity)
+  }
+
+  /**
+   * life:lost (city-view §3.3, city side): camera shake, fx_boom over the
+   * destination building and its one-day scorch, the sign cracks and its
+   * counter resets. The red flash, the bomb fuse and the card are the HUD's.
+   */
+  private onLifeLost(p: LifeLostPayload): void {
+    this.shake(SHAKE_LOST_LIFE)
+    const b = this.buildings.get(p.destBuildingId)
+    if (b) {
+      const r = b.image ? visibleRect(b.image) : null
+      const x = r ? r.centerX : b.anchor.x
+      const y = r ? r.centerY : b.anchor.y - 32
+      this.playFx(
+        x,
+        y,
+        'fx_boom',
+        FX_BOOM_MS,
+        false,
+        DEPTH.marker + b.depth,
+        FX_BOOM_FRAMES,
+      )
+      const tick = p.report?.tick ?? this.vs.tick
+      this.scorched.set(b.id, tick + TICKS_PER_DAY)
+      b.setScorch(true)
+    }
+    this.refreshSign()
+  }
+
+  /** Drop scorches whose in-game day is over (2 Hz, day:ended). */
+  private refreshScorch(): void {
+    const now = this.vs.tick
+    for (const [id, until] of this.scorched) {
+      // A swapped-in sim may run behind the stored tick: drop those too.
+      if (now < until && until - now <= TICKS_PER_DAY) continue
+      this.scorched.delete(id)
+      this.buildings.get(id)?.setScorch(false)
+    }
+  }
+
+  /** Rebuild the scorch from sim state (wake, sim swap): the last loss only. */
+  private syncScorch(): void {
+    const last = getSim(this)?.state.lastLostLife ?? null
+    if (last && !this.scorched.has(last.destBuildingId))
+      this.scorched.set(last.destBuildingId, last.tick + TICKS_PER_DAY)
+    this.refreshScorch()
+    for (const [id] of this.scorched) this.buildings.get(id)?.setScorch(true)
+  }
+
+  /**
+   * The building tooltip's panel in screen px while it shows, else null:
+   * the HUD keeps its onboarding card off it (M1 polish: the step-3 card
+   * overlapped the tooltip).
+   */
+  tooltipScreenRect(): { x: number; y: number; w: number; h: number } | null {
+    if (!this.tooltip?.visible || !this.sys.isActive()) return null
+    const panel = (
+      this.tooltip as unknown as { panel?: Phaser.GameObjects.NineSlice }
+    ).panel
+    if (!panel) return null
+    const cam = this.cameras.main
+    const v = cam.worldView
+    const z = cam.zoom
+    return {
+      x: Math.round((panel.x - v.x) * z + cam.x),
+      y: Math.round((panel.y - v.y) * z + cam.y),
+      w: Math.round(panel.width * z),
+      h: Math.round(panel.height * z),
     }
   }
 

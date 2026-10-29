@@ -10,8 +10,9 @@
 // above it, and leaves through the canvas edge on the right, so no camera
 // viewport is needed (the HUD stays one camera, one batch).
 //
-// The queue is pure (TickerQueue, dailyLine) and unit-tested; Phaser is a
-// type-only import.
+// The queue is pure (TickerQueue, dailyLine) and unit-tested, as are the M2
+// lines the HUD pushes (stallLine, defusedLine, incidentLine — city-view
+// §3.2, §8.1); Phaser is a type-only import.
 import type Phaser from 'phaser'
 import type { TickerKind } from '../sim/events.ts'
 import type { Layout } from './layout.ts'
@@ -85,6 +86,26 @@ export function dailyLine(
   ]
   if (payroll > 0) parts.push(`payroll ${formatMoney(payroll)}`)
   return `Day ${day}: ${parts.join(', ')}`
+}
+
+/** city-view §3.2 / spec §6.4: the stall line per `lane:stalled` reason. */
+export function stallLine(reason: string): string {
+  if (reason === 'shelfFull') return 'Warehouse backed up — shelf full'
+  if (reason === 'bufferFull') return 'Warehouse backed up — lane jammed'
+  return 'Warehouse backed up — Hold Bay full'
+}
+
+/** city-view §8.1 `incident`: a malware Toss (`parcel:tossed {wasMalware}`). */
+export function defusedLine(label: string): string {
+  return `Close call! ${label} defused at the warehouse`
+}
+
+/** city-view §8.1 `incident`: `Malware delivered to Async Arms — 2 lives left`. */
+export function incidentLine(buildingName: string, livesLeft: number): string {
+  const n = Math.max(0, Math.floor(livesLeft))
+  const left =
+    n === 0 ? 'no lives left' : `${n} ${n === 1 ? 'life' : 'lives'} left`
+  return `Malware delivered to ${buildingName} — ${left}`
 }
 
 export interface TickerOptions {

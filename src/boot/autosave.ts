@@ -17,6 +17,15 @@
 // migrations). The sim never sees the onboarding object: HudScene keeps it in
 // the game registry under REG_ONBOARDING and this module serialises it.
 //
+// onboarding (city-view §9.1-§9.2): `step`/`skipped` (the tour), `sawFirstFlag`
+// (the scripted-flag hint was followed into the warehouse), `sawTossHint`
+// (the one-time puns.json tossHint toast) and `wanted` (malware labels
+// revealed by DEFUSED tosses and lost lives). HudScene mutates the registry
+// object in place; getOnboarding() is the one accessor (the warehouse's
+// wanted poster reads `.wanted` through it) and every save writes it, plus
+// an immediate save after a lost life / game over so a reload never loses a
+// revealed label.
+//
 // Phaser is a type-only import and storage is injectable, so everything here
 // runs under Vitest (tests/ui/autosave.test.ts).
 import type { GameData } from '../data/types.ts'
@@ -51,6 +60,30 @@ export const AUTOSAVE_MS = 10_000
 export const REG_ONBOARDING = 'onboarding'
 /** Game registry: a toast for the HUD to show once at create (Boot). */
 export const REG_PENDING_TOAST = 'pendingToast'
+
+/** What getOnboarding needs from a Phaser DataManager (game.registry). */
+export interface RegistryLike {
+  get(key: string): unknown
+  set(key: string, value: unknown): unknown
+}
+
+/**
+ * The live OnboardingSave in the game registry (REG_ONBOARDING). A missing
+ * or malformed value is replaced by a normalised object, so callers always
+ * get the one shared instance to read or mutate in place.
+ */
+export function getOnboarding(registry: RegistryLike): OnboardingSave {
+  const cur = registry.get(REG_ONBOARDING)
+  const ok =
+    typeof cur === 'object' &&
+    cur !== null &&
+    Array.isArray((cur as OnboardingSave).wanted) &&
+    typeof (cur as OnboardingSave).step === 'number'
+  if (ok) return cur as OnboardingSave
+  const fresh = normaliseOnboarding(cur)
+  registry.set(REG_ONBOARDING, fresh)
+  return fresh
+}
 
 export const STALE_SAVE_TEXT = 'Save from an older build was reset'
 export const SAVE_FAILED_TEXT = 'Autosave failed — retrying'

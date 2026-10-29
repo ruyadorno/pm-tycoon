@@ -47,6 +47,19 @@ export default defineConfig({
         deviceScaleFactor: 2,
       },
     },
+    {
+      // The 360x604 minimum-fit phone (plan.md §6.9.3, warehouse-view.md
+      // §1.1 / §7.5) — the M2 warehouse and card shots only.
+      name: 'min-fit',
+      testMatch: /shots\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 360, height: 604 },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
   ],
   webServer: {
     command: 'vlr preview',

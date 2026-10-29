@@ -15,9 +15,33 @@
 // with `node tools/fixtures/late-waiting.ts` after any data change (its
 // dataHash must match the build's, checked below). `?mute=1` is the shots
 // default (audio.md: sound on, muted).
+//
+// M2 (plan.md §12.5 task 11, warehouse-view.md §7.5, city-view.md §9.3-§9.4),
+// at the iPhone 16 profile and the 360×604 minimum-fit profile (`min-fit`,
+// names suffixed `-360x604`):
+//   warehouse-l1       ?view=warehouse + policy, t = 60 s
+//   warehouse-catch    policy 60 s, then policy off + debug.forceFlagNext:
+//                      frozen 300 ms into the catch moment (§3.3)
+//   warehouse-holdcard the forced flag in bay 1, tapped → HoldBayCard
+//   warehouse-stalled  fixture tests/fixtures/holdbay-full.json (Hold Bay at
+//                      cap, a flagged parcel waiting dark in slot 1)
+//   warehouse-buysheet policy 60 s, the first empty slot tapped → BuySheet
+//   lost-life          fixture malware-cleared.json + advance to the
+//                      delivery of the parcel the player Cleared
+//   game-over          fixture one-life.json + advance to the third loss
+// The M2 fixtures come from `node tools/fixtures/warehouse.ts` (same
+// staleness rule; tests/data/shot-fixtures.test.ts pins their scenarios).
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, test, type PmHelpers } from './fixtures.ts'
+import {
+  bayRect,
+  openSheet,
+  policyOff,
+  roomLayout,
+  settleUntil,
+  tapRoomRect,
+} from './warehouse.ts'
 
 const BASE = '/?seed=7&debug=1&mute=1'
 const CITY = `${BASE}&skipTitle=1`
@@ -30,15 +54,28 @@ interface Pt {
 }
 
 const isColumn = (): boolean => test.info().project.name === 'desktop-column'
+const isMinFit = (): boolean => test.info().project.name === 'min-fit'
 
 /** iPhone-only shots; the 430×932 column takes city-30s and garage only. */
 function phoneOnly(): void {
   test.skip(isColumn(), 'the 430×932 column only takes city-30s and garage')
+  test.skip(isMinFit(), 'the 360×604 profile only takes the M2 shots')
 }
 
-/** `<name>` on the phone, `<name>-430x932` in the desktop column. */
+/** M1 shots also taken in the 430×932 column (city-30s, garage). */
+function phoneAndColumn(): void {
+  test.skip(isMinFit(), 'the 360×604 profile only takes the M2 shots')
+}
+
+/** M2 shots: the iPhone 16 and the 360×604 minimum-fit profile. */
+function phoneAndMinFit(): void {
+  test.skip(isColumn(), 'the 430×932 column skips the M2 shots')
+}
+
+/** `<name>` on the phone, `-430x932` in the column, `-360x604` at min-fit. */
 function shotName(name: string): string {
-  return isColumn() ? `${name}-430x932` : name
+  if (isColumn()) return `${name}-430x932`
+  return isMinFit() ? `${name}-360x604` : name
 }
 
 /**
@@ -154,6 +191,7 @@ test.describe('M1 shots', () => {
   })
 
   test('city-30s', async ({ page, pm, consoleErrors }) => {
+    phoneAndColumn()
     await pm.open(POLICY)
     await runFor(page, pm, 30_000)
     await pm.shot(shotName('city-30s'))
@@ -395,6 +433,7 @@ test.describe('M1 shots', () => {
   })
 
   test('garage', async ({ page, pm, consoleErrors }) => {
+    phoneAndColumn()
     await pm.open(POLICY)
     // ~4 min: the policy owns three bikes (spec §7: a bike at price + $50).
     await runFor(page, pm, 240_000)
@@ -486,6 +525,250 @@ test.describe('M1 shots', () => {
     }))
     expect(st).toEqual({ paused: true, card: true })
     await pm.shot('paused')
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M2 ------------------------------------------------------------------
+
+const WH_POLICY = `${POLICY}&view=warehouse`
+
+interface ShotFixture {
+  text: string
+  fixture: Record<string, unknown> & { regenerate: string }
+}
+
+/**
+ * Freeze, check the fixture's data hash against the build's, load it
+ * through __pm.load (?policy=1 re-creates the policy for the loaded sim)
+ * and settle a few frames.
+ */
+async function loadFixture(
+  page: Page,
+  pm: PmHelpers,
+  name: string,
+): Promise<ShotFixture> {
+  const path = `tests/fixtures/${name}.json`
+  const text = readFileSync(path, 'utf8')
+  const fx = JSON.parse(text) as {
+    dataHash: string
+    fixture: ShotFixture['fixture']
+  }
+  const hash = await page.evaluate(() => window.__pm!.data.hash)
+  expect(
+    fx.dataHash,
+    `${path} is stale (data changed): run \`${fx.fixture.regenerate}\``,
+  ).toBe(hash)
+  await pm.freeze()
+  await page.evaluate((json) => window.__pm!.load(json), text)
+  return { text, fixture: fx.fixture }
+}
+
+/** Opening A for 60 s under the policy, in the warehouse (warehouse-l1). */
+async function warehouseAt60s(page: Page, pm: PmHelpers): Promise<void> {
+  await pm.open(WH_POLICY)
+  await runFor(page, pm, 60_000)
+  const st = await page.evaluate(() => {
+    const api = window.__pm!
+    const slot = (id: string): string | null =>
+      api.sim.lane.nodes().find((n) => n.id === id)?.fixture?.kind ?? null
+    return {
+      warehouse: api.game.scene.isActive('Warehouse'),
+      slot1: slot('slot1'),
+      slot2: slot('slot2'),
+    }
+  })
+  expect(st).toEqual({ warehouse: true, slot1: 'desk', slot2: 'machine' })
+}
+
+/**
+ * Policy off (it Tosses every flag on the next tick), debug.forceFlagNext
+ * ('metal'), then real frames at 4× until `event` fires and back to 1×:
+ * every parcel the room shows has its sprite before the catch, as in play
+ * (a sim-only advance would spawn the flagged sprite first and the rest of
+ * the lane over it on the next frame).
+ */
+async function forceFlag(
+  page: Page,
+  event: 'parcel:flagged' | 'parcel:held',
+): Promise<void> {
+  await policyOff(page)
+  const w = await page.evaluate((e) => {
+    const api = window.__pm!
+    const ev = api.core.events as unknown as {
+      on(n: string, f: (p: unknown) => void): unknown
+      off(n: string, f: (p: unknown) => void): unknown
+    }
+    const got: { payload: unknown } = { payload: null }
+    const fn = (p: unknown): void => {
+      got.payload ??= p
+    }
+    ev.on(e, fn)
+    api.sim.debug!.forceFlagNext('metal')
+    api.speed(4)
+    const t0 = api.sim.tick
+    let frames = 0
+    while (got.payload === null && frames < 4000) {
+      api.step(16)
+      frames++
+    }
+    api.speed(1)
+    ev.off(e, fn)
+    return {
+      ok: got.payload !== null,
+      frames,
+      simS: (api.sim.tick - t0) / 10,
+      payload: got.payload,
+    }
+  }, event)
+  console.log(`shots: forced flag ${JSON.stringify(w)}`)
+  expect(w.ok, `${event} after the forced flag`).toBe(true)
+}
+
+/** The HUD's lost-life / game-over card state. */
+function hudCards(page: Page): Promise<{ lost: boolean; over: boolean }> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      lostCard: { isOpen(): boolean }
+      overCard: { isOpen(): boolean }
+    }
+    return { lost: hud.lostCard.isOpen(), over: hud.overCard.isOpen() }
+  })
+}
+
+test.describe('M2 shots', () => {
+  test('warehouse-l1', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await warehouseAt60s(page, pm)
+    await pm.shot(shotName('warehouse-l1'))
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-catch', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await warehouseAt60s(page, pm)
+    await pm.overlay(false)
+    await pm.stamp('test')
+    await forceFlag(page, 'parcel:flagged')
+    // §3.3 at t + 300 ms: the flip to the dark parcel + trait icon done,
+    // the workers jumping, the slide toward the chute starting.
+    await pm.shot(shotName('warehouse-catch'), 19)
+    expect(await page.evaluate(() => window.__pm!.sim.holdBay.count)).toBe(1)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-holdcard', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await warehouseAt60s(page, pm)
+    await forceFlag(page, 'parcel:held')
+    await pm.settle(64) // the catch moment and the divert into bay 1
+    await tapRoomRect(page, pm, bayRect(0))
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'hold',
+      ),
+      'the Hold Bay card opens',
+    ).toBe(true)
+    await pm.shot(shotName('warehouse-holdcard'), 30)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-stalled', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(WH_POLICY)
+    const { fixture } = await loadFixture(page, pm, 'holdbay-full')
+    // The policy would Toss the full bay on the first tick.
+    await policyOff(page)
+    await pm.settle(64)
+    const lane = await page.evaluate(() => {
+      const vs = window.__pm!.sim
+      return { stalled: vs.lane.stalled, held: vs.holdBay.count }
+    })
+    console.log(`shots: stalled ${JSON.stringify(lane)}`)
+    expect(lane.stalled?.reason).toBe('holdBayFull')
+    expect(lane.stalled?.nodeId).toBe(fixture.stallNodeId)
+    expect(lane.held).toBe(3)
+    await pm.shot(shotName('warehouse-stalled'))
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-buysheet', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await warehouseAt60s(page, pm)
+    const slot = await page.evaluate(
+      () =>
+        window
+          .__pm!.sim.lane.nodes()
+          .find((n) => n.kind === 'slot' && !n.locked && n.fixture === null)
+          ?.id ?? null,
+    )
+    expect(slot, 'an empty live slot').not.toBeNull()
+    await tapRoomRect(page, pm, roomLayout.rectFor(slot!)!)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'buy',
+      ),
+      'the BuySheet opens',
+    ).toBe(true)
+    await pm.shot(shotName('warehouse-buysheet'), 30)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('lost-life', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'malware-cleared')
+    await pm.settle(5)
+    await focusCity(
+      page,
+      await buildingCentre(page, fixture.destBuildingId as string),
+    )
+    const capMs = ((fixture.lifeLostInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('life:lost', cap),
+      capMs,
+    )
+    console.log(
+      `shots: life:lost after ${w.waitedMs} ms ${JSON.stringify(w.payload?.report ?? null)}`,
+    )
+    expect(w.ok, 'the cleared malware is delivered').toBe(true)
+    expect(w.payload!.parcelId).toBe(fixture.parcelId)
+    expect(w.payload!.clearedByPlayerAt).not.toBeNull()
+    expect(
+      await settleUntil(page, pm, async () => (await hudCards(page)).lost),
+      'the lost-life card opens (600 ms after the loss)',
+    ).toBe(true)
+    await pm.shot(shotName('lost-life'), 30)
+    expect(await page.evaluate(() => window.__pm!.sim.lives)).toBe(2)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('game-over', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'one-life')
+    await pm.settle(5)
+    await focusCity(
+      page,
+      await buildingCentre(page, fixture.destBuildingId as string),
+    )
+    const capMs = ((fixture.gameOverInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('game:over', cap),
+      capMs,
+    )
+    expect(w.ok, 'the third malware delivery ends the game').toBe(true)
+    expect(
+      await settleUntil(page, pm, async () => (await hudCards(page)).over),
+      'the game-over screen opens',
+    ).toBe(true)
+    await pm.shot(shotName('game-over'), 30)
+    const st = await hudCards(page)
+    expect(st).toEqual({ lost: false, over: true })
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

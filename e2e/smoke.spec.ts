@@ -14,8 +14,26 @@
 //      autosave key appears, every live HUD hit rect is ≥ 44/zoom with no
 //      overlaps in the bottom bar, and the chips row fits W − 12 at W = 360
 //      at L1 and L2.
+//   M2 (§12.5 task 11, §6.9.3) — the warehouse loop: the HUD Warehouse
+//      button opens the room with the pre-hired desk in slot 1 (rendered),
+//      the room + readout fit between the HUD bands at 393×659 (iPhone 16)
+//      and 360×604 (the minimum viewport, warehouse-view.md §1.1), a forced
+//      flag (sim.debug.forceFlagNext) lands in the Hold Bay and the city
+//      Warehouse button shows the badge 1, TOSS on the Hold Bay card (real
+//      taps) sends it to the Quarantine Bin, and a pm:goto highlight while
+//      in the room opens the BuySheet — no console errors.
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures.ts'
+import { expect, test, type PmHelpers } from './fixtures.ts'
+import {
+  bayRect,
+  expectRoomFits,
+  openSheet,
+  policyOff,
+  roomFit,
+  settleUntil,
+  tapRoomRect,
+  tapTarget,
+} from './warehouse.ts'
 
 const BASE = '/?view=gallery&debug=1&seed=1&audio=0'
 const M1_URL = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1'
@@ -467,6 +485,170 @@ test.describe('M1 city smoke', () => {
     console.log(`smoke: chips L2 ${JSON.stringify(l2)}`)
     expect(l2.rowW).toBeLessThanOrEqual(l2.maxRowW)
     expectHudHits(await hudHits(page), 'W=360 L2')
+
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M2 ------------------------------------------------------------------
+
+/** The city Warehouse button's badge text (null when none). */
+function warehouseBadge(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      whBtn: { badge: { list: { text?: string }[] } | null }
+    }
+    return hud.whBtn.badge?.list[1]?.text ?? null
+  })
+}
+
+/** Real tap on the HUD Warehouse / City button, then wait for `to`. */
+async function switchView(
+  page: Page,
+  pm: PmHelpers,
+  to: 'city' | 'warehouse',
+): Promise<void> {
+  const r = await page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      L: {
+        warehouse: { rect: { x: number; y: number; w: number; h: number } }
+      }
+    }
+    return hud.L.warehouse.rect
+  })
+  await pm.tap(r.x + Math.floor(r.w / 2), r.y + Math.floor(r.h / 2))
+  const want = to === 'city' ? 'City' : 'Warehouse'
+  const ok = await settleUntil(page, pm, async () => {
+    const w = await worlds(page)
+    const active = to === 'city' ? w.city : w.warehouse
+    return active === 'active'
+  })
+  expect(ok, `${want} is active after the button tap`).toBe(true)
+  // The 120 ms fade out + 150 ms fade in / 16 px drop (§5.3).
+  await pm.settle(24)
+}
+
+test.describe('M2 warehouse smoke', () => {
+  test('warehouse: desk in slot 1, fits 393×659 and 360×604, forced flag → Hold Bay + badge 1, Toss', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(M1_URL)
+    await pm.freeze()
+    // Opening A (policy): a bike + the Metal detector at t = 0; parcels
+    // run through the lane well before 60 s. Then the policy stops, so the
+    // forced flag stays in the Hold Bay (it Tosses every flag next tick).
+    await pm.advance(60_000)
+    await pm.settle(10)
+    await policyOff(page)
+
+    // City → Warehouse by a real tap on the HUD button.
+    await switchView(page, pm, 'warehouse')
+    const lane = await page.evaluate(() => {
+      const api = window.__pm!
+      const nodes = api.sim.lane.nodes()
+      const slot1 = nodes.find((n) => n.id === 'slot1')
+      const wh = api.game.scene.getScene('Warehouse') as unknown as {
+        lane: {
+          fixtureImage(
+            id: string,
+          ): { visible: boolean; frame: { name: string } } | null
+        }
+      }
+      const img = wh.lane.fixtureImage('slot1')
+      const fx = slot1?.fixture ?? null
+      return {
+        nodes: nodes.map((n) => n.id),
+        slot1: fx?.kind ?? null,
+        inspectors: fx?.kind === 'desk' ? fx.inspectorIds.length : 0,
+        deskFrame: img?.frame.name ?? null,
+        deskVisible: img?.visible ?? false,
+      }
+    })
+    console.log(`smoke: warehouse lane ${JSON.stringify(lane)}`)
+    for (const id of ['dock1', 'conv1', 'slot1', 'slot2', 'slot3', 'hold'])
+      expect(lane.nodes).toContain(id)
+    expect(lane.slot1, 'slot 1 holds the pre-hired desk').toBe('desk')
+    expect(lane.inspectors).toBeGreaterThanOrEqual(1)
+    expect(lane.deskFrame ?? '').toMatch(/desk/)
+    expect(lane.deskVisible).toBe(true)
+    expectRoomFits(await roomFit(page), 'W=393 H=659')
+
+    // Back in the city, a forced flag lands in the Hold Bay → badge 1.
+    await switchView(page, pm, 'city')
+    await page.evaluate(() => window.__pm!.sim.debug!.forceFlagNext('metal'))
+    const held = await page.evaluate(() =>
+      window.__pm!.waitEvent('parcel:held'),
+    )
+    console.log(`smoke: forced flag ${JSON.stringify(held)}`)
+    expect(held.ok, 'the forced flag is held within 60 s').toBe(true)
+    await pm.settle(4)
+    expect(await page.evaluate(() => window.__pm!.sim.holdBay.count)).toBe(1)
+    expect(await warehouseBadge(page)).toBe('1')
+
+    // Warehouse → tap bay 1 → the Hold Bay card → TOSS (real taps).
+    await switchView(page, pm, 'warehouse')
+    await pm.settle(40) // the divert into the bay
+    await tapRoomRect(page, pm, bayRect(0))
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'hold',
+      ),
+      'the Hold Bay card opens',
+    ).toBe(true)
+    await pm.settle(16) // the 150 ms tap guard + the slide-in
+    const q0 = await page.evaluate(() => window.__pm!.sim.quarantine.count)
+    await tapTarget(page, pm, 'Warehouse', 'hold:toss')
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () =>
+          (await page.evaluate(() => window.__pm!.sim.holdBay.count)) === 0,
+      ),
+      'TOSS empties the bay',
+    ).toBe(true)
+    const q1 = await page.evaluate(() => window.__pm!.sim.quarantine)
+    console.log(`smoke: after Toss quarantine ${JSON.stringify(q1)}`)
+    expect(q1.count).toBe(q0 + 1)
+    expect(await openSheet(page)).toBeNull()
+
+    // pm:goto {warehouse, highlight} while already here (the lost-life
+    // card's Open warehouse) opens the BuySheet on the first empty slot.
+    await page.evaluate(() =>
+      window.__pm!.game.events.emit('pm:goto', {
+        view: 'warehouse',
+        highlight: 'metal_detector',
+      }),
+    )
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'buy',
+      ),
+      'the highlight opens the BuySheet in the awake room',
+    ).toBe(true)
+    await page.keyboard.press('Escape')
+    expect(
+      await settleUntil(page, pm, async () => (await openSheet(page)) === null),
+      'Esc closes the BuySheet',
+    ).toBe(true)
+
+    // The 360×604 minimum viewport still fits (warehouse-view.md §1.1).
+    await page.setViewportSize({ width: 360, height: 604 })
+    expect(
+      await settleUntil(page, pm, async () => {
+        const f = await roomFit(page)
+        return f.W === 360 && f.H === 604
+      }),
+      'the game resized to 360×604',
+    ).toBe(true)
+    await pm.settle(4)
+    expectRoomFits(await roomFit(page), 'W=360 H=604')
 
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

@@ -92,6 +92,15 @@ describe('Shield popover (city-view §5.3, spec §6.3 readout)', () => {
     const rows = sp.strainRows(stats, vs.data)
     expect(rows).toHaveLength(1)
     expect(rows[0]?.text).toBe('metal 97%')
+    // The lane already holds the counter: no advert for it.
+    expect(stats.suggest?.owned).toBe(true)
+    expect(rows[0]?.counter).toBeNull()
+  })
+
+  it('the inspector alone reads metal 85% → Metal detector $150 from the live sim', () => {
+    const vs = createViewSim(makeSim(1))
+    const rows = sp.strainRows(vs.laneStats(), vs.data)
+    expect(rows[0]?.text).toBe('metal 85%')
     expect(rows[0]?.counter?.text).toBe('→ Metal detector $150')
   })
 })

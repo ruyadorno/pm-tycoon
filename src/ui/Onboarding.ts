@@ -7,19 +7,26 @@
 // autosave.ts writes it; the sim never sees it, so a reload never repeats a
 // step. `step` = the highest step completed (0 = none).
 //
-// M1 ships steps 1 (Garage, at a new game with no vehicle; clears on
-// vehicle:bought, no timeout) and 3 (rush, on the first parcel:pickedUp once
-// another building has waiting parcels; clears on building:rushed or 20 s).
-// HudScene shows step 3 only once such a building is on screen with room for
-// the card above it, and hides any card while a sheet, popover or dialog is
-// up (setSuppressed); an arrow that would land inside the card is dropped.
-// Step 2 (the warehouse hint) lands in M2 by adding it to ONBOARDING_STEPS
-// and STEP_TEXT; `stepEligible` already orders steps by that list.
+// Steps: 1 (Garage, at a new game with no vehicle; clears on vehicle:bought,
+// no timeout), 2 (warehouse, 3 s after the first vehicle:bought: the
+// detection hint computed from employees.json / machines.json and the §6.3
+// compounding — step2Text(); clears on pm:view warehouse or 45 s) and 3
+// (rush, on the first parcel:pickedUp once another building has waiting
+// parcels; clears on building:rushed or 20 s). HudScene shows step 3 only
+// once such a building is on screen with room for the card above it, and
+// hides any card while a sheet, popover or dialog is up or while it would
+// overlap the city's building tooltip (setSuppressed); an arrow that would
+// land inside the card is dropped.
+//
+// `wanted` (city-view §9.2, warehouse-view §5.1) is the run's list of
+// revealed malware labels (DEFUSED tosses and lost lives): addWanted()
+// appends, wantedByStrain() groups it for the warehouse's wanted poster.
 //
 // The class is plain (constructed by HudScene with the layout; HudScene
 // forwards the sim events, city-view §11.2). Phaser is a type-only import so
 // the model functions are unit-testable under Node.
 import type Phaser from 'phaser'
+import type { GameData, StrainId } from '../data/types.ts'
 import type { OnboardingSave } from '../sim/save.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import type { Layout, Rect } from './layout.ts'
@@ -28,8 +35,9 @@ import { addText, lineCount, LINE_H } from './text.ts'
 import { THEME } from './theme.ts'
 
 /** Steps implemented in this build, in tour order. */
-export const ONBOARDING_STEPS: readonly number[] = [1, 3]
+export const ONBOARDING_STEPS: readonly number[] = [1, 2, 3]
 
+/** Static step texts; step 2's is computed from the data (step2Text). */
 export const STEP_TEXT: Readonly<Record<number, string>> = {
   1: 'Buy a bike in the Garage to start delivering',
   3: 'Tap a building with waiting parcels to rush a vehicle there',
@@ -38,8 +46,12 @@ export const STEP_TEXT: Readonly<Record<number, string>> = {
 /** Auto-clear after this many ms of scene time (null = until its action). */
 export const STEP_TIMEOUT_MS: Readonly<Record<number, number | null>> = {
   1: null,
+  2: 45_000,
   3: 20_000,
 }
+
+/** Step 2 shows this long after the first vehicle:bought (city-view §9.1). */
+export const STEP2_DELAY_MS = 3_000
 
 export const ONBOARDING_W = 240
 export const ONBOARDING_PAD = 6
@@ -101,6 +113,123 @@ export function completeStep(s: OnboardingSave, step: number): OnboardingSave {
 export function skipTour(s: OnboardingSave): OnboardingSave {
   s.skipped = true
   return s
+}
+
+// ---- step 2: the detection hint (city-view §9.1, spec §6.3) ------------------
+
+export interface Step2Model {
+  /** The first announced strain (L1: metal). */
+  strain: StrainId
+  /** The inspector's catch chance vs that strain, 0..100. */
+  inspectorPct: number
+  /** The strain's counter machine (parcels.json strains[].counter). */
+  machineId: string
+  machineName: string
+  price: number
+  /** D(strain) for inspector + that machine (§6.3 series compounding), 0..100. */
+  lanePct: number
+}
+
+/** p(strain) of a checker row: pMatch on its strain (generalists: always), else pOther. */
+function rowP(
+  row: { strain: string; pMatch: number; pOther: number },
+  strain: string,
+): number {
+  return row.strain === 'any' || row.strain === strain ? row.pMatch : row.pOther
+}
+
+/**
+ * The numbers of step 2, never literals: the L1 strain, the inspector's
+ * catch chance (employees.json), its counter machine (parcels.json →
+ * machines.json) and the lane D(s) = 1 − Π(1 − p_i) with both (§6.3).
+ */
+export function step2Model(data: GameData): Step2Model | null {
+  const strains = data.parcels.malware.strains
+  const first = strains.find((s) => s.level <= 1) ?? strains[0]
+  if (!first) return null
+  const machine = data.machines.checkers.find((c) => c.id === first.counter)
+  if (!machine) return null
+  const pi = rowP(data.employees.inspector, first.id)
+  const pm = rowP(machine, first.id)
+  const d = 1 - (1 - pi) * (1 - pm)
+  return {
+    strain: first.id,
+    inspectorPct: Math.round(100 * pi),
+    machineId: machine.id,
+    machineName: machine.name,
+    price: machine.price,
+    lanePct: Math.round(100 * d),
+  }
+}
+
+/** `Your inspector catches 85% by hand. A Metal detector ($150) lifts the lane to 97%`. */
+export function step2Text(data: GameData): string {
+  const m = step2Model(data)
+  if (!m) return ''
+  return (
+    `Your inspector catches ${m.inspectorPct}% by hand. ` +
+    `A ${m.machineName} ($${m.price}) lifts the lane to ${m.lanePct}%`
+  )
+}
+
+// ---- the scripted first flag (city-view §9.2, spec §5.4) ----------------------
+
+/** The red 6-s toast on `parcel:flagged {scripted: true}`. */
+export function firstFlagText(lives: number): string {
+  return `A parcel flagged — Toss it. Lives: ${lives}`
+}
+
+/** The follow-up toast when the warehouse was not opened 10 s later. */
+export const FLAG_FOLLOW_TEXT =
+  'Parcels pile up while a flagged one waits — open the warehouse'
+
+/**
+ * The first flag of a run when it is not the scripted malware (UX M2 review:
+ * a decoy is flagged before the scripted parcel reaches the lane on most
+ * seeds, which left a cold player with only a pulsing button). Neutral on
+ * purpose: "Toss it" would be the wrong advice for a decoy.
+ */
+export const FIRST_FLAG_CITY_TEXT =
+  'A parcel was flagged — open the warehouse to Toss or Clear it'
+
+/** Shown on entering the warehouse through the flag funnel (or a flag there). */
+export const FIRST_FLAG_ROOM_TEXT =
+  'Flagged parcels wait in the Hold Bay — tap one to Toss or Clear it'
+
+/** The funnel toasts a Toss / the room hint replace (HUD). */
+export function isFlagFunnelText(text: string | null, lives: number): boolean {
+  return (
+    text === FLAG_FOLLOW_TEXT ||
+    text === FIRST_FLAG_CITY_TEXT ||
+    text === FIRST_FLAG_ROOM_TEXT ||
+    text === firstFlagText(lives)
+  )
+}
+
+// ---- wanted poster (city-view §9.2, warehouse-view §5.1) ----------------------
+
+/** Append a revealed malware label (deduped, in place); true when added. */
+export function addWanted(s: OnboardingSave, label: string): boolean {
+  if (!label || s.wanted.includes(label)) return false
+  s.wanted.push(label)
+  return true
+}
+
+/**
+ * The wanted list grouped by strain (puns.json malwareLabels), for the
+ * strains in `strains` (the announced ones), in that order; labels of other
+ * strains or unknown labels are left out. Empty groups are kept so the
+ * poster can show the strain icon with nothing under it.
+ */
+export function wantedByStrain(
+  wanted: readonly string[],
+  malwareLabels: Readonly<Partial<Record<StrainId, readonly string[]>>>,
+  strains: readonly StrainId[],
+): { strain: StrainId; labels: string[] }[] {
+  return strains.map((strain) => {
+    const known = malwareLabels[strain] ?? []
+    return { strain, labels: wanted.filter((w) => known.includes(w)) }
+  })
 }
 
 // ---- view ---------------------------------------------------------------------
@@ -184,13 +313,18 @@ export class Onboarding {
     return stepEligible(this.state, step)
   }
 
-  /** Show `step` (if eligible) with its arrow at `anchor()` (re-read every update). */
-  show(step: number, anchor: AnchorFn): boolean {
+  /**
+   * Show `step` (if eligible) with its arrow at `anchor()` (re-read every
+   * update). `text` overrides STEP_TEXT (step 2's computed hint).
+   */
+  show(step: number, anchor: AnchorFn, text?: string): boolean {
     if (!this.eligible(step) || this.active !== null) return false
+    const body = text ?? STEP_TEXT[step] ?? ''
+    if (!body) return false
     this.active = step
     this.anchor = anchor
     this.shownAt = this.scene.time.now
-    this.text.setText(STEP_TEXT[step] ?? '')
+    this.text.setText(body)
     this.fit()
     this.root.setVisible(!this.suppressed)
     this.place()
@@ -206,6 +340,17 @@ export class Onboarding {
     if (this.suppressed === on) return
     this.suppressed = on
     this.root.setVisible(this.active !== null && !on)
+  }
+
+  /** The card's screen rect while a step is active (shown or suppressed), else null. */
+  bounds(): Rect | null {
+    if (this.active === null) return null
+    return {
+      x: Math.round(this.panel.x),
+      y: Math.round(this.panel.y),
+      w: Math.round(this.panel.width),
+      h: Math.round(this.panel.height),
+    }
   }
 
   /** The step's action happened (or it timed out): mark it done and hide. */

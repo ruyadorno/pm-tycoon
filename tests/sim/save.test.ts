@@ -20,7 +20,8 @@ import {
   serialise,
 } from '../../src/sim/save.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
-import { TICKS_PER_DAY } from '../../src/sim/types.ts'
+import type { Command } from '../../src/sim/commands.ts'
+import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   collect,
@@ -29,6 +30,7 @@ import {
   openingA,
   runSeconds,
   runTicks,
+  runUntil,
 } from './helpers.ts'
 
 /** A game a little past its first day boundary, with commands in the log. */
@@ -151,6 +153,156 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(stateHash(loaded.state)).toBe(stateHash(live.state))
     expect(loaded.commandLog).toEqual(live.commandLog)
     expect(auditState(loaded.state, loaded.data)).toEqual([])
+  })
+
+  it('mid-lane M2 save (stations mid-process, a full Hold Bay and a stalled flag, a lost-life report, a pending debug flag) → JSON → load → 600 ticks = the uninterrupted run', () => {
+    const live = makeSim(6)
+    openingA(live)
+    live.dispatch({ kind: 'buyVehicle', type: 'bike' })
+    const vs = createViewSim(live, { debug: true })
+    expect(vs.debug?.forceMalwareDelivery()).toEqual({ ok: true })
+    runSeconds(live, 150)
+    expect(vs.debug?.fillHoldBay()).toEqual({ ok: true })
+    expect(vs.debug?.forceFlagNext('rattle')).toEqual({ ok: true })
+    // nobody tosses: the next flag waits in its slot
+    runUntil(live, () => live.state.lane.stallReason === 'holdBayFull', 6000)
+    expect(vs.debug?.forceFlagNext('battery')).toEqual({ ok: true })
+    const s = live.state
+    expect(vs.holdBay.count).toBe(vs.holdBay.cap)
+    expect(s.lane.stallReason).toBe('holdBayFull')
+    expect(s.lastLostLife?.path.length).toBeGreaterThan(3)
+    expect(s.lane.debugForceFlag).toBe('battery')
+    const loaded = Sim.load(
+      dataFixture(),
+      JSON.parse(JSON.stringify(live.snapshot())),
+    )
+    expect(loaded.state).toEqual(live.state)
+    for (const sim of [live, loaded]) {
+      runTicks(sim, 300)
+      const hold = sim.state.lane.nodes.find((n) => n.kind === 'holdBay')!
+      for (const id of hold.queue.slice()) {
+        sim.dispatch({ kind: 'toss', parcelId: id })
+      }
+      runTicks(sim, 300)
+    }
+    expect(stateHash(loaded.state)).toBe(stateHash(live.state))
+    expect(auditState(loaded.state, loaded.data)).toEqual([])
+  })
+
+  it('randomized player (Toss / Clear / move / remove / buy / hire / fire / sell / zones / rush) on 12 seeds: a JSON round trip mid-run (parcels mid-process, items in the Hold Bay) = the uninterrupted run, and seed + log replay to the same hash', () => {
+    let midProcess = 0
+    let heldAtSave = 0
+    for (let seed = 1; seed <= 12; seed++) {
+      let a = (seed * 2654435761) >>> 0
+      const r = (): number => {
+        a = (a + 0x6d2b79f5) >>> 0
+        let t = a
+        t = Math.imul(t ^ (t >>> 15), t | 1)
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+      const pick = <T>(xs: readonly T[]): T | undefined =>
+        xs[Math.floor(r() * xs.length)]
+      const live = makeSim(seed, { economy: { startMoney: 4000 } })
+      const slots = ['slot1', 'slot2', 'slot3']
+      const randomCommand = (): Command | null => {
+        const s = live.state
+        const held = laneNode(s.lane, 'hold')!.queue
+        const k = r()
+        if (k < 0.3 && held.length > 0) {
+          return { kind: r() < 0.7 ? 'toss' : 'clear', parcelId: pick(held)! }
+        }
+        if (k < 0.38)
+          return { kind: 'moveFixture', from: pick(slots)!, to: pick(slots)! }
+        if (k < 0.42) return { kind: 'removeFixture', nodeId: pick(slots)! }
+        if (k < 0.5)
+          return {
+            kind: 'buyMachine',
+            defId: 'metal_detector',
+            nodeId: pick(slots)!,
+          }
+        if (k < 0.54) return { kind: 'placeDesk', nodeId: pick(slots)! }
+        if (k < 0.62) return { kind: 'hireInspector' }
+        if (k < 0.66) {
+          const e = pick(s.employees.filter((x) => x.kind === 'inspector'))
+          return e ? { kind: 'fireInspector', employeeId: e.id } : null
+        }
+        if (k < 0.74)
+          return {
+            kind: 'buyVehicle',
+            type: pick(['bike', 'bike', 'van'] as const)!,
+          }
+        if (k < 0.78) {
+          const v = pick(s.vehicles)
+          return v ? { kind: 'sellVehicle', id: v.id } : null
+        }
+        if (k < 0.86) {
+          const v = pick(s.vehicles)
+          return v
+            ? {
+                kind: 'setZone',
+                id: v.id,
+                zone: pick(['any', 'highres', 'downtown'])!,
+              }
+            : null
+        }
+        const b = pick(
+          Object.values(s.buildings).filter((x) => x.waiting.length > 0),
+        )
+        return b ? { kind: 'rush', buildingId: b.id } : null
+      }
+      const end = 8 * TICKS_PER_DAY
+      let snap: string | null = null
+      for (let t = 0; t < end; t++) {
+        const s = live.state
+        if (snap === null && t >= 3 * TICKS_PER_DAY) {
+          const busy = s.lane.nodes.some((n) =>
+            n.stations.some(
+              (st) =>
+                st.parcelId !== null &&
+                st.doneTick !== null &&
+                st.doneTick > s.tick,
+            ),
+          )
+          const held = laneNode(s.lane, 'hold')!.queue.length > 0
+          if ((busy && held) || t >= 6 * TICKS_PER_DAY) {
+            snap = JSON.stringify(live.snapshot())
+            if (busy) midProcess += 1
+            if (held) heldAtSave += 1
+          }
+        }
+        if (r() < 0.05) {
+          const cmd = randomCommand()
+          if (cmd) live.dispatch(cmd)
+        }
+        live.tick()
+      }
+      expect(auditState(live.state, live.data), `seed ${seed}`).toEqual([])
+      // the reloaded game, fed the same commands at the same ticks
+      const loaded = Sim.load(
+        dataFixture({ economy: { startMoney: 4000 } }),
+        JSON.parse(snap!),
+      )
+      const from = loaded.state.tick
+      const rest = live.commandLog.filter((e) => e.tick >= from)
+      let i = 0
+      while (loaded.state.tick < end) {
+        while (i < rest.length && rest[i]!.tick === loaded.state.tick) {
+          loaded.dispatch(rest[i]!.cmd)
+          i += 1
+        }
+        loaded.tick()
+      }
+      expect(stateHash(loaded.state), `seed ${seed} reload`).toBe(
+        stateHash(live.state),
+      )
+      const again = replay(live.data, seed, live.commandLog, end)
+      expect(stateHash(again.state), `seed ${seed} replay`).toBe(
+        stateHash(live.state),
+      )
+    }
+    expect(midProcess).toBeGreaterThan(0)
+    expect(heldAtSave).toBeGreaterThan(0)
   })
 
   it('seed + data + commandLog replay to the same state', () => {

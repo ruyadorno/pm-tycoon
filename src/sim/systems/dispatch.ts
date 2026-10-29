@@ -576,7 +576,12 @@ function pickupAt(sim: Sim, v: Vehicle, buildingId: BuildingId): void {
     p.state = 'picked_up'
     p.reservedBy = null
     p.vehicleId = v.id
-    p.trace.push({ tick: s.tick, what: 'pickedUp', ref: String(v.id) })
+    p.trace.push({
+      tick: s.tick,
+      what: 'pickedUp',
+      ref: String(v.id),
+      text: `Picked up by ${v.name}`,
+    })
     picked.push(id)
   }
   for (const id of mine) take(id)
@@ -626,6 +631,7 @@ function dockArrive(sim: Sim, v: Vehicle): void {
   if (!dock) return
   v.state = 'docked_unloading'
   v.waitUntilTick = null
+  dock.stuckSinceTick = null
   dock.nextTransferTick =
     sim.state.tick + ticksFromS(1 / sim.data.vehicles.dockUnloadPerS)
   for (const id of v.cargo) {
@@ -687,11 +693,20 @@ export const LEG_HOOKS: LegHooks = {
 /**
  * §4.5 step 2, the `idle_lot` pass (vehicle id order): collectable parcels
  * in its zone → collecting; else an eligible shelf parcel → queued; else stay.
+ *
+ * Run decision Q-RUN1 (b), STALL PREFERENCE: while the lane is stalled on a
+ * full shelf the two checks swap — a vehicle that could load ≥ 1 shelf
+ * parcel re-queues (empty) to load before it goes collecting, so an empty
+ * van / truck docks, loads and drains the shelf (with (a), the dock yield in
+ * docks.ts, this ends the single-dock full-shelf deadlock).
  */
 export function idlePass(sim: Sim): void {
+  const lane = sim.state.lane
+  const drainShelf = lane.stalled && lane.stallReason === 'shelfFull'
   for (const v of sim.state.vehicles.slice()) {
     if (v.state !== 'idle_lot') continue
-    if (hasCollectable(sim, v)) startCollecting(sim, v)
+    if (drainShelf && shelfHasEligible(sim, v)) joinQueue(sim, v)
+    else if (hasCollectable(sim, v)) startCollecting(sim, v)
     else if (shelfHasEligible(sim, v)) joinQueue(sim, v)
   }
 }

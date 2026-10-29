@@ -7,7 +7,7 @@
   "satisfaction":{
     "start":60,"min":0,"max":100,"driftPerDayToward":50,"driftStep":1,
     "onTime":2,"favouredBonus":1,"favouredPickup":1,"positiveCapPerDay":4,"late":-3,
-    "waitingOver180s":-2,"waitingPenaltyCapPerDay":-6,"malwareDelivered":-20,"wrongToss":-3,
+    "waitingOver180s":-2,"waitingPenaltyAfterS":180,"waitingPenaltyCapPerDay":-6,"malwareDelivered":-20,"wrongToss":-3,
     "intervalMultAt0":1.5,"intervalMultAt50":1.0,"intervalMultAt100":0.6,
     "loudBelow":30,"happyAbove":80
   },

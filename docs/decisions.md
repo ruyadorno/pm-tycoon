@@ -24,6 +24,63 @@ overrules any line by number.
   `node:*` modules and `tsconfig.json` typechecks them; `types` is `["vite/client", "node"]`.
 - **vite 8 / rolldown** rejects the object form of `manualChunks`; the phaser chunk is split with the function form.
 
+- **This VM's global `~/.gitignore` ignores `*.md` and `CLAUDE.md`.** The repo `.gitignore` re-includes them (`!*.md`,
+  `!CLAUDE.md`) so the docs are tracked.
+
+## Run decisions on spec gaps (numbered Q-RUN; each also listed in the report's open questions)
+
+- **Q-RUN1 — single loading dock + full shelf deadlock** (found by the M1 sim review; spec §6.4/§6.8 make a full
+  shelf stall the lane, and with one dock nothing can load while the docked vehicle cannot unload into the full
+  conveyor). Three rules, all in `src/sim/systems/{docks,dispatch}.ts`; inbound parcels never skip a checker:
+  (a) **yield** — a `docked_unloading` vehicle blocked for ≥ `vehicles.dockIdleWaitS` while someone is queued leaves
+  the dock with its cargo and rejoins the back of the queue; (b) **stall preference** — while the lane is stalled with
+  `shelfFull`, the `idle_lot` pass prefers "re-queue to load" over "go collect", so an empty truck/van can dock and
+  drain the shelf; (c) **relief** — when the dock has been blocked ≥ `dockIdleWaitS` with the shelf at cap, the docked
+  vehicle could carry ≥ 1 shelf parcel and no empty vehicle that could is queued, the shelf accepts the lane's parcels
+  past its cap (as it accepts a sold vehicle's cargo, §4.1) until that vehicle has unloaded; it then loads as usual. A
+  randomized soak test (`tests/sim/dock-soak.test.ts`) asserts no deadlock. Default — confirm.
+- **Selling a vehicle with inbound cargo**: spec §4.1 says carried parcels return to the shelf; parcels that were
+  collected but not yet inspected now go to the dock conveyor instead (they pass the checkers like any inbound
+  parcel), only outbound cargo returns to the shelf — otherwise selling a vehicle let malware bypass every checker
+  (§6.4 "never wave through"). `src/sim/systems/vehicles.ts` sellVehicle.
+- **Q-RUN2 — `economy.satisfaction.waitingPenaltyAfterS = 180`** added (spec §9.1 "crosses 180 s"), so no threshold is
+  hard-coded in `satisfaction.ts`; validated by `schema.ts`.
+- **Retune (gate row `holdBayEventsPer10MinMin`, §7.6 order after values; plan Q-R2 levers):**
+  `parcels.malware.baseShare` 0.03 → 0.05 and `parcels.decoyShare` 0.10 → 0.20. At the spec values the L1 Hold Bay
+  density was ~4/10 min (< 6). A 40-seed study on the L1 window (~12 min): decoyShare 0.15 → median 6.67 with 18/40
+  seeds < 6; 0.20 → 7.50 with 13/40. Cost: ~2.5 more wrong tosses per 30 min under the Toss-everything policy.
+- **Wrong Toss of a same-district parcel** costs that district −3 once (origin and destination are the same
+  district), not twice. `src/sim/systems/holdbay.ts`. Default — confirm.
+- **Lost-life card rates come from the parcel's own rolls** (the lane as it was when this parcel passed), not the lane
+  at the moment of loss — otherwise a detector bought after the parcel passed showed "was 97%" next to "missed (85% vs
+  metal)". Cleared parcels keep the lane-now reading (their card leads with "Cleared by you").
+- **Generalist flags show no trait icon** (warehouse-view §1.5/§3.1 call for the flagging checker's trait icon): decoy
+  traits are uniform over all four strains (spec §5.4) while L1 malware is metal only, so a desk flag showing a
+  battery/dense/rattle icon would give the decoy away. Specialist machines show their own strain. `HoldBayCard`,
+  `LaneRenderer`.
+- **First-flag funnel**: city-view §9.2 ties the toast + arrow to the scripted malware only, but on many seeds the first
+  flag is a decoy minutes earlier; the first flag of a run now gets a neutral toast + the bouncing arrow + a room hint,
+  and the scripted malware keeps its red "Toss it. Lives: 3". `HudScene`, `Onboarding`.
+- **Busy checker = backpressure, not a stall**: `lane:stalled` fires for Hold Bay full / shelf full / a jammed buffer
+  only, never while a slot is merely busy processing — otherwise the red button and stall alarm flashed ~15×/min with
+  the desk behind a machine. The §7 policy rule "2nd inspector when the lane stalls > 10 s" is re-based on the dock
+  being blocked (M3).
+
+## View-level deviations (M1–M2)
+
+- `map.json lot.parking` re-ordered: the first parking tiles are the ones the warehouse sprite does not hide (+2.5 s on
+  the first delivery, still < 60 s median).
+- Top bar + ticker alpha 0.94 (city-view says 0.85: world labels read through it); Warehouse/Garage buttons up to 92 px
+  wide where W ≥ 393 (76 px left 1 px around the label).
+- Onboarding step 3 waits until a building with waiting parcels is on screen; onboarding cards hide while a sheet,
+  popover or dialog is up.
+- `sign_locked`/`sign_pop` 96×52 (city-view 48×32) so m5x7 "Unlocks at Lv N" + "Trucks only" fit.
+- Phaser 4.2.1 `TweenManager` reads `Date.now()`, so `__pm.freeze` drives tweens from the stepped delta
+  (phaser4-notes §10 says tweens follow the frozen clock — not true for 4.2.1).
+- Toasts in the warehouse sit on the room's north wall (L.toast covered the lane readout at 360×604).
+- Lost-life card, counterOwned branch: "This one got through on the 3%" (city-view's "Your lane was at 97% — …" repeated
+  the line above it).
+
 ## Runtime dependencies
 
 - `phaser@4.2.1` — the engine (MIT). ~1.2 MB min / ~0.3 MB gz in its own chunk.

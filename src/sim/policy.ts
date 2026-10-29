@@ -11,7 +11,9 @@
 //     (SIM_FEATURES.levels — no-op until M3, the level never moves before);
 //   a 2nd (then 3rd) inspector when the lane stalled > stallHireS in the
 //     current day, one hire per day (SIM_FEATURES.payroll — M3);
-//   Toss every flag on the tick it is held (SIM_FEATURES.lane — M2);
+//   Toss every flag on the tick it is held (SIM_FEATURES.lane, M2): the
+//     step before the next tick tosses every parcel in the Hold Bay, so a
+//     Hold Bay stall never builds under the policy;
 //   home zones stay `any`.
 // Prices come from src/data; the buffer and the counts are the policy's own
 // parameters (spec §7 wording), not balance numbers.

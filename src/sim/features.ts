@@ -1,14 +1,15 @@
-// Which later-milestone systems the sim runs (plan.md §12.4-§12.6). M1 ships
+// Which later-milestone systems the sim runs (plan.md §12.4-§12.6). M1 shipped
 // the city loop with a pass-through lane; the flags flip as the milestones
-// land: `lane` (checkers roll, flagged parcels divert to the Hold Bay) and
-// `lives` (malware delivered costs a life) in M2, `levels` (level-ups,
-// region unlocks, lane growth) and `payroll` (paydays, walkouts) in M3.
+// land: `lane` (checkers roll, flagged parcels divert to the Hold Bay; the
+// policy Tosses) and `lives` (malware delivered costs a life) are on since
+// M2, `levels` (level-ups, region unlocks, lane growth) and `payroll`
+// (paydays, walkouts) come in M3.
 // tools/sim/report.ts reads the same flags so a gate window whose system is
 // not built yet prints as informational instead of failing.
 
 export const SIM_FEATURES = {
-  lane: false,
-  lives: false,
+  lane: true,
+  lives: true,
   levels: false,
   payroll: false,
 }

@@ -3,8 +3,9 @@
 //   on-time delivery +onTime (destination), by the favoured vehicle
 //   +favouredBonus, pickup by the favoured vehicle +favouredPickup (origin) —
 //   the positive rows, capped together at +positiveCapPerDay per district per
-//   in-game day; late −late; a waiting parcel crossing the threshold unpicked
-//   −waitingOver180s, capped at waitingPenaltyCapPerDay per district per day;
+//   in-game day; late −late; a waiting parcel crossing waitingPenaltyAfterS
+//   unpicked −waitingOver180s, capped at waitingPenaltyCapPerDay per district
+//   per day;
 //   malware delivered −malwareDelivered; drift driftStep per day toward
 //   driftPerDayToward. Clamped to [min, max]. m(s) of §9.3 scales the spawn
 //   interval; the HUD mood is the mean of live districts (types.ts).
@@ -12,14 +13,7 @@
 import type { Sim } from '../sim.ts'
 import { districtDef } from '../map.ts'
 import type { DistrictId } from '../types.ts'
-import { TICKS_PER_S } from '../types.ts'
-
-/**
- * The §9.1 waiting-pickup threshold. economy.json carries it only in the key
- * name `waitingOver180s` (no seconds field); kept here as the one named
- * constant until the table grows a `waitingThresholdS` key (reported).
- */
-export const WAITING_PENALTY_AFTER_S = 180
+import { ticksFromS } from '../types.ts'
 
 export type SatisfactionKind = 'positive' | 'waiting' | 'other'
 
@@ -79,13 +73,15 @@ export function changeSatisfaction(
 
 /**
  * Tick step 9 (plan.md §6.4): every parcel still waiting at its origin
- * (reserved or not — it is unpicked) crossing the threshold this tick costs
+ * (reserved or not — it is unpicked) crossing waitingPenaltyAfterS
+ * (economy.json, run decision Q-RUN2) this tick costs
  * the origin district the capped penalty. Each parcel crosses exactly once.
  */
 export function waitingStep(sim: Sim): void {
   const s = sim.state
-  const threshold = WAITING_PENALTY_AFTER_S * TICKS_PER_S
-  const delta = sim.data.economy.satisfaction.waitingOver180s
+  const c = sim.data.economy.satisfaction
+  const threshold = ticksFromS(c.waitingPenaltyAfterS)
+  const delta = c.waitingOver180s
   for (const b of sim.data.buildings) {
     const waiting = s.buildings[b.id]?.waiting
     if (!waiting || waiting.length === 0) continue

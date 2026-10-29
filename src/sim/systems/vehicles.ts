@@ -14,7 +14,7 @@
 
 import type { VehicleTypeDef } from '../../data/types.ts'
 import { sellRefund } from './economy.ts'
-import { returnToShelf } from './lane.ts'
+import { returnToConveyor, returnToShelf } from './lane.ts'
 import { mapIndex, sameTile, unitsOf, vehicleTypeDef } from '../map.ts'
 import type { Sim } from '../sim.ts'
 import type { Heading, TileXY, Vehicle } from '../types.ts'
@@ -264,23 +264,33 @@ export function leaveDockBay(sim: Sim, v: Vehicle): void {
   if (dock && dock.vehicleId === v.id) {
     dock.vehicleId = null
     dock.nextTransferTick = null
+    dock.stuckSinceTick = null
+    delete dock.relief
   }
   v.dockId = null
 }
 
 // Sell (§4.1; buy is commands.ts createVehicle + parkingTile) ----------------------
 
+/** Cargo not yet through the lane (§11 picked_up → in_transit_in → unloading). */
+const INBOUND = new Set(['picked_up', 'in_transit_in', 'unloading'])
+
 /**
- * §4.1 Sell, from any state: carried parcels return to the shelf (past cap),
- * reservations and its rush go back to the pool, a docked vehicle frees its
- * dock at once, a queued one leaves the queue, the driver leaves the payroll,
- * then the sellRefund × price refund and vehicle:sold.
+ * §4.1 Sell, from any state: carried parcels return to the warehouse past
+ * cap — outbound ones (§11 loaded / in_transit_out) to the shelf, inbound
+ * ones to the dock conveyor so they still pass every checker (§6.4, M2
+ * review: the shelf would wave a malware parcel through) — reservations and
+ * its rush go back to the pool, a docked vehicle frees its dock at once, a
+ * queued one leaves the queue, the driver leaves the payroll, then the
+ * sellRefund × price refund and vehicle:sold.
  */
 export function sellVehicle(sim: Sim, v: Vehicle): void {
   const s = sim.state
   for (const id of v.cargo) {
     const p = s.parcels[String(id)]
-    if (p) returnToShelf(sim, p)
+    if (!p) continue
+    if (INBOUND.has(p.state)) returnToConveyor(sim, p, v.dockId, v.name)
+    else returnToShelf(sim, p)
   }
   v.cargo = []
   v.unitsUsed = 0

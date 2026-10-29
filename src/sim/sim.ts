@@ -401,6 +401,7 @@ function buildStartLane(data: GameData, L1: LevelDef): Lane {
         vehicleId: null,
         nextTransferTick: null,
         busyTicksThisDay: 0,
+        stuckSinceTick: null,
       },
     ],
     slotNodeIds: slotIds,
@@ -541,8 +542,22 @@ export function auditState(state: SimState, data: GameData): string[] {
     if (n.dockId !== null && !dockIds.includes(n.dockId)) {
       add(`lane.${n.id}.dockId: unknown dock ${n.dockId}`)
     }
+    // A slot's buffer may sit above its cap by the parcels a fixture change
+    // sent back from its stations (lane.ts reseat, Q31) — at most a full
+    // desk; a conveyor by a sold vehicle's inbound cargo (vehicles.ts
+    // sellVehicle) — at most the largest vehicle's capacity in parcels.
+    const biggest = Math.max(
+      0,
+      ...data.vehicles.types.map((t) => t.capacityUnits),
+    )
+    const slack =
+      n.kind === 'slot'
+        ? data.employees.inspector.maxPerDesk
+        : n.kind === 'conveyor'
+          ? biggest
+          : 0
     const capped = n.kind === 'conveyor' || n.kind === 'slot'
-    if (capped && n.cap !== null && n.queue.length > n.cap) {
+    if (capped && n.cap !== null && n.queue.length > n.cap + slack) {
       add(`lane.${n.id}: ${n.queue.length} queued > cap ${n.cap}`)
     }
     if (n.kind === 'holdBay' && n.cap !== null && n.queue.length > n.cap) {

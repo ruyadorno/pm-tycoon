@@ -227,6 +227,8 @@ export interface SatisfactionDef {
   positiveCapPerDay: number
   late: number
   waitingOver180s: number
+  /** Seconds a parcel waits unpicked before the waitingOver180s penalty (spec §9.1 "crosses 180 s"). */
+  waitingPenaltyAfterS: number
   waitingPenaltyCapPerDay: number
   malwareDelivered: number
   wrongToss: number

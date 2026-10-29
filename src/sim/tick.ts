@@ -49,19 +49,19 @@ export function dispatch(sim: Sim, _ctx: TickContext): void {
 /** 4. prev ← pos, movement, headings, wheel, 1.5 s stops, pickups, deliveries, hand-offs, lot entrance → queued. */
 export function vehicles(sim: Sim, _ctx: TickContext): void {
   // Arrivals and stop ends run the §4.6 leg logic (dispatch.ts LEG_HOOKS);
-  // deliveries pay through economy.ts (TODO(M2): life:lost on malware).
+  // deliveries pay through economy.ts (malware: $0 + life:lost, §10).
   vehiclesStep(sim, LEG_HOOKS)
 }
 
-/** 5. Dock queue → free dock, unload / outbound set / load, idle wait, depart, busyTicksThisDay. */
+/** 5. Dock queue → free dock, unload / outbound set / load, idle wait, the Q-RUN1 yield, depart, busyTicksThisDay. */
 export function docks(sim: Sim, _ctx: TickContext): void {
   docksStep(sim)
 }
 
 /** 6. Conveyor → slots → Hold Bay / shelf, process timers, rolls, stalls. */
 export function lane(sim: Sim, _ctx: TickContext): void {
-  // M1: pass-through slots + shelf cap + stalls; TODO(M2, SIM_FEATURES.lane):
-  // checkers + detection.ts rolls, Hold Bay divert.
+  // Stations + process timers, one detection.ts roll per parcel on exit,
+  // flagged → Hold Bay, stall root (systems/lane.ts).
   laneStep(sim)
 }
 
@@ -108,7 +108,8 @@ export function day(sim: Sim, ctx: TickContext): void {
   }
   const last = s.lastLostLife
   const incidentToday = last !== null && last.tick > s.tick - TICKS_PER_DAY
-  // A life:lost resets daysSinceIncident to 0 (M2, lives); a clean day adds 1.
+  // A life:lost resets daysSinceIncident to 0 (economy.ts loseLife); a clean
+  // day adds 1.
   if (!incidentToday) s.economy.daysSinceIncident += 1
   sim.emit('day:ended', { day: s.day })
   s.stats.minutes.push(buildMinuteRow(sim))

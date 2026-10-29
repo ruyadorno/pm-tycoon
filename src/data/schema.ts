@@ -359,6 +359,7 @@ const satisfactionKeys = [
   'positiveCapPerDay',
   'late',
   'waitingOver180s',
+  'waitingPenaltyAfterS',
   'waitingPenaltyCapPerDay',
   'malwareDelivered',
   'wrongToss',
@@ -891,6 +892,11 @@ function crossCheck(d: Tables, out: Problems): void {
   const sat = eco.satisfaction
   if (!(sat.min <= sat.start && sat.start <= sat.max && sat.min < sat.max))
     bad('economy.satisfaction', 'expected min <= start <= max')
+  if (!(sat.waitingPenaltyAfterS > 0))
+    bad(
+      'economy.satisfaction.waitingPenaltyAfterS',
+      `expected a positive number of seconds, got ${sat.waitingPenaltyAfterS}`,
+    )
   if (eco.lives.start > eco.lives.cap)
     bad('economy.lives.start', `exceeds cap ${eco.lives.cap}`)
 

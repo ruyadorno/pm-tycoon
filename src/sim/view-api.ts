@@ -1,19 +1,24 @@
 // The ViewSim facade (plan.md §5): the only object scenes touch. Read-only
 // fields and queries derive from sim.state; every command builds a Command
 // and goes through Sim.dispatch, returning its result. Nothing here mutates
-// state directly. Readouts the state cannot back yet return documented
-// placeholders (see `debug`).
+// state directly (the `debug` helpers are commands too, so replays stay
+// exact). The pure §6.3 readouts live in detection.ts and are re-exported
+// here with their M0 signatures.
 
-import type { BuildingDef, GameData, MapData, StrainId } from '../data/types.ts'
+import type { BuildingDef, GameData, MapData } from '../data/types.ts'
 import type { CommandResult } from './commands.ts'
+import {
+  announcedStrains,
+  laneCatchRate,
+  laneRatePerMin,
+  machineChecker,
+} from './detection.ts'
 import type { SimEmitter, StallReason } from './events.ts'
 import type { Sim } from './sim.ts'
 import type {
   Building,
   BuildingId,
-  Checker,
   DistrictId,
-  Lane,
   LaneNode,
   LoadingDock,
   Parcel,
@@ -27,13 +32,20 @@ import type {
 } from './types.ts'
 import {
   laneNode,
-  liveSlotIds,
   meanSatisfaction,
   TICKS_PER_DAY,
   TICKS_PER_S,
   ticksFromS,
 } from './types.ts'
 import { paidValue } from './value.ts'
+
+export {
+  activeCheckers,
+  activeStrains,
+  checkerP,
+  laneCatchRate,
+  laneRatePerMin,
+} from './detection.ts'
 
 /** What the city view reads per frame (city-view.md §2). */
 export interface VehicleSnapshot {
@@ -107,10 +119,24 @@ export interface StrainDetection {
 
 export interface LaneStats {
   ratePerMin: number
-  /** round(100 × mean over active strains of D(s)). */
+  /** round(100 × mean over announced strains of D(s)). */
   detectionPct: number
   byStrain: { strain: Strain; pct: number; counter: string }[]
   stalled: { reason: StallReason; nodeId: string } | null
+  /**
+   * ADDITION (M2): the counter machine for the weakest announced strain
+   * (spec §6.3 "tap → per-strain list with the counter machine suggested for
+   * the weakest strain"): its strain and current %, the machine
+   * (parcels.json strains[].counter), whether the lane already holds one,
+   * and the % with one more of it. Null with no announced strain.
+   */
+  suggest: {
+    strain: Strain
+    pct: number
+    counter: string
+    owned: boolean
+    withCounterPct: number
+  } | null
 }
 
 export interface PayrollView {
@@ -122,9 +148,24 @@ export interface PayrollView {
   drivers: number
 }
 
+/** One Hold Bay item (bay = 0-based rack position, lowest first). */
+export interface HoldBayItem {
+  parcelId: number
+  bay: number
+  /** ADDITION (M2): the trait it was flagged on (parcel.flaggedStrain). */
+  strain: Strain | null
+  /**
+   * ADDITION (M2): the flagging checker's name ("Metal detector",
+   * "Inspection desk") and the slot it flagged in, from the parcel's
+   * 'flagged' trace entry — still right after the fixture moved or left.
+   */
+  checkerName: string | null
+  nodeId: string | null
+}
+
 export interface HoldBayView {
   /** bay = 0-based rack position (index in the Hold Bay queue, lowest first). */
-  readonly items: readonly { parcelId: number; bay: number }[]
+  readonly items: readonly HoldBayItem[]
   readonly cap: number
   readonly count: number
   toss(parcelId: number): CommandResult
@@ -147,7 +188,13 @@ export interface LaneView {
   rehire(employeeId: number): CommandResult
 }
 
-/** Debug-build helpers for shots/tests; placeholders until M2 (always {ok:false,'locked'}). */
+/**
+ * Debug-build helpers for shots / tests (each dispatches a debug command):
+ * forceFlagNext — the next checker roll flags its parcel on `strain`;
+ * fillHoldBay — every free bay gets a freshly flagged parcel (malware and
+ * decoys in turn), so the next flag stalls the lane; forceMalwareDelivery —
+ * a malware parcel is delivered now (life:lost with a full card payload).
+ */
 export interface ViewSimDebug {
   forceFlagNext(strain: Strain): CommandResult
   fillHoldBay(): CommandResult
@@ -210,58 +257,6 @@ export interface ViewSim {
 
 export interface ViewSimOptions {
   debug?: boolean
-}
-
-// Pure §6.3 readouts (reused by the lost-life card / detection.ts in M2) ------
-
-/** p(strain) of one checker: pMatch on its strain (generalists: always), else pOther. */
-export function checkerP(c: Checker, strain: Strain): number {
-  return c.strain === 'any' || c.strain === strain ? c.pMatch : c.pOther
-}
-
-/** Live slots whose fixture has ≥ 1 station (a desk with no inspector passes parcels through). */
-export function activeCheckers(lane: Lane): { node: LaneNode; c: Checker }[] {
-  const out: { node: LaneNode; c: Checker }[] = []
-  for (const id of liveSlotIds(lane)) {
-    const node = laneNode(lane, id)
-    if (node?.fixture && node.stations.length > 0) {
-      out.push({ node, c: node.fixture.checker })
-    }
-  }
-  return out
-}
-
-/** D(s) = 1 − Π(1 − p_i(s)) over the active checkers (+ `extra`, for "what if"). */
-export function laneCatchRate(
-  lane: Lane,
-  strain: Strain,
-  extra: readonly Checker[] = [],
-): number {
-  let miss = 1
-  for (const { c } of activeCheckers(lane)) miss *= 1 - checkerP(c, strain)
-  for (const c of extra) miss *= 1 - checkerP(c, strain)
-  return 1 - miss
-}
-
-/** Strains whose level ≤ the company level, in parcels.json order. */
-export function activeStrains(data: GameData, level: number): StrainId[] {
-  return data.parcels.malware.strains
-    .filter((s) => s.level <= level)
-    .map((s) => s.id)
-}
-
-/**
- * Lane rate in parcels/min (spec §6.3): min over active checkers of
- * stations / processS, capped by the loading docks (dockUnloadPerS each).
- */
-export function laneRatePerMin(lane: Lane, data: GameData): number {
-  const dockCap = lane.docks.length * data.vehicles.dockUnloadPerS * 60
-  let rate = dockCap
-  for (const { node, c } of activeCheckers(lane)) {
-    const perMin = (node.stations.length * 60 * TICKS_PER_S) / c.processTicks
-    rate = Math.min(rate, perMin)
-  }
-  return rate
 }
 
 // The facade ----------------------------------------------------------------------
@@ -335,7 +330,7 @@ export function createViewSim(
   }
   const detection = (): StrainDetection[] => {
     const sim = get()
-    return activeStrains(sim.data, sim.state.level.level).map((strain) => ({
+    return announcedStrains(sim.state, sim.data).map((strain) => ({
       strain,
       d: laneCatchRate(sim.state.lane, strain),
       counter:
@@ -346,8 +341,21 @@ export function createViewSim(
 
   const holdBay: HoldBayView = {
     get items() {
-      const q = node(st().lane.holdBayNodeId)?.queue ?? []
-      return q.map((parcelId, bay) => ({ parcelId, bay }))
+      const s = st()
+      const q = node(s.lane.holdBayNodeId)?.queue ?? []
+      return q.map((parcelId, bay): HoldBayItem => {
+        const p = s.parcels[String(parcelId)]
+        const flagged = p?.trace.findLast((t) => t.what === 'flagged')
+        // "Slot 1 Metal detector: flagged (metal)" → "Metal detector"
+        const m = /^Slot \d+ (.+): flagged/.exec(flagged?.text ?? '')
+        return {
+          parcelId,
+          bay,
+          strain: p?.flaggedStrain ?? null,
+          checkerName: m?.[1] ?? null,
+          nodeId: flagged?.ref ?? null,
+        }
+      })
     },
     get cap() {
       return node(st().lane.holdBayNodeId)?.cap ?? st().level.holdBayCap
@@ -375,13 +383,11 @@ export function createViewSim(
     rehire: (employeeId) => run({ kind: 'rehire', employeeId }),
   }
 
-  const locked: CommandResult = { ok: false, reason: 'locked' }
   const debug: ViewSimDebug | null = opts.debug
     ? {
-        // TODO(M2): force the next checker roll / fill the Hold Bay / deliver malware.
-        forceFlagNext: () => locked,
-        fillHoldBay: () => locked,
-        forceMalwareDelivery: () => locked,
+        forceFlagNext: (strain) => run({ kind: 'debugForceFlag', strain }),
+        fillHoldBay: () => run({ kind: 'debugFillHoldBay' }),
+        forceMalwareDelivery: () => run({ kind: 'debugMalwareDelivery' }),
       }
     : null
 
@@ -552,11 +558,37 @@ export function createViewSim(
       return meanSatisfaction(st(), get().data)
     },
     laneStats() {
+      const sim = get()
       const byStrain = detection()
       const mean =
         byStrain.length === 0
           ? 0
           : byStrain.reduce((sum, x) => sum + x.d, 0) / byStrain.length
+      // The weakest strain (first on ties, parcels.json order) and its counter.
+      const weakest = byStrain.reduce<StrainDetection | null>(
+        (w, x) => (w === null || x.d < w.d ? x : w),
+        null,
+      )
+      const def = weakest
+        ? sim.data.machines.checkers.find((c) => c.id === weakest.counter)
+        : undefined
+      const suggest =
+        weakest && def
+          ? {
+              strain: weakest.strain,
+              pct: Math.round(100 * weakest.d),
+              counter: weakest.counter,
+              owned: sim.state.lane.nodes.some(
+                (n) => !n.locked && n.fixture?.checker.defId === def.id,
+              ),
+              withCounterPct: Math.round(
+                100 *
+                  laneCatchRate(sim.state.lane, weakest.strain, [
+                    machineChecker(def, `counter:${def.id}`, sim.state.tick),
+                  ]),
+              ),
+            }
+          : null
       return {
         ratePerMin: Math.round(lane.rate()),
         detectionPct: Math.round(100 * mean),
@@ -566,6 +598,7 @@ export function createViewSim(
           counter: x.counter,
         })),
         stalled: stalled(),
+        suggest,
       }
     },
     payroll() {

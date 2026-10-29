@@ -5,8 +5,11 @@
 // Handlers marked TODO(Mn) validate what they can and return 'locked' until
 // that milestone wires them to src/sim/systems/*.ts. A handler that changes
 // state while reporting a failure marks it `applied` (logged for replay).
+// The three `debug*` kinds back ViewSim.debug (debug builds only; logged
+// like any command, so __pm.replay stays exact).
 
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
+import { machineChecker } from './detection.ts'
 import type { Sim } from './sim.ts'
 import type {
   BuildingId,
@@ -15,6 +18,7 @@ import type {
   Fixture,
   LaneNode,
   SimState,
+  Strain,
   Tick,
   Vehicle,
   VehicleType,
@@ -22,6 +26,19 @@ import type {
 } from './types.ts'
 import { laneNode, ticksFromS } from './types.ts'
 import { applyRush } from './systems/dispatch.ts'
+import { debugMalwareDelivery } from './systems/economy.ts'
+import {
+  clearParcel,
+  debugFillHoldBay,
+  isHeld,
+  tossParcel,
+} from './systems/holdbay.ts'
+import {
+  fireInspector,
+  moveFixture,
+  placeFixture,
+  removeFixture,
+} from './systems/lane.ts'
 import { parkingTile, sellVehicle } from './systems/vehicles.ts'
 
 export type Command =
@@ -43,6 +60,12 @@ export type Command =
   | { kind: 'continueWithOneLife' }
   /** build 2 */
   | { kind: 'acceptQuest'; questId: string }
+  /** Debug builds (ViewSim.debug.forceFlagNext): the next checker roll flags on `strain`. */
+  | { kind: 'debugForceFlag'; strain: Strain }
+  /** Debug builds (ViewSim.debug.fillHoldBay): fill every free bay with flagged parcels. */
+  | { kind: 'debugFillHoldBay' }
+  /** Debug builds (ViewSim.debug.forceMalwareDelivery): deliver a malware parcel now (a life). */
+  | { kind: 'debugMalwareDelivery' }
 
 export type CommandKind = Command['kind']
 export type CommandOf<K extends CommandKind> = Extract<Command, { kind: K }>
@@ -108,6 +131,9 @@ const FIELDS: { [K in CommandKind]: Record<string, FieldType> } = {
   buyDock: { index: 'int' },
   continueWithOneLife: {},
   acceptQuest: { questId: 'string' },
+  debugForceFlag: { strain: 'string' },
+  debugFillHoldBay: {},
+  debugMalwareDelivery: {},
 }
 
 /** Structural check for commands arriving from outside TS (__pm.dispatch, replays). */
@@ -197,20 +223,12 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     if (sim.state.economy.balance < def.price) {
       return fail('insufficient-funds')
     }
-    const checker: Checker = {
-      id: nextCheckerId(sim.state),
-      kind: 'machine',
-      defId: def.id,
-      strain: def.strain,
-      pMatch: def.pMatch,
-      pOther: def.pOther,
-      decoyFlag: def.decoyFlag,
-      processTicks: ticksFromS(def.processS),
-      stations: 1,
-      price: def.price,
-      boughtTick: sim.state.tick,
-    }
-    placeFixture(node, { kind: 'machine', checker })
+    const checker: Checker = machineChecker(
+      def,
+      nextCheckerId(sim.state),
+      sim.state.tick,
+    )
+    placeFixture(sim, node, { kind: 'machine', checker })
     sim.debit(def.price, 'purchase')
     sim.emit('lane:fixturePlaced', {
       nodeId: node.id,
@@ -226,7 +244,7 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     if (typeof node === 'string') return fail(node)
     const price = sim.data.employees.deskPrice
     if (sim.state.economy.balance < price) return fail('insufficient-funds')
-    placeFixture(node, {
+    placeFixture(sim, node, {
       kind: 'desk',
       checker: deskChecker(sim.state, sim.data, 0),
       inspectorIds: [],
@@ -248,17 +266,25 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     }
     if (from.locked || to.locked) return fail('slot-locked')
     if (!from.fixture || from.id === to.id) return fail('invalid')
-    // TODO(M2): systems/lane.ts move/swap (warehouse-view.md Q-W2/Q-W3:
-    // a mid-process parcel restarts under the new fixture), lane:fixtureMoved.
-    return fail('locked')
+    // Free (§6.2); an occupied target swaps (Q30); parcels stay and re-seat (Q31).
+    const swapped = moveFixture(sim, from, to)
+    sim.emit('lane:fixtureMoved', { from: from.id, to: to.id, swapped })
+    return OK
   },
 
   removeFixture(sim, cmd) {
     const node = laneNode(sim.state.lane, cmd.nodeId)
     if (!node || node.kind !== 'slot' || !node.fixture) return fail('invalid')
-    // TODO(M2): systems/lane.ts remove (refund removalRefund × price for a
-    // machine; a desk's inspectors walk out), lane:fixtureRemoved.
-    return fail('locked')
+    // A machine refunds removalRefund × its price (§7.2, Q11); a desk is
+    // free and its inspectors leave without refund (§6.2).
+    const f = removeFixture(sim, node)
+    const refund =
+      f?.kind === 'machine'
+        ? Math.round(f.checker.price * sim.data.machines.removalRefund)
+        : 0
+    if (refund > 0) sim.credit(refund, 'refund', false)
+    sim.emit('lane:fixtureRemoved', { nodeId: node.id, refund })
+    return OK
   },
 
   hireInspector(sim) {
@@ -289,9 +315,14 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   fireInspector(sim, cmd) {
     const e = sim.state.employees.find((x) => x.id === cmd.employeeId)
     if (!e || e.kind !== 'inspector' || !e.active) return fail('invalid')
-    // TODO(M2): systems/lane.ts fire (station −1; a parcel in that station
-    // goes back to the buffer head), worker:fired.
-    return fail('locked')
+    const node = sim.state.lane.nodes.find(
+      (n) =>
+        n.fixture?.kind === 'desk' && n.fixture.inspectorIds.includes(e.id),
+    )
+    if (!node) return fail('invalid')
+    // §6.7: instant, no refund; the desk loses a station.
+    fireInspector(sim, node, e.id)
+    return OK
   },
 
   rehire(sim, cmd) {
@@ -303,17 +334,17 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   },
 
   toss(sim, cmd) {
-    if (!isHeld(sim, cmd.parcelId)) return fail('invalid')
-    // TODO(M2): Hold Bay Toss (§6.6): bin, bounty or wrongTossFee + −3 ×2
-    // districts, quarantine counters, parcel:tossed.
-    return fail('locked')
+    const p = sim.state.parcels[String(cmd.parcelId)]
+    if (!p || !isHeld(sim, cmd.parcelId)) return fail('invalid')
+    tossParcel(sim, p) // §6.6: bounty, or the fee + satisfaction
+    return OK
   },
 
   clear(sim, cmd) {
-    if (!isHeld(sim, cmd.parcelId)) return fail('invalid')
-    // TODO(M2): Hold Bay Clear (§6.6): → shelf skipping slots, 'shelf-full'
-    // at cap (Q-W15), parcel:cleared_by_player.
-    return fail('locked')
+    const p = sim.state.parcels[String(cmd.parcelId)]
+    if (!p || !isHeld(sim, cmd.parcelId)) return fail('invalid')
+    const refused = clearParcel(sim, p) // §6.6: → shelf; Q35 'shelf-full'
+    return refused === null ? OK : fail(refused)
   },
 
   buyDock() {
@@ -333,6 +364,24 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   acceptQuest() {
     // build 2: quests (spec §5.5, §8 ultimate quest).
     return fail('locked')
+  },
+
+  debugForceFlag(sim, cmd) {
+    const known = sim.data.parcels.malware.strains.some(
+      (x) => x.id === cmd.strain,
+    )
+    if (!known) return fail('invalid')
+    sim.state.lane.debugForceFlag = cmd.strain
+    return OK
+  },
+
+  debugFillHoldBay(sim) {
+    return debugFillHoldBay(sim) > 0 ? OK : fail('invalid')
+  },
+
+  debugMalwareDelivery(sim) {
+    debugMalwareDelivery(sim)
+    return OK
   },
 }
 
@@ -354,19 +403,6 @@ function slotTarget(
   if (node.locked) return 'slot-locked'
   if (node.fixture) return 'slot-occupied'
   return node
-}
-
-function placeFixture(node: LaneNode, fixture: Fixture): void {
-  node.fixture = fixture
-  node.stations = Array.from({ length: fixture.checker.stations }, () => ({
-    parcelId: null,
-    doneTick: null,
-  }))
-}
-
-function isHeld(sim: Sim, parcelId: number): boolean {
-  const p = sim.state.parcels[String(parcelId)]
-  return p !== undefined && p.state === 'held'
 }
 
 /** 'chk<n>' from nextId.checker. */

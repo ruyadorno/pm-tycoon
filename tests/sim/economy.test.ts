@@ -11,6 +11,7 @@ import {
   dataFixture,
   injectParcel,
   makeSim,
+  noCheckers,
   quietSim,
   runUntil,
 } from './helpers.ts'
@@ -62,7 +63,7 @@ describe('economy (spec §7)', () => {
   })
 
   it('malware delivered pays $0: nothing toward the balance or lifetime earned', () => {
-    const sim = quietSim(1)
+    const sim = noCheckers(quietSim(1)) // nothing in the lane to catch it
     buy(sim, 'bike')
     const before = sim.state.economy.balance
     injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe', { malware: true })
@@ -72,7 +73,7 @@ describe('economy (spec §7)', () => {
     expect(sim.state.economy.balance).toBe(before)
     expect(sim.state.economy.lifetimeEarned).toBe(0)
     expect(sim.state.stats.malwareMissed).toBe(1)
-    expect(sim.state.economy.lives).toBe(data.economy.lives.start) // life loss: M2
+    expect(sim.state.economy.lives).toBe(data.economy.lives.start - 1) // §10, lives.test.ts
   })
 
   it('selling refunds sellRefund × price as `refund`; lifetime earned never decreases', () => {

@@ -174,13 +174,36 @@ export type ParcelState =
   | 'clearing'
   | 'cleared'
 
-/** One hop of a parcel's history, for the lost-life card path (§10). */
+/**
+ * One hop of a parcel's history, for the lost-life card path (§10). `what`:
+ * 'spawned' (ref building), 'pickedUp' (vehicle id), 'unloaded' (dock id),
+ * one slot result per slot passed — 'empty' | 'passed' | 'missed' |
+ * 'flagged' | 'skipped' (ref node id; M2) — 'held' / 'cleared' / 'tossed'
+ * (Hold Bay), 'shelved' / 'returned' (shelf), 'loaded' (vehicle id),
+ * 'delivered' (building). M1 saves may still hold 'slot' (entered a slot).
+ */
 export interface TraceEntry {
   tick: Tick
-  /** e.g. 'spawned', 'pickedUp', 'unloaded', 'slot', 'missed', 'shelved', 'delivered'. */
   what: string
   /** A building / vehicle / node / checker id as a string, or null. */
   ref: string | null
+  /**
+   * ADDITION (M2): the card line without its time, e.g. "Picked up by Bike 1",
+   * "Slot 1 Metal detector: missed (15% vs rattle)", "Slot 2: empty". Stored
+   * when the hop happens if it depends on something that may change later
+   * (vehicle names, the fixture in a slot); always present on the life:lost
+   * path (detection.ts fills the rest from the static tables).
+   */
+  text?: string
+  /**
+   * ADDITION (M2 review): on a slot result that rolled ('passed' / 'missed'
+   * / 'flagged'), the Checker.id — so a checker never rolls the same parcel
+   * twice (e.g. a desk moved downstream of a parcel it already checked) —
+   * and, for a malware parcel, that checker's p vs its strain: the
+   * lost-life card's lane rate is the D this parcel actually faced (§10).
+   */
+  chk?: string
+  p?: number
 }
 
 export interface Parcel {
@@ -292,6 +315,22 @@ export interface LoadingDock {
   nextTransferTick: Tick | null
   /** Ticks with a vehicle in the dock this day → dock:occupancy (§6.5). */
   busyTicksThisDay: number
+  /**
+   * ADDITION (M2, run decision Q-RUN1): first tick of the current run of
+   * due-but-blocked unloads (the conveyor full); null while unloading flows
+   * or nobody is docked. A docked_unloading vehicle blocked for
+   * ≥ vehicles.dockIdleWaitS while another vehicle is queued yields the dock.
+   */
+  stuckSinceTick: Tick | null
+  /**
+   * ADDITION (M2 review, run decision Q-RUN1 (c), RELIEF): set while the
+   * docked_unloading vehicle — blocked ≥ dockIdleWaitS by a full shelf and
+   * able to carry ≥ 1 shelf parcel — unloads with the shelf accepting the
+   * lane's parcels past its cap (as it accepts a sold vehicle's cargo,
+   * §6.8); deleted when that vehicle finishes unloading or leaves the dock.
+   * Absent otherwise (and in older saves).
+   */
+  relief?: true
 }
 
 export interface Lane {
@@ -311,6 +350,12 @@ export interface Lane {
   sorterArm: boolean
   /** ADDITION to §6.4: the FIFO dock queue on the lot (vehicle ids, index 0 docks next, §4.3). */
   dockQueue: number[]
+  /**
+   * ADDITION (M2, debug builds): the next checker roll flags its parcel on
+   * this trait whatever it carries (ViewSim debug.forceFlagNext). Absent
+   * normally; deleted once used.
+   */
+  debugForceFlag?: Strain
 }
 
 export interface Employee {

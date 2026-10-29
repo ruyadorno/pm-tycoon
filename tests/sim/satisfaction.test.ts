@@ -8,7 +8,6 @@ import type { Sim } from '../../src/sim/sim.ts'
 import {
   changeSatisfaction,
   spawnMultiplier,
-  WAITING_PENALTY_AFTER_S,
 } from '../../src/sim/systems/satisfaction.ts'
 import { meanSatisfaction, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
@@ -17,6 +16,7 @@ import {
   collect,
   dataFixture,
   injectParcel,
+  noCheckers,
   quietSim,
   runTicks,
   runUntil,
@@ -34,6 +34,7 @@ function deliverOne(
   opts: Parameters<typeof injectParcel>[3] = {},
 ) {
   const sim = quietSim(1)
+  if (opts.malware) noCheckers(sim) // nothing in the lane to catch it
   sim.state.tick = 100 // inside day 1, clear of the boundary
   buy(sim, 'bike')
   const p = injectParcel(sim, origin, dest, opts)
@@ -107,7 +108,7 @@ describe('satisfaction deltas (spec §9.1)', () => {
     const ids = ['hr_towers_a', 'hr_towers_b', 'hr_async_arms', 'hr_daycare']
     for (const id of ids)
       injectParcel(sim, id, 'dt_cache_cafe', { spawnedTick: 100 })
-    const crossAt = 100 + WAITING_PENALTY_AFTER_S * 10
+    const crossAt = 100 + data.economy.satisfaction.waitingPenaltyAfterS * 10
     runTicks(sim, crossAt - 1)
     const before = sat(sim, 'highres')
     const events = collect(sim, 'satisfaction:changed')

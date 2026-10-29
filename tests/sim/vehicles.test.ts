@@ -1,12 +1,14 @@
 // spec §4.1-§4.2, §4.6 vehicles: every state transition fires its enter
 // event, movement along cached paths at class speed with prev/pos, headings
 // and the wheel frame, 1.5 s stops, buy on a free parking tile, the last
-// vehicle unsellable, sell from any state returning cargo to the shelf past
-// cap and freeing dock / queue / reservations / driver.
+// vehicle unsellable, sell from any state returning cargo past cap (inbound
+// onto the dock conveyor, outbound to the shelf) and freeing dock / queue /
+// reservations / driver.
 
 import { describe, expect, it } from 'vitest'
 import type { SimEventName } from '../../src/sim/events.ts'
 import type { Sim } from '../../src/sim/sim.ts'
+import { auditState } from '../../src/sim/sim.ts'
 import { MILLI } from '../../src/sim/systems/vehicles.ts'
 import { laneNode } from '../../src/sim/types.ts'
 import type { VehicleState } from '../../src/sim/types.ts'
@@ -226,36 +228,92 @@ describe('buy / sell (spec §4.1)', () => {
     })
   })
 
-  it('sell returns carried parcels to the shelf even past cap, frees the dock and reservations, removes the driver', () => {
+  it('sell returns carried parcels past cap — inbound ones onto the dock conveyor (§6.4: never waved through), outbound ones to the shelf — frees the dock and reservations, removes the driver', () => {
     const sim = quietSim(1)
     const a = buy(sim, 'bike')
     buy(sim, 'bike')
     const shelf = laneNode(sim.state.lane, 'shelf')!
+    const conv = laneNode(sim.state.lane, 'conv1')!
     for (let i = 0; i < shelf.cap!; i++)
       shelveParcel(sim, 'dt_cache_cafe', 'dt_bundle_boutique', { size: 'L' })
-    const p1 = injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    const p1 = injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe', {
+      malware: true,
+    })
     const p2 = injectParcel(sim, 'hr_towers_a', 'dt_registry_tower')
     const picked = collect(sim, 'parcel:pickedUp')
     runUntil(sim, () => picked.length === 2)
+    while (conv.queue.length < conv.cap!) {
+      const q = injectParcel(sim, 'dt_cache_cafe', 'hr_towers_b')
+      const b = sim.state.buildings.dt_cache_cafe!
+      b.waiting.splice(b.waiting.indexOf(q.id), 1)
+      conv.queue.push(q.id)
+      q.state = 'in_conveyor'
+      q.nodeId = conv.id
+    }
+    // an outbound parcel aboard too (loaded at the dock earlier)
+    const out = shelveParcel(sim, 'hr_towers_b', 'dt_peer_plaza')
+    shelf.queue.pop()
+    const va = vehicleById(sim, a.id)
+    va.cargo.push(out.id)
+    va.unitsUsed += 1
+    Object.assign(out, {
+      state: 'in_transit_out',
+      nodeId: null,
+      vehicleId: a.id,
+    })
     // a third parcel reserved by the same bike elsewhere
     const p3 = injectParcel(sim, 'hr_towers_b', 'dt_cache_cafe')
     p3.reservedBy = a.id
-    vehicleById(sim, a.id).reserved.push(p3.id)
+    va.reserved.push(p3.id)
     const returned = collect(sim, 'parcel:returned')
+    const unloaded = collect(sim, 'parcel:unloaded')
     const sold = collect(sim, 'vehicle:sold')
     expect(sim.dispatch({ kind: 'sellVehicle', id: a.id })).toEqual({
       ok: true,
     })
-    expect(returned.map((r) => r.id)).toEqual([p1.id, p2.id])
-    expect(shelf.queue.length).toBe(shelf.cap! + 2)
-    expect(sim.state.parcels[String(p1.id)]).toMatchObject({
+    expect(returned.map((r) => r.id)).toEqual([out.id])
+    expect(shelf.queue.length).toBe(shelf.cap! + 1)
+    expect(sim.state.parcels[String(out.id)]).toMatchObject({
       state: 'on_shelf',
       vehicleId: null,
+    })
+    expect(unloaded).toEqual([
+      { id: p1.id, dockId: 'dock1' },
+      { id: p2.id, dockId: 'dock1' },
+    ])
+    expect(conv.queue.length).toBe(conv.cap! + 2)
+    expect(sim.state.parcels[String(p1.id)]).toMatchObject({
+      state: 'in_conveyor',
+      vehicleId: null,
+    })
+    expect(sim.state.parcels[String(p1.id)]?.trace.at(-1)).toMatchObject({
+      what: 'unloaded',
+      text: 'Unloaded (Bike 1 sold)',
     })
     expect(sim.state.parcels[String(p3.id)]?.reservedBy).toBeNull()
     expect(sold).toEqual([{ id: a.id }])
     expect(sim.state.vehicles.map((v) => v.id)).not.toContain(a.id)
     expect(sim.state.employees.some((e) => e.vehicleId === a.id)).toBe(false)
+    expect(auditState(sim.state, data)).toEqual([])
+    // the malware parcel still meets the desk: it never reaches the shelf unchecked
+    const flagged = collect(sim, 'parcel:flagged')
+    const shelved = collect(sim, 'parcel:shelved')
+    shelf.cap = 1000
+    runUntil(
+      sim,
+      () =>
+        sim.state.parcels[String(p1.id)]?.state !== 'in_conveyor' &&
+        sim.state.parcels[String(p1.id)]?.state !== 'in_slot',
+      3000,
+    )
+    const p1Now = sim.state.parcels[String(p1.id)]!
+    expect(
+      p1Now.trace.some((t) => t.ref === 'slot1' && t.chk !== undefined),
+    ).toBe(true)
+    expect(
+      flagged.some((f) => f.id === p1.id) ||
+        shelved.some((x) => x.id === p1.id),
+    ).toBe(true)
   })
 
   it('selling a docked vehicle frees the dock at once; selling a queued one leaves the queue', () => {

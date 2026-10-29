@@ -214,3 +214,108 @@ export function eventLog(
   })
   return out
 }
+
+// M2 lane helpers ------------------------------------------------------------------
+
+/** Take every fixture out of the lane (all slots pass through; no checker). */
+export function noCheckers(sim: Sim): Sim {
+  for (const n of sim.state.lane.nodes) {
+    if (n.kind === 'slot' && n.fixture) {
+      const res = sim.dispatch({ kind: 'removeFixture', nodeId: n.id })
+      if (!res.ok) throw new Error(`noCheckers: ${n.id} ${res.reason}`)
+    }
+  }
+  return sim
+}
+
+/** Buy a machine into a slot (topping the balance up and the level gate first). */
+export function placeMachine(sim: Sim, defId: string, nodeId: string): void {
+  const def = sim.data.machines.checkers.find((c) => c.id === defId)
+  if (!def) throw new Error(`no machine ${defId}`)
+  if (def.unlockLevel > sim.state.level.level) {
+    sim.state.level.level = def.unlockLevel
+  }
+  const node = laneNode(sim.state.lane, nodeId)
+  if (node?.locked) delete node.locked
+  sim.state.economy.balance = Math.max(sim.state.economy.balance, def.price)
+  const res = sim.dispatch({ kind: 'buyMachine', defId, nodeId })
+  if (!res.ok)
+    throw new Error(`placeMachine ${defId} → ${nodeId}: ${res.reason}`)
+}
+
+export interface LaneParcelOptions extends InjectOptions {
+  decoy?: Parcel['decoy']
+  strain?: Parcel['strain']
+  /** The §5.4 forced catch: the first checker flags it with certainty. */
+  scripted?: boolean
+  magic?: boolean
+}
+
+/**
+ * A parcel put straight into a lane node's queue (a conveyor or a slot
+ * buffer), as if it had been unloaded; `in_conveyor` / `in_slot`.
+ */
+export function laneParcel(
+  sim: Sim,
+  nodeId: string,
+  opts: LaneParcelOptions = {},
+  origin: BuildingId = 'hr_towers_a',
+  dest: BuildingId = 'dt_cache_cafe',
+): Parcel {
+  const p = injectParcel(sim, origin, dest, opts)
+  const b = sim.state.buildings[origin] as { waiting: number[] }
+  b.waiting.splice(b.waiting.indexOf(p.id), 1)
+  if (opts.strain !== undefined) p.strain = opts.strain
+  if (opts.decoy !== undefined) p.decoy = opts.decoy
+  if (opts.scripted) p.scripted = true
+  if (opts.magic) p.magic = true
+  const node = laneNode(sim.state.lane, nodeId)
+  if (!node) throw new Error(`no node ${nodeId}`)
+  node.queue.push(p.id)
+  p.nodeId = node.id
+  p.nodeEnterTick = sim.state.tick
+  p.state = node.kind === 'slot' ? 'in_slot' : 'in_conveyor'
+  return p
+}
+
+/**
+ * A flagged parcel put straight into the Hold Bay (`held`), flagged by the
+ * first active checker (or 'test').
+ */
+export function heldParcel(
+  sim: Sim,
+  opts: LaneParcelOptions = {},
+  origin: BuildingId = 'hr_towers_a',
+  dest: BuildingId = 'dt_cache_cafe',
+): Parcel {
+  const p = laneParcel(sim, 'conv1', opts, origin, dest)
+  const conv = laneNode(sim.state.lane, 'conv1') as { queue: number[] }
+  conv.queue.splice(conv.queue.indexOf(p.id), 1)
+  const hold = laneNode(sim.state.lane, sim.state.lane.holdBayNodeId)
+  if (!hold) throw new Error('no Hold Bay')
+  hold.queue.push(p.id)
+  p.state = 'held'
+  p.nodeId = hold.id
+  p.flaggedBy =
+    sim.state.lane.nodes.find((n) => n.fixture)?.fixture?.checker.id ?? 'test'
+  p.flaggedStrain = p.strain ?? p.decoy ?? 'metal'
+  return p
+}
+
+/** Keep conv1 topped up with fresh clean parcels until `total` have been fed. */
+export function feeder(
+  sim: Sim,
+  total: number,
+  opts: LaneParcelOptions = {},
+): () => number {
+  let fed = 0
+  return () => {
+    const conv = laneNode(sim.state.lane, 'conv1')
+    const room = conv ? (conv.cap ?? 0) - conv.queue.length : 0
+    for (let i = 0; i < room && fed < total; i++) {
+      laneParcel(sim, 'conv1', opts)
+      fed += 1
+    }
+    return fed
+  }
+}

@@ -164,6 +164,14 @@ export class Highlights {
         const f = e.fixture as { checker?: { defId?: string } } | undefined
         return `${at} placed ${f?.checker?.defId ?? 'fixture'} in ${e.nodeId}`
       }
+      case 'lane:fixtureMoved':
+        return `${at} ${e.swapped ? 'swapped' : 'moved'} ${e.from} → ${e.to}`
+      case 'lane:fixtureRemoved':
+        return `${at} removed the fixture in ${e.nodeId} (+$${e.refund})`
+      case 'parcel:cleared_by_player':
+        return this.#first('clearedByPlayer')
+          ? `${at} first parcel cleared by the player #${e.id}`
+          : null
       case 'worker:hired':
       case 'worker:walkedOut':
       case 'worker:fired': {
@@ -207,6 +215,10 @@ export interface RunMetrics {
   holdBayEventsPer10MinL1: number | null
   /** Hold Bay arrivals per 10 min over the whole run (informational). */
   holdBayEventsPer10Min: number
+  /** ADDITION (M2): flag time of the scripted first malware (§5.4), or null. */
+  scriptedCaughtS: number | null
+  /** ADDITION (M2): clean parcels tossed (wrong Tosses) over the run. */
+  wrongTosses: number
   /** Malware share at the end of the run (informational; at 30 min in the gate). */
   malwareShareAtEnd: number
   level3Min: number | null
@@ -310,6 +322,9 @@ export function computeMetrics(
   const truck = stats.truckTick
   const last = rows.at(-1)
   const delivered = firstTick((e) => e.name === 'parcel:delivered')
+  const scripted = firstTick(
+    (e) => e.name === 'parcel:flagged' && e.scripted === true,
+  )
   return {
     seed,
     minutes,
@@ -324,6 +339,10 @@ export function computeMetrics(
       l1End <= 0 ? null : round((heldL1 * 10 * TICKS_PER_DAY) / l1End, 2),
     holdBayEventsPer10Min:
       minutes <= 0 ? 0 : round((held.length * 10) / minutes, 2),
+    scriptedCaughtS: scripted === null ? null : scripted / TICKS_PER_S,
+    wrongTosses: events.filter(
+      (e) => e.name === 'parcel:tossed' && e.wasMalware === false,
+    ).length,
     malwareShareAtEnd: last ? last.malShare : 0,
     level3Min: toMin(levelTick(3)),
     level4Min: toMin(levelTick(4)),
@@ -423,6 +442,8 @@ export function median(values: readonly (number | null)[]): number | null {
 
 export interface MedianMetrics extends GateInputs {
   holdBayEventsPer10Min: number | null
+  scriptedCaughtS: number | null
+  wrongTosses: number | null
   malwareShareAtEnd: number | null
   level3Min: number | null
   level4Min: number | null
@@ -442,6 +463,8 @@ export function medianMetrics(runs: readonly RunMetrics[]): MedianMetrics {
     shelfStallS: pick('shelfStallS'),
     holdBayEventsPer10MinL1: pick('holdBayEventsPer10MinL1'),
     holdBayEventsPer10Min: pick('holdBayEventsPer10Min'),
+    scriptedCaughtS: pick('scriptedCaughtS'),
+    wrongTosses: pick('wrongTosses'),
     malwareShareAtEnd: pick('malwareShareAtEnd'),
     level3Min: pick('level3Min'),
     level4Min: pick('level4Min'),
@@ -520,6 +543,18 @@ export function summarise(
       note: 'informational',
     },
     {
+      key: 'scriptedCaughtS',
+      target: 'flag time of the scripted malware',
+      median: medians.scriptedCaughtS,
+      note: 'informational',
+    },
+    {
+      key: 'wrongTosses',
+      target: 'clean parcels tossed (Toss-everything)',
+      median: medians.wrongTosses,
+      note: 'informational',
+    },
+    {
       key: 'malwareShareAt30Min',
       target: `share at ${meta.minutes} min`,
       median: medians.malwareShareAtEnd,
@@ -580,6 +615,8 @@ const GATE_COLS: readonly {
     cell: (m) => num(m.holdBayEventsPer10MinL1, 2),
   },
   { head: 'hold/10m', w: 8, cell: (m) => num(m.holdBayEventsPer10Min, 2) },
+  { head: 'script_s', w: 8, cell: (m) => num(m.scriptedCaughtS) },
+  { head: 'wrong', w: 5, cell: (m) => num(m.wrongTosses, 0) },
   {
     head: 'mal@end',
     w: 7,

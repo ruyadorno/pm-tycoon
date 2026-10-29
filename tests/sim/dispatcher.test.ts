@@ -12,6 +12,7 @@ import {
   outboundSet,
   pickCollectTarget,
 } from '../../src/sim/systems/dispatch.ts'
+import { auditState, Sim, stateHash } from '../../src/sim/sim.ts'
 import { joinQueue, originTile } from '../../src/sim/systems/vehicles.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import {
@@ -19,7 +20,9 @@ import {
   collect,
   dataFixture,
   injectParcel,
+  laneParcel,
   makeSim,
+  noCheckers,
   quietSim,
   runTicks,
   runUntil,
@@ -255,18 +258,19 @@ describe('§4.5 step 2 — the idle pass, and the dock idle wait (§4.6)', () =>
     expect(sim.state.lane.docks[0]?.vehicleId).toBe(b.id)
   })
 
-  // KNOWN SPEC GAP (sim review, reported to the orchestrator): §4.6 claims
-  // "with one dock and two bikes the cycle cannot deadlock", but §6.4 / §1
-  // ("Stall") make a docked vehicle keep waiting while the conveyor is full,
-  // and only a docked vehicle that finished unloading may load (§4.6
-  // docked_loading, "never interleaved"). Once the shelf is at cap with
-  // parcels nobody loads (all bikes zoned to one district at L1; Industrial
-  // parcels without a truck at L2) the conveyor fills, the docked vehicle can
-  // never finish unloading, nobody can load, and the shelf never drains —
-  // permanently, even after the player fixes the zones (or buys a truck,
-  // which queues behind it). Every fix contradicts one of those sentences, so
-  // it needs a design call; un-skip this once one lands.
-  it.skip('§4.6 one dock cannot deadlock: a full shelf never strands the docked vehicle once the fleet can carry the shelf again', () => {
+  // Run decision Q-RUN1 (the single-dock deadlock of the M1 review): once the
+  // shelf is at cap with parcels nobody loads, the conveyor fills, the docked
+  // vehicle cannot unload and — "never interleaved" (§4.6) — nobody could
+  // load. (a) YIELD: a docked vehicle whose unloads stay blocked for
+  // dockIdleWaitS while ≥ 1 vehicle is queued leaves the dock with its cargo
+  // for the back of the queue; (b) STALL PREFERENCE: during a shelfFull stall
+  // an idle vehicle that could load a shelf parcel queues to load before it
+  // goes collecting. Recovery needs a vehicle that is free to load: when every
+  // vehicle holds inbound cargo the yield only rotates them (inbound parcels
+  // never skip the checkers), so "once the fleet can carry the shelf again"
+  // means a free vehicle that can carry it — here a new bike after the zones
+  // are opened again.
+  it('§4.6 / Q-RUN1 one dock cannot deadlock: a full shelf never strands the docked vehicle once the fleet can carry the shelf again', () => {
     const sim = makeSim(2)
     const bikes = [buy(sim, 'bike'), buy(sim, 'bike'), buy(sim, 'bike')]
     for (const b of bikes) {
@@ -279,14 +283,278 @@ describe('§4.5 step 2 — the idle pass, and the dock idle wait (§4.6)', () =>
       sim.state.lane.stallReason === 'shelfFull' &&
       conv.queue.length === conv.cap &&
       sim.state.vehicles.some((v) => v.state === 'docked_unloading')
-    expect(runUntil(sim, stuck, 600 * 30)).toBeGreaterThan(0)
+    // The player Tosses every flag (a Hold Bay stall is the other way to jam).
+    const tossing = (pred: () => boolean, max: number): number => {
+      for (let i = 1; i <= max; i++) {
+        const hold = laneNode(sim.state.lane, 'hold')!
+        for (const id of hold.queue.slice()) {
+          sim.dispatch({ kind: 'toss', parcelId: id })
+        }
+        sim.tick()
+        if (pred()) return i
+      }
+      return -1
+    }
+    expect(tossing(stuck, 600 * 30)).toBeGreaterThan(0)
     for (const b of bikes) {
       sim.dispatch({ kind: 'setZone', id: b.id, zone: 'any' })
     }
+    buy(sim, 'bike') // a free vehicle that can carry the shelf
     const before = sim.state.stats.deliveries
-    runTicks(sim, 600 * 5)
-    expect(sim.state.stats.deliveries).toBeGreaterThan(before)
-    expect(sim.state.lane.stalled).toBe(false)
+    let stalledTicks = 0
+    tossing(() => {
+      if (sim.state.lane.stallReason === 'shelfFull') stalledTicks += 1
+      return false
+    }, 600 * 5)
+    expect(sim.state.stats.deliveries).toBeGreaterThan(before + 30)
+    expect(stalledTicks).toBeLessThan(600 * 2) // drained within 2 minutes
+    expect(sim.state.lane.stallReason).not.toBe('shelfFull')
+    expect(auditState(sim.state, data)).toEqual([])
+  })
+
+  it('Q-RUN1 (c) relief: the M1 review jam (highres bikes, then every zone → any, nobody empty, no vehicle bought) recovers — the shelf takes the lane past its cap only while a docked bike that can carry a shelf parcel unloads', () => {
+    for (const seed of [2, 3, 5]) {
+      const sim = makeSim(seed)
+      const bikes = [buy(sim, 'bike'), buy(sim, 'bike'), buy(sim, 'bike')]
+      for (const b of bikes) {
+        sim.dispatch({ kind: 'setZone', id: b.id, zone: 'highres' })
+      }
+      const shelf = laneNode(sim.state.lane, 'shelf')!
+      const conv = laneNode(sim.state.lane, 'conv1')!
+      const toss = (): void => {
+        for (const id of laneNode(sim.state.lane, 'hold')!.queue.slice()) {
+          sim.dispatch({ kind: 'toss', parcelId: id })
+        }
+      }
+      let jam = false
+      for (let t = 0; t < 600 * 30 && !jam; t++) {
+        toss()
+        sim.tick()
+        jam =
+          sim.state.lane.stallReason === 'shelfFull' &&
+          conv.queue.length === conv.cap &&
+          sim.state.vehicles.some((v) => v.state === 'docked_unloading')
+      }
+      expect(jam, `seed ${seed} jams`).toBe(true)
+      for (const b of bikes) {
+        sim.dispatch({ kind: 'setZone', id: b.id, zone: 'any' })
+      }
+      expect(
+        sim.state.vehicles.every(
+          (v) => v.cargo.length > 0 || v.state === 'collecting',
+        ),
+      ).toBe(true)
+      const before = sim.state.stats.deliveries
+      let over = 0
+      let reliefTicks = 0
+      let snap: string | null = null
+      for (let t = 0; t < 600 * 10; t++) {
+        toss()
+        sim.tick()
+        over = Math.max(over, shelf.queue.length - shelf.cap!)
+        if (sim.state.lane.docks[0]!.relief) {
+          reliefTicks += 1
+          snap ??= JSON.stringify(sim.snapshot()) // a save mid-relief
+        }
+        if (shelf.queue.length > shelf.cap!) {
+          // past the cap only during a relief or while its vehicle loads
+          const v = sim.state.vehicles.find(
+            (x) => x.id === sim.state.lane.docks[0]!.vehicleId,
+          )
+          expect(
+            sim.state.lane.docks[0]!.relief === true ||
+              v?.state === 'docked_loading' ||
+              v?.state === 'docked_unloading' ||
+              sim.state.lane.stallReason === 'shelfFull',
+          ).toBe(true)
+        }
+      }
+      expect(reliefTicks).toBeGreaterThan(0)
+      expect(
+        sim.state.stats.deliveries - before,
+        `seed ${seed}`,
+      ).toBeGreaterThan(60)
+      expect(shelf.queue.length).toBeLessThan(shelf.cap!)
+      expect(over).toBeLessThanOrEqual(6 + 3 * (2 + 1) + 4) // the lane + one bike
+      expect(auditState(sim.state, data)).toEqual([])
+      // the relief round-trips through a save: same game afterwards
+      const loaded = Sim.load(data, JSON.parse(snap!))
+      expect(loaded.state.lane.docks[0]!.relief).toBe(true)
+      while (loaded.state.tick < sim.state.tick) {
+        for (const id of laneNode(loaded.state.lane, 'hold')!.queue.slice()) {
+          loaded.dispatch({ kind: 'toss', parcelId: id })
+        }
+        loaded.tick()
+      }
+      expect(stateHash(loaded.state)).toBe(stateHash(sim.state))
+    }
+  })
+
+  it('Q-RUN1 (c) relief needs a docked vehicle that can carry a shelf parcel: a full shelf nobody can carry keeps the lane stalled (the player must act) and the shelf at its cap', () => {
+    const sim = quietSim(3)
+    unlockDistrict(sim, 'industrial')
+    const shelf = laneNode(sim.state.lane, 'shelf')!
+    for (let i = 0; i < shelf.cap!; i++) {
+      shelveParcel(sim, 'hr_towers_a', 'in_lodash_smelting')
+    }
+    const bike = buy(sim, 'bike')
+    for (const b of ['hr_towers_b', 'hr_async_arms']) {
+      injectParcel(sim, b, 'dt_cache_cafe')
+      injectParcel(sim, b, 'dt_cache_cafe')
+    }
+    for (const id of ['slot3', 'slot2', 'slot1']) {
+      laneParcel(sim, id)
+      laneParcel(sim, id)
+    }
+    for (let i = 0; i < 6; i++) laneParcel(sim, 'conv1')
+    runUntil(
+      sim,
+      () => vehicleById(sim, bike.id).state === 'docked_unloading',
+      3000,
+    )
+    runTicks(sim, 600)
+    expect(vehicleById(sim, bike.id).state).toBe('docked_unloading')
+    expect(sim.state.lane.docks[0]!.relief).toBeUndefined()
+    expect(shelf.queue.length).toBe(shelf.cap)
+    expect(sim.state.lane.stallReason).toBe('shelfFull')
+  })
+
+  it('Q-RUN1 (a) yield: a docked vehicle blocked for dockIdleWaitS while another is queued leaves with its cargo for the back of the queue; alone, it keeps waiting', () => {
+    const sim = noCheckers(quietSim(1))
+    laneNode(sim.state.lane, 'shelf')!.cap = 0
+    const a = buy(sim, 'van')
+    for (let i = 0; i < 15; i++)
+      injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    runUntil(sim, () => vehicleById(sim, a.id).state === 'docked_unloading')
+    runTicks(sim, 600) // alone: it waits (12 in the lane, 3 still aboard)
+    expect(vehicleById(sim, a.id)).toMatchObject({ state: 'docked_unloading' })
+    expect(vehicleById(sim, a.id).cargo).toHaveLength(3)
+    const b = buy(sim, 'bike')
+    joinQueue(sim, vehicleById(sim, b.id))
+    const queued = collect(sim, 'vehicle:queued')
+    const docked = collect(sim, 'vehicle:docked')
+    runTicks(sim, 1)
+    expect(queued).toEqual([{ id: a.id, position: 1 }]) // stuck far longer than dockIdleWaitS
+    const va = vehicleById(sim, a.id)
+    expect(va.cargo).toHaveLength(3)
+    expect(va.dockId).toBeNull()
+    expect(
+      va.cargo.every(
+        (id) => sim.state.parcels[String(id)]?.state === 'in_transit_in',
+      ),
+    ).toBe(true)
+    expect(sim.state.lane.dockQueue).toEqual([a.id])
+    expect(sim.state.lane.docks[0]?.vehicleId).toBe(b.id)
+    runUntil(sim, () => docked.length > 0, 200)
+    expect(docked[0]).toEqual({ id: b.id, dockId: 'dock1' })
+  })
+
+  it('Q-RUN1 (a) the yield waits dockIdleWaitS from the first blocked unload', () => {
+    const sim = noCheckers(quietSim(1))
+    laneNode(sim.state.lane, 'shelf')!.cap = 0
+    const a = buy(sim, 'van')
+    const b = buy(sim, 'bike')
+    vehicleById(sim, b.id).zone = 'downtown' // stays parked
+    for (let i = 0; i < 15; i++)
+      injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    runUntil(sim, () => sim.state.lane.docks[0]?.stuckSinceTick !== null)
+    const since = sim.state.lane.docks[0]!.stuckSinceTick!
+    joinQueue(sim, vehicleById(sim, b.id))
+    const queued = collect(sim, 'vehicle:queued')
+    runUntil(sim, () => queued.some((q) => q.id === a.id), 400)
+    expect(sim.state.tick - since).toBe(
+      data.vehicles.dockIdleWaitS * TICKS_PER_S,
+    )
+  })
+
+  it('Q-RUN1 (b) stall preference: during a shelfFull stall an idle vehicle that could load a shelf parcel queues before it collects', () => {
+    const sim = quietSim(1)
+    const a = buy(sim, 'bike')
+    laneNode(sim.state.lane, 'shelf')!.cap = 1
+    shelveParcel(sim, 'dt_cache_cafe', 'hr_towers_a') // the shelf is full
+    laneParcel(sim, 'slot3') // … and slot 3 cannot push: shelfFull
+    injectParcel(sim, 'hr_towers_b', 'dt_cache_cafe') // collectable too
+    const queued = collect(sim, 'vehicle:queued')
+    runTicks(sim, 10) // the first dispatcher tick: stalled → load first
+    expect(sim.state.lane.stallReason).toBe('shelfFull')
+    expect(queued).toEqual([{ id: a.id, position: 0 }])
+    const sim2 = quietSim(1)
+    const b = buy(sim2, 'bike')
+    shelveParcel(sim2, 'dt_cache_cafe', 'hr_towers_a')
+    injectParcel(sim2, 'hr_towers_b', 'dt_cache_cafe')
+    runTicks(sim2, 10) // no stall: collect first (§4.5 step 2)
+    expect(vehicleById(sim2, b.id).state).toBe('collecting')
+  })
+
+  it('Q-RUN1: a fresh truck drains a full shelf of Industrial parcels while bikes hold full inbound cargo; inbound parcels never skip the checkers', () => {
+    const sim = quietSim(3)
+    unlockDistrict(sim, 'industrial')
+    const shelf = laneNode(sim.state.lane, 'shelf')!
+    const cap = shelf.cap!
+    for (let i = 0; i < cap; i++) {
+      shelveParcel(sim, 'hr_towers_a', 'in_lodash_smelting')
+    }
+    // the lane behind the full shelf: buffers and the conveyor full
+    for (const id of ['slot3', 'slot2', 'slot1']) {
+      laneParcel(sim, id)
+      laneParcel(sim, id)
+    }
+    for (let i = 0; i < 6; i++) laneParcel(sim, 'conv1')
+    const bikes = [buy(sim, 'bike'), buy(sim, 'bike')]
+    for (const b of [
+      'hr_towers_b',
+      'hr_async_arms',
+      'hr_daycare',
+      'hr_pizza',
+    ]) {
+      injectParcel(sim, b, 'dt_cache_cafe')
+      injectParcel(sim, b, 'dt_cache_cafe')
+    }
+    const inbound = Object.values(sim.state.parcels)
+      .filter((p) => p.state === 'waiting')
+      .map((p) => p.id)
+    runUntil(
+      sim,
+      () =>
+        bikes.every((b) => vehicleById(sim, b.id).cargo.length > 0) &&
+        sim.state.vehicles.some((v) => v.state === 'docked_unloading'),
+      6000,
+    )
+    expect(sim.state.lane.stallReason).toBe('shelfFull')
+    const truck = buy(sim, 'truck')
+    const loaded = collect(sim, 'parcel:loaded')
+    const yielded = collect(sim, 'vehicle:queued')
+    const n = runUntil(
+      sim,
+      () => loaded.some((l) => l.vehicleId === truck.id),
+      3 * 600,
+    )
+    expect(n).toBeGreaterThan(0)
+    expect(yielded.some((q) => bikes.some((b) => b.id === q.id))).toBe(true)
+    runUntil(sim, () => vehicleById(sim, truck.id).state === 'delivering', 600)
+    const t = vehicleById(sim, truck.id)
+    expect(t.cargo.length).toBeGreaterThan(0)
+    expect(
+      t.cargo.every(
+        (id) => sim.state.parcels[String(id)]?.destRegion === 'industrial',
+      ),
+    ).toBe(true)
+    runTicks(sim, 2 * 600)
+    expect(sim.state.lane.stallReason).not.toBe('shelfFull')
+    for (const b of bikes) {
+      expect(vehicleById(sim, b.id).state).not.toBe('docked_unloading')
+    }
+    for (const id of inbound) {
+      const p = sim.state.parcels[String(id)]
+      if (!p || p.state === 'waiting' || p.state === 'picked_up') continue
+      if (p.state === 'in_transit_in' || p.state === 'unloading') continue
+      if (p.state === 'in_conveyor' || p.state === 'in_slot') continue
+      expect(
+        p.trace.some((x) => x.ref === 'slot1'),
+        `parcel ${id}`,
+      ).toBe(true)
+    }
+    expect(auditState(sim.state, data)).toEqual([])
   })
 
   it('§6.5 dock:occupancy {dockId, pct} fires once per in-game minute: the share of the minute a vehicle held the dock', () => {

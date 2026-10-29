@@ -1,27 +1,69 @@
-// The intake lane (spec §6.1-§6.4, §6.8; plan.md §6.4 tick step 6) as the
-// generic LaneNode[] of spec §6.9: dock1 → conv1 → slot1 … slotN → shelf,
-// flagged parcels diverting to the Hold Bay. Flow follows `next` edges and
-// passes straight through locked slots (nextLiveNodeId), so no code assumes
-// slot indices are the only topology.
+// The intake lane (spec §6.1-§6.4, §6.6-§6.8; plan.md §6.4 tick step 6) as
+// the generic LaneNode[] of spec §6.9: dock1 → conv1 (cap 6) → slot1 … slotN
+// (each empty | machine | desk, input buffer cap 2) → shelf, flagged parcels
+// diverting to the Hold Bay (`hold`, cap from the level row). Flow follows
+// `next` edges and passes straight through locked slots (nextLiveNodeId), so
+// no code assumes slot indices are the only topology.
 //
-// M1 = PASS-THROUGH: every slot forwards its buffer head (≤ 1 parcel per node
-// per tick) whether or not it holds a fixture; the inspector desk in slot1
-// does not process yet. TODO(M2, SIM_FEATURES.lane): stations, process
-// timers and the §6.3 roll in place of passThrough() for occupied slots.
+// A slot with a fixture and ≥ 1 station is ACTIVE: a parcel entering it waits
+// in the buffer until a station is free (`parcel:processing`), is processed
+// for the checker's processTicks (stations in parallel — a desk seats 1-3
+// inspectors), then rolled once on exit (detection.ts; `parcel:flagged`).
+// Flagged → the Hold Bay at once (`parcel:held`), skipping every downstream
+// checker; otherwise on to the next node. Any other slot is PASS-THROUGH
+// (0 s). Every node hands on at most one parcel per tick.
 //
-// Each tick nodes move downstream-first (the shelf end first), so a node's
-// space frees before its upstream neighbour pushes; the conveyors then feed
-// the first slot round-robin, at most one parcel per tick in total (§6.4).
-// A node holding a parcel it cannot push — next buffer full (and not
-// draining), Hold Bay full, shelf at cap — keeps it; the most downstream such
-// node is the stall root:
-// `lane:stalled {reason, nodeId}` when it appears or changes,
-// `lane:resumed` when it clears, +0.1 s of stallSecondsToday per stalled
-// tick. Nothing is dropped, ever.
+// One tick, in order:
+//   1. completions, lane order (slot1 first): stations whose time is up roll
+//      (so the rng and the flag events follow the lane order);
+//   2. diverts, lane order: one flagged, finished parcel per slot → the Hold
+//      Bay if a bay is free (bays fill in lane order, warehouse-view.md §3.5);
+//   3. forwards, shelf end first: one clean, finished parcel (pass-through:
+//      the buffer head) → the next node if it has room; then the slot seats
+//      its buffer head(s) in free stations — so a station freed this tick
+//      starts its next parcel this tick (1 inspector = 15/min exactly) and the
+//      buffer has room before the node upstream pushes;
+//   4. the conveyors feed the first slot round-robin, ≤ 1 parcel per tick;
+//   5. the stall root (below).
+//
+// Stalls (§6.4, nothing is ever dropped): the most downstream node holding a
+// finished parcel it cannot hand on — a flagged one with every bay full
+// (`holdBayFull`), a clean one with the shelf at cap (`shelfFull`), or a full
+// next buffer that is neither moving nor processing (`bufferFull`). A slot
+// that is busy processing is backpressure, not a stall, and so is every full
+// buffer upstream of it (so a saturated desk never flaps the warehouse
+// button, in whichever slot it sits). While a docked vehicle that can
+// drain the shelf is in Q-RUN1 relief (docks.ts) the shelf takes parcels
+// past its cap. `lane:stalled {reason, nodeId}` when the
+// root appears or changes, `lane:resumed` when it clears, +0.1 s of
+// stallSecondsToday per stalled tick.
+//
+// Fixtures (§6.2, warehouse-view.md §2.3 / Q31): parcels belong to the node,
+// not the fixture. When a slot's fixture changes (bought, moved, swapped,
+// removed, an inspector hired or fired) `reseat` re-seats the station parcels
+// under the new fixture: a parcel mid-process restarts its process time, a
+// finished one keeps its roll; with no station left (or more parcels than
+// stations) they go back to the front of the buffer, which may then sit
+// above its cap until it drains (hasRoom refuses new parcels meanwhile), and
+// pass through when the slot is now empty.
 
+import {
+  checkerName,
+  rollChecker,
+  rolledBy,
+  slotLabel,
+  slotResultEntry,
+} from '../detection.ts'
 import type { StallReason } from '../events.ts'
 import type { Sim } from '../sim.ts'
-import type { Lane, LaneNode, Parcel } from '../types.ts'
+import type {
+  Checker,
+  Fixture,
+  Lane,
+  LaneNode,
+  Parcel,
+  Strain,
+} from '../types.ts'
 import { laneNode, liveSlotIds, nextLiveNodeId } from '../types.ts'
 
 export function shelfNode(lane: Lane): LaneNode {
@@ -30,16 +72,32 @@ export function shelfNode(lane: Lane): LaneNode {
   return n
 }
 
+export function holdNode(lane: Lane): LaneNode {
+  const n = laneNode(lane, lane.holdBayNodeId)
+  if (!n) throw new Error('lane: no Hold Bay node')
+  return n
+}
+
 /** A node can take one more parcel (its cap counts its queue; null = unbounded). */
 export function hasRoom(node: LaneNode): boolean {
   return node.cap === null || node.queue.length < node.cap
 }
 
-/** Any live slot with a fixture and ≥ 1 station (a desk with no inspector is pass-through). */
+/** A live slot with a fixture and ≥ 1 station (a desk with no inspector is pass-through). */
+export function isActiveSlot(node: LaneNode): boolean {
+  return (
+    node.kind === 'slot' &&
+    !node.locked &&
+    node.fixture !== null &&
+    node.stations.length > 0
+  )
+}
+
+/** Any live slot with a fixture and ≥ 1 station. */
 export function hasActiveChecker(lane: Lane): boolean {
   return liveSlotIds(lane).some((id) => {
     const n = laneNode(lane, id)
-    return n !== null && n.fixture !== null && n.stations.length > 0
+    return n !== null && isActiveSlot(n)
   })
 }
 
@@ -84,14 +142,14 @@ function flowChain(lane: Lane): string[] {
 
 /** Put a parcel into a node (state, trace and the node's enter event). */
 export function enterNode(sim: Sim, p: Parcel, node: LaneNode): void {
-  const tick = sim.state.tick
+  const s = sim.state
+  const tick = s.tick
   node.queue.push(p.id)
   p.nodeId = node.id
   p.nodeEnterTick = tick
   p.nodeDoneTick = null
   if (node.kind === 'slot') {
     p.state = 'in_slot'
-    p.trace.push({ tick, what: 'slot', ref: node.id })
     sim.emit('parcel:enteredSlot', { id: p.id, nodeId: node.id, slot: node.id })
   } else if (node.kind === 'shelf') {
     p.state = 'on_shelf'
@@ -99,6 +157,11 @@ export function enterNode(sim: Sim, p: Parcel, node: LaneNode): void {
     sim.emit('parcel:shelved', { id: p.id })
   } else if (node.kind === 'conveyor') {
     p.state = 'in_conveyor'
+  } else if (node.kind === 'holdBay') {
+    p.state = 'held'
+    p.trace.push({ tick, what: 'held', ref: node.id })
+    s.stats.holdBayEvents += 1
+    sim.emit('parcel:held', { id: p.id })
   }
 }
 
@@ -117,76 +180,287 @@ export function returnToShelf(sim: Sim, p: Parcel): void {
   sim.emit('parcel:returned', { id: p.id })
 }
 
+/**
+ * A sold vehicle's INBOUND cargo (picked up, not yet through the lane): onto
+ * its dock's conveyor (the first one when it was not docked), accepted past
+ * the cap like the shelf takes outbound cargo (§4.1) — it still passes every
+ * checker: nothing is waved through (§6.4). `parcel:unloaded` as if the
+ * vehicle had unloaded it.
+ */
+export function returnToConveyor(
+  sim: Sim,
+  p: Parcel,
+  dockId: string | null,
+  vehicleName: string,
+): void {
+  const lane = sim.state.lane
+  const dock = lane.docks.find((d) => d.id === dockId) ?? lane.docks[0]
+  const conv = dock ? laneNode(lane, dock.conveyorNodeId) : null
+  if (!dock || !conv) {
+    returnToShelf(sim, p)
+    return
+  }
+  p.vehicleId = null
+  p.reservedBy = null
+  enterNode(sim, p, conv)
+  p.trace.push({
+    tick: sim.state.tick,
+    what: 'unloaded',
+    ref: dock.id,
+    text: `Unloaded (${vehicleName} sold)`,
+  })
+  sim.emit('parcel:unloaded', { id: p.id, dockId: dock.id })
+}
+
 /** Remove a parcel id from a node's queue (no-op when absent). */
 export function takeFrom(node: LaneNode, id: number): void {
   const i = node.queue.indexOf(id)
   if (i >= 0) node.queue.splice(i, 1)
 }
 
-/** Forward the buffer head one node downstream if it has room. */
-function passThrough(sim: Sim, node: LaneNode, next: LaneNode): boolean {
-  const head = node.queue[0]
-  if (head === undefined || !hasRoom(next)) return false
-  const p = sim.state.parcels[String(head)]
-  if (!p) return false
-  node.queue.shift()
-  enterNode(sim, p, next)
-  return true
+// Processing ------------------------------------------------------------------------
+
+type Station = LaneNode['stations'][number]
+
+const parcelOf = (sim: Sim, id: number | null): Parcel | null =>
+  id === null ? null : (sim.state.parcels[String(id)] ?? null)
+
+/** A flagged parcel still in a slot waits to divert to the Hold Bay. */
+const isFlagged = (p: Parcel): boolean => p.flaggedBy !== null
+
+/**
+ * Seat a parcel in a free station: a parcel already rolled at this node (it
+ * came back from a fixture change), a magic one (checkers skip it, §5.5) or
+ * one this very checker already rolled in another slot (one roll per parcel
+ * per checker, §6.3 — trace "already checked") is done at once; anything
+ * else starts its process time (`parcel:processing`).
+ */
+function seat(sim: Sim, node: LaneNode, st: Station, id: number): void {
+  const tick = sim.state.tick
+  const p = parcelOf(sim, id)
+  const c = node.fixture?.checker
+  st.parcelId = id
+  if (!p || !c || p.nodeDoneTick !== null || p.magic) {
+    st.doneTick = tick
+    return
+  }
+  if (rolledBy(p, c.id)) {
+    // One roll per parcel per checker (§6.3): this checker already rolled
+    // it in another slot (it was moved downstream of the parcel) — done.
+    st.doneTick = tick
+    p.nodeDoneTick = tick
+    p.trace.push({
+      tick,
+      what: 'skipped',
+      ref: node.id,
+      text: `${slotLabel(node.id)} ${checkerName(sim.data, c)}: already checked`,
+    })
+    return
+  }
+  st.doneTick = tick + c.processTicks
+  sim.emit('parcel:processing', { id, nodeId: node.id })
 }
 
-function stallReasonFor(target: LaneNode): StallReason {
-  if (target.kind === 'shelf') return 'shelfFull'
-  if (target.kind === 'holdBay') return 'holdBayFull'
-  return 'bufferFull'
+/** Fill the free stations of an active slot from its buffer head. */
+function seatFromBuffer(sim: Sim, node: LaneNode): void {
+  for (const st of node.stations) {
+    if (st.parcelId !== null) continue
+    const id = node.queue.shift()
+    if (id === undefined) return
+    seat(sim, node, st, id)
+  }
+}
+
+/** Flag a parcel at a checker (§6.3, §6.6): the reveal; it diverts next. */
+function flag(
+  sim: Sim,
+  node: LaneNode,
+  c: Checker,
+  p: Parcel,
+  strain: Strain,
+): void {
+  const s = sim.state
+  p.flaggedBy = c.id
+  p.flaggedStrain = strain
+  if (p.malware) {
+    s.stats.malwareCaught += 1
+    if (s.stats.firstCatchTick === null) s.stats.firstCatchTick = s.tick
+  }
+  sim.emit('parcel:flagged', {
+    id: p.id,
+    checkerId: c.id,
+    strain,
+    nodeId: node.id,
+    scripted: p.scripted,
+  })
+}
+
+/** A station's process time is up: the one roll on exit (detection.ts). */
+function finishProcessing(sim: Sim, node: LaneNode, p: Parcel): void {
+  const c = node.fixture?.checker
+  if (!c) return
+  const tick = sim.state.tick
+  p.nodeDoneTick = tick
+  const strain = p.magic ? null : rollChecker(sim, c, p)
+  p.trace.push(slotResultEntry(sim.data, tick, node, c, p, strain))
+  if (strain !== null) flag(sim, node, c, p, strain)
+}
+
+interface Ready {
+  p: Parcel
+  /** The station holding it, or null for a pass-through buffer head. */
+  st: Station | null
+}
+
+/**
+ * Parcels at a slot that may leave this tick, in exit order: a pass-through
+ * slot's buffer head (FIFO); an active slot's finished station parcels,
+ * earliest finish first (ties → lower station).
+ */
+function readyParcels(sim: Sim, node: LaneNode): Ready[] {
+  if (!isActiveSlot(node)) {
+    const p = parcelOf(sim, node.queue[0] ?? null)
+    return p ? [{ p, st: null }] : []
+  }
+  const out: { r: Ready; done: number; i: number }[] = []
+  node.stations.forEach((st, i) => {
+    const p = parcelOf(sim, st.parcelId)
+    if (p && p.nodeDoneTick !== null) {
+      out.push({ r: { p, st }, done: st.doneTick ?? 0, i })
+    }
+  })
+  return out.toSorted((a, b) => a.done - b.done || a.i - b.i).map((x) => x.r)
+}
+
+/** Move a ready parcel out of `node` into `target`. */
+function handOn(sim: Sim, node: LaneNode, r: Ready, target: LaneNode): void {
+  if (r.st) {
+    r.st.parcelId = null
+    r.st.doneTick = null
+  } else {
+    takeFrom(node, r.p.id)
+    if (r.p.nodeDoneTick === null && !isFlagged(r.p)) {
+      // Passed an empty slot (or one whose fixture left mid-process).
+      r.p.trace.push(
+        slotResultEntry(sim.data, sim.state.tick, node, null, r.p, null),
+      )
+    }
+  }
+  enterNode(sim, r.p, target)
+}
+
+/** An active slot with a station still processing (backpressure, not a stall). */
+function busy(sim: Sim, node: LaneNode): boolean {
+  if (!isActiveSlot(node)) return false
+  return node.stations.some((st) => {
+    const p = parcelOf(sim, st.parcelId)
+    return p !== null && p.nodeDoneTick === null
+  })
 }
 
 /** Tick step 6. */
 export function laneStep(sim: Sim): void {
   const s = sim.state
   const lane = s.lane
+  const hold = holdNode(lane)
   const chain = flowChain(lane)
-  const nodes = chain.map((id) => laneNode(lane, id))
-  /** chain index → the node forwarded a parcel this tick (it is flowing). */
-  const moved = nodes.map(() => false)
+    .map((id) => laneNode(lane, id))
+    .filter((n): n is LaneNode => n !== null)
+  const slots = chain.filter((n) => n.kind === 'slot')
+  /** Node id → it handed a parcel on this tick. */
+  const moved: Record<string, boolean> = {}
+  // Q-RUN1 (c) relief (docks.ts): the shelf takes the lane's parcels past
+  // its cap while a docked vehicle that can drain it unloads.
+  const relief = lane.docks.some((d) => d.relief === true)
+  const accepts = (target: LaneNode): boolean =>
+    hasRoom(target) || (relief && target.kind === 'shelf')
 
-  // Slots, downstream first (the last chain entry is the shelf).
-  for (let i = nodes.length - 2; i >= 0; i--) {
-    const node = nodes[i]
-    const next = nodes[i + 1]
-    if (node && next) moved[i] = passThrough(sim, node, next)
+  // 1. completions, lane order.
+  for (const node of slots) {
+    if (!isActiveSlot(node)) continue
+    for (const st of node.stations) {
+      if (st.doneTick === null || s.tick < st.doneTick) continue
+      const p = parcelOf(sim, st.parcelId)
+      if (p && p.nodeDoneTick === null) finishProcessing(sim, node, p)
+    }
   }
 
-  // Conveyors → the first slot, round-robin, ≤ 1 parcel per tick.
-  const head = nodes[0]
+  // 2. diverts to the Hold Bay, lane order.
+  for (const node of slots) {
+    if (!hasRoom(hold)) break
+    // (A pass-through slot offers only its buffer head: FIFO.)
+    const flagged = readyParcels(sim, node).find((x) => isFlagged(x.p))
+    if (flagged) {
+      handOn(sim, node, flagged, hold)
+      moved[node.id] = true
+    }
+  }
+
+  // 3. forwards, shelf end first; then seat the buffer.
+  for (let i = chain.length - 2; i >= 0; i--) {
+    const node = chain[i] as LaneNode
+    const next = chain[i + 1] as LaneNode
+    if (!moved[node.id] && accepts(next)) {
+      const r = readyParcels(sim, node).find((x) => !isFlagged(x.p))
+      if (r) {
+        handOn(sim, node, r, next)
+        moved[node.id] = true
+      }
+    }
+    if (isActiveSlot(node)) seatFromBuffer(sim, node)
+  }
+
+  // 4. conveyors → the first node, round-robin, ≤ 1 parcel per tick.
+  const head = chain[0]
   const convs = conveyorIds(lane)
   if (head && convs.length > 0) {
     for (let k = 0; k < convs.length; k++) {
       const conv = laneNode(lane, convs[(s.tick + k) % convs.length] as string)
-      if (conv && conv.queue.length > 0) {
-        passThrough(sim, conv, head)
-        break
+      if (!conv || conv.queue.length === 0) continue
+      const p = parcelOf(sim, conv.queue[0] ?? null)
+      if (p && hasRoom(head)) {
+        conv.queue.shift()
+        enterNode(sim, p, head)
+        moved[conv.id] = true
       }
+      break
     }
   }
 
-  // Stall root: the most downstream node holding a parcel it cannot push
-  // into a full target that is not itself flowing (a full buffer that
-  // forwarded a parcel this tick is backpressure, not a stall).
-  const blocked = (target: LaneNode, ti: number): boolean =>
-    !hasRoom(target) && !(moved[ti] ?? false)
+  // 5. the stall root, shelf end first. A full target that is moving or
+  // processing — or that is itself only held up by such a node further
+  // down (`backed`) — is backpressure, a queue and not a stall, wherever
+  // the slow checker sits (a desk behind a machine or in slot 3 included).
+  const backed: Record<string, boolean> = {}
+  const blocked = (target: LaneNode): StallReason | 'backpressure' | null => {
+    if (accepts(target)) return null
+    if (target.kind === 'holdBay') return 'holdBayFull'
+    if (target.kind === 'shelf') return 'shelfFull'
+    if (moved[target.id] || busy(sim, target) || backed[target.id]) {
+      return 'backpressure'
+    }
+    return 'bufferFull'
+  }
   let root: { reason: StallReason; nodeId: string } | null = null
-  for (let i = nodes.length - 2; i >= 0 && !root; i--) {
-    const node = nodes[i]
-    const next = nodes[i + 1]
-    if (node && next && node.queue.length > 0 && blocked(next, i + 1)) {
-      root = { reason: stallReasonFor(next), nodeId: node.id }
+  for (let i = chain.length - 2; i >= 0 && !root; i--) {
+    const node = chain[i] as LaneNode
+    const next = chain[i + 1] as LaneNode
+    for (const r of readyParcels(sim, node)) {
+      const reason = blocked(isFlagged(r.p) ? hold : next)
+      if (reason === 'backpressure') {
+        backed[node.id] = true
+      } else if (reason) {
+        root = { reason, nodeId: node.id }
+        break
+      }
     }
   }
   if (!root && head) {
     for (const id of convs) {
       const conv = laneNode(lane, id)
-      if (conv && conv.queue.length > 0 && blocked(head, 0)) {
-        root = { reason: stallReasonFor(head), nodeId: conv.id }
+      const reason = conv && conv.queue.length > 0 ? blocked(head) : null
+      if (conv && reason && reason !== 'backpressure') {
+        root = { reason, nodeId: conv.id }
         break
       }
     }
@@ -217,4 +491,117 @@ function setStall(
     lane.stallSinceTick = null
     sim.emit('lane:resumed', {})
   }
+}
+
+// Fixtures (§6.2, §6.7; warehouse-view.md §2.3) ---------------------------------------------
+
+/**
+ * Re-seat a slot's station parcels under its current fixture (Q31): as many
+ * stations as the fixture has; parcels mid-process restart their process
+ * time, finished ones stay finished; the rest go back to the front of the
+ * buffer (and pass through if the slot is now empty).
+ */
+export function reseat(sim: Sim, node: LaneNode): void {
+  const ids = node.stations.flatMap((st) =>
+    st.parcelId === null ? [] : [st.parcelId],
+  )
+  const n = node.fixture ? node.fixture.checker.stations : 0
+  node.stations = Array.from({ length: n }, () => ({
+    parcelId: null,
+    doneTick: null,
+  }))
+  const back: number[] = []
+  for (const id of ids) {
+    const st = node.stations.find((x) => x.parcelId === null)
+    if (st) seat(sim, node, st, id)
+    else back.push(id)
+  }
+  if (back.length > 0) node.queue.unshift(...back)
+}
+
+/** Point a desk's inspectors (and walked-out ones) at the node it now sits in. */
+function relinkDesk(sim: Sim, node: LaneNode): void {
+  const f = node.fixture
+  if (f?.kind !== 'desk') return
+  for (const e of sim.state.employees) {
+    if (f.inspectorIds.includes(e.id) || f.walkedOutIds.includes(e.id)) {
+      e.nodeId = node.id
+    }
+  }
+}
+
+/** Install a fixture in an empty slot (bought machine / placed desk). */
+export function placeFixture(sim: Sim, node: LaneNode, fixture: Fixture): void {
+  node.fixture = fixture
+  relinkDesk(sim, node)
+  reseat(sim, node)
+}
+
+/**
+ * Move `from`'s fixture to `to` (free, §6.2); an occupied `to` swaps (Q30).
+ * Parcels stay in their nodes and re-seat under the new fixtures (Q31).
+ * Returns whether it was a swap.
+ */
+export function moveFixture(sim: Sim, from: LaneNode, to: LaneNode): boolean {
+  const a = from.fixture
+  const b = to.fixture
+  to.fixture = a
+  from.fixture = b
+  relinkDesk(sim, to)
+  relinkDesk(sim, from)
+  reseat(sim, from)
+  reseat(sim, to)
+  return b !== null
+}
+
+/**
+ * Take the fixture out of a slot: the desk's inspectors (and any walked-out
+ * ones) leave for good — `worker:fired` each, no refund; the station
+ * parcels pass through (Q31). Returns the removed fixture.
+ */
+export function removeFixture(sim: Sim, node: LaneNode): Fixture | null {
+  const f = node.fixture
+  if (!f) return null
+  node.fixture = null
+  if (f.kind === 'desk') {
+    const gone = [...f.inspectorIds, ...f.walkedOutIds]
+    sim.state.employees = sim.state.employees.filter(
+      (e) => !gone.includes(e.id),
+    )
+    for (const id of f.inspectorIds) {
+      sim.emit('worker:fired', {
+        employeeId: id,
+        kind: 'inspector',
+        nodeId: node.id,
+      })
+    }
+  }
+  reseat(sim, node)
+  return f
+}
+
+/**
+ * §6.7 Fire: the inspector leaves at once (no refund) and the desk loses a
+ * station — a free one when there is one, else the last, whose parcel goes
+ * back to the front of the buffer (it restarts when re-seated).
+ */
+export function fireInspector(
+  sim: Sim,
+  node: LaneNode,
+  employeeId: number,
+): void {
+  const f = node.fixture
+  if (f?.kind !== 'desk') return
+  f.inspectorIds = f.inspectorIds.filter((id) => id !== employeeId)
+  f.checker.stations = Math.max(0, f.checker.stations - 1)
+  let i = node.stations.findLastIndex((st) => st.parcelId === null)
+  if (i < 0) i = node.stations.length - 1
+  const st = i >= 0 ? node.stations.splice(i, 1)[0] : undefined
+  if (st && st.parcelId !== null) node.queue.unshift(st.parcelId)
+  sim.state.employees = sim.state.employees.filter((e) => e.id !== employeeId)
+  sim.emit('worker:fired', {
+    employeeId,
+    kind: 'inspector',
+    nodeId: node.id,
+  })
 }

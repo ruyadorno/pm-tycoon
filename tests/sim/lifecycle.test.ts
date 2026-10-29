@@ -54,6 +54,7 @@ describe('parcel lifecycle (spec §11)', () => {
       'parcel:unloaded',
       'vehicle:unloaded',
       'parcel:enteredSlot',
+      'parcel:processing', // the inspector desk in slot 1 (spec §6.3)
       'parcel:enteredSlot',
       'parcel:enteredSlot',
       'parcel:shelved',
@@ -65,9 +66,9 @@ describe('parcel lifecycle (spec §11)', () => {
       'spawned',
       'pickedUp',
       'unloaded',
-      'slot',
-      'slot',
-      'slot',
+      'passed', // slot 1, the desk
+      'empty', // slot 2
+      'empty', // slot 3
       'shelved',
       'loaded',
       'delivered',

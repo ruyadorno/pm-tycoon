@@ -220,20 +220,25 @@ describe('malware at spawn (spec §5.4)', () => {
     ).toBe(true)
   })
 
-  it('share per level: 3 % at L1, 5 % at L2, +1 pt per day after the playtest cap, capped at 20 %, ×2 overseas', () => {
+  it('share per level: baseShare at L1, + perLevel at L2, + postVictoryPerDay per day after the playtest cap, capped, × overseasMult', () => {
     const sim = makeSim(1)
     const s = sim.state
-    expect(malwareShare(s, data)).toBeCloseTo(0.03, 10)
-    expect(malwareShare(s, data, true)).toBeCloseTo(0.06, 10)
+    const m = data.parcels.malware
+    expect(malwareShare(s, data)).toBeCloseTo(m.baseShare, 10)
+    expect(malwareShare(s, data, true)).toBeCloseTo(
+      m.baseShare * m.overseasMult,
+      10,
+    )
     s.level.level = 2
-    expect(malwareShare(s, data)).toBeCloseTo(0.05, 10)
+    const l2 = m.baseShare + m.perLevel
+    expect(malwareShare(s, data)).toBeCloseTo(l2, 10)
     s.stats.levelTick['2'] = 600 * 3 + 120 // reached L2 (the cap) during day 3
     s.tick = 600 * 4
     s.day = 4
-    expect(malwareShare(s, data)).toBeCloseTo(0.06, 10)
+    expect(malwareShare(s, data)).toBeCloseTo(l2 + m.postVictoryPerDay, 10)
     s.tick = 600 * 9
     s.day = 9
-    expect(malwareShare(s, data)).toBeCloseTo(0.11, 10)
+    expect(malwareShare(s, data)).toBeCloseTo(l2 + 6 * m.postVictoryPerDay, 10)
     s.tick = 600 * 40
     s.day = 40
     expect(malwareShare(s, data)).toBe(data.parcels.malware.cap)

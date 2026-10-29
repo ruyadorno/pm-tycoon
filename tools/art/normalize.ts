@@ -2,8 +2,13 @@
 // 128 -> 0/255, trim, pad to the class canvas and place the sprite: city
 // classes put the footprint diamond's bottom vertex on the anchor pixel
 // (W/2-1..W/2, H-1); vehicles, icons and interior sprites centre their
-// bounding box. Procedural finals are already normalized (the pass is a
-// no-op on them); generated candidates go through normalizeRgba() in gen.
+// bounding box. A final already on its class canvas passes through: the
+// procedural drawers place their own art, and installed PixelLab finals are
+// copies of processed candidates that candidates.ts already fitted to the
+// class contract (vehicle wheels on the per-heading road line, the worker's
+// feet on row 29 and its jump lift, the machines' 24-px belt opening and the
+// shaker's ±1-px frames, props standing on their tile) — re-centring their
+// bbox here would undo exactly that. Only a mis-sized final is re-placed.
 // Also hosts the helpers shared by the other passes (entry selection,
 // nearest-colour index, per-frame read/process/write with finalSha256
 // upkeep).
@@ -162,13 +167,13 @@ export function normalizeRgba(
 
 /**
  * Normalize a final already read as an Img (alpha thresholded by readImg):
- * generated art and mis-sized frames are re-placed; procedural frames of
- * the right size pass through unchanged.
+ * mis-sized frames are re-placed; frames already on the class canvas
+ * (procedural or installed candidates) pass through unchanged.
  */
 export function normalizeFinal(e: ManifestEntry, img: Img): Img {
   if (e.class === 'font') return img
   const [W, H] = e.canvas
-  if (!isGenerated(e) && img.w === W && img.h === H) return img
+  if (img.w === W && img.h === H) return img
   return placeOnCanvas(e, img) ?? img
 }
 
@@ -179,8 +184,8 @@ export function run(opts: StepOpts): number {
     (e) => e.class === 'font',
     (e, img, frame) => {
       const [W, H] = e.canvas
-      if (!isGenerated(e) && img.w === W && img.h === H) {
-        return img // alpha already thresholded on read
+      if (img.w === W && img.h === H) {
+        return img // placed by its drawer / candidates.ts; alpha thresholded on read
       }
       const out = placeOnCanvas(e, img)
       if (!out) {

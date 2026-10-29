@@ -275,14 +275,21 @@
           if (e.candidates.length && !e.approved) {
             const cands = document.createElement('div')
             cands.className = 'cands'
-            e.candidates.forEach((src, n) => {
+            e.candidates.forEach((src) => {
+              // candidates/<id>/<n>.png: n is the candidate number (art:approve -- id:n)
+              const n = src
+                .split('/')
+                .pop()
+                .replace(/\.png$/, '')
               const fig = document.createElement('figure')
               const img = document.createElement('img')
               img.src = '/gallery/' + src
               img.alt = `${e.id}:${n}`
               fig.append(img)
               const cap = document.createElement('figcaption')
-              cap.textContent = `${e.id}:${n}`
+              cap.textContent =
+                `${e.id}:${n}` +
+                (String(e.chosenCandidate) === n ? ' (chosen)' : '')
               fig.append(cap)
               cands.append(fig)
             })

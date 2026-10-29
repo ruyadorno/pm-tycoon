@@ -4,7 +4,8 @@
 //
 // Panel style (§1.7): cream `grey5` face, 1-px `outline` border, 2-px `grey3`
 // bevel on the bottom/right; dark panels `grey0`; buttons `blue1` primary /
-// `grey4` secondary with a 2-px lip that collapses to a 1-px top shadow when
+// `grey4` secondary / `red1` / `grass1` confirm (ui_btn_green + _down, the
+// Hold Bay CLEAR face) with a 2-px lip that collapses to a 1-px top shadow when
 // pressed (the face shifts down 1 px and darkens one step); disabled = flat
 // `grey3`; chips are pills (active `yellow2`); bars 8 px tall, `grey3` track;
 // the Hold Bay card border is `mal1` (2 px).
@@ -167,6 +168,12 @@ const BTN: Readonly<Record<string, { up: BtnStyle; down: BtnStyle }>> = {
   glow: {
     up: { face: 'yellow2', hi: 'yellow3', lip: 'yellow1' },
     down: { face: 'yellow1', hi: 'yellow2', lip: 'yellow0' },
+  },
+  // confirm (Hold Bay CLEAR): the grass ramp, pressed lip one step darker
+  // into leaf0 (the blue/red faces use `outline` there; leaf0 keeps it green)
+  green: {
+    up: { face: 'grass1', hi: 'grass2', lip: 'grass0' },
+    down: { face: 'grass0', hi: 'grass1', lip: 'leaf0' },
   },
 }
 
@@ -386,6 +393,15 @@ for (const [id, build] of Object.entries(SINGLE)) {
     ),
   )
 }
+
+// ui_btn_green: one id, frames '' (up) and '_down' (pressed)
+registerDrawer({ id: 'ui_btn_green' }, (d: DrawCtx) => {
+  const s = BTN.green as { up: BtnStyle; down: BtnStyle }
+  return gridFrames(
+    d,
+    d.entry.frames.map((f) => (f === '_down' ? btnDown(s.down) : btnUp(s.up))),
+  )
+})
 
 registerDrawer({ id: 'ui_btn_ring' }, (d: DrawCtx) =>
   gridFrames(

@@ -351,25 +351,53 @@ export function contactStaleness(m: Manifest): string[] {
   return out
 }
 
-/** candidate PNGs of an id (art/candidates/<id>/<n>.png), sorted */
-export function candidatesOf(id: string): string[] {
+export interface CandidateFile {
+  /** candidate number (the `chosenCandidate` / `vlr art:approve -- id:n` value) */
+  n: number
+  path: string
+}
+
+/**
+ * One preview PNG per candidate of an id, sorted by candidate number. Layout
+ * art/candidates/<id>/<n>/{raw/, <frame>.png, meta.json} (gen.ts; the frame
+ * file is 'base.png' for the '' suffix, else the suffix without its '_'):
+ * the preview is base.png, else the entry's first frame (`firstSuffix`),
+ * else the first processed PNG of the directory. The legacy flat layout
+ * <id>/<n>.png is still read.
+ */
+export function candidatesOf(id: string, firstSuffix = ''): CandidateFile[] {
   const dir = join(CANDIDATES_DIR, id)
   if (!existsSync(dir)) return []
-  return readdirSync(dir)
-    .filter((f) => /^\d+\.png$/.test(f))
-    .toSorted((a, b) => Number.parseInt(a) - Number.parseInt(b))
-    .map((f) => join(dir, f))
+  const out: CandidateFile[] = []
+  for (const f of readdirSync(dir)) {
+    const legacy = /^(\d+)\.png$/.exec(f)
+    if (legacy) {
+      out.push({ n: Number(legacy[1]), path: join(dir, f) })
+      continue
+    }
+    if (!/^\d+$/.test(f)) continue
+    const cdir = join(dir, f)
+    if (!statSync(cdir).isDirectory()) continue
+    const stem = firstSuffix === '' ? 'base' : firstSuffix.replace(/^_/, '')
+    const pick = ['base.png', `${stem}.png`].find((x) =>
+      existsSync(join(cdir, x)),
+    )
+    const first =
+      pick ??
+      readdirSync(cdir)
+        .filter((x) => x.endsWith('.png'))
+        .toSorted()[0]
+    if (first) out.push({ n: Number(f), path: join(cdir, first) })
+  }
+  return out.toSorted((a, b) => a.n - b.n)
 }
 
 /** a sheet of candidates side by side (gen's vision pass, anchors@4x) */
 export function candidateSheet(ids: string[], out: string): boolean {
   const cells: Cell[] = []
   for (const id of ids) {
-    for (const p of candidatesOf(id)) {
-      cells.push({
-        name: `${id}:${p.split('/').pop()?.replace('.png', '')}`,
-        path: p,
-      })
+    for (const c of candidatesOf(id)) {
+      cells.push({ name: `${id}:${c.n}`, path: c.path })
     }
   }
   if (cells.length === 0) return false
@@ -402,12 +430,12 @@ export function run(opts: StepOpts): number {
   }
   // gallery data for public/gallery.html
   const entries = m.entries.map((e) => {
-    const cands = candidatesOf(e.id)
-    const copied = cands.map((p, i) => {
-      const rel = `candidates/${e.id}/${i}.png`
+    const cands = candidatesOf(e.id, e.frames[0])
+    const copied = cands.map((c) => {
+      const rel = `candidates/${e.id}/${c.n}.png`
       const dst = join(GALLERY_DIR, rel)
       mkdirSync(join(GALLERY_DIR, 'candidates', e.id), { recursive: true })
-      copyFileSync(p, dst)
+      copyFileSync(c.path, dst)
       return rel
     })
     return {
@@ -424,6 +452,7 @@ export function run(opts: StepOpts): number {
       frames: frameNames(e).filter((n) => existsSync(finalPath(e, n))),
       base: baseFrameNames(e),
       candidates: copied,
+      chosenCandidate: e.chosenCandidate ?? null,
       rejects: e.rejects,
       note: e.note ?? null,
     }

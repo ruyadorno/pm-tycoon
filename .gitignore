@@ -3,8 +3,10 @@ dist/
 dist-zip/
 .env
 .logs/
-docs/gate/quick.*
 art/candidates/
+# PixelLab vision-pass review sheets (regenerable with `vlr art:gen -- --staging --sheet`); the G3
+# category sheets art/contact/<category>@4x.png and anchors@4x.png stay committed
+art/contact/candidates-*
 public/gallery/
 shots/
 test-results/
@@ -19,3 +21,5 @@ coverage/
 # this VM's global excludesfile (~/.gitignore) ignores *.md and CLAUDE.md; the repo tracks its docs
 !*.md
 !CLAUDE.md
+# after the !*.md re-include: the quick gate's table stays untracked (plan.md §6.9.2)
+docs/gate/quick.*

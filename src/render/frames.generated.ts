@@ -379,6 +379,8 @@ export const FRAMES = {
   ui_btn: 'ui_btn',
   ui_btn_down: 'ui_btn_down',
   ui_btn_glow: 'ui_btn_glow',
+  ui_btn_green: 'ui_btn_green',
+  ui_btn_green_down: 'ui_btn_green_down',
   ui_btn_off: 'ui_btn_off',
   ui_btn_primary: 'ui_btn_primary',
   ui_btn_primary_down: 'ui_btn_primary_down',
@@ -573,11 +575,11 @@ export function buildingFrame(buildingId: string, locked = false): FrameName {
 
 /** chimney smoke emitters: canvas pixel offsets from the top-left */
 export const SMOKE_ANCHORS: Readonly<Record<string, readonly (readonly [number, number])[]>> = {
-  in_lodash_smelting: [[60, 40], [76, 34]],
-  in_chalk_pigment: [[120, 52]],
-  in_tarball_packing: [[68, 48]],
-  in_gzip_compressors: [[128, 44]],
-  in_minify_metal: [[72, 46]],
+  in_lodash_smelting: [[80, 41], [118, 57]],
+  in_chalk_pigment: [[141, 44]],
+  in_tarball_packing: [[148, 46]],
+  in_gzip_compressors: [[127, 51]],
+  in_minify_metal: [[148, 65]],
 }
 
 /** board faces (BitmapText goes here), canvas px: sign_days 64x40, sign_locked 96x52 */

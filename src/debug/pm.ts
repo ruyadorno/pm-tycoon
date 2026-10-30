@@ -16,6 +16,12 @@
 // director before this API exists; disabled under ?audio=0, still present).
 // `ready` flips after Core READY + the CREATE of the world scene ?view=
 // selects (City by default, Warehouse, Gallery).
+// Build 2 / M5 (B2 §5): `attractSim` is the Title's attract Sim while it is
+// installed (null once Continue / New game swapped in the player's — so
+// `core !== attractSim` proves the swap), and `ready` waits for the City to
+// leave attract mode (pm:attractEnd) when the City was created under the
+// Title's attract tour. debugLotCorners(on) marks the lot footprint's four
+// iso corners in the City (the city-lot-zoom2 shot).
 // M4 (plan.md §12.7 task 1, §12.9): playtest() is the live playtest profile
 // (the HUD's PlaytestRecorder, registry REG_PLAYTEST; null before the HUD
 // exists), downloadPlaytest() saves it as playtest.json (the summary card's
@@ -24,7 +30,7 @@ import Phaser from 'phaser'
 import type { AudioDebugApi, AudioDirector } from '../audio/director.ts'
 import type { Stepper } from '../boot/stepper.ts'
 import { REG, setSim } from '../boot/simBinding.ts'
-import { EV_GOTO, type WorldView } from '../boot/nav.ts'
+import { EV_ATTRACT_END, EV_GOTO, type WorldView } from '../boot/nav.ts'
 import type { GameData } from '../data/index.ts'
 import {
   PLAYTEST_FILE,
@@ -88,6 +94,8 @@ export interface PmApi {
   readonly sim: ViewSim
   /** The raw Sim (state, commandLog, dispatch). */
   readonly core: Sim
+  /** The Title's attract Sim while installed (B2 §5), else null. */
+  readonly attractSim: Sim | null
   readonly seed: number
   readonly stepper: Stepper
   readonly data: GameData
@@ -119,6 +127,11 @@ export interface PmApi {
   playtest(): Playtest | null
   /** Save the live profile as playtest.json; false when there is none or it failed. */
   downloadPlaytest(): boolean
+  /**
+   * Mark (true) / clear (false) the lot footprint's four iso corners in the
+   * City (B2 §6.1 check); returns the new state (false without a City).
+   */
+  debugLotCorners(on?: boolean): boolean
 }
 
 declare global {
@@ -188,6 +201,9 @@ export function installDebugApi(
     },
     get core() {
       return core()
+    },
+    get attractSim() {
+      return (game.registry.get(REG.attractSim) as Sim | null) ?? null
     },
     get seed() {
       return core().state.seed
@@ -330,18 +346,32 @@ export function installDebugApi(
       const pt = recorder()?.snapshot() ?? null
       return pt ? downloadJson(PLAYTEST_FILE, pt) : false
     },
+    debugLotCorners(on = true) {
+      const city = game.scene.getScene('City') as unknown as {
+        setLotCorners?(on: boolean): boolean
+      } | null
+      return city?.setLotCorners?.(on) ?? false
+    },
   }
   window.__pm = pm
 
   // ready: Core READY (already past when Boot creates this) + the world
-  // scene's CREATE.
+  // scene's CREATE — or, for a City created under the Title's attract tour,
+  // its pm:attractEnd (the player's game is in).
   const key = worldSceneKey(p)
   const armWorld = (): void => {
     const scene = game.scene.getScene(key)
     if (!scene) return
-    scene.events.once(Phaser.Scenes.Events.CREATE, () => {
+    const done = (): void => {
       pm.ready = true
-    })
+      scene.events.off(Phaser.Scenes.Events.CREATE, onCreate)
+      game.events.off(EV_ATTRACT_END, done)
+    }
+    const onCreate = (): void => {
+      if ((scene as unknown as { attract?: boolean }).attract !== true) done()
+    }
+    scene.events.on(Phaser.Scenes.Events.CREATE, onCreate)
+    game.events.on(EV_ATTRACT_END, done)
   }
   if (game.isRunning) armWorld()
   else game.events.once(Phaser.Core.Events.READY, armWorld)

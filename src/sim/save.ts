@@ -1,17 +1,24 @@
-// Save payload (plan.md §5 localStorage `pm.save.v1`, §6.4 "Save and load").
-// The sim never reads the clock or storage: src/boot/autosave.ts supplies
-// savedAt / build / onboarding and does the localStorage I/O. No migrations
-// (R9): a payload loads only when version === 1 and its dataHash matches the
-// running data tables (isCompatible); otherwise the Title discards it.
+// Save payload (plan.md §5 localStorage key, §6.4 "Save and load";
+// spec-build2 §8: `pm.save.v2` since build 2). The sim never reads the clock
+// or storage: src/boot/autosave.ts supplies savedAt / build / onboarding,
+// picks the key (SAVE_KEY, or SAVE_KEY + ':cfg:<name>' under ?config=) and
+// does the localStorage I/O. No migrations (R9): a payload loads only when
+// version === SAVE_VERSION (types.ts STATE_VERSION, 2) and its dataHash
+// matches the running data tables (isCompatible); otherwise the Title
+// discards it — a build-1 save (`pm.save.v1`, version 1) included.
 
 import type { GameData } from '../data/types.ts'
 import type { CommandLogEntry } from './commands.ts'
 import { Sim, snapshotProblems } from './sim.ts'
 import type { LoadOptions } from './sim.ts'
-import type { SimState } from './types.ts'
+import { STATE_VERSION, type SimState } from './types.ts'
 
-export const SAVE_KEY = 'pm.save.v1'
-export const SAVE_VERSION = 1
+/** The build-2 save key (spec-build2 §8). */
+export const SAVE_KEY = 'pm.save.v2'
+/** The build-1 key: never loaded, removed with the stale-save toast. */
+export const LEGACY_SAVE_KEY = 'pm.save.v1'
+/** = the sim's STATE_VERSION: payload, snapshot and state share one number. */
+export const SAVE_VERSION = STATE_VERSION
 
 /** UI state the HUD's Onboarding keeps (the sim never reads it). */
 export interface OnboardingSave {
@@ -23,7 +30,7 @@ export interface OnboardingSave {
 }
 
 export interface SavePayload {
-  version: 1
+  version: typeof SAVE_VERSION
   /** Wall-clock ms supplied by the caller (Date.now() in autosave.ts). */
   savedAt: number
   /** __BUILD_STAMP__ */
@@ -98,7 +105,7 @@ export function deserialise(text: string): SavePayload {
   return p as unknown as SavePayload
 }
 
-/** Title "Continue" rule: version 1 and the same data tables. */
+/** Title "Continue" rule: version SAVE_VERSION and the same data tables. */
 export function isCompatible(payload: unknown, data: GameData): boolean {
   if (typeof payload !== 'object' || payload === null) return false
   const p = payload as Partial<SavePayload>

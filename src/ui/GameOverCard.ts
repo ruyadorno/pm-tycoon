@@ -11,6 +11,11 @@
 // `New game` opens the playtest summary card (HudScene closes this card and
 // reopens it on the summary's `Back`).
 //
+// Build 2 (report-playtest1 §6.12, plan-build2 §8.2 task 10): Enter opens the
+// run summary (gameOverEnterAction) — it used to start a new game at once,
+// skipping the summary and clearing the save. Without a summary action Enter
+// is swallowed: `New game` is a tap, never a key's default.
+//
 // Like the lost-life card it draws through its own full-screen camera over
 // an off-screen origin so nothing in the HUD covers it, and it swallows every
 // tap. The stats are pure (tests/ui/game-over-card.test.ts); Phaser is a
@@ -116,6 +121,13 @@ export function gameOverModel(
   }
 }
 
+/** What Enter does on the card: the run summary when offered, else nothing. */
+export function gameOverEnterAction(
+  opts: Pick<GameOverCardOptions, 'onSummary'>,
+): 'summary' | 'none' {
+  return opts.onSummary ? 'summary' : 'none'
+}
+
 // ---- view -----------------------------------------------------------------------
 
 export interface GameOverCardOptions {
@@ -180,9 +192,10 @@ export class GameOverCard {
   }
 
   private onKey(ev: KeyboardEvent): void {
-    // Enter = New game; Esc is swallowed (the screen has no "back").
+    // Enter = Run summary (§6.12); Esc is swallowed (the screen has no "back").
     if (ev.key === 'Enter') {
-      if (claimKey(ev, this)) this.opts.onNewGame()
+      if (!claimKey(ev, this) || ev.repeat) return
+      if (gameOverEnterAction(this.opts) === 'summary') this.opts.onSummary?.()
     } else if (ev.key === 'Escape') claimKey(ev, this)
   }
 

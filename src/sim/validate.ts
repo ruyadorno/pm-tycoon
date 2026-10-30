@@ -3,9 +3,10 @@
 // cross-references and conservation identity (sim.ts). A save with the
 // running data hash can still be damaged (a flipped digit that stays valid
 // JSON, a hand-edited payload, a build that changed the state shape without
-// bumping `version`); every field the tick and the command handlers read
-// must then have its type, its enum value or a data id, or tick() throws on
-// the first frame after Continue. Problems here make the Title discard the
+// bumping `version` — types.ts STATE_VERSION, 2 since build 2, the only
+// value accepted); every field the tick and the command handlers read must
+// then have its type, its enum value or a data id, or tick() throws on the
+// first frame after Continue. Problems here make the Title discard the
 // save with "Save from an older build was reset" (autosave.ts checkSave)
 // instead of crashing. Lenient where a legitimate save varies: extra keys
 // are ignored, the ADDITION fields of types.ts are optional (older saves
@@ -13,7 +14,7 @@
 
 import type { GameData } from '../data/types.ts'
 import { roadGraph } from './roads.ts'
-import type { SimState } from './types.ts'
+import { STATE_VERSION, type SimState } from './types.ts'
 
 type Add = (m: string) => void
 /** Checks `v` at `path`; returns false when it is not even the right kind. */
@@ -229,7 +230,8 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
   }
 
   const shape = obj({
-    version: oneOf([1]),
+    // Build 2 only (plan.md R9): a version-1 state never loads.
+    version: oneOf([STATE_VERSION]),
     seed: int(),
     rng: int(0, 0xffffffff),
     tick,

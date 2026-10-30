@@ -109,6 +109,13 @@ describe('§2.1 BuySheet rows: unlocked first, desk row, locked last', () => {
     expect(bs.unlockText(data, 2)).toBe('Unlocks at Lv 2')
   })
 
+  it('plan-build2 §8.2 task 11: the suffix vanishes by data once the cap rises', () => {
+    const top = Math.max(...data.levels.map((l) => l.level))
+    const open = dataFixture({ economy: { playtestMaxLevel: top } })
+    expect(bs.unlockText(open, 3)).toBe('Unlocks at Lv 3')
+    expect(bs.unlockText(open, top)).toBe(`Unlocks at Lv ${top}`)
+  })
+
   it('the desk row: free, seats 1–3, 85% any strain, 15/min each, $20/day each', () => {
     const desk = bs.buyRows(data, 1, null).find((r) => r.kind === 'desk')
     expect(desk).toMatchObject({

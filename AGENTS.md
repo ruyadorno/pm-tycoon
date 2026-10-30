@@ -44,7 +44,7 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 
 - `src/sim/**` and `src/data/**` are headless: no Phaser, DOM, Date.now, performance.now, Math.random, timers; 10 ticks/s;
   seeded PRNG only (`tools/check-sim-purity.mjs` enforces it, and also keeps `src/ui/layout.ts`, `src/render/warehouse/RoomLayout.ts`,
-  `src/render/{decayPhase,cityFx,quality,vehicleDepth}.ts`, `src/input/GestureClassifier.ts`, `src/audio/{chords,leadsheet,arranger}.ts` and `src/metrics/playtest.ts` free of Phaser/DOM value
+  `src/render/{decayPhase,cityFx,quality,vehicleDepth,AttractCamera,atlases,frames}.ts`, `src/input/GestureClassifier.ts`, `src/audio/{chords,leadsheet,arranger}.ts` and `src/metrics/playtest.ts` free of Phaser/DOM value
   imports so Vitest can load them under Node). Scenes only read sim state and call the `ViewSim` facade
   (`src/sim/view-api.ts`), which builds a `Command` and calls `Sim.dispatch`; rendering never mutates sim state.
 - Relative imports carry the `.ts` extension; erasable syntax only (no enums, parameter properties, namespaces) so Node 26 runs
@@ -55,9 +55,14 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 - No new runtime dependency without a paragraph in docs/decisions.md (why, licence, size). Dev deps need no note.
 - Sprites follow art/STYLE.md + art/manifest.json (canvas classes, anchors, headings, palette); scenes reference frames through
   `src/render/frames.generated.ts`; `vlr art:lint` fails off-contract pixels. Art swaps never require code changes.
-- Two atlases: `world` (city, UI nine-slices, icons, the m5x7 glyph sheet — the HUD binds only this one) and `interior`
-  (warehouse room, fixtures, machines, workers, faces), packed by the manifest's `atlas` key with hashed URLs; the logo
-  (`public/assets/logo.png`) is brand art outside both atlases and the palette lint. BitmapText only (Text only in the debug overlay);
+- Two atlases in `src/assets/` (≤ 2048² each, `world` ≤ 75 % fill): `world` = the city, the UI nine-slices and everything the
+  HUD, `src/ui/**`, GarageSheet and the room's FRONT layers draw (the HUD binds only this one); `interior` = the room's BACK
+  layers (floor, walls, belts, fixtures, racks, shelves, doors, tails, signs); shared frames (icons, parcels, fx, machines,
+  workers, the desk, the m5x7 glyph sheet) are packed into both. Placement = manifest `atlas` ('world' | 'interior' | 'both')
+  ?? the class default in `tools/art/atlas.ts`; frames.generated.ts carries FRAME_ATLAS / SHARED_FRAMES. Every asset URL
+  (atlases, m5x7.xml, `src/assets/logo.png` — brand art outside both atlases and the palette lint — and attract.json) is
+  content-hashed by Vite through `src/render/assetUrls.ts` (the only `?url` module); nothing ships from `public/assets/`.
+  BitmapText only (Text only in the debug overlay);
   integer camera zoom {1, 2}; no setScale/rotation/filters/flipX on world art; `scene.sleep/run` for view switches (never
   `start`); sim events are subscribed on WAKE/create and removed on SLEEP/SHUTDOWN, with `syncAll()` on wake.
 

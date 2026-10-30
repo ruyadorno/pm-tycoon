@@ -2,7 +2,10 @@
 // validation (a full-screen problem list on DataError), the Sim (new, or the
 // autosave when the Title is skipped; the Title's Continue / New game swap it
 // with setSim), the stepper, the AudioDirector (installAudio below), navigation
-// and the debug API; then Preload. Runs once per page.
+// and the debug API; then Preload. Runs once per page. Build 2 (B2 §5): the
+// policy module is loaded whenever the Title may run its attract city (the
+// competent policy drives the demo), not only for ?policy=1; registry
+// 'createPolicy' holds its factory. The director never hears the attract sim.
 import Phaser from 'phaser'
 import type { AudioDirector, SimLookups } from '../audio/director.ts'
 import {
@@ -10,7 +13,12 @@ import {
   REG_PENDING_TOAST,
   startupGame,
 } from '../boot/autosave.ts'
-import { REG, setSim, SIM_REPLACED } from '../boot/simBinding.ts'
+import {
+  REG,
+  setSim,
+  SIM_REPLACED,
+  type SimReplaced,
+} from '../boot/simBinding.ts'
 import { installNav } from '../boot/nav.ts'
 import { installStepper, type Stepper } from '../boot/stepper.ts'
 import { DataError, type GameData } from '../data/index.ts'
@@ -70,16 +78,81 @@ export function importAudio(): Promise<AudioModule | null> {
   )
 }
 
-/** ?policy=1 loads src/sim/policy.ts lazily (absent until M1: the glob is then empty). */
+/** src/sim/policy.ts, lazily (absent until M1: the glob is then empty). */
 const POLICY_MODULES = import.meta.glob<{ createPolicy?: PolicyFactory }>(
   '../sim/policy.ts',
 )
 
-async function loadPolicyFactory(): Promise<PolicyFactory | null> {
+/** Registry key of the importPolicy() promise src/main.ts starts before the game boots. */
+export const REG_POLICY_MODULE = 'policyModule'
+
+/**
+ * The policy chunk (src/sim/policy.ts, a few KB) for the Title's attract
+ * city (B2 §5: every default boot) and ?policy=1, fetched in parallel with
+ * Phaser's boot like importAudio (src/main.ts starts it; Boot awaits it).
+ * null when the module is absent or its chunk fails to load (a flaky
+ * network, a redeploy race, report §6.21): the Title then shows the plain
+ * backdrop and ?policy=1 runs without a policy. Never rejects.
+ */
+export function importPolicy(): Promise<PolicyFactory | null> {
   const load = POLICY_MODULES['../sim/policy.ts']
-  if (!load) return null
-  const mod = await load()
-  return mod.createPolicy ?? null
+  if (!load) return Promise.resolve(null)
+  return load().then(
+    (mod) => mod.createPolicy ?? null,
+    (err: unknown) => {
+      console.warn(
+        'boot: the policy chunk failed to load (no attract city)',
+        err,
+      )
+      return null
+    },
+  )
+}
+
+type KeyboardShutdown = {
+  game: Phaser.Game
+  resetKeys(): void
+  shutdown(): void
+}
+let keyboardPatched = false
+
+/**
+ * Phaser 4.2.1 KeyboardPlugin#shutdown removes its game BLUR listener
+ * without the context — `game.events.off(BLUR, this.resetKeys)` — and since
+ * resetKeys is one prototype function, EventEmitter3 then drops the BLUR
+ * listener of EVERY scene's keyboard plugin. A scene that stops while others
+ * keep running (the Title over the attract City, B2 §5: the City is never
+ * restarted) left the City and the HUD without the key reset on window blur
+ * (and e2e/lifecycle.spec.ts saw game:blur 5 → 3). The patched shutdown
+ * passes `this` as the context, so only its own listener goes. Idempotent.
+ */
+export function patchKeyboardShutdown(): void {
+  if (keyboardPatched) return
+  keyboardPatched = true
+  const proto = Phaser.Input.Keyboard.KeyboardPlugin
+    .prototype as unknown as KeyboardShutdown
+  const shutdown = proto.shutdown
+  proto.shutdown = function (this: KeyboardShutdown): void {
+    const events = this.game.events as unknown as {
+      off(n: unknown, fn?: unknown, ctx?: unknown, once?: unknown): unknown
+    }
+    const own = Object.prototype.hasOwnProperty.call(events, 'off')
+    const off = events.off
+    events.off = (n, fn, ctx, once) =>
+      off.call(
+        events,
+        n,
+        fn,
+        fn === this.resetKeys && ctx === undefined ? this : ctx,
+        once,
+      )
+    try {
+      shutdown.call(this)
+    } finally {
+      if (own) events.off = off
+      else delete (events as { off?: unknown }).off
+    }
+  }
 }
 
 /** The ground bake needs a 3072-px texture; refuse below 4096 (city-view.md §1.2). */
@@ -126,6 +199,7 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     const game = this.game
     const p = params()
+    patchKeyboardShutdown()
     // The director owns visibility (Q46): Phaser's sound manager must never
     // suspend the shared context on a desktop blur, from the first frame on.
     const sound = game.sound as { pauseOnBlur?: boolean } | undefined
@@ -182,13 +256,23 @@ export class BootScene extends Phaser.Scene {
     if (resume.toast) game.registry.set(REG_PENDING_TOAST, resume.toast)
     const sim = resume.game?.sim ?? new Sim(data, p.seed)
     const stepper = installStepper(game, sim)
+    // The Title's attract city (B2 §5) runs the competent policy too (the
+    // Title also comes back after a game over, so ?skipTitle=1 needs it).
+    // src/main.ts started the fetch; null on a failed chunk (never fatal).
+    const createPolicy =
+      p.policy || p.attract
+        ? await ((game.registry.get(REG_POLICY_MODULE) as
+            | Promise<PolicyFactory | null>
+            | undefined) ?? importPolicy())
+        : null
+    game.registry.set(REG.createPolicy, createPolicy)
     if (p.policy) {
-      const createPolicy = await loadPolicyFactory()
       if (createPolicy)
         game.registry.set(REG.policyFactory, (s: Sim) =>
           createPolicy(s, 'competent'),
         )
-      else console.warn('policy=1: src/sim/policy.ts is not built yet')
+      else
+        console.warn('policy=1: no policy module (absent, or its chunk failed)')
     }
     setSim(game, sim)
     const waitFrom = performance.now()
@@ -219,7 +303,8 @@ export class BootScene extends Phaser.Scene {
  *     audio:muted / audio:nowPlaying / audio:unlocked;
  *   - the sim's events, re-attached whenever setSim() swaps the Sim (New game,
  *     Continue, __pm.load: SIM_REPLACED), with lookups that always read the
- *     current sim;
+ *     current sim; the Title's attract sim (B2 §5) is never attached — the
+ *     demo city makes no sound and never counts as the player's;
  *   - without a Title tap (?skipTitle=1, ?view=…) the first gesture anywhere
  *     unlocks (the Title calls unlock() itself).
  * Never throws: a Web Audio or data failure yields a disabled director whose
@@ -258,9 +343,9 @@ export function installAudio(
   }
   const first = sim()
   let detach = first ? audio.attachSim(first.events, lookups) : () => {}
-  game.events.on(SIM_REPLACED, (e: { sim: Sim }) => {
+  game.events.on(SIM_REPLACED, (e: SimReplaced) => {
     detach()
-    detach = audio.attachSim(e.sim.events, lookups)
+    detach = e.attract ? () => {} : audio.attachSim(e.sim.events, lookups)
   })
   if (p.skipTitle || p.view !== null) audio.unlockOnFirstGesture()
   return audio

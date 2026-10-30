@@ -1,4 +1,4 @@
-# Decisions log (playtest 1)
+# Decisions log (playtest 1 + build 2)
 
 Every "(default — confirm)" choice taken during the run, numbered as in `plan.md` §14, with where it is coded;
 every runtime dependency (why, licence, size); every deviation from the plan found while running. The author
@@ -236,3 +236,83 @@ Every §14 question (Q1–Q79) is listed with the shipped default and where it i
     - the only cross-part unison is the written trumpet + vibes unison of chorus 2.
   - Verdict: "unheard on this VM — author to judge".
 - **Q52 — Credits.** CREDITS.md audio section (text supplied) plus the Title-screen Credits card, which the integration adds.
+
+## Run decisions (build 2)
+
+Build 2 (plan-build2.md, spec-build2.md cited `B2 §N`) runs M5 → M10 in one autonomous run from 84334f7. Each line is a
+plan-build2.md §11 question with what is coded and where; the author overrules any line by number.
+
+**Answered by the author before the run (2026-10-30), coded as stated:**
+
+- **Q-B2-1 — logo as-is.** `art/logo.png` is Lanczos-downscaled to 352×176 by `tools/art/logo.ts` (`vlr art:logo`, a step
+  of `art:build`) and drawn 1:1 logical on the Title; manifest class `logo`, outside both atlases and exempt from lint
+  A01/A07 (B2 §5).
+- **Q-B2-2 — driver picker on every vehicle purchase**; `Hire later` parks the vehicle `No driver` (B2 §2.5).
+- **Q-B2-3 — the Hold Bay sorter is Toss-only**: the wanted list and its judgement decide what to toss; the rest is tagged
+  `looks clean` for the player's Clear; it never Clears, so it can never cost a life (B2 §2.6).
+- **Q-B2-8 — one long autonomous run M5 → M10** with the review at the end.
+- **Q-B2-15 — PixelLab budget 1,500 generations with a 300 reserve**, set by the author's run prompt (the plan's
+  alternative to the 2,000 / 400 default). L5 region ids start at 2 candidates; the bulk order stays fixes →
+  machines/people → Docks → L4 regions → L5 regions → tiers (plan-build2 §8.8 R18). `tools/art/gen.ts` counts only
+  batches from 2026-10-30 on; `PIXELLAB_RUN_BUDGET` / `PIXELLAB_RESERVE` change the limits without a code edit. Balance
+  at the start: 3,299 of the 5,000 monthly generations.
+
+**Defaults taken (plan-build2 §11), implemented as stated:**
+
+- **Q-B2-4** — desk 2 unlocks at L3 for $400 (`employees.json desks.rows`).
+- **Q-B2-5** — charisma reaches colleagues at the same desk only (`src/sim/systems/people.ts`).
+- **Q-B2-6** — `Post an ad` ($30, `employees.json applicants.adPrice`) rerolls one pool now; pools also refresh free every day.
+- **Q-B2-7** — a failed or expired quest has no penalty (`src/sim/systems/quests.ts`).
+- **Q-B2-9** — at M10 the run dispatches the Pages workflow once (`gh workflow run pages.yml`) with the ruy-bot token and
+  checks `https://ruyadorno.com/pm-tycoon/` with one GET.
+- **Q-B2-10** — dist transfer budget 6 → 8 MB (`tools/check-dist.mjs`).
+- **Q-B2-11** — the attract city is a fixed demo snapshot (seed 7, competent policy, 24 min; `src/assets/attract.json`
+  from `vlr fixtures:attract`), never the player's own save.
+- **Q-B2-12** — quest cash counts toward lifetime earned (spec §7.3); R15 guards the level windows.
+- **Q-B2-13** — the magic parcel's destination is within 20 road tiles of the lot (`quests.json magic_parcel.goal.maxRoadTiles`).
+- **Q-B2-14** — the `vehicle-bike` canvas grows 24×24 → 32×32 (`tools/art/manifest.ts`); no gameplay effect.
+
+**Run-start findings (2026-10-30):**
+
+- The VM's vlt moved 1.6.0 → 1.6.1; `tools/check-toolchain.mjs` accepts any 1.6.x patch (same CLI and lockfile format).
+- The AGENTS.md scope guard was rewritten for build 2 in the first M5 commit (plan-build2 §10).
+
+## Run decisions and deviations (M5)
+
+- **Atlas placement follows who binds the frame** (deviation from B2 §6.8's list): `world` holds the city, the
+  nine-slices and everything the HUD, `src/ui/**`, the Garage and the room's front layers (parcels, machines, workers,
+  badges, fx, readout) draw; `interior` holds the room's back layers (floor, walls, belts, fixtures, dock tail);
+  `icon16`, `parcel`, `fx`, `machine`, `worker`, `fixture-desk` and the font are packed into both. Phaser draws one
+  texture per batch on the iPhone profile, so an interior-only machine or face would cost the HUD a texture switch.
+  The room binds per layer (`roomAtlas()` for back layers, `atlasOf()` for front layers; the north-wall sign uses
+  `ROOM_FONT_KEY`). Measured: world 2048² at 57.9 %, interior 2048×512 at 24.2 %; draw calls city 3, warehouse 6.
+- **Hashed assets**: the atlases, the m5x7 XML, the logo and the attract snapshot live in `src/assets/` behind the `?url`
+  imports of `src/render/assetUrls.ts` (`assetsInlineLimit: 0`); `tools/check-dist.mjs` requires every one hashed and
+  fetched once, budget 8 MB (Q-B2-10). Dist: 5.24 MB raw, ~3.45 MB gzip.
+- **Hop sink is a crop, not a scale** (B2 §6.3; no setScale on world art): the pickup icon is cut to a centred square
+  stepping 16 → 0 px over the last 40 % of the flight, ending on the vehicle body centre (`VehicleView.bodyCentre()`,
+  y − 4); the delivery hop starts there at full size.
+- **Slab** (B2 §6.1): `slabStamps()` in `src/render/cityFx.ts` stamps `lot_slab_a/b/c` on the 16 footprint tiles,
+  `lot_ramp` on the dock tiles (a dropped kerb) and `bollard_a/b` on the three tiles off the slab's S, W and E corners
+  (baked into the ground, so only on tiles in front of the building and off every vehicle path). The exterior is
+  generated without an apron or shadow strip; lint A04 is strict for `warehouse-ext`. Bay-light and dock-pose anchors
+  are measured per exterior frame in the manifest (`WH_ANCHORS`).
+- **Art picks**: the agent's picks go through `tools/art/decide.ts --manifest` (`chosenCandidate`, `approved: false`);
+  `vlr art:approve` stays the author's. `dk_pier` and `dk_customs` were rejected with the author's reasons and moved to
+  `manifest.retired[]`. The worker scan frames are a scripted edit of the PixelLab idle frames (forearm raised with a
+  scanner, 0 generations: PixelLab's animations came out at another scale). `fx_dust` is one 256×224 cloud per frame.
+  PixelLab spend M5: 126 generations (3,299 → 3,173).
+- **Save v2**: `STATE_VERSION = 2` (state, snapshot, save); with `?config=<name>` the save and playtest keys take a
+  `:cfg:<name>` suffix (report §6.13); a `pm.save.v1` reads as stale only when the session has no v2 save of its own;
+  Reset enumerates and clears every `pm.save.*` key.
+- **Attract title**: the HUD does not run on the Title (it launches at the swap); `__pm.ready` flips on `pm:attractEnd`;
+  the policy chunk loads in `main.ts` with the audio chunk (a failed fetch falls back to the plain backdrop); the audio
+  director never attaches to the attract sim, so the demo city is silent until the first tap; the demo is recycled
+  after 30 min of attract time, a lost life or game over; the fps sampler skips attract frames. Phaser 4.2.1's
+  `KeyboardPlugin#shutdown` calls `game.events.off(BLUR, resetKeys)` without a context and strips every scene's blur
+  listener; `BootScene` patches it to pass `this` (the Title now stops while the City keeps running).
+- **Report §6 fixes**: the ticker drops queued `day` lines when a newer one queues and any line older than 90 s of
+  unpaused display time; the 8-line cap evicts by rank (filler < daily < other < offer/incident/level). Enter on Game Over
+  opens the run summary (nothing without one). The district sheet grows but never shrinks while open; the Garage list
+  is sized to its rows, capped at the old height. The Paused card is on the modal stack: W, G and Esc-to-City wait,
+  Space/1/2/4 still resume. The Title's Credits card is modal.

@@ -555,6 +555,78 @@ export function stairStepOk(img: Img, w: number): string[] {
   return problems
 }
 
+/**
+ * Rows the warehouse exterior's wall base may sit inside its 4x4 footprint
+ * diamond (B2 §6.1; the slab tiles show in that rim). 6 rows = 12 px at the
+ * side corners.
+ */
+export const EXTERIOR_INSET_MAX = 6
+
+/**
+ * A04 strict for class warehouse-ext (B2 §6.1, build 2): the sprite paints
+ * no ground — the lot slab is ground-bake tiles — so its wall base must
+ * stand on the footprint diamond `w` wide at the canvas bottom: no opaque
+ * pixel outside the diamond's columns, none below its lower edges (the
+ * lower half rows outside the span), the walls' bottom vertex within
+ * `inset` rows of the anchor row and the side corners within 2 * `inset`
+ * px of the diamond's side vertices. Holes inside the diamond are allowed
+ * (the slab shows there).
+ */
+export function exteriorBaseOk(
+  img: Img,
+  w: number,
+  inset = EXTERIOR_INSET_MAX,
+): string[] {
+  const problems: string[] = []
+  const spans = diamondSpans(w)
+  const row0 = img.h - spans.length
+  const left = img.w / 2 - w / 2
+  const right = left + w - 1
+  const b = bbox(img)
+  if (!b) return ['empty sprite']
+  if (b.x0 < left || b.x1 > right) {
+    problems.push(
+      `opaque pixel at x ${b.x0 < left ? b.x0 : b.x1} outside the ` +
+        `diamond columns ${left}..${right}`,
+    )
+  }
+  spans.forEach(([s0, s1], r) => {
+    if (problems.length > 0 || r < spans.length / 2) return
+    const y = row0 + r
+    for (let x = 0; x < img.w; x++) {
+      if (x >= left + s0 && x <= left + s1) continue
+      if (opaque(img, x, y)) {
+        problems.push(`row ${y}: opaque pixel x ${x} below the diamond edge`)
+        return
+      }
+    }
+  })
+  // the walls' bottom vertex: the lowest opaque row of the centre columns
+  const cx = img.w / 2
+  let low = -1
+  for (let y = img.h - 1; y >= 0 && low < 0; y--) {
+    for (let x = cx - 4; x < cx + 4; x++) {
+      if (opaque(img, x, y)) {
+        low = y
+        break
+      }
+    }
+  }
+  if (low < img.h - 1 - inset) {
+    problems.push(
+      `wall base ends at row ${low} at the centre, more than ${inset} rows ` +
+        `above the footprint's bottom vertex (row ${img.h - 1})`,
+    )
+  }
+  if (b.x0 > left + 2 * inset || b.x1 < right - 2 * inset) {
+    problems.push(
+      `wall base spans x ${b.x0}..${b.x1}, not on the diamond's side ` +
+        `vertices ${left}..${right} (within ${2 * inset} px)`,
+    )
+  }
+  return problems
+}
+
 // ---------------------------------------------------------------------------
 // Materials
 

@@ -51,7 +51,7 @@ export const PHASE_TINT: Record<DecayPhase, number> = {
 export type { MoodKind } from './cityFx.ts'
 
 const BADGE_ICON = 'ic_parcel_m'
-/** m5x7 metrics (public/assets/m5x7.xml): cap top 4, cap height 7. */
+/** m5x7 metrics (src/assets/m5x7.xml): cap top 4, cap height 7. */
 export const CAP_TOP = 4
 export const CAP_H = 7
 

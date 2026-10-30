@@ -43,9 +43,8 @@ import {
 } from '../boot/nav.ts'
 import { bindSim, getSim, getViewSim, REG } from '../boot/simBinding.ts'
 import type { GameData } from '../data/types.ts'
-import { WAREHOUSE_ATLAS } from '../render/atlases.ts'
 import { formatMmSs } from '../render/decayPhase.ts'
-import { frameOrNull } from '../render/frames.ts'
+import { atlasOf, frameOrNull } from '../render/frames.ts'
 import { DockView, lockedDockText } from '../render/warehouse/DockView.ts'
 import { Fx, reducedMotion } from '../render/warehouse/Fx.ts'
 import {
@@ -857,13 +856,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     if (!src) return
     press.lifted = true
     this.endMove()
+    // the ghost copies the fixture's own texture (interior, or world for a
+    // frame only that atlas holds — tools/art/atlas.ts)
     const ghost = this.add
-      .image(
-        src.x,
-        src.y,
-        WAREHOUSE_ATLAS,
-        frameOrNull(src.frame.name) ?? 'desk',
-      )
+      .image(src.x, src.y, src.texture.key, src.frame.name)
       .setOrigin(0, 0)
       .setAlpha(GHOST_ALPHA)
     this.layers.fx.add(ghost)
@@ -951,8 +947,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     for (const r of rows) {
       let x = pad
       if (r.icon && frameOrNull(r.icon)) {
+        // on a ui_panel with text: the icon's home atlas (world for the
+        // shared icons) batches with the panel and the BitmapText
         const ic = this.add
-          .image(x, y + 2, WAREHOUSE_ATLAS, r.icon)
+          .image(x, y + 2, atlasOf(r.icon), r.icon)
           .setOrigin(0, 0)
         lines.push(ic)
         x += 20

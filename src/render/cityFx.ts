@@ -1,9 +1,14 @@
 // Pure rules and timelines of the city's M3 flourishes (plan.md §7, §12.6
 // tasks 5 + 9; city-view.md §1.3-§1.4, §2, §9.6; spec-core.md §3.5, §9.2,
-// Q33). No Phaser, no DOM: CityScene / BuildingView / VehicleView /
-// DistrictLabel drive their sprites from these and Vitest pins them under
-// Node (tests/render/cityFx.test.ts). Every time is ms on the scene clock
+// Q33) and of the build-2 lot (spec-build2.md §6.1: the warehouse slab, ramp
+// and bollards stamped by the ground bake; the exterior anchors read from the
+// manifest-derived frames.generated.ts). No Phaser, no DOM: CityScene /
+// BuildingView / VehicleView / DistrictLabel / ground.ts drive their sprites
+// from these and Vitest pins them under Node (tests/render/cityFx.test.ts,
+// tests/render/ground-slab.test.ts). Every time is ms on the scene clock
 // (frozen-clock friendly: __pm.freeze steps it).
+import { isRoadTile, mapBlockAt, type MapData, type XY } from '../data/index.ts'
+import { WH_ANCHORS, type WarehouseAnchorSet } from './frames.generated.ts'
 
 // ---------------------------------------------------------------- region unlock (§1.4)
 
@@ -31,20 +36,16 @@ export function signPopFrame(msSincePop: number): number | null {
 
 // ---------------------------------------------------------------- level-up moment (§9.6)
 
-/** fx_dust: 4 frames × 250 ms = scaffold, dust, dust, reveal. */
+/**
+ * fx_dust: 4 frames × 250 ms = scaffold, dust, dust, reveal. Each frame is
+ * ONE 256×224 cloud over the whole exterior (report §6.23), placed like
+ * wh_ext: origin (0.5, 1) on the lot's footprint anchor.
+ */
 export const DUST_FRAMES = 4
 export const DUST_FRAME_MS = 250
 export const CONSTRUCTION_MS = DUST_FRAMES * DUST_FRAME_MS
 /** The exterior swaps to the new tier as the reveal frame starts. */
 export const CONSTRUCTION_SWAP_MS = (DUST_FRAMES - 1) * DUST_FRAME_MS
-/**
- * Dust puffs cover the warehouse on a staggered grid (32×32 frames) with a
- * deterministic jitter, so the scaffold frame reads as a building site and
- * not a fence pattern.
- */
-export const DUST_STEP_X = 40
-export const DUST_STEP_Y = 30
-export const DUST_JITTER = 7
 
 /** fx_dust frame index `elapsed` ms into the construction, null when done. */
 export function dustFrame(elapsed: number): number | null {
@@ -81,56 +82,11 @@ export function stampPose(
   }
 }
 
-export interface Rect {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
-/** Small deterministic integer hash (no Math.random: same cloud every run). */
+/** Small deterministic integer hash (no Math.random: same slab every run). */
 function hash2(a: number, b: number): number {
   let h = (Math.imul(a + 1, 0x9e3779b1) ^ Math.imul(b + 7, 0x85ebca6b)) >>> 0
   h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0
   return (h ^ (h >>> 13)) >>> 0
-}
-
-/**
- * Centres of the dust puffs covering `rect` (the exterior's visible rect):
- * a staggered grid jittered by up to ±DUST_JITTER px, keeping the points
- * where the sprite is opaque.
- */
-export function dustPoints(
-  rect: Rect,
-  isOpaque: (x: number, y: number) => boolean,
-  stepX = DUST_STEP_X,
-  stepY = DUST_STEP_Y,
-  jitter = DUST_JITTER,
-): { x: number; y: number }[] {
-  const out: { x: number; y: number }[] = []
-  const span = 2 * jitter + 1
-  let row = 0
-  for (let y = rect.y + stepY / 2; y < rect.y + rect.h; y += stepY, row++) {
-    let col = 0
-    const x0 = rect.x + (row % 2 === 0 ? stepX / 2 : stepX)
-    for (let x = x0; x < rect.x + rect.w; x += stepX, col++) {
-      const h = hash2(row, col)
-      const px = Math.round(
-        Math.min(
-          rect.x + rect.w - 1,
-          Math.max(rect.x, x + (h % span) - jitter),
-        ),
-      )
-      const py = Math.round(
-        Math.min(
-          rect.y + rect.h - 1,
-          Math.max(rect.y, y + ((h >>> 8) % span) - jitter),
-        ),
-      )
-      if (isOpaque(px, py)) out.push({ x: px, y: py })
-    }
-  }
-  return out
 }
 
 // ---------------------------------------------------------------- moods (spec §9.2)
@@ -190,21 +146,69 @@ export function honkShown(nowMs: number, vehicleId: number): boolean {
 
 /** wh_ext_t* canvas (256×256, origin (0.5, 1) at the lot's footprint anchor). */
 export const WH_CANVAS = 256
+
+/** A canvas pixel, from the frame's top-left. */
+export type CanvasPt = readonly [number, number]
+
 /**
- * Dock-bay lights, wh_ext canvas px, origin (0.5, 1): the pointer tip sits on
- * the amber lamp above each bay door of the visible SW face (bays 1-3).
+ * Where the city hangs things on a warehouse exterior frame (canvas px from
+ * the top-left; the sprite's origin is (0.5, 1) on the footprint anchor):
+ * `bayLights` = the pointer tip on the amber lamp above each bay door of the
+ * visible SW face (bays 1-3); `dockPose` = foot point of a vehicle docked at
+ * bay 1, in front of the open door, nose in (`<type>_ne_<phase>`). The map's
+ * dock tile (20, 22) lies on the hidden NW side of the sprite, so the view
+ * draws the docked vehicle here.
  */
-export const BAY_LIGHTS: readonly (readonly [number, number])[] = [
-  [47, 139],
-  [71, 151],
-  [96, 163],
-]
+export type WarehouseAnchors = WarehouseAnchorSet
+
+/** The tier-1 exterior frame: the default (and fallback) anchor set. */
+export const WH_ANCHOR_FRAME = 'wh_ext_t1'
+
 /**
- * Foot point of a vehicle docked at bay 1 (canvas px): in front of the open
- * door, nose in (`<type>_ne_<phase>`). The map's dock tile (20, 22) lies on
- * the hidden NW side of the sprite, so the view draws the docked vehicle here.
+ * Playtest-1 measurements of the apron-era wh_ext_t1 (the art-install
+ * hand-off). Used only when frames.generated.ts carries no WH_ANCHORS row
+ * for the frame or tier 1 (the manifest's wh_ext `bayLights` / `dockPose`,
+ * measured on the regenerated exterior of B2 §6.1).
  */
-export const DOCK_POSE_CANVAS: readonly [number, number] = [40, 178]
+export const LEGACY_WH_ANCHORS: WarehouseAnchors = {
+  bayLights: [
+    [47, 139],
+    [71, 151],
+    [96, 163],
+  ],
+  dockPose: [40, 178],
+}
+
+/** WH_ANCHORS' shape: exterior frame name → its anchor set. */
+export type WarehouseAnchorTable = Readonly<
+  Partial<Record<string, WarehouseAnchors>>
+>
+
+/**
+ * Anchors of exterior `frame` (`wh_ext_t1`, `wh_ext_t2`, …) from `table`
+ * (frames.generated.ts WH_ANCHORS, written by `vlr art:atlas` from
+ * art/manifest.json): the frame's own set, else tier 1's (every tier is an
+ * edit on the same footprint); null when the table has neither.
+ */
+export function manifestWarehouseAnchors(
+  frame: string = WH_ANCHOR_FRAME,
+  table: WarehouseAnchorTable = WH_ANCHORS,
+): WarehouseAnchors | null {
+  return table[frame] ?? table[WH_ANCHOR_FRAME] ?? null
+}
+
+/** Anchors of exterior `frame`: the manifest's, else the legacy playtest-1 set. */
+export function warehouseAnchors(
+  frame: string = WH_ANCHOR_FRAME,
+  table: WarehouseAnchorTable = WH_ANCHORS,
+): WarehouseAnchors {
+  return manifestWarehouseAnchors(frame, table) ?? LEGACY_WH_ANCHORS
+}
+
+/** Tier-1 bay lights (CityScene creates one light each, then places them per exterior frame). */
+export const BAY_LIGHTS: readonly CanvasPt[] = warehouseAnchors().bayLights
+/** Tier-1 docked-vehicle foot point (CityScene reads the current frame's on every tier swap). */
+export const DOCK_POSE_CANVAS: CanvasPt = warehouseAnchors().dockPose
 /** The dock pose draws over the warehouse wall: footprint depth + this. */
 export const DOCK_POSE_DEPTH = 0.2
 /** Blend radius (tiles) around the dock tile: the approach from the queue head. */
@@ -230,6 +234,131 @@ export function dockBlend(
   const inLot = Math.max(0, Math.min(1, (tx - (lotX0 - 1)) * 2))
   const inColumn = Math.max(0, Math.min(1, (ty - dock[1] + 0.5) * 2))
   return Math.min(1, near) * inLot * inColumn
+}
+
+// ---------------------------------------------------------------- lot slab (B2 §6.1)
+
+/**
+ * The warehouse foundation is ground, not sprite (spec-build2.md §6.1, the
+ * author's city #1): the exteriors carry no apron, and the ground bake
+ * stamps a concrete slab tile on every tile of the lot's warehouse
+ * footprint, the ramp tile on the dock tiles, and a few bollards beside the
+ * slab's visible corners — on the grid by construction, in every tier.
+ */
+export const SLAB_FRAMES = ['lot_slab_a', 'lot_slab_b', 'lot_slab_c'] as const
+export const RAMP_FRAME = 'lot_ramp'
+export const BOLLARD_FRAMES = ['bollard_a', 'bollard_b'] as const
+
+export type LotStampKind = 'slab' | 'ramp' | 'bollard'
+
+/**
+ * One ground-bake stamp. `slab` / `ramp` replace the tile's base ground
+ * frame (full 64×32 diamonds); a `bollard` is a prop stamped after every
+ * tile, its frame's bottom-centre on the tile's bottom vertex (the map
+ * props' anchor), so the post stands on the tile centre.
+ */
+export interface LotStamp {
+  kind: LotStampKind
+  frame: string
+  tx: number
+  ty: number
+}
+
+/**
+ * Variant pick per tile: a fixed integer hash (no Math.random, same lot every
+ * run); its low byte is skipped, which mixes small n better on this lot.
+ */
+export function lotVariant(tx: number, ty: number, n: number): number {
+  return n > 0 ? (hash2(tx, ty) >>> 8) % n : 0
+}
+
+/** Tiles of the lot's warehouse footprint, row-major. */
+export function slabTiles(map: Pick<MapData, 'lot'>): XY[] {
+  const { tile, footprint } = map.lot.warehouse
+  const out: XY[] = []
+  for (let y = tile[1]; y < tile[1] + footprint[1]; y++)
+    for (let x = tile[0]; x < tile[0] + footprint[0]; x++) out.push([x, y])
+  return out
+}
+
+/**
+ * Candidate bollard tiles, before filtering: just off the slab's three
+ * visible corners (S, W, E — the N corner is behind the building) and at
+ * both ends of the dock run (the ramp's sides).
+ */
+function bollardCandidates(map: Pick<MapData, 'lot'>): XY[] {
+  const { tile, footprint } = map.lot.warehouse
+  const x0 = tile[0]
+  const y0 = tile[1]
+  const x1 = x0 + footprint[0] - 1
+  const y1 = y0 + footprint[1] - 1
+  const out: XY[] = [
+    [x1 + 1, y1 + 1],
+    [x0, y1 + 1],
+    [x1 + 1, y0],
+  ]
+  const docks = map.lot.docks
+  if (docks.length > 0) {
+    const xs = docks.map((d) => d[0])
+    const ys = docks.map((d) => d[1])
+    const minX = Math.min(...xs)
+    const maxX = Math.max(...xs)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+    if (minX === maxX) out.push([minX, minY - 1], [minX, maxY + 1])
+    else if (minY === maxY) out.push([minX - 1, minY], [maxX + 1, minY])
+  }
+  return out
+}
+
+/**
+ * Where a bollard may stand: a lot tile off the slab that no vehicle uses
+ * (not a road, entrance, dock, queue or parking tile, nor the sign's tile)
+ * and in front of the building (tx ≥ x0 and ty ≥ y0 — behind the NW / NE
+ * walls the exterior sprite would hide a ground stamp).
+ */
+export function bollardTileOk(map: MapData, x: number, y: number): boolean {
+  const lot = map.lot
+  const { tile, footprint } = lot.warehouse
+  const at = (p: readonly number[]): boolean => p[0] === x && p[1] === y
+  if (x < 0 || y < 0 || x >= map.size[0] || y >= map.size[1]) return false
+  if (isRoadTile(map, x, y)) return false
+  if (mapBlockAt(map, x, y)?.kind !== 'lot') return false
+  if (at(lot.entrance) || at(lot.sign)) return false
+  if (lot.docks.some(at) || lot.queue.some(at) || lot.parking.some(at))
+    return false
+  const inSlab =
+    x >= tile[0] &&
+    x < tile[0] + footprint[0] &&
+    y >= tile[1] &&
+    y < tile[1] + footprint[1]
+  if (inSlab) return false
+  return x >= tile[0] && y >= tile[1]
+}
+
+/**
+ * Every lot stamp of the ground bake, in stamp order: the slab tiles
+ * (variant a/b/c by tile hash) over the whole footprint, the ramp on each
+ * dock tile, then the bollards (a/b by tile hash) on the candidate tiles
+ * that pass bollardTileOk, de-duplicated.
+ */
+export function slabStamps(map: MapData): LotStamp[] {
+  const out: LotStamp[] = []
+  for (const [tx, ty] of slabTiles(map)) {
+    const frame = SLAB_FRAMES[lotVariant(tx, ty, SLAB_FRAMES.length)]
+    if (frame) out.push({ kind: 'slab', frame, tx, ty })
+  }
+  for (const [tx, ty] of map.lot.docks)
+    out.push({ kind: 'ramp', frame: RAMP_FRAME, tx, ty })
+  const seen = new Set<string>()
+  for (const [tx, ty] of bollardCandidates(map)) {
+    const k = `${tx},${ty}`
+    if (seen.has(k) || !bollardTileOk(map, tx, ty)) continue
+    seen.add(k)
+    const frame = BOLLARD_FRAMES[lotVariant(tx, ty, BOLLARD_FRAMES.length)]
+    if (frame) out.push({ kind: 'bollard', frame, tx, ty })
+  }
+  return out
 }
 
 // ---------------------------------------------------------------- smoke (§1.3)

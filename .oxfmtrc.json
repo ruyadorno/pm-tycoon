@@ -9,7 +9,7 @@
     "src/data/**/*.json",
     "**/*.generated.*",
     "vlt-lock.json",
-    "public/assets/**",
+    "src/assets/**",
     "public/audio/**",
     "art/manifest.json",
     "art/palette.json",

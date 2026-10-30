@@ -1,24 +1,35 @@
 // Autosave and the localStorage keys (plan.md §5 "localStorage keys", §6.4
 // "Save and load"; spec §2 "autosave every 10 s and on hide"; city-view.md
-// §9.5): the payload shape {version: 1, savedAt, build, dataHash, seed,
-// state, onboarding} under pm.save.v1, the Title header `Day 7 · $1,240 ·
-// Lv 2`, Continue only for version 1 + same dataHash (else "Save from an
-// older build was reset"), Reset clears the three keys, settings {muted,
+// §9.5; spec-build2 §8): the payload shape {version: 2, savedAt, build,
+// dataHash, seed, state, onboarding} under pm.save.v2 (pm.save.v2:cfg:<name>
+// in a ?config= session, report-playtest1 §6.13), the Title header `Day 7 ·
+// $1,240 · Lv 2`, Continue only for version 2 + same dataHash (else "Save
+// from an older build was reset", a build-1 pm.save.v1 included), Reset
+// clears every pm.save / pm.playtest key and the settings, settings {muted,
 // speed} merge, and a failed write reports once and retries next cycle.
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   AUTOSAVE_MS,
   Autosave,
   checkSave,
   clearAllKeys,
+  discardSave,
+  LEGACY_SAVE_KEY,
   loadGame,
   newGame,
   parseSettings,
+  PLAYTEST_KEY,
+  playtestKey,
+  readPlaytest,
   readSave,
   readSettings,
   SAVE_FAILED_TEXT,
   SAVE_KEY,
+  saveConfig,
   saveHeader,
+  saveKey,
+  savedRun,
+  setSaveConfig,
   SETTINGS_KEY,
   STALE_SAVE_TEXT,
   startupGame,
@@ -27,10 +38,11 @@ import {
   type KeyValueStore,
 } from '../../src/boot/autosave.ts'
 import { serialise } from '../../src/sim/save.ts'
-import { stateHash } from '../../src/sim/sim.ts'
+import { Sim, stateHash } from '../../src/sim/sim.ts'
 import { freshOnboarding } from '../../src/ui/Onboarding.ts'
 import { dataFixture, makeSim, runSeconds } from '../sim/helpers.ts'
 
+/** A Storage fake; enumerable (length / key) like localStorage. */
 class MemoryStore implements KeyValueStore {
   readonly map = new Map<string, string>()
   failWrites = false
@@ -44,14 +56,30 @@ class MemoryStore implements KeyValueStore {
   removeItem(k: string): void {
     this.map.delete(k)
   }
+  get length(): number {
+    return this.map.size
+  }
+  key(i: number): string | null {
+    return [...this.map.keys()][i] ?? null
+  }
+}
+
+/** The minimal store (no enumeration), as robustness.test.ts uses. */
+function plainStore(map: Map<string, string>): KeyValueStore {
+  return {
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => void map.set(k, v),
+    removeItem: (k) => void map.delete(k),
+  }
 }
 
 const data = dataFixture()
 
 function saverFor(
-  store: MemoryStore,
+  store: KeyValueStore,
   sim = makeSim(1),
   onError?: (msg: string) => void,
+  getPlaytest?: () => unknown,
 ) {
   const ob = freshOnboarding()
   let now = 1_700_000_000_000
@@ -62,22 +90,64 @@ function saverFor(
     now: () => now++,
     store,
     onError,
+    getPlaytest,
   })
   return { saver, sim, ob }
 }
 
-describe('plan.md §5: the three pm.* keys', () => {
-  it('Reset clears pm.save.v1, pm.settings.v1 and pm.playtest.v1', () => {
+afterEach(() => setSaveConfig(undefined))
+
+describe('plan.md §5 / spec-build2 §8: the pm.* keys', () => {
+  it('the build-2 keys; no ?config= under Node means the plain keys', () => {
+    expect(SAVE_KEY).toBe('pm.save.v2')
+    expect(LEGACY_SAVE_KEY).toBe('pm.save.v1')
+    expect(SETTINGS_KEY).toBe('pm.settings.v1')
+    // The profile stays v1 until M10; only the per-config suffix is new.
+    expect(PLAYTEST_KEY).toBe('pm.playtest.v1')
+    expect(saveConfig()).toBeNull()
+    expect(saveKey()).toBe('pm.save.v2')
+    expect(playtestKey()).toBe('pm.playtest.v1')
+    expect(saveKey('spicy')).toBe('pm.save.v2:cfg:spicy')
+    expect(playtestKey('spicy')).toBe('pm.playtest.v1:cfg:spicy')
     expect(STORAGE_KEYS).toEqual([
       'pm.save.v1',
+      'pm.save.v2',
       'pm.settings.v1',
       'pm.playtest.v1',
     ])
+  })
+
+  it('Reset clears every pm.save key (v1, v2, every :cfg:), the settings and every playtest key', () => {
     const store = new MemoryStore()
-    for (const k of STORAGE_KEYS) store.setItem(k, '{}')
+    for (const k of [
+      'pm.save.v1',
+      'pm.save.v2',
+      'pm.save.v2:cfg:spicy',
+      'pm.save.v2:cfg:calm',
+      'pm.settings.v1',
+      'pm.playtest.v1',
+      'pm.playtest.v1:cfg:spicy',
+    ])
+      store.setItem(k, '{}')
     store.setItem('other', 'kept')
+    store.setItem('pm.other', 'kept')
     clearAllKeys(store)
-    expect([...store.map.keys()]).toEqual(['other'])
+    expect([...store.map.keys()].toSorted()).toEqual(['other', 'pm.other'])
+    // From inside a config session too (the Title's Reset under ?config=).
+    setSaveConfig('spicy')
+    store.setItem('pm.save.v2', '{}')
+    store.setItem('pm.save.v2:cfg:calm', '{}')
+    clearAllKeys(store)
+    expect([...store.map.keys()].toSorted()).toEqual(['other', 'pm.other'])
+  })
+
+  it('Reset without enumeration still clears the fixed keys and this session’s', () => {
+    const map = new Map<string, string>()
+    setSaveConfig('spicy')
+    for (const k of [...STORAGE_KEYS, saveKey(), playtestKey()])
+      map.set(k, '{}')
+    clearAllKeys(plainStore(map))
+    expect([...map.keys()]).toEqual([])
   })
 
   it('pm.settings.v1 {muted, speed}: defaults, parse and merge', () => {
@@ -104,7 +174,7 @@ describe('plan.md §5: the three pm.* keys', () => {
 })
 
 describe('spec §2: autosave every 10 s of real time and on hide', () => {
-  it('writes the plan.md §5 payload shape under pm.save.v1', () => {
+  it('writes the plan.md §5 payload shape under pm.save.v2', () => {
     const store = new MemoryStore()
     const { saver, sim, ob } = saverFor(store)
     ob.step = 1
@@ -122,7 +192,8 @@ describe('spec §2: autosave every 10 s of real time and on hide', () => {
         'version',
       ].toSorted(),
     )
-    expect(p.version).toBe(1)
+    expect(p.version).toBe(2)
+    expect(p.state.version).toBe(2)
     expect(p.build).toBe('test-build')
     expect(p.dataHash).toBe(data.hash)
     expect(p.seed).toBe(sim.state.seed)
@@ -200,7 +271,59 @@ describe('city-view §9.5 / plan.md §6.4: Title Continue', () => {
     expect(checkSave(JSON.stringify({ ...p, version: 0 }), data).kind).toBe(
       'stale',
     )
+    expect(checkSave(JSON.stringify({ ...p, version: 1 }), data).kind).toBe(
+      'stale',
+    )
     expect(STALE_SAVE_TEXT).toBe('Save from an older build was reset')
+  })
+
+  it('save v2 rejects a v1 save: pm.save.v1 reads stale, is removed with the toast, never loaded', () => {
+    // A build-1 save as it sits on a player's device: version 1 throughout.
+    const sim = makeSim(4)
+    runSeconds(sim, 20)
+    const v1 = JSON.parse(
+      serialise(sim, { savedAt: 0, build: 'build-1', onboarding: null }),
+    ) as { version: number; state: { version: number } }
+    v1.version = 1
+    v1.state.version = 1
+    const v1Text = JSON.stringify(v1)
+    expect(checkSave(v1Text, data).kind).toBe('stale')
+
+    // The Title: readSave → stale → discardSave → STALE_SAVE_TEXT.
+    const store = new MemoryStore()
+    store.setItem(LEGACY_SAVE_KEY, v1Text)
+    const check = readSave(data, store)
+    expect(check.kind).toBe('stale')
+    if (check.kind === 'stale') expect(check.problems[0]).toMatch(/pm.save.v1/)
+    expect(savedRun(store)).toBeNull()
+    discardSave(store)
+    expect(store.getItem(LEGACY_SAVE_KEY)).toBeNull()
+    expect(readSave(data, store).kind).toBe('none')
+
+    // Even copied under the v2 key, a version-1 payload never loads.
+    store.setItem(SAVE_KEY, v1Text)
+    expect(readSave(data, store).kind).toBe('stale')
+
+    // ?skipTitle=1: the same toast path, and the fresh sim is kept.
+    const boot = new MemoryStore()
+    boot.setItem(LEGACY_SAVE_KEY, v1Text)
+    const got = startupGame(
+      data,
+      { skipTitle: true, newGame: false, seedFromUrl: false },
+      boot,
+    )
+    expect(got).toEqual({ game: null, toast: STALE_SAVE_TEXT })
+    expect(boot.map.size).toBe(0)
+  })
+
+  it('a v2 save wins over a leftover v1 save, and the first build-2 save removes pm.save.v1', () => {
+    const store = new MemoryStore()
+    store.setItem(LEGACY_SAVE_KEY, '{"version":1}')
+    const { saver } = saverFor(store, makeSim(6))
+    expect(saver.save('manual')).toBe(true)
+    expect(store.getItem(LEGACY_SAVE_KEY)).toBeNull()
+    store.setItem(LEGACY_SAVE_KEY, '{"version":1}')
+    expect(readSave(data, store).kind).toBe('ok')
   })
 
   it('Continue resumes the saved game tick-exact with its tour state', () => {
@@ -259,5 +382,69 @@ describe('plan.md §5 URL params: ?skipTitle=1 resumes unless ?newGame=1 / ?seed
     expect(got.game).toBeNull()
     expect(got.toast).toBe(STALE_SAVE_TEXT)
     expect(store.getItem(SAVE_KEY)).toBeNull()
+  })
+})
+
+describe('report-playtest1 §6.13: a ?config session keeps its own save', () => {
+  it('a ?config session uses its own key: pm.save.v2:cfg:<name>, and never touches the cold save', () => {
+    const store = new MemoryStore()
+    // The cold run, saved first.
+    const cold = makeSim(3)
+    runSeconds(cold, 10)
+    const coldSaver = saverFor(store, cold, undefined, () => ({ run: 'cold' }))
+    expect(coldSaver.saver.save('manual')).toBe(true)
+    const coldText = store.getItem('pm.save.v2')
+    expect(coldText).not.toBeNull()
+
+    // A spicy session (other data tables, so another dataHash): its own key.
+    setSaveConfig('spicy')
+    expect(saveConfig()).toBe('spicy')
+    expect(saveKey()).toBe('pm.save.v2:cfg:spicy')
+    expect(playtestKey()).toBe('pm.playtest.v1:cfg:spicy')
+    const spicyData = dataFixture({ economy: { startMoney: 600 } })
+    expect(spicyData.hash).not.toBe(data.hash)
+    // Nothing saved for spicy yet: none (not stale), so no toast and no
+    // discard of the cold save.
+    expect(readSave(spicyData, store).kind).toBe('none')
+    expect(readPlaytest(store)).toBeNull()
+    expect(
+      startupGame(
+        spicyData,
+        { skipTitle: true, newGame: false, seedFromUrl: false },
+        store,
+      ),
+    ).toEqual({ game: null, toast: null })
+    const spicy = new Sim(spicyData, 11)
+    const spicySaver = saverFor(store, spicy, undefined, () => ({
+      run: 'spicy',
+    }))
+    expect(spicySaver.saver.save('manual')).toBe(true)
+    expect(store.getItem('pm.save.v2')).toBe(coldText)
+    expect(JSON.parse(store.getItem('pm.playtest.v1')!)).toEqual({
+      run: 'cold',
+    })
+    expect(JSON.parse(store.getItem('pm.playtest.v1:cfg:spicy')!)).toEqual({
+      run: 'spicy',
+    })
+    const s = readSave(spicyData, store)
+    expect(s.kind).toBe('ok')
+    if (s.kind === 'ok') expect(s.payload.seed).toBe(11)
+    expect(savedRun(store)?.seed).toBe(11)
+    expect(readPlaytest(store)).toEqual({ run: 'spicy' })
+    // New game in the spicy session drops the spicy save only.
+    discardSave(store)
+    expect(store.getItem('pm.save.v2:cfg:spicy')).toBeNull()
+    expect(store.getItem('pm.save.v2')).toBe(coldText)
+
+    // Back without ?config: the cold save is still there and loads.
+    setSaveConfig(null)
+    expect(saveKey()).toBe('pm.save.v2')
+    const back = readSave(data, store)
+    expect(back.kind).toBe('ok')
+    if (back.kind !== 'ok') return
+    expect(stateHash(loadGame(data, back.payload).sim.state)).toBe(
+      stateHash(cold.state),
+    )
+    expect(readPlaytest(store)).toEqual({ run: 'cold' })
   })
 })

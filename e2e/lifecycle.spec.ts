@@ -13,8 +13,11 @@
 //     moment (forced flag), the lost-life card (malware-cleared.json) and
 //     with the Garage open;
 //   - New game after game over, past a region unlock (one-life.json after
-//     level-up.json): the restarted City leaves no orphan ground texture;
-//   - Continue after a reload in the middle of the level-up moment;
+//     level-up.json): the Title restarts the City in attract mode (B2 §5)
+//     and New game swaps the player's sim back in under the fade — no orphan
+//     ground texture, every listener back to its baseline;
+//   - Continue after a reload in the middle of the level-up moment (over the
+//     attract city: the City is not re-created, it syncs to tier 2 at once);
 //   - __pm.load of every tests/fixtures/*.json in both views;
 //   - landscape ↔ portrait (rotate card) and tab hide/show (Paused card);
 //   - gestures with real CDP multi-touch: a HUD tap during a city pan keeps
@@ -24,7 +27,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { CDPSession, Page } from '@playwright/test'
-import { expect, test } from './fixtures.ts'
+import { expect, gameUp, test, titleUp } from './fixtures.ts'
 import { policyOff, sceneTarget, tapTarget } from './warehouse.ts'
 
 const GAME = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1&newGame=1&mute=1'
@@ -463,14 +466,10 @@ test.describe('lifecycle', () => {
     )
     await frames(page, 5) // new interactive objects join the input list next frame
     await tapTarget(page, pm, 'HUD', 'gameOver:newGame')
-    await page.waitForFunction(() => window.__pm!.game.scene.isActive('Title'))
+    await titleUp(page)
     await frames(page, 10)
     await tapTarget(page, pm, 'Title', 'title:new-game')
-    await page.waitForFunction(
-      () =>
-        window.__pm!.game.scene.isActive('City') &&
-        window.__pm!.game.scene.isActive('HUD'),
-    )
+    await gameUp(page)
     await frames(page, 10)
     // The same visits as openGame() (the Warehouse / Garage were stopped).
     await goto(page, 'warehouse')
@@ -496,10 +495,10 @@ test.describe('lifecycle', () => {
     await page.goto(TITLE)
     await page.evaluate(() => localStorage.clear())
     await page.goto(TITLE)
-    await page.waitForFunction(() => window.__pm?.game.scene.isActive('Title'))
+    await titleUp(page)
     await frames(page, 10)
     await tapTarget(page, pm, 'Title', 'title:new-game')
-    await page.waitForFunction(() => window.__pm?.ready === true)
+    await gameUp(page)
     await loadFixture(page, 'level-up')
     await page.waitForFunction(
       () => window.__pm!.core.state.level.level === 2,
@@ -516,10 +515,10 @@ test.describe('lifecycle', () => {
     )
     expect(mid, 'reloading during the construction overlay').toBe(true)
     await page.reload()
-    await page.waitForFunction(() => window.__pm?.game.scene.isActive('Title'))
+    await titleUp(page)
     await frames(page, 10)
     await tapTarget(page, pm, 'Title', 'title:continue')
-    await page.waitForFunction(() => window.__pm!.game.scene.isActive('City'))
+    await gameUp(page)
     await frames(page, 30)
     const st = await page.evaluate(() => {
       const c = window.__pm!.game.scene.getScene('City') as unknown as {
@@ -626,6 +625,98 @@ test.describe('lifecycle', () => {
     await pm.tap(Math.round(W / 2), 120)
     await frames(page, 10)
     expectAtRest(await invariants(page), 'after resume')
+
+    // The HUD's real key routing under the Paused card (report §6.5, M5
+    // review): W and G wait; Space, 1 and 2 resume through the card; a
+    // shield popover open before the hide is closed under the card (one Esc
+    // then only resumes); in the Warehouse Esc resumes and stays in the room.
+    const hideShow = async (): Promise<void> => {
+      await visibility(true)
+      await frames(page, 2)
+      await visibility(false)
+      await frames(page, 5)
+    }
+    const card = (): Promise<{
+      card: boolean
+      shield: boolean
+      garage: boolean
+      depth: number
+      holds: string[]
+    }> =>
+      page.evaluate(() => {
+        const sm = window.__pm!.game.scene
+        const hud = sm.getScene('HUD') as unknown as {
+          paused: { isOpen(): boolean }
+          shield: { isOpen(): boolean } | null
+          holds: Set<string>
+          modalDepth(): number
+        }
+        return {
+          card: hud.paused.isOpen(),
+          shield: hud.shield?.isOpen() ?? false,
+          garage: sm.isActive('Garage') && !sm.isSleeping('Garage'),
+          depth: hud.modalDepth(),
+          holds: [...hud.holds],
+        }
+      })
+    const onCard = { card: true, shield: false, garage: false, depth: 1 }
+    const resumed = { card: false, shield: false, depth: 0, holds: [] }
+    await hideShow()
+    expect(await card()).toMatchObject({ ...onCard, holds: ['hidden'] })
+    for (const key of ['w', 'g']) {
+      await page.keyboard.press(key)
+      await frames(page, 20)
+      expect(await card(), `${key} waits under the card`).toMatchObject({
+        ...onCard,
+        holds: ['hidden'],
+      })
+      const inv = await invariants(page)
+      expect([inv.city, inv.warehouse], `${key}: still the City`).toEqual([
+        'awake',
+        'asleep',
+      ])
+    }
+    for (const key of ['Space', '1', '2']) {
+      if (key !== 'Space') await hideShow()
+      await page.keyboard.press(key)
+      await frames(page, 5)
+      expect(await card(), `${key} resumes through the card`).toMatchObject(
+        resumed,
+      )
+    }
+    await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        shield: { open(): void }
+      }
+      hud.shield.open()
+    })
+    expect((await card()).shield).toBe(true)
+    await hideShow()
+    expect(
+      await card(),
+      'the shield closes under the Paused card',
+    ).toMatchObject({ ...onCard, holds: ['hidden'] })
+    await page.keyboard.press('Escape')
+    await frames(page, 5)
+    expect(await card(), 'one Esc: the card only').toMatchObject(resumed)
+    await goto(page, 'warehouse')
+    await page.waitForFunction(() => {
+      const sm = window.__pm!.game.scene
+      return sm.isActive('Warehouse') && !sm.isSleeping('Warehouse')
+    })
+    await frames(page, 30)
+    await hideShow()
+    expect(await card()).toMatchObject({ ...onCard, holds: ['hidden'] })
+    await page.keyboard.press('Escape')
+    await frames(page, 20)
+    expect(await card(), 'Esc resumes in the Warehouse').toMatchObject(resumed)
+    const inRoom = await invariants(page)
+    expect(
+      [inRoom.city, inRoom.warehouse],
+      'Esc on the card stays in the room',
+    ).toEqual(['asleep', 'awake'])
+    await restInCity(page)
+    expectAtRest(await invariants(page), 'after the key checks')
     expect(await listeners(page)).toEqual(before)
     expect(consoleErrors).toEqual([])
   })

@@ -24,7 +24,7 @@ import type { Employee, LaneNode } from '../../sim/types.ts'
 import type { ViewSim } from '../../sim/view-api.ts'
 import { addText } from '../../ui/text.ts'
 import { PALETTE, THEME } from '../../ui/theme.ts'
-import { WAREHOUSE_ATLAS } from '../atlases.ts'
+import { atlasOf } from '../frames.ts'
 import { moveAlong } from './Fx.ts'
 import type { RoomLayers } from './LaneRenderer.ts'
 import { DOOR_POINT, type FixedLaneLayout, type Point } from './RoomLayout.ts'
@@ -85,7 +85,7 @@ export class WorkerSprites {
     this.vs = vs
     this.employees = employees
     this.unpaid = scene.add
-      .image(0, 0, WAREHOUSE_ATLAS, 'ic_alert')
+      .image(0, 0, atlasOf('ic_alert'), 'ic_alert')
       .setOrigin(0.5, 0.5)
       .setVisible(false)
     layers.badges.add(this.unpaid)
@@ -170,7 +170,7 @@ export class WorkerSprites {
     instant: boolean,
   ): void {
     const img = this.scene.add
-      .image(0, 0, WAREHOUSE_ATLAS, 'worker_e_idle_0')
+      .image(0, 0, atlasOf('worker_e_idle_0'), 'worker_e_idle_0')
       .setOrigin(0.5, 1)
     const tag = addText(this.scene, 0, 0, this.nameOf(id) ?? '', {
       tint: PALETTE.grey5,
@@ -213,7 +213,7 @@ export class WorkerSprites {
     w.leaving = true
     if (this.walkedOut.has(w.id)) {
       this.walkedOut.delete(w.id)
-      w.alert = this.scene.add.image(0, 0, WAREHOUSE_ATLAS, 'ic_alert')
+      w.alert = this.scene.add.image(0, 0, atlasOf('ic_alert'), 'ic_alert')
       this.L.workers.add(w.alert)
     }
     const pts = [

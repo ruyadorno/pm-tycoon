@@ -41,8 +41,8 @@ import { detectionTone, TONE_LIGHT } from '../../ui/ShieldPopover.ts'
 import { addText, textTop } from '../../ui/text.ts'
 import { PALETTE, THEME } from '../../ui/theme.ts'
 import { valueFactor } from '../decayPhase.ts'
-import { FONT_KEY, WAREHOUSE_ATLAS } from '../atlases.ts'
-import { frameOrNull } from '../frames.ts'
+import { FONT_KEY, ROOM_FONT_KEY } from '../atlases.ts'
+import { atlasOf, frameOrNull, roomAtlas } from '../frames.ts'
 import {
   BELT_CX,
   BIN_COUNTER,
@@ -431,7 +431,7 @@ export class LaneRenderer {
     this.buildReadout()
     for (let i = 0; i < MAX_PARCELS; i++) {
       const img = scene.add
-        .image(0, 0, WAREHOUSE_ATLAS, 'parcel_s')
+        .image(0, 0, atlasOf('parcel_s'), 'parcel_s')
         .setVisible(false)
         .setActive(false)
       this.pool.push(img)
@@ -451,10 +451,27 @@ export class LaneRenderer {
   ): Img {
     const f = frameOrNull(frame) ?? '__MISSING'
     const i = this.scene.add
-      .image(Math.round(x), Math.round(y), WAREHOUSE_ATLAS, f)
+      .image(Math.round(x), Math.round(y), this.atlasFor(layer, f), f)
       .setOrigin(originX, originY)
     layer.add(i)
     return i
+  }
+
+  /**
+   * Back layers (floor, walls, belts, fixtures, tail: static room art) bind
+   * `interior`, front layers (parcels, machines, workers, badges, fx, with
+   * their panels and text) bind `world`: one texture switch per frame on the
+   * phone's one-texture batches (spec-build2 §6.8, tools/art/atlas.ts).
+   */
+  private atlasFor(layer: Box, frame: string): string {
+    const L = this.L
+    const back =
+      layer === L.floor ||
+      layer === L.walls ||
+      layer === L.belts ||
+      layer === L.fixtures ||
+      layer === L.tail
+    return back ? roomAtlas(frame) : atlasOf(frame)
   }
 
   private text(layer: Box, x: number, y: number, s: string, tint: number): Txt {
@@ -502,6 +519,11 @@ export class LaneRenderer {
     // North-wall sign, crack overlay, lights.
     this.sign = this.img(this.L.walls, SIGN.x, SIGN.y, `sign_t${t}`)
     this.signText = this.text(this.L.walls, SIGN_TEXT.x, 0, '', THEME.textLight)
+    // the walls are a back layer: the same m5x7 from `interior` keeps the
+    // sign text in the back batch (PreloadScene registers ROOM_FONT_KEY)
+    if (this.scene.cache.bitmapFont.has(ROOM_FONT_KEY)) {
+      this.signText.setFont(ROOM_FONT_KEY)
+    }
     this.crack = this.img(this.L.walls, SIGN.x, SIGN.y, 'sign_crack_1')
     this.crack.setVisible(false)
     this.bulb = this.img(this.L.walls, BULB.x, BULB.y, 'bulb_0')
@@ -755,6 +777,7 @@ export class LaneRenderer {
     const parent = t.parentContainer
     if (!parent) return
     const g = addText(this.scene, t.x, t.y, t.text, { tint: t.tintTopLeft })
+    if (g.font !== t.font) g.setFont(t.font) // the copy stays in t's batch
     parent.addAt(g, parent.getIndex(t) + 1)
     t.setAlpha(0)
     this.scene.tweens.add({ targets: t, alpha: 1, duration: TIER_FADE_MS })
@@ -771,7 +794,7 @@ export class LaneRenderer {
     const parent = img.parentContainer
     if (!parent) return
     const g = this.scene.add
-      .image(img.x, img.y, WAREHOUSE_ATLAS, img.frame.name)
+      .image(img.x, img.y, img.texture.key, img.frame.name)
       .setOrigin(img.originX, img.originY)
     parent.addAt(g, parent.getIndex(img) + 1)
     this.scene.tweens.add({
@@ -1384,7 +1407,7 @@ export class LaneRenderer {
     if (dark && strain) {
       const f = frameOrNull(`ic_strain_${strain}`)
       if (f && !rec.icon) {
-        rec.icon = this.scene.add.image(0, 0, WAREHOUSE_ATLAS, f)
+        rec.icon = this.scene.add.image(0, 0, atlasOf(f), f)
         this.L.parcels.add(rec.icon)
       } else if (f && rec.icon) rec.icon.setFrame(f)
     } else {
@@ -1396,7 +1419,7 @@ export class LaneRenderer {
 
   private setCheck(rec: PSprite, on: boolean): void {
     if (on && !rec.check) {
-      rec.check = this.scene.add.image(0, 0, WAREHOUSE_ATLAS, 'ic_check')
+      rec.check = this.scene.add.image(0, 0, atlasOf('ic_check'), 'ic_check')
       this.L.parcels.add(rec.check)
     } else if (!on && rec.check) {
       rec.check.destroy()
@@ -1834,7 +1857,8 @@ export class LaneRenderer {
       const k = Math.round(((1 - f) / Math.max(0.01, 1 - floor)) * 8)
       const frame = Math.max(0, Math.min(8, k))
       if (!rec.ring) {
-        rec.ring = this.scene.add.image(0, 0, WAREHOUSE_ATLAS, `ring_${frame}`)
+        const ring = `ring_${frame}`
+        rec.ring = this.scene.add.image(0, 0, atlasOf(ring), ring)
         rec.ring.setOrigin(0, 0)
         this.L.parcels.add(rec.ring)
       } else if (rec.ringFrame !== frame) rec.ring.setFrame(`ring_${frame}`)

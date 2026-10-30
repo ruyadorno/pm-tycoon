@@ -1,7 +1,10 @@
 // GarageSheet `Garage` (city-view.md §7, §6.2, §11.2; plan.md §9; spec §4.1,
 // §7.3-§7.4): the overlay scene launched above City/Warehouse + HUD and
-// slept when closed (so the list scroll survives). One Sheet of height
-// max(320, round(H × 0.6)):
+// slept when closed (so the list scroll survives). One Sheet that fits its
+// rows (report-playtest1 §6.14: the fixed max(320, round(H × 0.6)) left a
+// ~380-px empty list at 430×932): header + one 56-px pitch per vehicle (at
+// least one, for the empty state) + the buy block, capped at that old height
+// (the list scrolls past it); a buy or a sale re-fits it in place:
 //   header (56)  `Garage · Fleet 3` / `Payday in 0:23`, then
 //                `Payroll $44/day` (red after a short payday) ·
 //                `Lane 15/min · Detection 97%` (the % in the §6.3 colours)
@@ -71,18 +74,69 @@ export const CARD_H = 88
 export const CARD_GAP = 8
 export const CARD_MAX_W = 120
 const MARGIN = 12
+/** The buy card's sprite box (card-local); the name column starts at 58. */
+const SPRITE_BOX = { x: 6, y: 4, w: 48, h: 32 }
+/** The fleet row's icon column centre (a 16-px icon spans 20..36). */
+const ICON_CX = 28
 
-/** Sheet height (city-view §7). */
+/** The most the sheet takes (city-view §7's height, now the cap). */
 export function garageSheetHeight(H: number): number {
   return Math.max(320, Math.round(H * 0.6))
 }
 
-/** Fleet list viewport height: sheet − header − buy block − safe area. */
-export function garageListHeight(H: number, safeBottom = 0): number {
-  return Math.max(
+/** Air under the last fleet row (the list's content height is n × 56 + 4). */
+export const LIST_PAD = 4
+
+/**
+ * Fleet list viewport height: the rows (`rows` vehicles, at least one pitch
+ * for the empty state), at most cap − header − buy block − safe area;
+ * without `rows`, that maximum.
+ */
+export function garageListHeight(
+  H: number,
+  safeBottom = 0,
+  rows?: number,
+): number {
+  const max = Math.max(
     ROW_PITCH,
     garageSheetHeight(H) - HEADER_H - BOTTOM_H - Math.max(0, safeBottom),
   )
+  if (rows === undefined) return max
+  return Math.min(max, Math.max(1, rows) * ROW_PITCH + LIST_PAD)
+}
+
+/** The sheet height that fits `rows` fleet rows (header, list, buy block). */
+export function garageFitHeight(
+  H: number,
+  safeBottom: number,
+  rows: number,
+): number {
+  return (
+    HEADER_H +
+    garageListHeight(H, safeBottom, rows) +
+    BOTTOM_H +
+    Math.max(0, safeBottom)
+  )
+}
+
+/**
+ * Where a type's frame sits in its buy card's 48×32 sprite box (card-local):
+ * centred across, bottom-aligned, from the frame's real size (the bike canvas
+ * grew from 24² to 32², plan-build2 §8.2 task 5) — never left of the box.
+ */
+export function cardSpritePos(w: number, h: number): { x: number; y: number } {
+  return {
+    x: SPRITE_BOX.x + Math.max(0, Math.round((SPRITE_BOX.w - w) / 2)),
+    y: SPRITE_BOX.y + Math.max(0, SPRITE_BOX.h - Math.round(h)),
+  }
+}
+
+/** The row's type icon, centred on its column from the frame's real size. */
+export function rowIconPos(w: number, h: number): { x: number; y: number } {
+  return {
+    x: Math.max(MARGIN + 2, Math.round(ICON_CX - w / 2)),
+    y: Math.floor((ROW_PITCH - Math.round(h)) / 2),
+  }
 }
 
 // ---- pure model --------------------------------------------------------------
@@ -404,7 +458,6 @@ export function toggleGarage(from: Phaser.Scene): void {
 // ---- the scene ---------------------------------------------------------------
 
 const ROW_PAD_R = 6
-const ICON_X = 20
 const NAME_X = 42
 const STATUS_X = 120
 /**
@@ -476,6 +529,9 @@ export class GarageSheet extends Phaser.Scene {
   private payroll: Phaser.GameObjects.BitmapText | null = null
   private lane: Phaser.GameObjects.BitmapText | null = null
   private lanePct: Phaser.GameObjects.BitmapText | null = null
+  private foot: Phaser.GameObjects.BitmapText | null = null
+  /** The fleet list viewport height the sheet is fitted to. */
+  private listH = 0
   private dirty = true
   private layoutDirty = false
   private since = 0
@@ -493,6 +549,8 @@ export class GarageSheet extends Phaser.Scene {
     this.picker = null
     this.dialog = null
     this.measurer = null
+    this.foot = null
+    this.listH = 0
     this.dirty = true
     this.layoutDirty = false
     this.since = 0
@@ -587,10 +645,10 @@ export class GarageSheet extends Phaser.Scene {
 
   private buildUi(): Sheet {
     this.readSize()
-    const height = garageSheetHeight(this.H)
-    const listH = garageListHeight(this.H, this.sb)
+    const rows = this.vs.vehicles.length
+    const listH = garageListHeight(this.H, this.sb, rows)
     const sheet = new Sheet(this, {
-      height,
+      height: garageFitHeight(this.H, this.sb, rows),
       W: this.W,
       H: this.H,
       id: GARAGE_SHEET_ID,
@@ -599,14 +657,15 @@ export class GarageSheet extends Phaser.Scene {
       onClosed: () => this.scene.sleep(),
     })
     this.sheet = sheet
+    this.listH = listH
     this.buildHeader()
-    this.buildCards(height)
-    const foot = addText(this, MARGIN, 0, footerText(this.vs.data), {
+    this.buildCards()
+    this.foot = addText(this, MARGIN, 0, footerText(this.vs.data), {
       tint: MUTED,
       maxWidth: this.W - 2 * MARGIN,
     })
-    foot.setY(textTop(height - this.sb - BOTTOM_H + 4 + CARD_H + 2, LINE_BAND))
-    sheet.add(foot)
+    sheet.add(this.foot)
+    this.placeBottom()
     this.rows = []
     this.rowsBuilt = false
     this.empty = null
@@ -639,7 +698,23 @@ export class GarageSheet extends Phaser.Scene {
     s.add(this.title, this.payday, this.payroll, this.lane, this.lanePct)
   }
 
-  private buildCards(height: number): void {
+  /** The buy cards and the footer under the list (sheet-local). */
+  private placeBottom(): void {
+    const y = HEADER_H + this.listH + 4
+    for (const c of this.cards) c.btn.setY(y)
+    this.foot?.setY(textTop(y + CARD_H + 2, LINE_BAND))
+  }
+
+  /** Re-fit the sheet to `rows` fleet rows (a buy, a sale) in place. */
+  private fitRows(rows: number): void {
+    const listH = garageListHeight(this.H, this.sb, rows)
+    if (listH === this.listH) return
+    this.listH = listH
+    this.sheet?.resize(garageFitHeight(this.H, this.sb, rows), listH)
+    this.placeBottom()
+  }
+
+  private buildCards(): void {
     const s = this.sheet
     if (!s) return
     const data = this.vs.data
@@ -648,7 +723,7 @@ export class GarageSheet extends Phaser.Scene {
     const cw = cardWidth(this.W, n)
     const total = n * cw + (n - 1) * CARD_GAP
     const x0 = Math.round((this.W - total) / 2)
-    const y = height - this.sb - BOTTOM_H + 4
+    const y = 0 // placeBottom() puts the row under the list
     models.forEach((m, i) => {
       const btn = new Button(this, {
         x: x0 + i * (cw + CARD_GAP),
@@ -662,10 +737,8 @@ export class GarageSheet extends Phaser.Scene {
       const frame: FrameName =
         frameOrNull(`${m.type}_sw_0`) ?? (`ic_${m.type}` as FrameName)
       const sprite = this.add.image(0, 0, UI_ATLAS, frame).setOrigin(0, 0)
-      sprite.setPosition(
-        6 + Math.round((48 - sprite.width) / 2),
-        4 + Math.max(0, 32 - Math.round(sprite.height)),
-      )
+      const at = cardSpritePos(sprite.width, sprite.height)
+      sprite.setPosition(at.x, at.y)
       const name = addText(this, 58, textTop(4, 14), m.name)
       const price = addText(this, 58, textTop(18, 14), m.priceText)
       const capacity = addText(this, 6, textTop(38, 14), m.capacity)
@@ -783,7 +856,8 @@ export class GarageSheet extends Phaser.Scene {
       this.rows.push(row)
       this.updateRow(row, v)
     })
-    const listH = garageListHeight(this.H, this.sb)
+    this.fitRows(list.length)
+    const listH = this.listH
     if (list.length === 0) {
       const t = addText(this, 0, 0, 'Buy your first vehicle below')
       t.setPosition(
@@ -815,9 +889,9 @@ export class GarageSheet extends Phaser.Scene {
       ROW_PITCH - 4,
       'ui_panel',
     ).setInteractive()
-    const icon = this.add
-      .image(ICON_X, Math.floor((ROW_PITCH - 16) / 2), UI_ATLAS, `ic_${v.type}`)
-      .setOrigin(0, 0)
+    const icon = this.add.image(0, 0, UI_ATLAS, `ic_${v.type}`).setOrigin(0, 0)
+    const iconAt = rowIconPos(icon.width, icon.height)
+    icon.setPosition(iconAt.x, iconAt.y)
     const name = addText(this, col.nameX, textTop(LINE1, LINE_BAND), '')
     const driver = addText(this, col.nameX, textTop(LINE2, LINE_BAND), '', {
       tint: MUTED,
@@ -1101,6 +1175,7 @@ export class GarageSheet extends Phaser.Scene {
     for (const r of this.rows) r.tipTimer?.remove(false)
     this.rows = []
     this.cards = []
+    this.foot = null
     this.sheet = null
     this.pending = false
   }

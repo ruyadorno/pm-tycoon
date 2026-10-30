@@ -62,7 +62,9 @@
 // Sim events come through bindSim (attached while awake — always — and moved
 // on a Sim swap, with syncAll on WAKE / swap). The autosave timer runs from
 // update(); HIDDEN and pagehide save immediately. Keyboard: Space, 1, 2, 4
-// (debug), W, G, Esc through the shared claimKey stack (src/ui/Sheet.ts).
+// (debug), W, G, Esc through the shared claimKey stack (src/ui/Sheet.ts);
+// the Paused card is on that stack (report §6.5): under it W and G wait,
+// Esc is the card's (resume), Space and the speed keys resume through it.
 import Phaser from 'phaser'
 import {
   Autosave,
@@ -188,6 +190,7 @@ import {
   modalCount,
   popModal,
   pushModal,
+  topModal,
 } from '../ui/Sheet.ts'
 import { ShieldPopover } from '../ui/ShieldPopover.ts'
 import { SummaryCard, type SummaryMode } from '../ui/SummaryCard.ts'
@@ -1060,7 +1063,7 @@ export class HudScene extends Phaser.Scene {
     if (r.offered || this.vs.gameOver || this.summary.isOpen()) return
     if (this.vs.tick < SUMMARY_OFFER_S * TICKS_PER_S) return
     r.markOffered()
-    this.ticker.push(SUMMARY_OFFER_LINE, 'daily')
+    this.ticker.push(SUMMARY_OFFER_LINE, 'offer')
     this.longToast(SUMMARY_OFFER_TOAST, false, HINT_TOAST_MS)
   }
 
@@ -2580,8 +2583,10 @@ export class HudScene extends Phaser.Scene {
       this.release('hidden')
       return
     }
-    // A modal card never renders under the sheet (plan.md §6.7).
-    if (this.garageOpen()) this.scene.sleep('Garage')
+    // A modal card never renders under the sheet (plan.md §6.7), nor over
+    // the shield / mood popovers, the district panel or a tooltip (one Esc
+    // must not close one of those and resume through the card).
+    this.prepareModal()
     this.paused.show()
   }
 
@@ -2917,7 +2922,9 @@ export class HudScene extends Phaser.Scene {
       }
       if (keyClaimed(ev)) return
       if (this.tip) this.hideTooltip()
-      this.shield?.close()
+      // Only while the shield is the top modal (a card above it owns Esc).
+      if (this.shield?.isOpen() && claimKey(ev, this.shield))
+        this.shield.close()
       return
     }
     if (keyClaimed(ev)) return
@@ -2929,7 +2936,11 @@ export class HudScene extends Phaser.Scene {
       }
       return
     }
-    if (!claimKey(ev, null)) return
+    // The Paused card on top (report §6.5): the view switch waits; Space and
+    // the speed keys resume through it, as their taps would.
+    const onCard = topModal() === this.paused
+    if (onCard && lower === 'w') return
+    if (!claimKey(ev, onCard ? this.paused : null)) return
     switch (lower) {
       case ' ':
         ev.preventDefault?.()

@@ -7,7 +7,9 @@
 // the render interpolation factor scenes read in update(). advance(ms) is the
 // uncapped, speed-independent sim-only entry (?fastForward=, __pm.advance):
 // floor(ms / 100) ticks, no render. game.pause() is never used as a pause.
-// With ?policy=1 the policy's step() runs before every tick on both paths.
+// With ?policy=1 the policy's step() runs before every tick on both paths;
+// the Title's attract sim (B2 §5) gets the competent policy the same way
+// (setSim's `policy` option), at speed 1, whatever ?policy says.
 import Phaser from 'phaser'
 
 export const TICK_MS = 100
@@ -30,7 +32,7 @@ export interface StepPolicy {
 export interface Stepper {
   /** The sim being stepped; swapped by setSim() (simBinding.ts) on load / new game. */
   sim: Tickable
-  /** ?policy=1: called before every tick (src/sim/policy.ts, M1); null otherwise. */
+  /** ?policy=1 / the attract sim: called before every tick (src/sim/policy.ts); null otherwise. */
   policy: StepPolicy | null
   speed: Speed
   /** Modal pause (lostLife, gameOver, paused, rotate, summary cards). */

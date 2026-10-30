@@ -1,10 +1,25 @@
-# pm-tycoon — run status (playtest 1)
+# pm-tycoon — run status (playtest 1 + build 2)
 
-Filled in place by the playtest-1 run (format: plans/pm-tycoon/status.md); newest checkpoint entry first; copied back to plans/pm-tycoon/status.md as the last M4 step.
+Filled in place by the runs (format: plans/pm-tycoon/status.md); newest checkpoint entry first. Playtest 1 (M0–M4) was
+copied back to plans/pm-tycoon/status.md at its end; build 2 (M5–M10, plan-build2.md) copies the file back at M10.
 
-Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: 77615ef (M4) + the hand-off docs commit; zip dist-zip/pm-tycoon-77615ef.zip
+Run (build 2): started 2026-10-30 — plan-build2.md DRAFT v2 + spec-build2.md — Node v26.12.1 / vlt 1.6.1 — Chromium:
+installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2;
+budget 1,500 generations with a 300 reserve (author's run prompt); balance at start 3,299 — current head: see the
+newest entry.
 
-## Milestone checklist
+Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: 77615ef (M4) + the hand-off docs commit; zip dist-zip/pm-tycoon-77615ef.zip
+
+## Milestone checklist (build 2)
+
+- [x] M5 foundations + the author's fixes: logo + attract title, slab, bike, hop, modern port art, two atlases + hashed URLs, save v2, report §6 rough edges (commit `M5: …`)
+- [ ] M6 people: applicants, pips, charisma, salaries, desk 2, the Hold Bay sorter, drivers, hire sheets, faces, policies (commit `M6: …`)
+- [ ] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
+- [ ] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
+- [ ] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
+- [ ] M10 playtest-2 build: metrics v2, summary card v2, shots, report, Pages deploy, hand-off (commit `M10: …`)
+
+## Milestone checklist (playtest 1)
 
 - [x] M0 scaffold + tooling + data tables + sim skeleton + procedural art + Gallery scene (commit `M0: …`)
 - [x] M1 city loop: spawn → collect → pass-through warehouse → deliver → money; Garage sheet; autosave (commit `M1: …`)
@@ -14,7 +29,7 @@ Run: started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 �
 
 ## Gate results
 
-Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M3 commit (data 2112987b); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
+Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M5 commit (data 2112987b, unchanged since M3); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
 
 | Gate                                                          | Window           | Median    | Min / max     | Pass                        |
 | ------------------------------------------------------------- | ---------------- | --------- | ------------- | --------------------------- |
@@ -31,6 +46,35 @@ JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 an
 L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `level:up {3}` in any 30-min run).
 
 ## Checkpoint entries (newest first)
+
+## M5 — foundations + fixes — 2026-10-30 02:38 UTC — DONE at (this commit; sha recorded in the M6 entry)
+
+Built: the Title as an overlay over an attract-mode City (`src/assets/attract.json`: seed 7, competent policy, 24 min,
+the L2 city; camera tour `src/render/AttractCamera.ts`, 12-s legs + 1-s holds; Continue/New game swap in the real sim
+under a fade; `?attract=0` keeps the old flow) with the author's logo (`tools/art/logo.ts`, 352×176, B2 §5); the
+warehouse foundation as ground-bake slab/ramp/bollard tiles on the 4×4 footprint with exteriors regenerated without an
+apron (lint A04 strict; B2 §6.1); the courier bike on a 32×32 canvas (B2 §6.2); the pickup hop sinking into the
+vehicle body (B2 §6.3); the modern port (`dk_terminal_a/b`, `dk_port_office`; `dk_pier`/`dk_customs` rejected; B2 §6.4);
+two atlases + content-hashed asset URLs (B2 §6.8, report §6.21); save v2 with a per-config key (report §6.13); report
+§6.5/6.6/6.11/6.12/6.14/6.23/6.24 fixes. `economy.playtestMaxLevel` stays 2 (every "coming soon" reads it).
+Gate: unchanged from M4 (no sim or data change): first delivery 44.05 s, scripted catch 174.3 s (10/10), L2 13.05 min,
+truck +2.10 min, lives 0, shelf stall 0 s, Hold Bay 7.15/10 min — every median PASS; L3–L5 rows informational.
+Tests: 1,204 passing (vitest, 73 files + 1 todo); e2e: full `vlr e2e` PASS (smoke, dist, lifecycle, audio,
+audio-render, shots); `vlr check` 88 s. Draw calls: city 3, warehouse 6 (≤ 7), attract Title 4 (logged); attract Title
+56.8 fps under SwiftShader (logged).
+Shots: `title` / `title-430x932` — the logo over the moving L2 city, no HUD, New game / Reset / Credits, "tuning up…";
+`city-lot-zoom2` — the debug crosses sit on the slab's corners, slab joints on the tile grid; `city-bike` — a
+white-helmeted courier on an orange bicycle; `city-hop` (+ crop) — the parcel icon shrunk to 12 px sinking into the
+cargo box; `docks-locked` — the fogged modern port (port office with radar mast, reach-stacker terminal, gantry
+terminal, ship); `warehouse-l1` / `warehouse-tier2` — the room from the interior atlas; `garage` /
+`garage-430x932` / `district-panel` — sized to their content; `level-up` — one dust cloud. All in the STYLE.md look.
+Deviations from spec-core.md / B2: atlas placement by binder (B2 §6.8's interior list moved to world/both); hop shrink
+by crop; worker scan frames a scripted edit of the PixelLab idle frames; the Phaser 4.2.1 keyboard-shutdown patch
+(docs/decisions.md "Run decisions and deviations (M5)").
+Open for the author: G4 — `art/contact/fixes@4x.png` (exterior t1/t2 on the slab, the 8 bike frames, the port in colour
+and fogged, the hop crop): confirm or reject `wh_ext_t1`, `wh_ext_t2`, `bike`, `dk_terminal_a`, `dk_terminal_b`,
+`dk_port_office`, the worker scan frames; the dust cloud reads as a flat blob (art call).
+Next: M6 people
 
 ## M4 — playtest build — 2026-10-29 16:55 UTC — DONE at 77615ef
 
@@ -103,12 +147,18 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Art approvals pending
 
+- G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
+- G5 region sheets (build 2): pending (M8–M9)
+- G6 tiers 3–5 + machines + people (build 2): pending (M6–M9)
+
 - G1 palette + STYLE.md: drawn 2026-10-29 (M0), presented in the end-of-run report — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
 - G2 anchor sheet: <not run | provisional (agent-approved ids: …, scores) | author-confirmed ids: … | rejected ids: …> — `art/contact/anchors@4x.png`
 - G3 category sheets: <none | buildings-downtown <status>, buildings-highres <status>, buildings-industrial <status>, vehicles <status>, warehouse-interior <status>, procedural <status>>
 - Placeholders still in use: <count from `vlr art:lint` warning A12> — ids listed in `docs/art-todo.md`
 
 ## Cost spent
+
+- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173), $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)
 - Retro Diffusion: $0 (expected; only with RD_API_KEY and after the author read its ToS)

@@ -5,8 +5,10 @@ data hash of the tables it was made with. `__pm.load` refuses a fixture with a s
 `tests/data/shot-fixtures.test.ts` (part of `vlr check`). That test also checks that each fixture still sets up the
 scenario its shot needs.
 
-After any change to `src/data/*.json`, the sim state shape, or a sim rule that changes a seeded run, regenerate all of
-them:
+After any change to `src/data/*.json`, the sim state shape, a save-version bump (`STATE_VERSION` in
+`src/sim/types.ts`; `Sim.load` refuses any other version, plan.md R9 / plan-build2 R19 — 2 since build 2), or a sim rule
+that changes a seeded run, regenerate all of them (and the Title's attract snapshot, `node tools/fixtures/attract.ts` →
+`src/assets/attract.json`, which follows the same rule):
 
 ```sh
 node tools/fixtures/late-waiting.ts   # late-waiting.json

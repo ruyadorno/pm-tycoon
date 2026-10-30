@@ -86,7 +86,7 @@ function registry(): {
   }
 }
 
-describe('plan.md §5: pm.save.v1.onboarding lives in the game registry', () => {
+describe('plan.md §5: pm.save.v2.onboarding lives in the game registry', () => {
   it('getOnboarding returns the one shared object (mutations persist)', () => {
     const reg = registry()
     const ob = freshOnboarding()

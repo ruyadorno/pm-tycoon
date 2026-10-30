@@ -242,7 +242,7 @@ describe('warehouse-view §1.1: the room fits between the HUD bands', () => {
 /** m5x7 advance widths from the BMFont descriptor (the plates' text width). */
 const ADVANCE = new Map<number, number>()
 for (const m of readFileSync(
-  new URL('../../public/assets/m5x7.xml', import.meta.url),
+  new URL('../../src/assets/m5x7.xml', import.meta.url),
   'utf8',
 ).matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
   ADVANCE.set(Number(m[1]), Number(m[2]))

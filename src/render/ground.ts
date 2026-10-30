@@ -9,6 +9,16 @@
 // A region unlock (city-view §1.4) bakes the new lock state into a SECOND
 // texture (nextGroundKey: 'ground' ↔ 'ground_b') whose Image the city fades
 // in over the old one before destroying the old bake.
+//
+// The warehouse foundation (spec-build2.md §6.1, the author's city #1) is
+// ground too: cityFx.slabStamps puts `lot_slab_a/b/c` on every tile of the
+// lot's 4×4 footprint and `lot_ramp` on the dock tiles in place of their base
+// frame (the ramp is a dropped kerb: no kerb line on its road edge), then
+// the bollards in a second pass (prop anchor: frame bottom-centre on the
+// tile's bottom vertex) so no later tile paints over a post. A frame
+// the atlas lacks falls back to the tile's base ground (`lot_concrete`); a
+// missing bollard is skipped. The exterior sprites carry no apron, so the
+// slab's diamond edges are the tile grid's by construction.
 import Phaser from 'phaser'
 import {
   groundAt,
@@ -19,7 +29,8 @@ import {
 } from '../data/index.ts'
 import { PALETTE, paletteColour } from '../ui/theme.ts'
 import { GROUND_H, GROUND_TEXTURE, GROUND_W, WORLD_ATLAS } from './atlases.ts'
-import { HH, HW, originX, tileTopLeft } from './iso.ts'
+import { slabStamps, type LotStamp } from './cityFx.ts'
+import { HH, HW, originX, tileToScreen, tileTopLeft } from './iso.ts'
 
 /**
  * Road autotile mask bits, 4-bit NESW in tile space (style-guide.md §7:
@@ -138,6 +149,14 @@ export function bakeGround(
   let isLocked = opts.isLocked ?? (() => false)
   let stamps = 0
 
+  // The lot's slab / ramp tiles (replacing the base frame) and bollards.
+  const lotTiles = new Map<string, LotStamp>()
+  const bollards: LotStamp[] = []
+  for (const st of slabStamps(map)) {
+    if (st.kind === 'bollard') bollards.push(st)
+    else lotTiles.set(`${st.tx},${st.ty}`, st)
+  }
+
   const draw = (): void => {
     missing.clear()
     stamps = 0
@@ -168,7 +187,9 @@ export function bakeGround(
         const block = mapBlockAt(map, x, y)
         const locked =
           block !== null && block.kind === 'region' && isLocked(block.region)
-        stamp(frame(groundAt(map, x, y), locked), x, y)
+        const lot = lotTiles.get(`${x},${y}`)
+        const lotFrame = lot ? frame(lot.frame, locked) : null
+        stamp(lotFrame ?? frame(groundAt(map, x, y), locked), x, y)
         if (isRoadTile(map, x, y)) {
           stamp(frame(roadFrameName(roadMask(map, x, y)), false), x, y)
           for (const t of roadThemesAt(map, x, y))
@@ -188,10 +209,23 @@ export function bakeGround(
             nb.block[1] === block.block[1]
           )
             continue
+          // The ramp is a dropped kerb: no kerb line where it meets the road.
+          if (lot?.kind === 'ramp' && isRoadTile(map, x + dx, y + dy)) continue
           const kerb = frame(`kerb_${dir}`, false)
           if (kerb) stamp(kerb, x, y, tint)
         }
       }
+    }
+    // Bollards last: posts rise over the tiles behind them.
+    for (const b of bollards) {
+      const name = frame(b.frame, false)
+      if (!name) continue
+      tileToScreen(b.tx, b.ty, ox, at)
+      dt.stamp(WORLD_ATLAS, name, at.x, at.y + HH - GROUND_Y, {
+        originX: 0.5,
+        originY: 1,
+      })
+      stamps++
     }
     dt.render()
     if (missing.size > 0)

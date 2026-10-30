@@ -10,10 +10,18 @@
 // carries an `End run — show summary` button under the text panel — off the
 // screen centre, which stays a resume tap. Its tap is a gesture too
 // (onGesture runs first: the audio resume must happen inside it on iOS).
+//
+// Build 2 (report-playtest1 §6.5, plan-build2 §8.2 task 10): the card is on
+// the shared modal stack (src/ui/Sheet.ts) while it shows, so the keys that
+// only act with no modal open (W view switch, G Garage, the Warehouse's
+// Esc-to-City) wait under it, and Esc resumes like a tap. The HUD routes
+// Space and the speed keys to the card when it is the top modal (they
+// resume, as their taps do). A sleeping or shut-down scene leaves the stack.
 import type Phaser from 'phaser'
 import { Button } from './Button.ts'
 import type { Layout } from './layout.ts'
 import { addPanel } from './Panel.ts'
+import { claimKey, popModal, pushModal } from './Sheet.ts'
 import { addText, textTop } from './text.ts'
 import { THEME } from './theme.ts'
 
@@ -47,6 +55,7 @@ export class PausedCard {
   private entry: Button | null = null
   private opts: PausedCardOptions
   private down = false
+  private opened = false
 
   constructor(scene: Phaser.Scene, L: Layout, opts: PausedCardOptions) {
     this.scene = scene
@@ -96,19 +105,32 @@ export class PausedCard {
       .setDepth(PAUSED_DEPTH)
       .setVisible(false)
     this.relayout(L)
+    scene.events.on('sleep', this.onSleep, this)
+    scene.events.on('wake', this.onWake, this)
+    scene.events.once('shutdown', this.detach, this)
   }
 
   isOpen(): boolean {
-    return this.root.visible
+    return this.opened
   }
 
   show(): void {
     this.down = false
+    if (!this.opened) {
+      this.opened = true
+      pushModal(this)
+      this.scene.input.keyboard?.on('keydown', this.onKey, this)
+    }
     this.root.setVisible(true)
   }
 
   hide(): void {
     this.down = false
+    if (this.opened) {
+      this.opened = false
+      popModal(this)
+      this.scene.input?.keyboard?.off('keydown', this.onKey, this)
+    }
     this.root.setVisible(false)
   }
 
@@ -150,6 +172,35 @@ export class PausedCard {
   }
 
   destroy(): void {
+    this.detach()
     this.root.destroy()
+  }
+
+  /** Esc resumes (the top-most modal only); every other key passes. */
+  private onKey(ev: KeyboardEvent): void {
+    if (!this.opened || ev.repeat || ev.key !== 'Escape') return
+    if (!claimKey(ev, this)) return
+    this.down = false
+    this.opts.onGesture?.()
+    this.scene.game.events.emit('ui:tap', { id: 'paused:resume' })
+    this.opts.onResume()
+  }
+
+  private onSleep(): void {
+    popModal(this)
+  }
+
+  private onWake(): void {
+    if (this.opened) pushModal(this)
+  }
+
+  /** Off the modal stack and the scene's emitters (shutdown / destroy). */
+  private detach(): void {
+    popModal(this)
+    this.opened = false
+    this.scene.input?.keyboard?.off('keydown', this.onKey, this)
+    this.scene.events.off('sleep', this.onSleep, this)
+    this.scene.events.off('wake', this.onWake, this)
+    this.scene.events.off('shutdown', this.detach, this)
   }
 }

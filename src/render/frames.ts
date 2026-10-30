@@ -1,11 +1,20 @@
 // Typed frame accessors (plan.md §5 "Atlas and frames", style-guide.md §7).
 // Scenes reach atlas frames through this module; it re-exports everything
-// `vlr art:atlas` generates (FRAMES, FrameName, isFrame, frame, roadFrame,
-// vehicleFrame, buildingFrame, SPRITE_MAP, VEHICLE_FOOT, SMOKE_ANCHORS,
-// SIGN_FACE, ROAD_N..W) and adds the few lookups the views share. A frame
-// that is not in the atlas is a type error for literals and a thrown error
-// (frame()) or null (the *OrNull helpers) for computed names.
-import { SPRITE_MAP, isFrame, type FrameName } from './frames.generated.ts'
+// `vlr art:atlas` generates (FRAMES, FrameName, FRAME_ATLAS, SHARED_FRAMES,
+// inAtlas, isFrame, frame, roadFrame, vehicleFrame, buildingFrame,
+// SPRITE_MAP, VEHICLE_FOOT, SMOKE_ANCHORS, SIGN_FACE, ROAD_N..W) and adds the
+// few lookups the views share. A frame that is not in the atlases is a type
+// error for literals and a thrown error (frame()) or null (the *OrNull
+// helpers) for computed names.
+import { INTERIOR_ATLAS, WORLD_ATLAS } from './atlases.ts'
+import {
+  FRAME_ATLAS,
+  SPRITE_MAP,
+  inAtlas,
+  isFrame,
+  type AtlasKey,
+  type FrameName,
+} from './frames.generated.ts'
 
 export * from './frames.generated.ts'
 
@@ -17,6 +26,28 @@ export function buildingSprite(buildingId: string): string {
 /** `name` when the atlas has it, else null. */
 export function frameOrNull(name: string): FrameName | null {
   return isFrame(name) ? name : null
+}
+
+/**
+ * The atlas a world-bound surface binds for `name`: `world` when the frame
+ * is packed there (incl. the shared frames, and unknown names), else
+ * `interior`. The city, the HUD, src/ui/** and the warehouse room's FRONT
+ * layers (parcels, machines, workers, badges, fx: they carry the panels and
+ * the m5x7 text) use it (spec-build2 §6.8).
+ */
+export function atlasOf(name: string): AtlasKey {
+  return isFrame(name) ? FRAME_ATLAS[name] : WORLD_ATLAS
+}
+
+/**
+ * The texture the warehouse room's BACK layers (floor, walls, belts,
+ * fixtures, tail) bind for `name`: `interior` when the frame is packed there
+ * (room art and the shared icons, parcels, fx, machines, workers), else
+ * `world` — so the static room batches from one texture under
+ * autoMobileTextures (spec-build2 §6.8, tools/art/atlas.ts).
+ */
+export function roomAtlas(name: string): AtlasKey {
+  return inAtlas(name, INTERIOR_ATLAS) ? INTERIOR_ATLAS : WORLD_ATLAS
 }
 
 /**

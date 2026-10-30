@@ -41,12 +41,14 @@ export const ASSET_CLASSES = [
   'icon16',
   'ui',
   'font',
+  'logo',
 ] as const
 
 export type AssetClass = (typeof ASSET_CLASSES)[number]
 export type Variant = 'locked' | 't2' | 'mood'
 export type Priority = 'P0' | 'P1' | 'P2'
-export type Source = 'procedural' | 'pixellab'
+/** 'author': brand art supplied by the author (the logo), never redrawn */
+export type Source = 'procedural' | 'pixellab' | 'author'
 
 export const VARIANT_SUFFIX: Readonly<Record<Variant, string>> = {
   locked: '_locked',
@@ -65,7 +67,8 @@ export const CLASS_CANVAS: Readonly<
   'warehouse-ext': [256, 256],
   prop: [64, 128],
   'dock-prop': [128, 96],
-  'vehicle-bike': [24, 24],
+  // build 2 (Q-B2-14): 24 -> 32 so the courier and helmet keep the margin
+  'vehicle-bike': [32, 32],
   'vehicle-van': [32, 32],
   'vehicle-truck': [48, 32],
   'interior-tile': [32, 32],
@@ -84,6 +87,9 @@ export const CLASS_CANVAS: Readonly<
   icon16: [16, 16],
   ui: null,
   font: null,
+  // the author's logo (B2 §5): brand art outside the palette contract,
+  // written to src/assets/logo.png by tools/art/logo.ts, never in an atlas
+  logo: [352, 176],
 }
 
 /** Classes whose rows may override the class canvas (prop boards 64x40 / 96x52). */
@@ -166,6 +172,66 @@ export interface ManifestEntry {
   finalSha256?: string
   /** free-form note (reconciled names, defaults) */
   note?: string
+  /**
+   * build 2 (plan-build2 §8.2 task 8): the atlas this entry is packed into
+   * ('both' = the two). Optional: the packer (atlas.ts placementOf) falls
+   * back to a class default; class 'logo' is never packed (isAtlasPacked).
+   */
+  atlas?: AtlasName
+  /**
+   * vehicles: the foot point on the road centre line, canvas px [x, y]
+   * (VEHICLE_FOOT in frames.generated.ts = the display origin); vehicleFoot()
+   * falls back to the class default
+   */
+  foot?: [number, number]
+  /**
+   * warehouse-ext: the amber lamp over each loading-bay door of the visible
+   * SW face (bays 1-3), canvas px [x, y] with origin (0.5, 1) at the lot's
+   * footprint anchor (cityFx BAY_LIGHTS)
+   */
+  bayLights?: [number, number][]
+  /**
+   * warehouse-ext: foot point of a vehicle docked at bay 1, canvas px
+   * (cityFx DOCK_POSE_CANVAS)
+   */
+  dockPose?: [number, number]
+  /**
+   * warehouse-ext: per-frame overrides of bayLights / dockPose, keyed by
+   * frame suffix ('_t2'): an edited tier keeps the footprint but its lamps
+   * can move a few px
+   */
+  frameAnchors?: Record<
+    string,
+    { bayLights: [number, number][]; dockPose: [number, number] }
+  >
+  /** follow-up edit recipe (wh_ext _t2): which edit k is the second frame */
+  editPick?: number
+}
+
+/**
+ * the two build-2 atlases (B2 §6.8); 'both' = packed into the two (art the
+ * HUD/city and the room both draw — atlas.ts placementOf)
+ */
+export type AtlasName = 'world' | 'interior' | 'both'
+export const ATLAS_NAMES: readonly AtlasName[] = ['world', 'interior', 'both']
+
+/**
+ * A rejected entry taken out of the game (B2 §6.4: dk_pier, dk_customs):
+ * kept for provenance (its gen[] and rejects[], incl. the author's reason)
+ * but never drawn, linted, packed or mapped to a building; its finals are
+ * deleted when it is retired (decide.ts --retire).
+ */
+export interface RetiredEntry {
+  id: string
+  class: AssetClass
+  source: Source
+  retiredAt: string
+  reason: string
+  /** what replaced it (ids of the new entries) */
+  replacedBy?: string[]
+  gen: GenLog[]
+  rejects: RejectLog[]
+  note?: string
 }
 
 export interface Batch {
@@ -182,6 +248,8 @@ export interface Manifest {
   version: 1
   entries: ManifestEntry[]
   batches: Batch[]
+  /** rejected entries removed from the game (provenance only) */
+  retired?: RetiredEntry[]
 }
 
 export const ROOT = fileURLToPath(new URL('../../', import.meta.url))
@@ -234,7 +302,83 @@ export function frameSetSha256(e: ManifestEntry): string | null {
 
 /** true when a final exists that `draw` must not overwrite */
 export function hasKeptFinal(e: ManifestEntry): boolean {
-  return e.approved || (e.source === 'pixellab' && !e.placeholder)
+  return (
+    e.approved ||
+    e.source === 'author' ||
+    (e.source === 'pixellab' && !e.placeholder)
+  )
+}
+
+/** classes that never go into an atlas (the logo is its own texture) */
+export const UNPACKED_CLASSES: readonly AssetClass[] = ['logo']
+
+/** false for entries the atlas packer must skip (class 'logo') */
+export function isAtlasPacked(e: ManifestEntry): boolean {
+  return !UNPACKED_CLASSES.includes(e.class)
+}
+
+/** where a class's art lives when it is not under art/final (the logo) */
+export const EXTERNAL_FINAL: Readonly<Partial<Record<AssetClass, string>>> = {
+  logo: 'src/assets/logo.png',
+}
+
+/**
+ * Vehicle foot point per class (the road-line point, canvas px), used when a
+ * row carries no `foot`: bike 32x32 since build 2 (Q-B2-14) — its wheels sit
+ * lower than the van's because the courier stands tall on a narrow frame.
+ */
+export const VEHICLE_FOOT_BY_CLASS: Readonly<
+  Partial<Record<AssetClass, readonly [number, number]>>
+> = {
+  'vehicle-bike': [16, 26],
+  'vehicle-van': [16, 23],
+  'vehicle-truck': [24, 22],
+}
+
+/** the foot point of a vehicle entry (row `foot`, else the class default) */
+export function vehicleFoot(e: ManifestEntry): [number, number] {
+  if (e.foot) return [e.foot[0], e.foot[1]]
+  const f = VEHICLE_FOOT_BY_CLASS[e.class]
+  if (f) return [f[0], f[1]]
+  return [e.canvas[0] / 2, Math.round(e.canvas[1] * 0.75)]
+}
+
+/** a warehouse exterior frame's city anchors, canvas px from the top-left */
+export interface WarehouseAnchorSet {
+  bayLights: [number, number][]
+  dockPose: [number, number]
+}
+
+/**
+ * WH_ANCHORS for frames.generated.ts (cityFx warehouseAnchors reads it), one
+ * entry per exterior frame: { wh_ext_t1: the row's bayLights / dockPose,
+ * wh_ext_t2: its frameAnchors._t2 override, else the row's, … }; {} when
+ * the row carries none.
+ */
+export function warehouseAnchorTable(
+  m: Manifest,
+): Record<string, WarehouseAnchorSet> {
+  const out: Record<string, WarehouseAnchorSet> = {}
+  const e = m.entries.find((x) => x.class === 'warehouse-ext')
+  if (!e?.bayLights || !e.dockPose) return out
+  const row = { bayLights: e.bayLights, dockPose: e.dockPose }
+  for (const f of e.frames) {
+    out[e.id + f] = e.frameAnchors?.[f] ?? row
+  }
+  return out
+}
+
+/**
+ * The warehouse exterior's city anchors (cityFx BAY_LIGHTS /
+ * DOCK_POSE_CANVAS), read from the wh_ext row; null when the row lacks them.
+ */
+export function warehouseAnchors(m: Manifest): {
+  bayLights: [number, number][]
+  dockPose: [number, number]
+} | null {
+  const e = m.entries.find((x) => x.class === 'warehouse-ext')
+  if (!e?.bayLights || !e.dockPose) return null
+  return { bayLights: e.bayLights, dockPose: e.dockPose }
 }
 
 // ---------------------------------------------------------------------------
@@ -322,8 +466,75 @@ export function validateManifest(
       errors.push(`${at}: unknown class ${String(e.class)}`)
       continue
     }
-    if (e.source !== 'procedural' && e.source !== 'pixellab') {
+    if (
+      e.source !== 'procedural' &&
+      e.source !== 'pixellab' &&
+      e.source !== 'author'
+    ) {
       errors.push(`${at}: bad source`)
+    }
+    if ((e.source === 'author') !== (e.class === 'logo')) {
+      errors.push(`${at}: source 'author' is the logo class only`)
+    }
+    if (e.atlas !== undefined) {
+      if (!ATLAS_NAMES.includes(e.atlas)) {
+        errors.push(`${at}: atlas must be ${ATLAS_NAMES.join(' | ')}`)
+      }
+      if (!isAtlasPacked(e)) errors.push(`${at}: class ${e.class} is unpacked`)
+    }
+    if (e.foot !== undefined) {
+      if (!e.class.startsWith('vehicle-')) {
+        errors.push(`${at}: foot is for vehicle classes`)
+      } else if (
+        !isPair(e.foot) ||
+        e.foot[0] >= e.canvas[0] ||
+        e.foot[1] >= e.canvas[1]
+      ) {
+        errors.push(`${at}: foot must be [x, y] inside the canvas`)
+      }
+    }
+    for (const [k, v] of [
+      ['bayLights', e.bayLights],
+      ['dockPose', e.dockPose === undefined ? undefined : [e.dockPose]],
+    ] as const) {
+      if (v === undefined) continue
+      if (e.class !== 'warehouse-ext') {
+        errors.push(`${at}: ${k} is for the warehouse-ext class`)
+      }
+      const ok =
+        Array.isArray(v) &&
+        v.every(
+          (p) =>
+            isPair(p) &&
+            isPair(e.canvas) &&
+            p[0] < e.canvas[0] &&
+            p[1] < e.canvas[1],
+        )
+      if (!ok) errors.push(`${at}: ${k} must be [x, y] points in the canvas`)
+    }
+    for (const [suffix, a] of Object.entries(e.frameAnchors ?? {})) {
+      if (e.class !== 'warehouse-ext' || !e.frames.includes(suffix)) {
+        errors.push(`${at}: frameAnchors ${suffix} is not a warehouse frame`)
+      }
+      const pts = [...(a.bayLights ?? []), a.dockPose]
+      if (
+        !Array.isArray(a.bayLights) ||
+        !pts.every(
+          (p) =>
+            isPair(p) &&
+            isPair(e.canvas) &&
+            p[0] < e.canvas[0] &&
+            p[1] < e.canvas[1],
+        )
+      ) {
+        errors.push(`${at}: frameAnchors ${suffix} must be canvas points`)
+      }
+    }
+    if (
+      e.editPick !== undefined &&
+      (!Number.isInteger(e.editPick) || e.editPick < 0)
+    ) {
+      errors.push(`${at}: editPick must be an integer >= 0`)
     }
     if (!isPair(e.canvas)) errors.push(`${at}: canvas must be [w, h]`)
     const fixed = CLASS_CANVAS[e.class]
@@ -383,6 +594,24 @@ export function validateManifest(
           errors.push(`${at}: frame ${name} also produced by ${other}`)
         }
         seenFrames.set(name, e.id)
+      }
+    }
+  }
+  if (m.retired !== undefined) {
+    if (!Array.isArray(m.retired)) errors.push('manifest: retired must be []')
+    else {
+      const seen = new Set<string>()
+      for (const r of m.retired) {
+        const at = `manifest retired ${r.id ?? '?'}`
+        if (seenIds.has(r.id)) errors.push(`${at}: id is also an entry`)
+        if (seen.has(r.id)) errors.push(`${at}: duplicate retired id`)
+        seen.add(r.id)
+        if (!Array.isArray(r.gen) || !Array.isArray(r.rejects)) {
+          errors.push(`${at}: gen / rejects must be []`)
+        }
+        if (typeof r.reason !== 'string' || r.reason.length === 0) {
+          errors.push(`${at}: a retired entry needs its reason`)
+        }
       }
     }
   }
@@ -493,6 +722,40 @@ export function setPlaceholder(
   }
   e.placeholder = placeholder
   return e
+}
+
+/**
+ * Move a rejected entry out of the game into m.retired (provenance kept).
+ * The caller deletes its finals (retiredFinals) and makes sure no building
+ * maps to it any more (A13 then flags uncovered buildings).
+ */
+export function retire(
+  m: Manifest,
+  id: string,
+  reason: string,
+  replacedBy: string[] = [],
+  at: string = new Date().toISOString(),
+): RetiredEntry {
+  const e = getEntry(m, id)
+  m.entries = m.entries.filter((x) => x !== e)
+  const r: RetiredEntry = {
+    id: e.id,
+    class: e.class,
+    source: e.source,
+    retiredAt: at,
+    reason,
+    ...(replacedBy.length ? { replacedBy } : {}),
+    gen: e.gen,
+    rejects: e.rejects,
+    ...(e.note ? { note: e.note } : {}),
+  }
+  ;(m.retired ??= []).push(r)
+  return r
+}
+
+/** the final paths a retired entry used to own (base + variant frames) */
+export function retiredFinals(e: ManifestEntry): string[] {
+  return frameNames(e).map((n) => finalPath(e, n))
 }
 
 /** Counts reported by tools: entries, base frames, frames incl. variants. */

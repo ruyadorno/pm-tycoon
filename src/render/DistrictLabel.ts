@@ -25,7 +25,7 @@ const PAD_X = 5
 const TAG_H = 18
 const ICON = 16
 const ICON_GAP = 2
-/** m5x7 line pitch (public/assets/m5x7.xml lineHeight). */
+/** m5x7 line pitch (src/assets/m5x7.xml lineHeight). */
 const LINE_H = 14
 
 export interface DistrictLabelInfo {

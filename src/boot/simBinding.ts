@@ -9,6 +9,15 @@
 //   - follows a Sim swap (setSim: __pm.load, New game, Continue): handlers move
 //     from the old emitter to the new one and onSync runs.
 // Handlers only mark things dirty or spawn effects; they never dispatch.
+//
+// Build 2 (B2 §5): the Title's attract city is a Sim too. setSim(game, sim,
+// {attract: true, policy}) installs it with the competent policy driving it
+// (whatever ?policy says) and records it in registry 'attractSim'; the next
+// plain setSim (Continue / New game) replaces that policy with the ?policy=1
+// factory's (or none) and clears 'attractSim'. SIM_REPLACED carries
+// `attract`, so listeners that must never hear the demo (the audio director)
+// can skip it. The attract sim is never saved: the HUD (autosave) does not
+// run while it is installed.
 import Phaser from 'phaser'
 import type { GameData } from '../data/index.ts'
 import { debugEnabled } from '../debug/params.ts'
@@ -40,10 +49,31 @@ export const REG = {
   audioContext: 'audioContext',
   /** (sim) => StepPolicy when ?policy=1 and src/sim/policy.ts exists. */
   policyFactory: 'policyFactory',
+  /** src/sim/policy.ts createPolicy (Boot loads it for the attract city), or null. */
+  createPolicy: 'createPolicy',
+  /** The installed attract Sim (Title, B2 §5) while it is the game's Sim, else null. */
+  attractSim: 'attractSim',
 } as const
 
-/** Game event emitted after setSim() swaps the Sim: payload {sim, viewSim}. */
+/** Game event emitted after setSim() swaps the Sim: payload SimReplaced. */
 export const SIM_REPLACED = 'pm:simReplaced'
+
+export interface SimReplaced {
+  sim: Sim
+  viewSim: ViewSim
+  /** The Title's attract sim (never the player's; no sound, no save). */
+  attract: boolean
+}
+
+export interface SetSimOptions {
+  /** Install the Title's attract sim (B2 §5): registry 'attractSim' = sim. */
+  attract?: boolean
+  /**
+   * The stepper's policy for this sim (the attract city's competent policy);
+   * omitted = the ?policy=1 factory's policy, or none.
+   */
+  policy?: StepPolicy | null
+}
 
 export type SimHandlers = {
   [K in SimEventName]?: SimEvents[K]
@@ -75,11 +105,17 @@ export function getAlpha(scene: Phaser.Scene): number {
  * (accumulator reset, policy re-created for the new sim), then SIM_REPLACED
  * so bound scenes move their handlers. The ViewSim is created once over a
  * registry getter, so the facade object survives swaps. Used by Boot (first
- * sim), __pm.load, New game and Continue.
+ * sim), __pm.load, New game, Continue and the Title's attract city.
  */
-export function setSim(game: Phaser.Game, sim: Sim): ViewSim {
+export function setSim(
+  game: Phaser.Game,
+  sim: Sim,
+  opts: SetSimOptions = {},
+): ViewSim {
   const prev = game.registry.get(REG.sim) as Sim | undefined
+  const attract = opts.attract === true
   game.registry.set(REG.sim, sim)
+  game.registry.set(REG.attractSim, attract ? sim : null)
   let viewSim = game.registry.get(REG.viewSim) as ViewSim | undefined
   if (!viewSim) {
     viewSim = createViewSim(() => game.registry.get(REG.sim) as Sim, {
@@ -94,13 +130,29 @@ export function setSim(game: Phaser.Game, sim: Sim): ViewSim {
     const factory = game.registry.get(REG.policyFactory) as
       | ((s: Sim) => StepPolicy)
       | undefined
-    if (factory && prev !== sim) {
-      stepper.policy?.dispose?.()
-      stepper.policy = factory(sim)
+    if (prev !== sim) {
+      // An explicit policy (the attract city's) wins; else ?policy=1's for
+      // the new sim, else none (the attract policy never drives a real game).
+      const next =
+        opts.policy !== undefined ? opts.policy : factory ? factory(sim) : null
+      if (stepper.policy !== next) {
+        stepper.policy?.dispose?.()
+        stepper.policy = next
+      }
     }
   }
-  if (prev && prev !== sim) game.events.emit(SIM_REPLACED, { sim, viewSim })
+  if (prev && prev !== sim)
+    game.events.emit(SIM_REPLACED, {
+      sim,
+      viewSim,
+      attract,
+    } satisfies SimReplaced)
   return viewSim
+}
+
+/** The attract Sim while it is installed (Title, B2 §5), else null. */
+export function getAttractSim(scene: Phaser.Scene): Sim | null {
+  return (scene.registry.get(REG.attractSim) as Sim | null | undefined) ?? null
 }
 
 export interface SimBinding {

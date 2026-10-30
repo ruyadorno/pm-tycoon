@@ -6,8 +6,10 @@
 // only scale mode that honours zoom), pixelArt + roundPixels — and the
 // resize/orientation handler (scale.resize + setZoom). The audio chunk's import
 // starts here too (registry 'audioModule'); Boot creates the director from it
-// and registry 'audioContext' (and sets pauseOnBlur = false). Nothing is
-// exposed globally here; window.__pm comes from src/debug/pm.ts.
+// and registry 'audioContext' (and sets pauseOnBlur = false). So does the
+// policy chunk's (registry 'policyModule', for the Title's attract city and
+// ?policy=1; null on a failed fetch, never fatal). Nothing is exposed
+// globally here; window.__pm comes from src/debug/pm.ts.
 import Phaser from 'phaser'
 import { createSharedContext } from './audio/context.ts'
 import { REG } from './boot/simBinding.ts'
@@ -15,7 +17,9 @@ import { params } from './debug/params.ts'
 import {
   BootScene,
   importAudio,
+  importPolicy,
   REG_AUDIO_MODULE,
+  REG_POLICY_MODULE,
   showCard,
 } from './scenes/BootScene.ts'
 import { CityScene } from './scenes/CityScene.ts'
@@ -84,6 +88,9 @@ function start(): void {
   // The audio chunk (Tone's Transport, smplr, the director) loads while
   // Phaser boots; Boot awaits it (a disabled director under ?audio=0).
   const audioModule = importAudio()
+  // The policy chunk too (the Title's attract city, ?policy=1): a failed
+  // fetch resolves null, never a fatal boot.
+  const policyModule = p.policy || p.attract ? importPolicy() : null
   const size = measure(el)
 
   const config: Phaser.Types.Core.GameConfig = {
@@ -127,6 +134,7 @@ function start(): void {
   const game = new Phaser.Game(config)
   game.registry.set(REG.audioContext, audioContext)
   game.registry.set(REG_AUDIO_MODULE, audioModule)
+  if (policyModule) game.registry.set(REG_POLICY_MODULE, policyModule)
   const setSafe = (zoom: number): void => {
     const s = readSafeInsets(zoom)
     game.registry.set(REG.safeTop, s.top)

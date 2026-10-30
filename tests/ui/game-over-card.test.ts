@@ -1,7 +1,8 @@
 // city-view.md §9.4 / spec §10: the game-over screen's headline and stats
 // block (days survived, lifetime earned, parcels delivered, malware caught /
 // missed, level reached, best day's $). Phaser is stubbed (the module
-// imports the Button kit).
+// imports the Button kit). Build 2 (report-playtest1 §6.12): Enter opens the
+// run summary instead of starting a new game.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -18,6 +19,7 @@ vi.mock('phaser', () => {
 })
 
 const go = await import('../../src/ui/GameOverCard.ts')
+const { claimKey, popModal, pushModal } = await import('../../src/ui/Sheet.ts')
 const { dataFixture } = await import('../sim/helpers.ts')
 
 const data = dataFixture()
@@ -87,5 +89,57 @@ describe('§9.4: the stats block', () => {
       data,
     )
     expect(m.stats[2]).toEqual(['Parcels delivered', '0'])
+  })
+})
+
+const key = (k: string, repeat = false): KeyboardEvent =>
+  ({ key: k, repeat }) as unknown as KeyboardEvent
+
+function card(withSummary: boolean) {
+  const onNewGame = vi.fn()
+  const onSummary = vi.fn()
+  const scene = { input: { keyboard: { on() {}, off() {} } } }
+  const c = new go.GameOverCard(scene as never, {} as never, {
+    onNewGame,
+    onSummary: withSummary ? onSummary : null,
+  })
+  // open() builds the view; the key routing only needs the stack entry.
+  pushModal(c)
+  const onKey = (ev: KeyboardEvent): void =>
+    (c as unknown as { onKey(ev: KeyboardEvent): void }).onKey(ev)
+  return { c, onKey, onNewGame, onSummary }
+}
+
+describe('report §6.12: Enter on the game-over card', () => {
+  it('opens the run summary, never a new game', () => {
+    const { c, onKey, onNewGame, onSummary } = card(true)
+    const ev = key('Enter')
+    onKey(ev)
+    expect(onSummary).toHaveBeenCalledOnce()
+    expect(onNewGame).not.toHaveBeenCalled()
+    expect(claimKey(ev, null)).toBe(false)
+    popModal(c)
+  })
+
+  it('without a summary action Enter is swallowed (New game stays a tap)', () => {
+    expect(go.gameOverEnterAction({ onSummary: null })).toBe('none')
+    expect(go.gameOverEnterAction({ onSummary: () => {} })).toBe('summary')
+    const { c, onKey, onNewGame } = card(false)
+    const ev = key('Enter')
+    onKey(ev)
+    expect(onNewGame).not.toHaveBeenCalled()
+    expect(claimKey(ev, null)).toBe(false)
+    popModal(c)
+  })
+
+  it('a held Enter (repeat) and a card under another modal do nothing', () => {
+    const { c, onKey, onSummary } = card(true)
+    onKey(key('Enter', true))
+    const dialog = {}
+    pushModal(dialog)
+    onKey(key('Enter'))
+    expect(onSummary).not.toHaveBeenCalled()
+    popModal(dialog)
+    popModal(c)
   })
 })

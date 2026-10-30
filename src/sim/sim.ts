@@ -35,14 +35,14 @@ import type {
   Strain,
   Tick,
 } from './types.ts'
-import { laneNode, TICKS_PER_DAY, ticksFromS } from './types.ts'
+import { laneNode, STATE_VERSION, TICKS_PER_DAY, ticksFromS } from './types.ts'
 
 /** Dev assertions (Node / Vitest / vite dev); vite build replaces DEV with false. */
 const DEV: boolean = import.meta.env?.DEV !== false
 
 /** snapshot() output: everything needed to resume (and replay) a run. */
 export interface SimSnapshot {
-  version: 1
+  version: typeof STATE_VERSION
   dataHash: string
   seed: number
   state: SimState
@@ -150,7 +150,7 @@ export class Sim {
   /** structuredClone of the state + the data hash + the command log. */
   snapshot(): SimSnapshot {
     return {
-      version: 1,
+      version: STATE_VERSION,
       dataHash: this.data.hash,
       seed: this.state.seed,
       state: structuredClone(this.state),
@@ -261,7 +261,7 @@ export function createStartState(data: GameData, seed: number): SimState {
   if (L1.strain) announced[L1.strain] = 0
 
   const state: SimState = {
-    version: 1,
+    version: STATE_VERSION,
     seed,
     rng: seedWord(seed),
     tick: 0,
@@ -730,7 +730,10 @@ export function snapshotProblems(
 ): string[] {
   if (!isRecord(snap)) return ['snapshot: not an object']
   const out: string[] = []
-  if (snap.version !== 1) out.push(`version: ${String(snap.version)} ≠ 1`)
+  // No migrations (plan.md R9): a snapshot of any other version (a build-1
+  // save is version 1) is refused, and the Title discards it with a toast.
+  if (snap.version !== STATE_VERSION)
+    out.push(`version: ${String(snap.version)} ≠ ${STATE_VERSION}`)
   if (typeof snap.dataHash !== 'string') out.push('dataHash: missing')
   else if (!opts.ignoreDataHash && snap.dataHash !== data.hash) {
     out.push(`dataHash: ${snap.dataHash} ≠ ${data.hash} (data changed)`)
@@ -746,7 +749,8 @@ export function snapshotProblems(
   }
   const st = snap.state
   if (!isRecord(st)) return [...out, 'state: not an object']
-  if (st.version !== 1) out.push(`state.version: ${String(st.version)} ≠ 1`)
+  if (st.version !== STATE_VERSION)
+    out.push(`state.version: ${String(st.version)} ≠ ${STATE_VERSION}`)
   if (st.seed !== snap.seed) out.push('state.seed ≠ snapshot seed')
   const shaped =
     isRecord(st.economy) &&

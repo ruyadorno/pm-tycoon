@@ -54,8 +54,23 @@ export interface LevelProgress {
   frac: number
   /** `$1,240 / $2,000` (+ ` · Lv 3 coming soon` at the playtest cap). */
   text: string
-  /** level ≥ economy.playtestMaxLevel. */
+  /**
+   * The counter is held below an existing levels.json row by
+   * economy.playtestMaxLevel (false at the top level: nothing is "coming").
+   */
   atCap: boolean
+}
+
+/**
+ * True when `level` sits at economy.playtestMaxLevel with a levels.json row
+ * after it: the "Lv N coming soon" suffixes read this, so they vanish by data
+ * once the cap rises (plan-build2 §8.2 task 11).
+ */
+export function cappedBelowNext(data: GameData, level: number): boolean {
+  return (
+    level >= data.economy.playtestMaxLevel &&
+    data.levels.some((l) => l.level === level + 1)
+  )
 }
 
 /**
@@ -69,7 +84,7 @@ export function levelProgress(
   lifetime: number,
   nextThreshold: number | null,
 ): LevelProgress {
-  const atCap = level >= data.economy.playtestMaxLevel
+  const atCap = cappedBelowNext(data, level)
   const base = data.levels.find((l) => l.level === level)?.threshold ?? 0
   if (nextThreshold === null) {
     return { frac: 1, text: formatMoney(lifetime), atCap }
@@ -88,10 +103,9 @@ export function levelProgress(
  * machine names); `Lv 3 coming soon` at the playtest cap.
  */
 export function nextUnlockLine(data: GameData, level: number): string {
-  if (level >= data.economy.playtestMaxLevel)
-    return `Lv ${level + 1} coming soon`
   const row = data.levels.find((l) => l.level === level + 1)
   if (!row) return `${levelLabel(data, level)} — top level`
+  if (cappedBelowNext(data, level)) return `Lv ${level + 1} coming soon`
   const parts: string[] = []
   for (const id of row.unlockRegions) {
     const d = data.districts.find((x) => x.id === id)

@@ -14,10 +14,13 @@
 //     next to the procedural shaker, the worker at the desk next to the
 //     procedural worker.
 //   art/contact/candidates-<k>@4x.png     the same blocks for a bulk batch.
+//   art/contact/fixes@4x.png              G4 (build 2): `node
+//     tools/art/contact.ts fixes [--hop <crop.png>]` (fixesSheet below).
 // Never writes art/final, the manifest or public/.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   type Canvas,
   type SKRSContext2D,
@@ -223,12 +226,9 @@ function vehicleBlock(m: Manifest, e: ManifestEntry, src: Source): Block[] {
       if (road) ctx.drawImage(road, x, H - 32 - 4)
       const v = src.get(`_${h}_${f}`)
       if (v) {
-        // origin (0.5, 0.75) at the tile centre
-        ctx.drawImage(
-          v,
-          x + 32 - v.width / 2,
-          H - 20 - Math.round(v.height * 0.75),
-        )
+        // the row's foot point (VEHICLE_FOOT) at the tile centre
+        const foot = e.foot ?? [v.width / 2, Math.round(v.height * 0.75)]
+        ctx.drawImage(v, x + 32 - foot[0], H - 20 - foot[1])
       }
       i++
     }
@@ -896,4 +896,310 @@ export function idSheets(m: Manifest, id: string, dir: string): string[] {
     ),
   )
   return [a, b]
+}
+
+// ---------------------------------------------------------------------------
+// G4 (plan-build2 §6, §8.2): art/contact/fixes@4x.png — the author's four
+// fixes on one sheet: the warehouse exterior t1 / t2 standing on the slab
+// tiles (the 4x4 footprint stamped with lot_slab_a/b/c, the dock column
+// with lot_ramp, bollards on the slab corners; with and without a grid
+// overlay of the footprint), the eight bike frames on road tiles and the
+// bike beside the van and truck, the three modern port sprites in context
+// on the quay by the sea (colour and the _locked look they ship with until
+// M8), and the hop frame (a crop from shots passed with --hop <png>, else a
+// placeholder cell). The lot and port scenes are drawn at 2x (camera zoom
+// 2), the vehicles at 4x.
+
+/** the slab variant of footprint tile (tx, ty): a stable a/b/c pattern */
+export function slabVariant(tx: number, ty: number): 'a' | 'b' | 'c' {
+  const k = (tx * 7 + ty * 3) % 5
+  return k === 0 ? 'b' : k === 3 ? 'c' : 'a'
+}
+
+function scaled(cv: Canvas, s: number): Canvas {
+  const out = createCanvas(cv.width * s, cv.height * s)
+  const ctx = out.getContext('2d')
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(cv, 0, 0, cv.width * s, cv.height * s)
+  return out
+}
+
+/** the lot scene's 4x4 footprint (tiles 2..5) and dock column (tx 1) */
+const inFp = (tx: number, ty: number) =>
+  tx >= 2 && tx <= 5 && ty >= 2 && ty <= 5
+const dock = (tx: number, ty: number) => tx === 1 && ty >= 3 && ty <= 5
+
+/** a src/data JSON table (contact sheets read the map as the game does) */
+const dataJson = (f: string): unknown =>
+  JSON.parse(readFileSync(join(ROOT, 'src/data', f), 'utf8')) as unknown
+
+/**
+ * The warehouse lot at 1x: 8x8 tiles of lot_concrete, the 4x4 footprint
+ * (tiles 2..5) on lot_slab, the dock column (tx 1, ty 3..5) on lot_ramp,
+ * bollards at the slab's front corners, `ext` at the footprint anchor;
+ * `grid` draws the footprint's tile edges and corners over everything.
+ */
+export function lotScene(
+  m: Manifest,
+  ext: Canvas | null,
+  grid: boolean,
+): Canvas {
+  const n = 8
+  const top = 200
+  const W = n * 64
+  const H = n * 32 + top
+  const cv = createCanvas(W, H)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('water1')
+  ctx.fillRect(0, 0, W, H)
+  const ox = W / 2 - 32
+  for (let ty = 0; ty < n; ty++) {
+    for (let tx = 0; tx < n; tx++) {
+      const t = inFp(tx, ty)
+        ? fin(m, 'lot_slab', `_${slabVariant(tx, ty)}`)
+        : dock(tx, ty)
+          ? fin(m, 'lot_ramp')
+          : fin(m, 'lot_concrete')
+      if (!t) continue
+      const p = scr(ox, top, tx, ty)
+      ctx.drawImage(t, p.x, p.y)
+    }
+  }
+  const draws: { d: number; f: () => void }[] = []
+  // bollards on the slab's front corners and by the dock column
+  const bol: [number, number, string][] = [
+    [5, 6, '_a'],
+    [6, 5, '_b'],
+    [1, 6, '_a'],
+  ]
+  for (const [tx, ty, f] of bol) {
+    const b = fin(m, 'bollard', f)
+    if (!b) continue
+    const p = scr(ox, top, tx, ty)
+    // prop rule: origin (0.5, 1) at the tile's top vertex + 32 rows puts
+    // the post on the tile's top corner area; bottom vertex = p.y + 32
+    draws.push({
+      d: tx + ty,
+      f: () => ctx.drawImage(b, p.x + 32 - b.width / 2, p.y + 16 - 16),
+    })
+  }
+  if (ext) {
+    const p = scr(ox, top, 5, 5)
+    draws.push({
+      d: 10,
+      f: () =>
+        ctx.drawImage(ext, p.x + 32 - ext.width / 2, p.y + 32 - ext.height),
+    })
+  }
+  draws.sort((a, b) => a.d - b.d)
+  for (const d of draws) d.f()
+  if (grid) {
+    // the footprint's tile edges (1-px dots) and its four corners
+    ctx.fillStyle = PALETTE.hex('red1')
+    for (let k = 2; k <= 6; k++) {
+      for (let t = 0; t <= 128; t += 2) {
+        // lines of constant tx = k and ty = k across the footprint
+        const a = scr(ox, top, k, 2)
+        ctx.fillRect(a.x + 32 - t, a.y + t / 2, 1, 1)
+        const b = scr(ox, top, 2, k)
+        ctx.fillRect(b.x + 32 + t, b.y + t / 2, 1, 1)
+      }
+    }
+    ctx.fillStyle = PALETTE.hex('yellow3')
+    for (const [tx, ty, dx, dy] of [
+      [2, 2, 32, 0],
+      [6, 2, 32, 0],
+      [2, 6, 32, 0],
+      [6, 6, 32, 0],
+    ] as const) {
+      const p = scr(ox, top, tx, ty)
+      ctx.fillRect(p.x + dx - 1, p.y + dy - 1, 3, 3)
+    }
+  }
+  return cv
+}
+
+/**
+ * The docks as the map lays them out (src/data/map.json + buildings.json):
+ * tiles x 0..12, y 26..38 — the west sea, the quay pavement, the three
+ * port sprites on their buildings.json footprints (sprite = SPRITE_MAP via
+ * coversBuildings), the crane, ship and container props at their map
+ * tiles; `locked` draws the fogged frames the region shows until M8.
+ */
+export function portScene(m: Manifest, locked: boolean): Canvas {
+  const X0 = 0
+  const Y0 = 26
+  const nx = 13
+  const ny = 13
+  const top = 200
+  const W = (nx + ny) * 32
+  const H = (nx + ny) * 16 + top
+  const cv = createCanvas(W, H)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('water1')
+  ctx.fillRect(0, 0, W, H)
+  const ox = ny * 32 - 32
+  const L = locked ? '_locked' : ''
+  const map = dataJson('map.json') as {
+    ground: {
+      scenery: { rect: [number, number, number, number]; frame: string }[]
+    }
+    props: { frame: string; tile: [number, number]; region: string }[]
+  }
+  const buildings = dataJson('buildings.json') as {
+    id: string
+    district: string
+    footprint: [number, number]
+    tile: [number, number]
+  }[]
+  const sea = map.ground.scenery.filter((r) => r.frame === 'water')
+  const isSea = (x: number, y: number) =>
+    sea.some(
+      (r) =>
+        x >= r.rect[0] && x <= r.rect[2] && y >= r.rect[1] && y <= r.rect[3],
+    )
+  for (let ty = 0; ty < ny; ty++) {
+    for (let tx = 0; tx < nx; tx++) {
+      const t = isSea(X0 + tx, Y0 + ty)
+        ? fin(m, 'water', '_f0')
+        : fin(m, 'pavement', L)
+      if (!t) continue
+      const p = scr(ox, top, tx, ty)
+      ctx.drawImage(t, p.x, p.y)
+    }
+  }
+  const sprite = new Map<string, string>()
+  for (const e of m.entries) {
+    for (const b of e.coversBuildings ?? []) sprite.set(b, e.id)
+  }
+  const frameOf = (id: string) =>
+    fin(m, id, entry(m, id)?.variants.includes('locked') ? L : '')
+  const draws: { d: number; f: () => void }[] = []
+  const put = (id: string, ax: number, ay: number) => {
+    const im = frameOf(id)
+    if (!im) return
+    const p = scr(ox, top, ax - X0, ay - Y0)
+    draws.push({
+      d: ax + ay,
+      f: () => ctx.drawImage(im, p.x + 32 - im.width / 2, p.y + 32 - im.height),
+    })
+  }
+  for (const b of buildings.filter((x) => x.district === 'docks')) {
+    const id = sprite.get(b.id) ?? b.id
+    // anchor = the bottom vertex of the footprint's max tile
+    put(id, b.tile[0] + b.footprint[0] - 1, b.tile[1] + b.footprint[1] - 1)
+  }
+  // props stand where CityScene puts them: origin (0.5, 1) at the tile's
+  // bottom vertex
+  for (const pr of map.props.filter((x) => x.region === 'docks')) {
+    put(pr.frame, pr.tile[0], pr.tile[1])
+  }
+  draws.sort((a, b) => a.d - b.d)
+  for (const d of draws) d.f()
+  return cv
+}
+
+/** bike, van and truck on a road, for scale (1x) */
+function fleetScene(m: Manifest): Canvas {
+  const cv = createCanvas(3 * 64 + 32, 64)
+  const ctx = cv.getContext('2d')
+  for (let i = 0; i < 4; i++) {
+    const road = fin(m, 'road', '_10')
+    if (road) ctx.drawImage(road, i * 64 - 16, 24)
+  }
+  const veh: [string, number][] = [
+    ['bike', 0],
+    ['van', 1],
+    ['truck', 2],
+  ]
+  for (const [id, i] of veh) {
+    const e = entry(m, id)
+    const im = fin(m, id, '_se_0')
+    if (!e || !im) continue
+    const foot = e.foot ?? [im.width / 2, Math.round(im.height * 0.75)]
+    // the road centre line point of each tile: (x + 32, 40)
+    ctx.drawImage(im, i * 64 + 48 - foot[0], 40 - foot[1])
+  }
+  return cv
+}
+
+/** a framed cell for the hop crop (or the placeholder text) */
+function hopCell(path: string | null): Canvas {
+  const crop = path ? pngCanvas(path) : null
+  const w = crop ? crop.width : 160
+  const h = crop ? crop.height : 96
+  const cv = createCanvas(w + 4, h + 4)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('outline')
+  ctx.fillRect(0, 0, w + 4, h + 4)
+  ctx.fillStyle = PALETTE.hex('grey4')
+  ctx.fillRect(2, 2, w, h)
+  if (crop) ctx.drawImage(crop, 2, 2)
+  return cv
+}
+
+export function fixesSheet(m: Manifest, hop: string | null = null): string {
+  const S = 2
+  const ext = (f: string) => fin(m, 'wh_ext', f)
+  const bike = entry(m, 'bike')
+  const sections: Section[] = [
+    {
+      title:
+        'F2 warehouse on the slab (2x = camera zoom 2): wh_ext_t1, wh_ext_t2, ' +
+        't1 with the footprint grid (red dots = tile edges, yellow = corners)',
+      blocks: [
+        { cv: lotScene(m, ext('_t1'), false), label: 'wh_ext_t1 on lot_slab' },
+        { cv: lotScene(m, ext('_t2'), false), label: 'wh_ext_t2 on lot_slab' },
+        { cv: lotScene(m, ext('_t1'), true), label: 't1 + footprint grid' },
+      ],
+    },
+    {
+      title: 'F3 bike: courier with a white helmet, 32x32 (4x)',
+      blocks: [
+        ...(bike
+          ? vehicleBlock(m, bike, {
+              n: -1,
+              get: (s) => fin(m, 'bike', s),
+              tag: 'bike_{ne,se,sw,nw}_{0,1}',
+            }).map((b) => ({ cv: scaled(b.cv, 2), label: b.label }))
+          : []),
+        { cv: scaled(fleetScene(m), 2), label: 'bike, van, truck (se_0)' },
+      ],
+    },
+    {
+      title:
+        'F5 modern port (2x): dk_terminal_a, dk_terminal_b, dk_port_office ' +
+        'with dk_crane, dk_ship, dk_containers — colour and _locked (M5-M7)',
+      blocks: [
+        { cv: portScene(m, false), label: 'docks in colour (live from M8)' },
+        { cv: portScene(m, true), label: 'docks _locked (as shipped)' },
+      ],
+    },
+    {
+      title: 'F4 hop: the pickup icon sinks into the vehicle body',
+      blocks: [
+        {
+          cv: hopCell(hop),
+          label: hop ? 'hop frame (shots crop)' : 'hop frame: crop from shots',
+        },
+      ],
+    },
+  ]
+  const out = join(CONTACT, 'fixes@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 1500, S))
+  return out.replace(ROOT, '')
+}
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url)
+if (isMain) {
+  const [cmd, ...rest] = process.argv.slice(2)
+  if (cmd === 'fixes') {
+    const i = rest.indexOf('--hop')
+    const hop = i >= 0 ? (rest[i + 1] ?? null) : null
+    const { loadManifest } = await import('./manifest.ts')
+    console.log(`contact: ${fixesSheet(loadManifest(), hop)}`)
+  } else {
+    console.error('usage: node tools/art/contact.ts fixes [--hop <crop.png>]')
+    process.exitCode = 1
+  }
 }

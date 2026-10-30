@@ -7,7 +7,8 @@
     <!--
       Dev-only art review page (style-guide.md §5). Served by `vlr dev -- --host`
       at /gallery.html. Reads /gallery/index.json (written by `vlr art:gallery`,
-      gitignored) and the committed atlas /assets/world.{png,json}; draws every
+      gitignored) and the committed atlases /src/assets/{world,interior}.{png,json}
+      (index.json lists them; the dev server serves them raw); draws every
       frame at 1x and 3x (integer scale, nearest neighbour), tags placeholders,
       shows PixelLab candidates of unapproved ids side by side with their
       rejects, and builds `vlr art:reject -- id "reason"` lines to copy.
@@ -165,22 +166,30 @@
       const $ = (id) => document.getElementById(id)
       const state = { cat: null, picks: new Map() }
       let index = null
+      /** frame name -> { f: atlas frame, sheet: its atlas image } (world first) */
       let atlas = null
-      let sheet = null
 
       async function load() {
         try {
-          const [i, a] = await Promise.all([
-            fetch('/gallery/index.json').then((r) => r.json()),
-            fetch(`/assets/world.json`).then((r) => r.json()),
-          ])
-          index = i
+          index = await fetch('/gallery/index.json').then((r) => r.json())
+          const list = index.atlases ?? [
+            {
+              key: 'world',
+              png: '/src/assets/world.png',
+              json: '/src/assets/world.json',
+            },
+          ]
           atlas = new Map()
-          for (const t of a.textures)
-            for (const f of t.frames) atlas.set(f.filename, f)
-          sheet = new Image()
-          sheet.src = '/assets/world.png'
-          await sheet.decode()
+          for (const at of list) {
+            const a = await fetch(at.json).then((r) => r.json())
+            const img = new Image()
+            img.src = at.png
+            await img.decode()
+            for (const t of a.textures)
+              for (const f of t.frames)
+                if (!atlas.has(f.filename))
+                  atlas.set(f.filename, { f, sheet: img })
+          }
         } catch (err) {
           $('status').textContent =
             'Run `vlr art:build` (or `vlr art:gallery` + `vlr art:atlas`) first: ' +
@@ -211,7 +220,8 @@
 
       /** draw one atlas frame at integer scale s (trim-aware) */
       function frameCanvas(name, s) {
-        const f = atlas.get(name)
+        const hit = atlas.get(name)
+        const f = hit?.f
         const c = document.createElement('canvas')
         if (!f) {
           c.width = c.height = 16 * s
@@ -222,7 +232,7 @@
         const ctx = c.getContext('2d')
         ctx.imageSmoothingEnabled = false
         ctx.drawImage(
-          sheet,
+          hit.sheet,
           f.frame.x,
           f.frame.y,
           f.frame.w,

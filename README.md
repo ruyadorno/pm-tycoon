@@ -33,8 +33,8 @@ the truck, the Shaky shaker and the tier-2 warehouse all arrive after minute 10.
 press **Download playtest.json** and **Copy summary**, and note how it felt. docs/playtest.md explains the file and
 the five fun-bar checks; docs/phone-checklist.md is the device checklist for the same session.
 
-**Optional short session** (after the cold run, and only once its `playtest.json` is downloaded: the spicy data
-replaces the cold run's save and profile on that origin): `?debug=1&config=spicy` loads `configs/spicy.json` — more malware
+**Optional short session** (after the cold run; it keeps its own save and profile, `pm.save.v2:cfg:spicy` and
+`pm.playtest.v1:cfg:spicy`, so the cold run's stay untouched): `?debug=1&config=spicy` loads `configs/spicy.json` — more malware
 and decoys, a Hold Bay of 2 — so a Hold Bay stall and the lost-life card show up within minutes. `?debug=1` also
 shows the fps/draw-call overlay, allows 4× speed (key `4`) and exposes `window.__pm` in the console.
 
@@ -93,9 +93,9 @@ vlr sim -- --minutes 30 --seed 7  # the headless sim with the scripted policy, o
 vlr sim:gate                      # seeds 1-10 x 30 min against the playtest-1 pacing windows → docs/gate/latest.md
 vlr e2e:install                   # once: Playwright's Chromium (no root); without it the e2e steps print SKIPPED
 vlr shots                         # build + screenshots into shots/
-vlr art:build                     # the offline art pipeline → public/assets/world.{png,json}
+vlr art:build                     # the offline art pipeline → src/assets/{world,interior}.{png,json} (+ logo.png)
 vlr build                         # production build → dist/
-node tools/check-dist.mjs         # transfer budget (≤ 6 MB without source maps), atlas, samples, spicy.json
+node tools/check-dist.mjs         # transfer budget (≤ 8 MB without source maps), hashed atlases, samples, spicy.json
 vlr bundle                        # dist/ → dist-zip/pm-tycoon-<sha>.zip
 ```
 

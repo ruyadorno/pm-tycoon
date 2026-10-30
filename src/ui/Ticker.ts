@@ -1,10 +1,20 @@
 // News ticker (city-view.md §8.1, §9.7; plan.md §9): the 16-px strip under
 // the top bar. Left cell (52 px): `Day N` over a fill that grows with the
 // day's progress (payday visible approaching). Right region: one m5x7 line
-// scrolling right-to-left at 40 px/s, each line once, from a FIFO queue of at
+// scrolling right-to-left at 40 px/s, each line once, from a queue of at
 // most 8 with identical-text dedupe; after 90 s with nothing queued a
 // `puns.json tickerFiller` line runs. While the game is paused the strip
 // shows a blinking `PAUSED` (1 Hz) instead and the line holds its place.
+//
+// Pacing (report-playtest1 §6.6, plan-build2 §8.2 task 10): the strip trailed
+// the clock (`Day 5: …` still scrolling at 13:16). Now a newer `Day N:` line
+// drops the stale day lines still waiting, a waiting line older than
+// TICKER_MAX_AGE_MS is dropped unread, and when more than 8 wait the cap
+// evicts fillers, then day lines, then the other lines, and the important
+// ones (the summary offer, a lost life, a level-up) last. Ages run on the
+// ticker's own clock: the ms the strip has run unpaused (update()'s clamped
+// deltas), so a pause, the Paused card or a hidden tab never ages the queue
+// and a 2× run does not either (the player reads the strip in wall time).
 //
 // Clipping: the line scrolls under the Day cell, which is opaque and drawn
 // above it, and leaves through the canvas edge on the right, so no camera
@@ -24,43 +34,87 @@ import { UI_ATLAS } from '../render/atlases.ts'
 export const TICKER_PX_PER_MS = 0.04
 export const TICKER_QUEUE_MAX = 8
 export const TICKER_FILLER_MS = 90_000
+/**
+ * A waiting line older than this (on the ticker's clock, see the header) is
+ * dropped unread (report §6.6). A UI pacing constant, not a balance number.
+ */
+export const TICKER_MAX_AGE_MS = 90_000
 export const PAUSED_BLINK_MS = 500
 /** city-view §8.1 says 0.85; matched to the top bar's 0.94 (world text read through). */
 export const TICKER_ALPHA = 0.94
 export const DAY_FILL_ALPHA = 0.3
 
-/** Kinds the HUD queues: the sim's TickerKind plus view-generated ones. */
-export type TickerLineKind = TickerKind
+/**
+ * Kinds the HUD queues: the sim's TickerKind plus view-generated ones —
+ * `offer` is the once-per-run summary offer line (Q55).
+ */
+export type TickerLineKind = TickerKind | 'offer'
 
 export interface TickerItem {
   text: string
   kind: TickerLineKind
 }
 
-/** FIFO of at most `max` waiting lines; identical text is never queued twice. */
+/** A waiting line with its queue time on the ticker's clock (ms). */
+export interface QueuedLine extends TickerItem {
+  at: number
+}
+
+/** Lines the cap evicts last: the summary offer, a lost life, a level-up. */
+export const TICKER_IMPORTANT: ReadonlySet<TickerLineKind> =
+  new Set<TickerLineKind>(['offer', 'incident', 'level'])
+
+/**
+ * Eviction rank when more than `max` lines wait (lowest goes first): filler
+ * 0, the daily summary 1, the other lines 2, TICKER_IMPORTANT 3.
+ */
+export function evictRank(kind: TickerLineKind): number {
+  if (kind === 'filler') return 0
+  if (kind === 'daily') return 1
+  return TICKER_IMPORTANT.has(kind) ? 3 : 2
+}
+
+/**
+ * At most `max` waiting lines, played in order; identical text is never
+ * queued twice; a newer daily line replaces the waiting ones; lines older
+ * than `maxAgeMs` are dropped; the cap evicts by evictRank, oldest first.
+ * `now` is the caller's clock in ms (Ticker passes its unpaused clock).
+ */
 export class TickerQueue {
   current: TickerItem | null = null
-  readonly waiting: TickerItem[] = []
+  readonly waiting: QueuedLine[] = []
   readonly max: number
+  readonly maxAgeMs: number
 
-  constructor(max = TICKER_QUEUE_MAX) {
+  constructor(max = TICKER_QUEUE_MAX, maxAgeMs = TICKER_MAX_AGE_MS) {
     this.max = max
+    this.maxAgeMs = maxAgeMs
   }
 
   /** 'duplicate' when the text is scrolling or already waiting. */
-  push(item: TickerItem): 'queued' | 'duplicate' {
+  push(item: TickerItem, now = 0): 'queued' | 'duplicate' {
     if (!item.text) return 'duplicate'
     if (this.current?.text === item.text) return 'duplicate'
+    this.prune(now)
     if (this.waiting.some((w) => w.text === item.text)) return 'duplicate'
-    this.waiting.push(item)
-    while (this.waiting.length > this.max) this.waiting.shift()
+    // `Day 6: …` supersedes a `Day 5: …` that never got to scroll.
+    if (item.kind === 'daily') this.dropWhere((w) => w.kind === 'daily')
+    this.waiting.push({ text: item.text, kind: item.kind, at: now })
+    while (this.waiting.length > this.max) this.evict()
     return 'queued'
   }
 
   /** The current line finished (or none was showing): promote the next. */
-  next(): TickerItem | null {
-    this.current = this.waiting.shift() ?? null
+  next(now = 0): TickerItem | null {
+    this.prune(now)
+    const q = this.waiting.shift()
+    this.current = q ? { text: q.text, kind: q.kind } : null
     return this.current
+  }
+
+  /** Drop the waiting lines older than maxAgeMs at `now`. */
+  prune(now: number): void {
+    this.dropWhere((w) => now - w.at > this.maxAgeMs)
   }
 
   get size(): number {
@@ -70,6 +124,25 @@ export class TickerQueue {
   clear(): void {
     this.current = null
     this.waiting.length = 0
+  }
+
+  /** Remove the lowest-ranked waiting line (the oldest of that rank). */
+  private evict(): void {
+    let at = -1
+    let rank = Infinity
+    this.waiting.forEach((w, i) => {
+      const r = evictRank(w.kind)
+      if (r < rank) {
+        rank = r
+        at = i
+      }
+    })
+    if (at >= 0) this.waiting.splice(at, 1)
+  }
+
+  private dropWhere(pred: (w: QueuedLine) => boolean): void {
+    for (let i = this.waiting.length - 1; i >= 0; i--)
+      if (pred(this.waiting[i] as QueuedLine)) this.waiting.splice(i, 1)
   }
 }
 
@@ -127,6 +200,8 @@ export class Ticker {
   private pausedText: Phaser.GameObjects.BitmapText
   private x = 0
   private idleMs = 0
+  /** The queue's clock: ms the strip has run unpaused (see the header). */
+  private clockMs = 0
   private paused = false
   private progress = 0
   private day = 1
@@ -195,9 +270,10 @@ export class Ticker {
     return this
   }
 
-  /** Queue a line (deduped; FIFO of 8). */
+  /** Queue a line (deduped; at most 8, aged on the ticker's clock). */
   push(text: string, kind: TickerLineKind): void {
-    if (this.queue.push({ text, kind }) === 'queued') this.idleMs = 0
+    if (this.queue.push({ text, kind }, this.clockMs) === 'queued')
+      this.idleMs = 0
   }
 
   /** `Day N` (N = completed days + 1). */
@@ -239,8 +315,9 @@ export class Ticker {
     }
     this.pausedText.setVisible(false)
     const d = Math.max(0, Math.min(delta, 100))
+    this.clockMs += d
     if (!this.queue.current) {
-      if (this.queue.next()) this.start()
+      if (this.queue.next(this.clockMs)) this.start()
       else {
         this.idleMs += d
         if (this.idleMs >= TICKER_FILLER_MS && this.fillers.length > 0) {
@@ -257,7 +334,7 @@ export class Ticker {
     if (this.x + this.line.width < left) {
       this.queue.current = null
       this.idleMs = 0
-      if (this.queue.next()) this.start()
+      if (this.queue.next(this.clockMs)) this.start()
       else this.line.setVisible(false)
       return
     }

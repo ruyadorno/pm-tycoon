@@ -29,6 +29,11 @@ export interface Params {
   config: string | null
   /** Ignore the autosave and start a fresh game. */
   newGame: boolean
+  /**
+   * The Title over the attract city (B2 §5); false for ?attract=0: no
+   * attract sim, the Title on a plain backdrop (tests that need the old flow).
+   */
+  attract: boolean
 }
 
 export const FAST_FORWARD_CAP_S = 1800
@@ -64,6 +69,7 @@ export function parseParams(search: string, fallbackSeed: number): Params {
     Math.max(0, int(q, 'fastForward') ?? 0),
   )
   const audioArg = q.get('audio')
+  const attractArg = q.get('attract')
   const config = q.get('config')
   return {
     seed,
@@ -79,6 +85,7 @@ export function parseParams(search: string, fallbackSeed: number): Params {
     audiolog: flag(q, 'audiolog'),
     config: config && config.trim() ? config.trim() : null,
     newGame: flag(q, 'newGame'),
+    attract: !(attractArg === '0' || attractArg === 'false'),
   }
 }
 

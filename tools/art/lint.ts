@@ -6,12 +6,23 @@
 //   A03 canvas = class canvas (rows for flex classes); icons 16x16 with a
 //       1-px transparent margin
 //   A04 city classes: the lowest rows form the footprint diamond, bottom
-//       vertex on the anchor (overlay tiles and mood_* overlays exempt)
+//       vertex on the anchor (overlay tiles and mood_* overlays exempt);
+//       strict for warehouse-ext (build 2, B2 §6.1): no ground patch, the
+//       wall base stands on the 256x128 diamond — nothing outside its
+//       columns or below its lower edges (iso.ts exteriorBaseOk)
 //   A05 inside the canvas, under the §1.5 height budget; vehicles keep a
 //       1-px margin
 //   A06 frame set complete (vehicles 4 headings x 2, worker 28, variants)
 //   A07 reserved-colour membership (mal / gold / red / water per class)
-//   A08 atlas <= 2048^2, power of two, no duplicate names, frames <-> world
+//   A08 atlases (src/assets/world.json + interior.json, atlas.ts
+//       atlasProblems) <= 2048^2, power of two, no duplicate names in one
+//       atlas; every packed frame in each atlas its placement names (frames
+//       placed 'both' live in the two); public/assets/world.png must not
+//       come back
+//   class 'logo' (B2 §5): the author's brand art at src/assets/logo.png
+//       (written by tools/art/logo.ts), outside the palette contract: only
+//       its size (352x176) and that it is a non-blank PNG are checked
+//       (A01/A02/A07/A10/A11 exempt); missing = a warning (art:logo)
 //   A09 every entry has its finals, every final maps to an entry,
 //       finalSha256 matches
 //   A10 outline continuity: opaque pixels touching transparency are
@@ -27,6 +38,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { ATLAS_KEYS, atlasJsonPath, atlasProblems } from './atlas.ts'
 import type { StepOpts } from './draw-api.ts'
 import {
   type Img,
@@ -36,6 +48,7 @@ import {
   opaque,
   pid,
   readImg,
+  exteriorBaseOk,
   rgbaToImg,
   stairStepOk,
 } from './iso.ts'
@@ -43,6 +56,7 @@ import {
   type Manifest,
   type ManifestEntry,
   CITY_CLASSES,
+  EXTERNAL_FINAL,
   FINAL_DIR,
   HEIGHT_BUDGET,
   MANIFEST_PATH,
@@ -98,10 +112,6 @@ interface Report {
 
 function hsvV(rgb: readonly number[]): number {
   return Math.max(...rgb) / 255
-}
-
-function pow2(n: number): boolean {
-  return n > 0 && (n & (n - 1)) === 0
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +234,11 @@ function checkPixels(
   const overlay = OVERLAY_TILE.test(e.id) || e.id.startsWith('mood_')
   if (CITY_CLASSES.includes(e.class) && !overlay) {
     const fp = e.footprint?.[0] ?? Math.round(W / 64)
-    for (const problem of stairStepOk(img, 64 * fp).slice(0, 1)) {
+    const problems =
+      e.class === 'warehouse-ext'
+        ? exteriorBaseOk(img, 64 * fp)
+        : stairStepOk(img, 64 * fp)
+    for (const problem of problems.slice(0, 1)) {
       r.errors.push(`A04 ${at}: ${problem}`)
     }
   }
@@ -322,32 +336,6 @@ function checkOrphans(r: Report, m: Manifest): void {
   }
 }
 
-const ATLAS_JSON = join(ROOT, 'public/assets/world.json')
-
-interface AtlasFrame {
-  filename: string
-  frame: { x: number; y: number; w: number; h: number }
-}
-
-export function atlasFrames(json: unknown): {
-  w: number
-  h: number
-  frames: AtlasFrame[]
-  textures: number
-} {
-  const j = json as {
-    textures?: { size: { w: number; h: number }; frames: AtlasFrame[] }[]
-  }
-  const t = j.textures ?? []
-  const first = t[0]
-  return {
-    w: first?.size.w ?? 0,
-    h: first?.size.h ?? 0,
-    frames: t.flatMap((x) => x.frames),
-    textures: t.length,
-  }
-}
-
 function newestFinal(): number {
   let t = 0
   if (!existsSync(FINAL_DIR)) return t
@@ -361,36 +349,62 @@ function newestFinal(): number {
   return t
 }
 
-/** A08 over public/assets/world.json (expected = every existing final) */
+/**
+ * A08 over the two atlases (atlas.ts atlasProblems: each <= 2048^2, power of
+ * two, one texture, no duplicate in one atlas, every existing final of a
+ * packed entry in each atlas its placement names — frames placed 'both' live
+ * in the two — and nothing else); stale atlases only warn unless strict
+ */
 export function checkAtlas(m: Manifest, r: Report, strict: boolean): void {
-  if (!existsSync(ATLAS_JSON)) {
-    r.warnings.push('A08 public/assets/world.json missing (run art:atlas)')
+  const { problems, missing } = atlasProblems(m)
+  if (missing.length > 0) {
+    r.warnings.push(`A08 ${missing.join(', ')} missing (run art:atlas)`)
     return
   }
-  const stale = statSync(ATLAS_JSON).mtimeMs < newestFinal()
-  const push = (msg: string) =>
-    strict || !stale ? r.errors.push(msg) : r.warnings.push(`${msg} (stale)`)
-  const a = atlasFrames(JSON.parse(readFileSync(ATLAS_JSON, 'utf8')))
-  if (a.textures !== 1) push(`A08 world.json: ${a.textures} textures, want 1`)
-  if (a.w > 2048 || a.h > 2048 || !pow2(a.w) || !pow2(a.h)) {
-    push(`A08 world.json: ${a.w}x${a.h} (<= 2048, power of two)`)
+  const newest = newestFinal()
+  const stale = ATLAS_KEYS.some(
+    (k) => statSync(atlasJsonPath(k)).mtimeMs < newest,
+  )
+  for (const msg of problems) {
+    if (strict || !stale) r.errors.push(msg)
+    else r.warnings.push(`${msg} (stale)`)
   }
-  const names = new Set<string>()
-  for (const f of a.frames) {
-    if (names.has(f.filename)) push(`A08 world.json: duplicate ${f.filename}`)
-    names.add(f.filename)
+  if (stale && problems.length > 0) {
+    r.warnings.push('A08 the atlases are older than the finals (art:atlas)')
   }
-  for (const e of m.entries) {
-    for (const n of frameNames(e)) {
-      const present = existsSync(finalPath(e, n))
-      if (present && !names.has(n)) push(`A08 ${e.id}: ${n} not in world.json`)
-      names.delete(n)
-    }
+}
+
+/**
+ * class 'logo' (B2 §5): brand art outside the palette contract at
+ * EXTERNAL_FINAL (src/assets/logo.png): a non-blank PNG of the class
+ * canvas; missing is a warning (tools/art/logo.ts writes it in art:build)
+ */
+function checkLogo(r: Report, e: ManifestEntry): number {
+  const rel = EXTERNAL_FINAL[e.class]
+  if (!rel) return 0
+  const p = join(ROOT, rel)
+  if (!existsSync(p)) {
+    r.warnings.push(`A09 ${e.id}: ${rel} missing (run vlr art:logo)`)
+    return 0
   }
-  for (const n of names) push(`A08 world.json: ${n} has no manifest frame`)
-  if (stale && r.warnings.length > 0) {
-    r.warnings.push('A08 the atlas is older than the finals (art:atlas)')
+  const buf = readFileSync(p)
+  const size = pngSize(buf)
+  if (!size) {
+    r.errors.push(`A03 ${e.id}: ${rel} is not a PNG`)
+    return 1
   }
+  const [W, H] = e.canvas
+  if (size[0] !== W || size[1] !== H) {
+    r.errors.push(
+      `A03 ${e.id}: ${rel} is ${size[0]}x${size[1]}, want ${W}x${H}`,
+    )
+    return 1
+  }
+  const { rgba } = decodePng(buf)
+  let ink = 0
+  for (let k = 3; k < rgba.length; k += 4) if ((rgba[k] as number) > 0) ink++
+  if (ink === 0) r.errors.push(`A09 ${e.id}: ${rel} is blank`)
+  return 1
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +470,10 @@ export async function run(opts: StepOpts): Promise<number> {
   const entries = selectedEntries(m, opts)
   let frames = 0
   for (const e of entries) {
+    if (EXTERNAL_FINAL[e.class] !== undefined) {
+      frames += checkLogo(r, e)
+      continue
+    }
     checkFrameSet(r, e)
     for (const name of baseFrameNames(e)) {
       if (!existsSync(finalPath(e, name))) {

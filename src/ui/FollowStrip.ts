@@ -7,6 +7,10 @@
 // onClose callback (HudScene). The pure text helpers (followText,
 // vehicleStateText, cargoCounts) live in hudKit.ts so Vitest can load them
 // without the kit Button; Phaser is a type-only import here.
+//
+// The type glyph is placed from its frame's real size (followIconPos), so a
+// redrawn icon or a bigger vehicle canvas (the bike went 24² → 32², plan-
+// build2 §8.2 task 5) lays out without a code change.
 import type Phaser from 'phaser'
 import type { FrameName } from '../render/frames.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
@@ -31,8 +35,28 @@ const TYPE_ICON: Record<string, FrameName> = {
   truck: 'ic_truck',
 }
 const STRIP_ALPHA = 0.92
+/** The parcel icons' size (icon16). */
 const ICON = 16
 const GAP = 4
+const PAD_X = 6
+
+/**
+ * The type glyph's top-left in a strip `stripH` tall at `stripY`, and the x
+ * where the text starts, from the glyph frame's real size.
+ */
+export function followIconPos(
+  w: number,
+  h: number,
+  stripY: number,
+  stripH: number,
+): { x: number; y: number; textX: number } {
+  const iw = Math.round(w)
+  return {
+    x: PAD_X,
+    y: stripY + Math.max(0, Math.floor((stripH - Math.round(h)) / 2)),
+    textX: PAD_X + iw + GAP,
+  }
+}
 
 export interface FollowStripOptions {
   onClose: () => void
@@ -105,6 +129,7 @@ export class FollowStrip {
     if (key === this.key) return
     this.key = key
     this.icon.setFrame(TYPE_ICON[v.type] ?? 'ic_bike')
+    const at = this.placeIcon()
     this.cargo.removeAll(true)
     // Cargo groups right-aligned before the close button.
     const right = this.L.followClose.rect.x - GAP
@@ -117,14 +142,27 @@ export class FollowStrip {
       t.setPosition(x, textTop(y, this.L.followStrip.h))
       x -= ICON + 1
       const img = this.scene.add
-        .image(x, y + 8, UI_ATLAS, PARCEL_ICON[c.size])
+        .image(
+          x,
+          y + Math.floor((this.L.followStrip.h - ICON) / 2),
+          UI_ATLAS,
+          PARCEL_ICON[c.size],
+        )
         .setOrigin(0, 0)
       x -= GAP
       this.cargo.add([img, t])
     }
-    const textX = 6 + ICON + GAP
-    const maxW = x - GAP - textX
+    const maxW = x - GAP - at.textX
     this.text.setText(ellipsize(line, maxW, (s) => this.text.setText(s).width))
+  }
+
+  /** Glyph and text x from the current frame's size. */
+  private placeIcon(): { x: number; y: number; textX: number } {
+    const r = this.L.followStrip
+    const at = followIconPos(this.icon.width, this.icon.height, r.y, r.h)
+    this.icon.setPosition(at.x, at.y)
+    this.text.setX(at.textX)
+    return at
   }
 
   relayout(L: Layout): void {
@@ -141,8 +179,8 @@ export class FollowStrip {
         L.W,
         hitH,
       )
-    this.icon.setPosition(6, r.y + 8)
-    this.text.setPosition(6 + ICON + GAP, textTop(r.y, r.h))
+    this.text.setY(textTop(r.y, r.h))
+    this.placeIcon()
     this.close.setRect(L.followClose.rect, L.followClose.hit)
     this.key = ''
   }

@@ -25,7 +25,7 @@
 // (tier 2 at once). Mood overlays per building (flower boxes ≥ 80, shutters
 // < 30), the angry label + a grumble ui:sfx every 20 s while on screen, the
 // honking queue + red dock lights, docked vehicles drawn in front of bay 1
-// (cityFx.ts DOCK_POSE_CANVAS), the six Industrial smoke emitters while
+// (the exterior frame's dockPose, cityFx.ts warehouseAnchors), the six Industrial smoke emitters while
 // Industrial is live, and the render-quality cut order (quality.ts, R4).
 //
 // M4 bug hunt: vehicles in front of a multi-tile footprint sort above it
@@ -36,6 +36,24 @@
 // what the player sees); the ground bake's texture is removed on SHUTDOWN
 // (a New game after a region unlock left the 3072×1536 'ground_b' behind).
 //
+// Build 2 / M5 (B2 §5, §6.3): the Title runs above this scene in ATTRACT
+// mode (start data {attract: true}): the Title's attract sim drives it, the
+// scene's input is off (no gestures, keys, hover, tooltip), nothing emits a
+// ui:sfx, and src/render/AttractCamera.ts tours the lot and the live regions
+// (12-s legs, 1-s holds, zoom 1). endAttract() (Continue / New game) fades
+// the camera out, hands over to the Title's swap (setSim(real) → syncAll,
+// the ground re-baked for the real lock state), drops every attract-only
+// view, puts the camera on the warehouse, turns input on, fades back in and
+// emits pm:attractEnd (what __pm.ready waits for). recycleAttract() (the
+// Title, every 30 min of attract sim time or on a lost life) re-installs the
+// demo snapshot under the same fade, the tour going on; a lost life in
+// attract mode never shakes the camera behind the logo, and the fps sampler
+// does not judge the Title (quality.ts skip). Parcel hops (F4): the
+// pickup hop ends inside the vehicle body (v.y − 4) and sinks to scale 0 over
+// its last 40 % (Popups.hop {sink}); the delivery hop starts from the body
+// at full size. Debug: setLotCorners() marks the lot footprint's four iso
+// corners (the city-lot-zoom2 shot).
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -43,6 +61,8 @@
 // ui:sfx; consumes pm:follow, pm:zonePick, pm:panTo.
 import Phaser from 'phaser'
 import {
+  ATTRACT_FADE_MS,
+  EV_ATTRACT_END,
   EV_GOTO,
   EV_VIEW,
   FADE_IN_MS,
@@ -50,6 +70,7 @@ import {
   FADE_RGB,
   PAN_TO_WAREHOUSE_MS,
   REG_CITY_CAM,
+  type CityStartData,
   type StoredCam,
   type WorldTransition,
   type WorldView,
@@ -70,6 +91,7 @@ import {
 } from '../data/index.ts'
 import { GestureClassifier } from '../input/GestureClassifier.ts'
 import { WORLD_ATLAS, FONT_KEY } from '../render/atlases.ts'
+import { AttractCamera, attractStops } from '../render/AttractCamera.ts'
 import {
   BuildingView,
   capTop,
@@ -81,10 +103,8 @@ import { CameraRig } from '../render/CameraRig.ts'
 import {
   BAY_LIGHTS,
   CONSTRUCTION_SWAP_MS,
-  DOCK_POSE_CANVAS,
   DOCK_POSE_DEPTH,
   dustFrame,
-  dustPoints,
   fadeK,
   levelStampText,
   moodFor,
@@ -95,7 +115,9 @@ import {
   smokePuff,
   stampPose,
   UNLOCK_FADE_MS,
+  WH_ANCHOR_FRAME,
   WH_CANVAS,
+  warehouseAnchors,
 } from '../render/cityFx.ts'
 import { decayPhase } from '../render/decayPhase.ts'
 import { DistrictLabel } from '../render/DistrictLabel.ts'
@@ -188,6 +210,11 @@ const ZONE_PULSE_MS = 1000
 const ZONE_FILL_ALPHA = 0.18
 /** Rise of a pickup / delivery popup's spawn point over the doorstep. */
 const POPUP_LIFT = 30
+/** The attract → game swap happens anyway if the fade never reports back (scene clock). */
+const ATTRACT_SWAP_TIMEOUT_MS = 1000
+/** Debug lot-corner marks (setLotCorners): colour, arm length. */
+const LOT_CORNER_COLOUR = 0xff00ff
+const LOT_CORNER_ARM = 4
 /** fx strips (4 frames each). */
 const FX_POP_MS = 250
 const FX_PING_MS = 300
@@ -199,7 +226,7 @@ const SHAKE_DEFUSED: readonly [number, number] = [120, 0.002]
 const SHAKE_LOST_LIFE: readonly [number, number] = [300, 0.004]
 /** The new ground bake fades in above the old one at this depth (§1.4). */
 const GROUND_FADE_DEPTH = -0.5
-/** fx_dust puffs draw over the warehouse sprite (its depth + this). */
+/** The fx_dust cloud draws over the warehouse sprite (its depth + this). */
 const DUST_DEPTH = 0.5
 /** The level stamp: over every popup; 2-px shadow at 32 px (2× m5x7). */
 const STAMP_DEPTH = DEPTH.popup + 1
@@ -351,12 +378,26 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private readonly viewRect: ViewRect = {
     contains: (x, y) => this.cameras.main.worldView.contains(x, y),
   }
+  /** The Title's attract city (B2 §5): see the header. */
+  attract = false
+  private attractCam: AttractCamera | null = null
+  /** endAttract() in flight (the fade before the swap). */
+  private leavingAttract = false
+  /** recycleAttract() in flight (the fade before the snapshot re-install). */
+  private recyclingAttract = false
+  /** Debug: the lot footprint's corner marks (setLotCorners). */
+  private lotCorners: Phaser.GameObjects.Graphics | null = null
 
   constructor() {
     super('City')
   }
 
-  init(): void {
+  init(data: CityStartData = {}): void {
+    this.attract = data?.attract === true
+    this.attractCam = null
+    this.leavingAttract = false
+    this.recyclingAttract = false
+    this.lotCorners = null
     this.buildings = new Map()
     this.byDistrict = new Map()
     this.vehicles = new Map()
@@ -405,7 +446,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.relayout()
     // Render quality (plan.md R4): boot level from the core count + the fps
     // sampler; idempotent, so a restarted City reuses the game's controller.
-    this.qualityCtl = installQuality(this.game)
+    // The attract Title (idle time, sample decode, the swap's re-bake) is
+    // not judged: the sampler skips — and restarts its window — while the
+    // attract sim is the game's.
+    this.qualityCtl = installQuality(this.game, {
+      skip: () => this.registry.get(REG.attractSim) != null,
+    })
     this.quality = this.qualityCtl.flags
 
     this.world = this.add.layer()
@@ -464,7 +510,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
           this.refreshScorch()
         },
         // §1.4: 1 s crossfade (sprites + a second ground bake), then sign_pop.
-        'region:unlocked': () => this.applyLockState(true),
+        'region:unlocked': () => {
+          this.applyLockState(true)
+          this.refreshAttractStops()
+        },
         // §9.6: fx_dust construction → wh_ext_t<tier> + the LEVEL stamp.
         'level:up': (p) => this.onLevelUp(p.level),
         'life:lost': (p) => this.onLifeLost(p),
@@ -476,7 +525,190 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.events.on(Phaser.Scenes.Events.SLEEP, this.onSleep, this)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.onShutdown, this)
     this.syncAll()
+    if (this.attract) this.beginAttract()
+    else this.game.events.emit(EV_VIEW, { name: 'city' })
+  }
+
+  // ---------------------------------------------------------------- attract (B2 §5)
+
+  /** Attract mode: input off, the camera tour from the lot. */
+  private beginAttract(): void {
+    this.input.enabled = false
+    this.tooltip.hide()
+    this.attractCam = new AttractCamera(this.cameras.main)
+    this.attractCam.setStops(this.attractStopList())
+    this.attractCam.begin(this.time.now)
+  }
+
+  /** The tour: the warehouse, then every live region's label tile. */
+  private attractStopList(): { x: number; y: number }[] {
+    return attractStops(
+      this.warehouseCentre(),
+      this.gd.map.regions,
+      (id) => this.districts.has(id) && this.vs.regionState(id) === 'live',
+      this.ox,
+    )
+  }
+
+  private refreshAttractStops(): void {
+    if (this.attract) this.attractCam?.setStops(this.attractStopList())
+  }
+
+  /**
+   * Continue / New game over the attract city (B2 §5): the camera fades out
+   * (ATTRACT_FADE_MS), then `swap` runs (the Title installs the
+   * player's sim and wakes the HUD) and the scene becomes the game's City
+   * under the fade-in. False when not in attract mode (or already leaving).
+   */
+  endAttract(swap: () => void): boolean {
+    if (!this.attract || this.leavingAttract) return false
+    this.leavingAttract = true
+    // A recycle fading out right now: its fade carries this swap instead
+    // (its own handler then does nothing; FADE_OUT_COMPLETE reaches both).
+    const recycling = this.recyclingAttract
+    this.recyclingAttract = false
+    const cam = this.cameras.main
+    const evt = Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE
+    let done = false
+    const go = (): void => {
+      if (done) return
+      done = true
+      cam.off(evt, go)
+      this.finishAttract(swap)
+    }
+    cam.once(evt, go)
+    this.time.delayedCall(ATTRACT_SWAP_TIMEOUT_MS, go)
+    const fade = cam.fadeEffect
+    if (!(recycling && fade.isRunning && fade.direction))
+      cam.fadeOut(ATTRACT_FADE_MS, FADE_RGB[0], FADE_RGB[1], FADE_RGB[2])
+    return true
+  }
+
+  /**
+   * Under the fade: drop every view of the demo city (vehicles, fx, scorch,
+   * popups), let `swap` install the player's sim, rebuild from it (syncAll:
+   * lock state + ground re-bake, tier, sign, moods), then the game camera on
+   * the warehouse at zoom 1, input on, fade in, pm:view + pm:attractEnd.
+   */
+  private finishAttract(swap: () => void): void {
+    this.attract = false
+    this.leavingAttract = false
+    this.recyclingAttract = false
+    this.attractCam?.stop()
+    this.attractCam = null
+    this.dropDemoViews()
+    try {
+      swap()
+    } catch (err) {
+      console.error('city: the attract swap failed', err)
+    }
+    this.syncAll()
+    const cam = this.cameras.main
+    this.rig.stop()
+    if (cam.zoom !== 1) cam.setZoom(1)
+    const wc = this.warehouseCentre()
+    this.focusOn(wc.x, wc.y, 0)
+    this.input.enabled = true
+    cam.resetFX()
+    cam.fadeIn(ATTRACT_FADE_MS, FADE_RGB[0], FADE_RGB[1], FADE_RGB[2])
     this.game.events.emit(EV_VIEW, { name: 'city' })
+    this.game.events.emit(EV_ATTRACT_END)
+  }
+
+  /** Every view of the demo city's moment: vehicles, fx, scorch, popups. */
+  private dropDemoViews(): void {
+    for (const v of this.vehicles.values()) v.destroy()
+    this.vehicles.clear()
+    for (const f of this.fx) f.img.destroy()
+    this.fx = []
+    for (const [id] of this.scorched) this.buildings.get(id)?.setScorch(false)
+    this.scorched.clear()
+    this.popOnCreate.clear()
+    this.dirty.clear()
+    this.popups.clear()
+    this.tooltip.hide()
+    if (this.followId !== null) this.unfollow(false)
+  }
+
+  /**
+   * The Title's demo recycle (B2 §5; AttractCamera attractRecycleDue): under
+   * the attract fade, `swap` re-installs the snapshot sim, the views are
+   * rebuilt from it (syncAll) and the tour goes on. False when not in
+   * attract mode, leaving it, or already recycling. A Continue / New game
+   * that lands inside the fade wins: the recycle then does nothing.
+   */
+  recycleAttract(swap: () => void): boolean {
+    if (!this.attract || this.leavingAttract || this.recyclingAttract)
+      return false
+    this.recyclingAttract = true
+    const cam = this.cameras.main
+    const evt = Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE
+    let done = false
+    const go = (): void => {
+      if (done) return
+      done = true
+      cam.off(evt, go)
+      if (!this.recyclingAttract) return
+      this.recyclingAttract = false
+      if (!this.attract || this.leavingAttract || this.shuttingDown) return
+      this.dropDemoViews()
+      try {
+        swap()
+      } catch (err) {
+        console.error('city: the attract recycle failed', err)
+      }
+      this.syncAll()
+      cam.resetFX()
+      cam.fadeIn(ATTRACT_FADE_MS, FADE_RGB[0], FADE_RGB[1], FADE_RGB[2])
+    }
+    cam.once(evt, go)
+    this.time.delayedCall(ATTRACT_SWAP_TIMEOUT_MS, go)
+    cam.fadeOut(ATTRACT_FADE_MS, FADE_RGB[0], FADE_RGB[1], FADE_RGB[2])
+    return true
+  }
+
+  // ---------------------------------------------------------------- debug
+
+  /**
+   * Debug (__pm.debugLotCorners): mark the four corners of the lot's
+   * footprint diamond (map.json lot.warehouse, iso tileToScreen) with small
+   * magenta crosses over everything, so the city-lot-zoom2 shot can check
+   * the slab against the grid. Returns the new state.
+   */
+  setLotCorners(on: boolean): boolean {
+    this.lotCorners?.destroy()
+    this.lotCorners = null
+    if (!on || !this.world) return false
+    const wh = this.gd.map.lot.warehouse
+    const [tx, ty] = wh.tile
+    const x1 = tx + wh.footprint[0] - 1
+    const y1 = ty + wh.footprint[1] - 1
+    const n = tileToScreen(tx, ty, this.ox)
+    const e = tileToScreen(x1, ty, this.ox)
+    const s = tileToScreen(x1, y1, this.ox)
+    const w = tileToScreen(tx, y1, this.ox)
+    const corners: [number, number][] = [
+      [n.x, n.y - HH],
+      [e.x + HW, e.y],
+      [s.x, s.y + HH],
+      [w.x - HW, w.y],
+    ]
+    const g = this.add.graphics().setDepth(DEPTH.popup + 2)
+    g.fillStyle(LOT_CORNER_COLOUR, 1)
+    const a = LOT_CORNER_ARM
+    for (const [cx, cy] of corners) {
+      // (x, y) is a pixel corner: 2-px arms centred on it, the 2×2 pixels
+      // around the vertex left clear so the slab's own corner shows.
+      const x = Math.round(cx)
+      const y = Math.round(cy)
+      g.fillRect(x - 1 - a, y - 1, a, 2)
+      g.fillRect(x + 1, y - 1, a, 2)
+      g.fillRect(x - 1, y - 1 - a, 2, a)
+      g.fillRect(x - 1, y + 1, 2, a)
+    }
+    this.world.add(g)
+    this.lotCorners = g
+    return true
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -510,6 +742,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
 
   private onShutdown(): void {
     this.shuttingDown = true
+    this.attractCam?.stop()
+    this.attractCam = null
     this.events.off(Phaser.Scenes.Events.WAKE, this.onWake, this)
     this.events.off(Phaser.Scenes.Events.SLEEP, this.onSleep, this)
     this.removeGameEvents()
@@ -598,11 +832,9 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     footprintAnchor(wh.tile, wh.footprint, this.ox, at)
     this.warehouseAnchor = { x: at.x, y: at.y }
     this.refreshWarehouse()
-    const left = at.x - WH_CANVAS / 2
-    const top = at.y - WH_CANVAS
-    BAY_LIGHTS.forEach(([bx, by], i) => {
+    BAY_LIGHTS.forEach((_, i) => {
       const img = this.add
-        .image(left + bx, top + by, WORLD_ATLAS, 'wh_dock_light_green')
+        .image(0, 0, WORLD_ATLAS, 'wh_dock_light_green')
         .setOrigin(0.5, 1)
         .setDepth(footprintDepth(wh.tile, wh.footprint) + DEPTH.bell)
         .setVisible(false)
@@ -610,7 +842,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.world.add(img)
       this.dockLights.push(img)
     })
-    this.dockPose = this.makeDockPose(left, top)
+    this.placeDockLights()
+    this.dockPose = this.makeDockPose()
 
     // Props (static Images; `_locked` frame while their region is fogged).
     for (const pr of map.props) {
@@ -786,12 +1019,13 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   /**
-   * Where a docked vehicle is drawn: DOCK_POSE_CANVAS on the exterior canvas
-   * (top-left `left`, `top`), relative to the map's first dock tile, over
-   * the wall (art-install hand-off: the dock tiles sit on the sprite's
-   * hidden NW side).
+   * Where a docked vehicle is drawn: the current exterior frame's dockPose
+   * (frames.generated WH_ANCHORS) on the exterior canvas, relative to the
+   * map's first dock tile, over the wall (art-install hand-off: the dock
+   * tiles sit on the sprite's hidden NW side). One object shared with every
+   * VehicleView; placeDockPose moves it on a tier swap.
    */
-  private makeDockPose(left: number, top: number): DockPose | null {
+  private makeDockPose(): DockPose | null {
     const map = this.gd.map
     const dock = map.lot.docks[0]
     if (!dock) return null
@@ -799,15 +1033,26 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     const rect = lotBlock
       ? blockRect(map, lotBlock.block[0], lotBlock.block[1])
       : null
-    const t = tileToScreen(dock[0], dock[1], this.ox)
     const wh = map.lot.warehouse
-    return {
+    const pose: DockPose = {
       tile: [dock[0], dock[1]],
       lotX0: rect ? rect[0] : map.lot.entrance[0] + 1,
-      dx: left + DOCK_POSE_CANVAS[0] - t.x,
-      dy: top + DOCK_POSE_CANVAS[1] - t.y,
+      dx: 0,
+      dy: 0,
       depth: footprintDepth(wh.tile, wh.footprint) + DOCK_POSE_DEPTH,
     }
+    this.placeDockPose(pose)
+    return pose
+  }
+
+  /** The dock pose's offset from the current exterior frame's anchors. */
+  private placeDockPose(pose: DockPose | null = this.dockPose): void {
+    if (!pose) return
+    const name = this.warehouse?.frame.name ?? WH_ANCHOR_FRAME
+    const [px, py] = warehouseAnchors(name).dockPose
+    const t = tileToScreen(pose.tile[0], pose.tile[1], this.ox)
+    pose.dx = this.warehouseAnchor.x - WH_CANVAS / 2 + px - t.x
+    pose.dy = this.warehouseAnchor.y - WH_CANVAS + py - t.y
   }
 
   private warehouseCentre(): { x: number; y: number } {
@@ -848,7 +1093,25 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         .setDepth(footprintDepth(wh.tile, wh.footprint))
       this.world.add(this.warehouse)
     } else this.warehouse.setFrame(name)
+    this.placeDockLights()
+    this.placeDockPose()
     this.refreshOccluders()
+  }
+
+  /**
+   * The dock-bay lights on the current exterior frame's lamps (manifest
+   * bayLights, per frame through frames.generated WH_ANCHORS: an edited tier
+   * keeps the footprint but its lamps can move a few px).
+   */
+  private placeDockLights(): void {
+    const name = this.warehouse?.frame.name ?? WH_ANCHOR_FRAME
+    const { bayLights } = warehouseAnchors(name)
+    const left = this.warehouseAnchor.x - WH_CANVAS / 2
+    const top = this.warehouseAnchor.y - WH_CANVAS
+    this.dockLights.forEach((img, i) => {
+      const p = bayLights[i] ?? bayLights[bayLights.length - 1]
+      if (p) img.setPosition(left + p[0], top + p[1])
+    })
   }
 
   /**
@@ -1008,29 +1271,15 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.setWarehouseTier(tier)
       return
     }
-    const r = visibleRect(img)
-    const left = img.x - img.displayOriginX
-    const top = img.y - img.displayOriginY
-    const frame = img.frame.name
-    const pts = dustPoints(
-      { x: r.x, y: r.y, w: r.width, h: r.height },
-      (x, y) =>
-        (this.textures.getPixelAlpha(
-          Math.floor(x - left),
-          Math.floor(y - top),
-          WORLD_ATLAS,
-          frame,
-        ) ?? 0) > 0,
-    )
-    const depth = img.depth + DUST_DEPTH
-    const dust = pts.map((p, i) => {
-      const d = this.add
-        .image(p.x, p.y, WORLD_ATLAS, 'fx_dust_f0')
-        .setOrigin(0.5, 0.5)
-        .setDepth(depth + i * 0.0001)
-      this.world.add(d)
-      return d
-    })
+    // report §6.23: ONE cloud over the whole exterior, placed like wh_ext
+    // (origin (0.5, 1) on the footprint anchor), not a grid of puffs.
+    const a = this.warehouseAnchor
+    const d = this.add
+      .image(a.x, a.y, WORLD_ATLAS, 'fx_dust_f0')
+      .setOrigin(0.5, 1)
+      .setDepth(img.depth + DUST_DEPTH)
+    this.world.add(d)
+    const dust = [d]
     this.construction = { start: this.time.now, tier, dust, swapped: false }
   }
 
@@ -1139,6 +1388,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.stalled = this.vs.lane.stalled !== null
     this.syncMoods()
     this.refreshMarkers()
+    this.refreshAttractStops()
   }
 
   /** Waiting badges and rush bells of every live building (2 Hz + on sync). */
@@ -1216,9 +1466,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
 
   update(_time: number, delta: number): void {
     const now = this.time.now
-    this.rig.update(delta)
-    this.gestures.update()
-    this.keyPan()
+    if (this.attractCam) this.attractCam.update(now)
+    else {
+      this.rig.update(delta)
+      this.gestures.update()
+      this.keyPan()
+    }
 
     this.updateVehicles(now)
     this.popups.update(delta)
@@ -1246,9 +1499,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.refreshMarkers()
       this.refreshTooltip()
       if (this.scorched.size > 0) this.refreshScorch()
-      this.updateGrumble(now)
+      // The demo city never makes a sound (B2 §5).
+      if (!this.attract) this.updateGrumble(now)
     }
-    this.updateHover(now)
+    if (!this.attract) this.updateHover(now)
   }
 
   private updateVehicles(now: number): void {
@@ -1367,9 +1621,15 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       b.door.y - POPUP_LIFT,
       icon,
     )
+    // B2 §6.3 (F4): the icon flies into the vehicle body and sinks there
+    // (scale → 0 over the last 40 %) — it never rests on the roof.
     const v = this.vehicles.get(vehicleId)
-    if (v)
-      this.popups.hop(this.viewRect, b.door.x, b.door.y, v.x, v.y - 8, icon)
+    if (v) {
+      const c = v.bodyCentre()
+      this.popups.hop(this.viewRect, b.door.x, b.door.y, c.x, c.y, icon, {
+        sink: true,
+      })
+    }
   }
 
   private onDelivered(id: number, paid: number, onTime: boolean): void {
@@ -1378,16 +1638,19 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.dirty.add(p.dest)
     const b = this.buildings.get(p.dest)
     if (!b) return
+    // The delivery hop leaves the vehicle body at full size (B2 §6.3).
     const v = p.vehicleId !== null ? this.vehicles.get(p.vehicleId) : undefined
-    if (v)
+    if (v) {
+      const c = v.bodyCentre()
       this.popups.hop(
         this.viewRect,
-        v.x,
-        v.y - 8,
+        c.x,
+        c.y,
         b.door.x,
         b.door.y,
         `ic_parcel_${p.size.toLowerCase()}`,
       )
+    }
     this.popups.delivered(
       this.viewRect,
       b.id,
@@ -1451,7 +1714,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
    * counter resets. The red flash, the bomb fuse and the card are the HUD's.
    */
   private onLifeLost(p: LifeLostPayload): void {
-    this.shake(SHAKE_LOST_LIFE)
+    // Never behind the Title's logo (the demo is recycled on a loss anyway).
+    if (!this.attract) this.shake(SHAKE_LOST_LIFE)
     const b = this.buildings.get(p.destBuildingId)
     if (b) {
       const r = b.image ? visibleRect(b.image) : null
@@ -1646,7 +1910,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   // callback, and the switch then waited for nav's 2-s timeout with the
   // City ignoring input (M4: a chip tap during the 200-ms pan).
   private readonly onFollowEv = (p: FollowPayload): void => {
-    if (this.transitioning) return
+    if (this.transitioning || this.attract) return
     if (!p || p.vehicleId === null) {
       if (this.followId !== null) this.unfollow(false)
       return
@@ -1655,11 +1919,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private readonly onZonePickEv = (p: ZonePickPayload): void => {
+    if (this.attract) return
     this.setZone(p?.districtId ?? null)
   }
 
   private readonly onPanToEv = (p: PanToPayload): void => {
-    if (!p || this.transitioning) return
+    if (!p || this.transitioning || this.attract) return
     if (this.followId !== null) this.unfollow(true)
     let x: number | null = null
     let y: number | null = null
@@ -1735,19 +2000,22 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       tap: (x, y) => this.onTap(x, y),
       doubleTap: (x, y) => this.onDoubleTap(x, y),
       longPress: (x, y) => this.onLongPress(x, y),
+      // Attract mode has no gestures (input is off; these guard anyway).
       panBy: (dx, dy) => {
-        if (this.transitioning) return
+        if (this.transitioning || this.attract) return
         if (this.followId !== null) this.unfollow(true)
         this.rig.panBy(dx, dy)
       },
       panEnd: (vx, vy) => {
-        if (!this.transitioning) this.rig.fling(vx, vy)
+        if (!this.transitioning && !this.attract) this.rig.fling(vx, vy)
       },
       pinch: (dir, cx, cy) => {
-        if (!this.transitioning) this.rig.zoomAt(dir === 'in' ? 2 : 1, cx, cy)
+        if (!this.transitioning && !this.attract)
+          this.rig.zoomAt(dir === 'in' ? 2 : 1, cx, cy)
       },
       wheel: (dir, x, y) => {
-        if (!this.transitioning) this.rig.zoomAt(dir > 0 ? 2 : 1, x, y)
+        if (!this.transitioning && !this.attract)
+          this.rig.zoomAt(dir > 0 ? 2 : 1, x, y)
       },
     })
     this.input.on(Phaser.Input.Events.POINTER_MOVE, this.onPointerMove, this)
@@ -1774,7 +2042,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
 
   private keyPan(): void {
     const c = this.cursors
-    if (!c || this.transitioning) return
+    if (!c || this.transitioning || this.attract) return
     let dx = 0
     let dy = 0
     if (c.left.isDown) dx += KEY_PAN_PX
@@ -1882,7 +2150,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private onTap(sx: number, sy: number): void {
-    if (this.transitioning || this.inHudBand(sy)) return
+    if (this.transitioning || this.attract || this.inHudBand(sy)) return
     const w = this.worldAt(sx, sy)
     const th = this.tooltip.hit(w.x, w.y)
     if (th === 'link') {
@@ -2019,7 +2287,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private onDoubleTap(sx: number, sy: number): void {
-    if (this.transitioning || this.inHudBand(sy)) return
+    if (this.transitioning || this.attract || this.inHudBand(sy)) return
     const w = this.worldAt(sx, sy)
     const v = this.vehicleAt(w.x, w.y)
     if (v) {
@@ -2031,7 +2299,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private onLongPress(sx: number, sy: number): void {
-    if (this.transitioning || this.inHudBand(sy)) return
+    if (this.transitioning || this.attract || this.inHudBand(sy)) return
     const w = this.worldAt(sx, sy)
     const pick = this.pick(w.x, w.y)
     let id: string | null = null
@@ -2049,7 +2317,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private followNearestToCursor(): void {
-    if (this.transitioning) return
+    if (this.transitioning || this.attract) return
     const p = this.input.activePointer
     const w = this.worldAt(p.x, p.y)
     let best: VehicleView | null = null

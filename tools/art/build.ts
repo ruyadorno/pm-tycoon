@@ -1,14 +1,16 @@
 // `vlr art:<step>` runner (style-guide.md §3.2):
 //   node tools/art/build.ts <step> [--ids a,b,c] [--offline] [--n 3] [args…]
 // Steps: palette, draw, gen, normalize, quantize, outline, variants, lint,
-// atlas, gallery, approve, reject, balance, all.
+// logo, atlas, gallery, approve, reject, balance, all.
 // palette/draw/approve/reject live here (with palette.ts, manifest.ts); the
 // others are modules tools/art/<step>.ts exporting run(opts: StepOpts) (type
 // in draw-api.ts) that return an exit code (void = 0). A missing module
 // prints "<step>: not built yet" and exits 0 — except lint, which exits 1
 // once art/manifest.json exists. balance calls pixellab.ts balance() / run().
 // all = draw → gen → normalize → quantize → outline → variants → lint →
-// atlas → gallery, stopping at the first non-zero step.
+// logo → atlas → gallery, stopping at the first non-zero step. `logo`
+// (tools/art/logo.ts, B2 §5) renders art/logo.png into src/assets/logo.png:
+// brand art outside the atlases and the palette contract.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -47,6 +49,7 @@ export const ALL_STEPS = [
   'outline',
   'variants',
   'lint',
+  'logo',
   'atlas',
   'gallery',
 ] as const
@@ -58,6 +61,7 @@ const MODULE_STEPS = new Set([
   'outline',
   'variants',
   'lint',
+  'logo',
   'atlas',
   'gallery',
 ])

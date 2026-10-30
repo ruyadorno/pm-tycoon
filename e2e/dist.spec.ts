@@ -2,9 +2,11 @@
 // `dist` project runs this against `vite preview` of dist/ (the production
 // bundle: import.meta.env.DEV is false), on the iPhone 16 profile.
 //   1. `/` — no debug surface: the Title appears (its New game button matches
-//      the pixels a ?debug=1 probe of the same layout captured),
+//      the pixels a ?debug=1 probe of the same layout captured; the attract
+//      city moves behind it, so "the same" allows SAME_PIXELS_MIN),
 //      window.__pm is absent before and after a real New game tap, and the
-//      game it starts autosaves pm.save.v1 on pagehide; no console error.
+//      game it starts autosaves pm.save.v2 (version 2) on pagehide; no
+//      console error.
 //   2. `/?debug=1` — window.__pm is present on the production build, the
 //      Title is the active scene, New game → __pm.ready (City); no console
 //      error.
@@ -20,14 +22,44 @@
 //      from the disk/memory cache — vite preview sends `Cache-Control:
 //      no-cache` + ETag). The number of samples requested before the tap is
 //      logged: Preload starts the fetch while the Title waits (audio.md §3.2).
+//   5. Hashed assets (report-playtest1 §6.21, spec-build2 §6.8): the `world`
+//      and `interior` atlases, the m5x7 XML, the logo and the attract
+//      snapshot are fetched once each under content-hashed names
+//      (assets/<stem>-<hash>.<ext>, answered 200), never from the unhashed
+//      playtest-1 paths; both atlases are textures, the logo a texture and
+//      the snapshot in the JSON cache. Draw calls (plan-build2 §6 / §8.2 task
+//      8, iPhone profile = one texture per batch): City + HUD ≤ 3, Warehouse
+//      + HUD ≤ 7 after 60 s of the policy.
 import { readFileSync } from 'node:fs'
 import type { CDPSession, Page } from '@playwright/test'
 import sharp from 'sharp'
 import { expect, READY_TIMEOUT_MS, test } from './fixtures.ts'
-import { sceneTarget, tapTarget } from './warehouse.ts'
+import { sceneTarget, settleUntil, tapTarget, worlds } from './warehouse.ts'
 
 const NEW_GAME = 'title:new-game'
-const SAVE_KEY = 'pm.save.v1'
+const SAVE_KEY = 'pm.save.v2'
+const SAVE_VERSION = 2
+/** plan-build2 §6 "Draw-call budget": city 3 (measured), warehouse 7. */
+const CITY_DRAW_CALLS = 3
+const WAREHOUSE_DRAW_CALLS = 7
+const POLICY_URL = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1'
+/** dist/assets/<stem>-<hash>.<ext> for every `?url` import of src/render/assetUrls.ts. */
+const HASHED_ASSETS = [
+  'world.png',
+  'world.json',
+  'interior.png',
+  'interior.json',
+  'm5x7.xml',
+  'logo.png',
+  'attract.json',
+] as const
+
+/** `world.png` -> /assets/world-<hash>.png */
+function hashedRe(asset: string): RegExp {
+  const dot = asset.lastIndexOf('.')
+  const stem = asset.slice(0, dot).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`/assets/${stem}-[\\w-]{6,}\\${asset.slice(dot)}$`)
+}
 const SPICY_PATH = 'public/configs/spicy.json'
 /** Share of identical pixels for "the New game button is on screen". */
 const SAME_PIXELS_MIN = 0.97
@@ -108,11 +140,14 @@ async function probeTitle(page: Page): Promise<TitleProbe> {
     },
     [r.x, r.y, r.w, r.h] as const,
   )
-  // Two frames apart: the button is static, and it is a button (face,
-  // outline, bevel, label), not a flat patch of the sky.
+  // Two frames apart: the button is static (the attract city drifting
+  // behind may only show through its rounded corners), and it is a button
+  // (face, outline, bevel, label), not a flat patch of the sky.
   const rgba = await clipRgba(page, rect)
   await page.waitForTimeout(250)
-  expect(sameFraction(rgba, await clipRgba(page, rect))).toBe(1)
+  expect(sameFraction(rgba, await clipRgba(page, rect))).toBeGreaterThanOrEqual(
+    SAME_PIXELS_MIN,
+  )
   expect(distinctColours(rgba)).toBeGreaterThanOrEqual(3)
   await page.evaluate(() => localStorage.clear())
   return { rect, rgba }
@@ -147,7 +182,7 @@ test.describe('dist build (vite preview of dist/)', () => {
     expect(await page.evaluate(() => typeof window.__pm)).toBe('undefined')
 
     // A real tap on New game (also the audio unlock), then a pagehide: the
-    // HUD's autosave writes pm.save.v1 at once (src/boot/autosave.ts).
+    // HUD's autosave writes pm.save.v2 at once (src/boot/autosave.ts).
     await page.touchscreen.tap(
       probe.rect.x + Math.floor(probe.rect.width / 2),
       probe.rect.y + Math.floor(probe.rect.height / 2),
@@ -163,9 +198,9 @@ test.describe('dist build (vite preview of dist/)', () => {
               ? (JSON.parse(raw) as { version?: number }).version
               : null
           }, SAVE_KEY),
-        { timeout: 15_000, message: 'pm.save.v1 after New game' },
+        { timeout: 15_000, message: `${SAVE_KEY} after New game` },
       )
-      .toBe(1)
+      .toBe(SAVE_VERSION)
     expect(await page.evaluate(() => typeof window.__pm)).toBe('undefined')
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
@@ -234,11 +269,11 @@ test.describe('dist build (vite preview of dist/)', () => {
     expect(configs.urls).toHaveLength(1)
 
     // Without ?debug=1 the override is ignored: Boot loads the data (and any
-    // config) before Preload requests the atlas, so once world.png answers
-    // the decision is made.
+    // config) before Preload requests the atlases, so once world-<hash>.png
+    // answers the decision is made.
     configs.urls.length = 0
     const atlas = page.waitForResponse((r) =>
-      r.url().endsWith('/assets/world.png'),
+      hashedRe('world.png').test(new URL(r.url()).pathname),
     )
     await page.goto('/?config=spicy&audio=0')
     expect((await atlas).status()).toBe(200)
@@ -357,6 +392,78 @@ test.describe('dist build (vite preview of dist/)', () => {
     console.log(
       `dist: reload — ${revalidated} samples revalidated (304), ` +
         `${hits.filter((h) => h.cached).length} from the cache`,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('hashed assets: both atlases, the font XML, logo and attract snapshot; draw calls city ≤ 3, warehouse ≤ 7', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    const seen: { path: string; status: number }[] = []
+    page.on('response', (r) => {
+      const path = new URL(r.url()).pathname
+      if (path.startsWith('/assets/') && !path.endsWith('.js')) {
+        seen.push({ path, status: r.status() })
+      }
+    })
+    await pm.open(POLICY_URL)
+    for (const asset of HASHED_ASSETS) {
+      const re = hashedRe(asset)
+      const hits = seen.filter((h) => re.test(h.path))
+      expect(hits.length, `one fetch of ${asset} under a hashed name`).toBe(1)
+      expect([200, 304], hits[0]!.path).toContain(hits[0]!.status)
+    }
+    const unhashed = seen.filter((h) =>
+      HASHED_ASSETS.some((a) => h.path.endsWith(`/assets/${a}`)),
+    )
+    expect(unhashed.map((h) => h.path)).toEqual([])
+    const loaded = await page.evaluate(() => {
+      const game = window.__pm!.game
+      const frames = (k: string): number =>
+        game.textures.exists(k)
+          ? game.textures.get(k).getFrameNames().length
+          : 0
+      return {
+        world: frames('world'),
+        interior: frames('interior'),
+        logo: game.textures.exists('logo'),
+        attract: game.cache.json.exists('attract'),
+        font: game.cache.bitmapFont.has('m5x7'),
+      }
+    })
+    console.log(`dist: textures ${JSON.stringify(loaded)}`)
+    expect(loaded.world).toBeGreaterThan(100)
+    expect(loaded.interior).toBeGreaterThan(50)
+    expect(loaded).toMatchObject({ logo: true, attract: true, font: true })
+
+    // Draw calls with the overlay hidden: the City at t = 0, then the
+    // Warehouse after 60 s of the policy (parcels, workers, the Hold Bay).
+    await pm.freeze()
+    await pm.overlay(false)
+    await pm.settle(4)
+    const city = await page.evaluate(() => window.__pm!.metrics().drawCalls)
+    await pm.advance(60_000)
+    await page.evaluate(() => window.__pm!.goto('warehouse'))
+    const ok = await settleUntil(
+      page,
+      pm,
+      async () => (await worlds(page)).warehouse === 'active',
+    )
+    expect(ok, 'the Warehouse is active').toBe(true)
+    await pm.settle(24)
+    const warehouse = await page.evaluate(
+      () => window.__pm!.metrics().drawCalls,
+    )
+    console.log(`dist: draw calls city ${city}, warehouse ${warehouse}`)
+    test.info().annotations.push({
+      type: 'draw calls',
+      description: `city ${city}, warehouse ${warehouse}`,
+    })
+    expect(city, 'City + HUD draw calls').toBeLessThanOrEqual(CITY_DRAW_CALLS)
+    expect(warehouse, 'Warehouse + HUD draw calls').toBeLessThanOrEqual(
+      WAREHOUSE_DRAW_CALLS,
     )
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

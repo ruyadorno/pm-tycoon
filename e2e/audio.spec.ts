@@ -29,8 +29,17 @@
 //      subscription to the new Sim (the old one no longer sounds).
 //   4. ?audio=0: a disabled director (still at __pm.audio), no AudioContext,
 //      no sample fetch, the game runs.
+// Build 2 (B2 §5): the Title runs over the attract city; the director never
+// attaches to the attract sim, so "nothing sounds before the tap" also
+// covers the demo fleet's deliveries (titleUp waits for the tour to run).
 import type { Page } from '@playwright/test'
-import { expect, READY_TIMEOUT_MS, test, type PmHelpers } from './fixtures.ts'
+import {
+  expect,
+  READY_TIMEOUT_MS,
+  test,
+  titleUp,
+  type PmHelpers,
+} from './fixtures.ts'
 import { sceneTarget } from './warehouse.ts'
 
 const TITLE_URL = '/?seed=7&debug=1&audiolog=1'
@@ -185,6 +194,7 @@ test.describe('audio (audio.md §9.4)', () => {
     await countContexts(page)
     await page.goto(TITLE_URL)
     await sceneUp(page, 'Title')
+    await titleUp(page)
     await recordAudioEvents(page)
 
     await test.step('Title: "tuning up…" goes once piano + bass are decoded', async () => {
@@ -374,6 +384,7 @@ test.describe('audio (audio.md §9.4)', () => {
     await test.step('game-over card "New game" → Title → "New game": the music restarts from bar 0', async () => {
       await tapButton(page, pm, 'HUD', 'gameOver:newGame')
       await sceneUp(page, 'Title')
+      await titleUp(page)
       expect(await transportState(page)).toBe('stopped')
       await page.evaluate(() => window.__pm!.audio!.log.clear())
       await tapButton(page, pm, 'Title', 'title:new-game')
@@ -407,6 +418,7 @@ test.describe('audio (audio.md §9.4)', () => {
     test.setTimeout(120_000)
     await page.goto('/?seed=7&debug=1')
     await sceneUp(page, 'Title')
+    await titleUp(page)
     await page.waitForFunction(
       () => window.__pm!.audio!.state().loaded.piano,
       null,

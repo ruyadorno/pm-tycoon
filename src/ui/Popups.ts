@@ -6,7 +6,14 @@
 //     16 px over 900 ms, hold 300 ms, fade;
 //   - catch stamps from the warehouse (DEFUSED +$50 gold, OOPS −$25 grey);
 //   - parcel hops (building door ↔ vehicle, 300 ms Sine.easeOut, 8-px arc),
-//     skipped when the pool is full.
+//     skipped when the pool is full. A pickup hop SINKS into the vehicle
+//     (spec-build2.md §6.3, the author's city #3: no parcel ever rests on a
+//     roof): it ends on the vehicle's body centre and its icon shrinks to
+//     nothing over the last 40 % of the flight; the delivery hop starts on
+//     the body centre at full size. The shrink is a centred crop window
+//     stepping 16 → 14 → … → 0 px (hopIconSide), not setScale: world art is
+//     never resampled (AGENTS.md, style-guide.md §7), so every pixel that
+//     shows stays 1:1.
 // Merge rule: a popup of the same kind for the same key younger than 400 ms
 // absorbs the new one (counts add, $ sums, timer restarts). With the pool
 // full, a new popup merges into the nearest alive popup of the same kind, or
@@ -43,8 +50,33 @@ const SPECS: Record<Exclude<Kind, 'hop'>, Spec> = {
   delivered: { rise: 16, riseMs: 900, holdMs: 300, fadeMs: 300 },
   stamp: { rise: 16, riseMs: 900, holdMs: 300, fadeMs: 300 },
 }
-const HOP_MS = 300
+export const HOP_MS = 300
 const HOP_ARC = 8
+/** k (0..1 of the flight) where a sinking hop starts to shrink: the last 40 %. */
+export const HOP_SINK_FROM = 0.6
+
+export interface HopOpts {
+  /**
+   * Pickup into a vehicle (B2 §6.3): the icon shrinks to 0 over the last
+   * 40 % of the flight, ending at (x1, y1) = the vehicle's body centre.
+   */
+  sink?: boolean
+}
+
+/** Icon size factor `k` (0..1) into a hop: 1, then 1 → 0 over the last 40 % with `sink`. */
+export function hopScale(k: number, sink: boolean): number {
+  if (!sink || k <= HOP_SINK_FROM) return 1
+  return Math.max(0, Math.min(1, (1 - k) / (1 - HOP_SINK_FROM)))
+}
+
+/**
+ * Visible side (px) of a `side`-px icon at size factor `scale`: even, so the
+ * centred crop window starts on a whole pixel; 0 once scale < 2 / side.
+ */
+export function hopIconSide(scale: number, side = ICON): number {
+  const half = Math.floor((side / 2) * Math.max(0, Math.min(1, scale)) + 1e-9)
+  return 2 * half
+}
 
 interface Slot {
   kind: Kind | null
@@ -59,6 +91,10 @@ interface Slot {
   /** Hop end point. */
   x1: number
   y1: number
+  /** Hop sinks into its end point (B2 §6.3). */
+  sink: boolean
+  /** Visible icon side while a sinking hop shrinks (ICON = uncropped). */
+  side: number
   age: number
   count: number
   amount: number
@@ -113,6 +149,8 @@ export class Popups {
         y: 0,
         x1: 0,
         y1: 0,
+        sink: false,
+        side: ICON,
         age: 0,
         count: 0,
         amount: 0,
@@ -192,7 +230,13 @@ export class Popups {
     })
   }
 
-  /** Parcel icon hop from (x0,y0) to (x1,y1); skipped when no slot is free. */
+  /**
+   * Parcel icon hop from (x0,y0) to (x1,y1); skipped when no slot is free.
+   * `opts.sink`: the pickup into a vehicle — (x1, y1) is the vehicle's body
+   * centre (VehicleView.bodyCentre) and the icon shrinks to nothing over the
+   * last 40 % of the flight (B2 §6.3). A delivery hop starts on the body
+   * centre (x0, y0) at full size, without sink.
+   */
   hop(
     view: ViewRect,
     x0: number,
@@ -200,6 +244,7 @@ export class Popups {
     x1: number,
     y1: number,
     frame: string,
+    opts: HopOpts = {},
   ): void {
     if (!view.contains(x0, y0) && !view.contains(x1, y1)) return
     const s = this.freeSlot()
@@ -210,8 +255,10 @@ export class Popups {
     s.y = y0
     s.x1 = x1
     s.y1 = y1
+    s.sink = opts.sink === true
     s.age = 0
     s.frame = frame
+    this.uncrop(s)
     s.container.setVisible(true).setAlpha(1)
     s.icon
       .setVisible(true)
@@ -277,7 +324,9 @@ export class Popups {
     s.key = key
     s.x = Math.round(x)
     s.y = Math.round(y)
+    s.sink = false
     s.age = 0
+    this.uncrop(s)
     apply(s, false)
     s.container.setVisible(true).setAlpha(1)
     this.render(s)
@@ -320,6 +369,28 @@ export class Popups {
       .setPosition(-Math.round(w / 2), 0)
   }
 
+  /**
+   * The sinking hop's shrink: a centred `side`×`side` crop of the icon frame
+   * (whole pixels, never resampled); hidden at 0.
+   */
+  private cropIcon(s: Slot, side: number): void {
+    if (side === s.side) return
+    s.side = side
+    if (side >= ICON) {
+      s.icon.setCrop().setVisible(true)
+      return
+    }
+    const off = (ICON - side) / 2
+    s.icon.setCrop(off, off, side, side).setVisible(side > 0)
+  }
+
+  /** Back to the whole icon (a slot reused by a hop or a pickup popup). */
+  private uncrop(s: Slot): void {
+    if (s.side === ICON) return
+    s.side = ICON
+    s.icon.setCrop()
+  }
+
   private place(s: Slot): void {
     if (s.kind === 'hop') {
       const k = Math.min(1, s.age / HOP_MS)
@@ -327,6 +398,7 @@ export class Popups {
       const x = s.x + (s.x1 - s.x) * e
       const y = s.y + (s.y1 - s.y) * e - Math.sin(Math.PI * k) * HOP_ARC
       s.container.setPosition(Math.round(x), Math.round(y))
+      if (s.sink) this.cropIcon(s, hopIconSide(hopScale(k, true)))
       return
     }
     if (!s.kind) return
@@ -361,6 +433,8 @@ export class Popups {
       if (!s.kind) continue
       s.age += delta
       if (s.age >= this.lifetime(s)) {
+        // A sinking hop lands at size 0 on the body centre, then frees.
+        if (s.kind === 'hop' && s.sink) this.place(s)
         this.release(s)
         continue
       }
@@ -371,6 +445,7 @@ export class Popups {
   private release(s: Slot): void {
     s.kind = null
     s.key = ''
+    s.sink = false
     s.container.setVisible(false)
   }
 

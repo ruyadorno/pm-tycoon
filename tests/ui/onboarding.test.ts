@@ -1,5 +1,5 @@
 // city-view.md §9.1 / plan.md §9 "Onboarding": three skippable tooltips whose
-// progress is persisted in pm.save.v1.onboarding = {step, skipped,
+// progress is persisted in pm.save.v2.onboarding = {step, skipped,
 // sawFirstFlag, sawTossHint, wanted} so a reload never repeats a step.
 // Steps 1 (Garage), 2 (warehouse hint, computed from the data, 45 s) and 3
 // (rush, 20 s timeout); `step` is the highest step done and steps show in
@@ -27,7 +27,7 @@ import {
 } from '../../src/ui/Onboarding.ts'
 import { dataFixture } from '../sim/helpers.ts'
 
-describe('onboarding state (pm.save.v1.onboarding)', () => {
+describe('onboarding state (pm.save.v2.onboarding)', () => {
   it('a new game starts with no step done and the full shape', () => {
     expect(freshOnboarding()).toEqual({
       step: 0,

@@ -6,7 +6,9 @@
 //   fx_boom   32x32 f0..f5  explosion on the destination building
 //   fx_puff   16x16 f0..f3  puff over the emptied life slot
 //   fx_smoke  16x16 f0..f3  chimney smoke rising (anchor = bottom-centre)
-//   fx_dust   32x32 f0..f3  tier-up construction: scaffold, dust, dust, reveal
+//   fx_dust  256x224 f0..f3  tier-up construction over the whole exterior,
+//                            one cloud per frame (build 2, report §6.23):
+//                            scaffold, dust, dust settling, reveal
 //   ring      16x16 _0.._8  decay coin ring, _0 = full, _8 = empty
 //   rush_ring 16x16 _0.._3  rush timer ring, _0 = full, _3 = a quarter left
 
@@ -275,71 +277,162 @@ function smoke(i: number): Grid {
   return g
 }
 
+/**
+ * fx_dust (build 2, report §6.23): ONE construction cloud per frame over the
+ * whole warehouse exterior, on the exterior's own frame of reference — the
+ * canvas is 256 wide (the 4x4 footprint) and DUST_H tall, placed like
+ * wh_ext with setOrigin(0.5, 1) at the lot's footprint anchor, so the cloud
+ * sits on the footprint diamond and rises over the walls and roof. The
+ * playtest-1 drawing was a 32x32 puff tiled in a jittered grid, which read
+ * as a field of separate puffs. Frames: f0 the scaffold rising out of a
+ * low dust skirt, f1 the cloud engulfing the building, f2 the cloud
+ * settling (lower, thinner), f3 the reveal: a last wisp along the base and
+ * sparkles. Every cloud is one connected mass (overlapping discs), shaded
+ * and outlined once.
+ */
+export const DUST_W = 256
+export const DUST_H = 224
+
+/** small integer hash for the seeded jitter of the cloud discs */
+function jit(a: number, b: number, n: number): number {
+  let h = (a * 374761393 + b * 668265263) >>> 0
+  h = ((h ^ (h >>> 13)) * 1274126177) >>> 0
+  return (h % (2 * n + 1)) - n
+}
+
+/**
+ * discs filling the exterior's silhouette (the 4x4 box over the footprint
+ * diamond, bottom vertex at (128, DUST_H - 1)) from the lower diamond edges
+ * up to `height` px above the upper edges; radius r, spacing `step` (< 2r,
+ * so the mass stays connected); `shrink` pulls the side columns in
+ */
+function massBlobs(
+  height: number,
+  r: number,
+  step: number,
+  shrink = 0,
+): Blob[] {
+  const out: Blob[] = []
+  const cx = DUST_W / 2
+  const by = DUST_H - 1
+  let col = 0
+  for (let x = r + 4 + shrink; x <= DUST_W - r - 5 - shrink; x += step, col++) {
+    const d = Math.abs(x - cx) / 2
+    const bottom = by - r - d + r / 2
+    const top = Math.max(r + 2, by - 128 + d - height)
+    let row = 0
+    for (let y = bottom; y >= top; y -= step, row++) {
+      out.push([
+        x + jit(col, row, 3),
+        y + jit(row, col, 3),
+        r + jit(col + row, 5, 2),
+      ])
+    }
+  }
+  return out
+}
+
+/** one row of discs along the lower diamond edges (a dust skirt) */
+function skirtBlobs(r: number, step: number, shrink = 0): Blob[] {
+  const out: Blob[] = []
+  const cx = DUST_W / 2
+  const by = DUST_H - 1
+  let col = 0
+  for (let x = r + 4 + shrink; x <= DUST_W - r - 5 - shrink; x += step, col++) {
+    const d = Math.abs(x - cx) / 2
+    out.push([
+      x + jit(col, 1, 2),
+      by - r - d + 2 + jit(1, col, 2),
+      r + jit(col, 3, 1),
+    ])
+  }
+  return out
+}
+
+/**
+ * One cloud mass from overlapping discs, shaded as a single body (not per
+ * disc): a light band along its upper-left edge, a dark band along its
+ * lower-right edge, the base fill between, a few billow crescents inside
+ * (the upper-left arc of every third disc), then one outline.
+ */
+function massCloud(g: Grid, blobs: readonly Blob[], s: Shades): void {
+  const inDisc = (x: number, y: number, b: Blob, r = b[2]) => {
+    const dx = x + 0.5 - b[0]
+    const dy = y + 0.5 - b[1]
+    return dx * dx + dy * dy <= r * r
+  }
+  const layer = new Grid(g.w, g.h)
+  const mask = new Uint8Array(g.w * g.h)
+  for (let y = 0; y < g.h; y++) {
+    for (let x = 0; x < g.w; x++) {
+      if (blobs.some((b) => inDisc(x, y, b))) mask[y * g.w + x] = 1
+    }
+  }
+  const m = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < g.w && y < g.h && mask[y * g.w + x] === 1
+  for (let y = 0; y < g.h; y++) {
+    for (let x = 0; x < g.w; x++) {
+      if (!m(x, y)) continue
+      const lit = !m(x - 3, y - 5) || !m(x - 1, y - 3)
+      const dark = !m(x + 2, y + 3) || !m(x + 1, y + 2)
+      layer.set(x, y, dark ? s[2] : lit ? s[1] : s[0])
+    }
+  }
+  // billows: a 2-px light crescent on the upper-left rim of every third
+  // disc, a 1-px dark line under it, only inside the mass
+  blobs.forEach((b, k) => {
+    if (k % 3 !== 1 || b[2] < 8) return
+    for (let y = Math.floor(b[1] - b[2]); y <= b[1]; y++) {
+      for (let x = Math.floor(b[0] - b[2]); x <= b[0] + b[2] * 0.3; x++) {
+        if (!m(x, y) || layer.get(x, y) !== s[0]) continue
+        const onRim = inDisc(x, y, b) && !inDisc(x, y, b, b[2] - 2)
+        if (onRim) layer.set(x, y, s[1])
+        else if (inDisc(x, y, b, b[2] - 2) && !inDisc(x, y, b, b[2] - 3)) {
+          layer.set(x, y, s[2])
+        }
+      }
+    }
+  })
+  layer.outline()
+  g.blit(layer, 0, 0)
+}
+
 function dust(i: number): Grid {
-  const g = new Grid(32, 32)
+  const g = new Grid(DUST_W, DUST_H)
   if (i === 0) {
-    // scaffold: poles and planks over a low dust skirt
-    const s = new Grid(32, 32)
-    for (const x of [6, 15, 24]) s.rect(x, 4, 2, 22, 'brown1')
-    for (const y of [6, 15]) s.rect(4, y, 24, 2, 'brown2')
-    s.line(7, 7, 15, 15, 'brown1')
-    s.line(16, 7, 24, 15, 'brown1')
+    // scaffold: poles along the front walls, two plank levels, rising out
+    // of a low dust skirt along the lower diamond edges
+    const s = new Grid(DUST_W, DUST_H)
+    const by = DUST_H - 1
+    for (const x of [24, 64, 104, 152, 192, 232]) {
+      const foot = by - 4 - Math.abs(x - 128) / 2
+      s.rect(x, foot - 120, 3, 120, 'brown1')
+    }
+    for (const lift of [50, 96]) {
+      for (let x = 24; x <= 234; x++) {
+        const y = Math.round(by - 4 - Math.abs(x - 128) / 2 - lift)
+        s.rect(x, y, 1, 3, 'brown2')
+      }
+    }
     s.outline()
     g.blit(s, 0, 0)
-    cloud(
-      g,
-      [
-        [8, 26, 4],
-        [16, 27, 4],
-        [24, 26, 4],
-      ],
-      DUST,
-    )
+    massCloud(g, skirtBlobs(14, 14), DUST)
     return g
   }
   if (i === 1) {
-    cloud(
-      g,
-      [
-        [16, 18, 9],
-        [8, 14, 6],
-        [24, 14, 6],
-        [12, 8, 5],
-        [21, 8, 5],
-        [7, 24, 5],
-        [25, 24, 5],
-      ],
-      DUST,
-    )
+    massCloud(g, massBlobs(110, 26, 22), DUST)
     return g
   }
   if (i === 2) {
-    cloud(
-      g,
-      [
-        [7, 10, 5],
-        [24, 9, 5],
-        [15, 18, 6],
-        [6, 24, 4],
-        [25, 23, 4],
-      ],
-      DUST,
-      [[15, 12, 2]],
-    )
+    massCloud(g, massBlobs(40, 22, 20, 14), DUST)
     return g
   }
-  // reveal: sparkles and a last wisp
-  sparkle(g, 9, 9, true)
-  sparkle(g, 23, 12, true)
-  sparkle(g, 15, 22, false)
-  cloud(
-    g,
-    [
-      [6, 25, 3.5],
-      [26, 24, 3],
-    ],
-    DUST,
-  )
+  // reveal: a last low wisp along the base and sparkles over the roof
+  massCloud(g, skirtBlobs(9, 12, 28), DUST)
+  sparkle(g, 70, 64, true)
+  sparkle(g, 150, 40, true)
+  sparkle(g, 196, 92, false)
+  sparkle(g, 104, 112, false)
   return g
 }
 

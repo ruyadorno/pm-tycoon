@@ -420,7 +420,7 @@ describe('the chaos player (seeds 1-2 × 30 min, rich; 10 seeds in robustness-pl
 })
 
 describe('save → load → save chains (plan.md §6.4; __pm.replay after loads)', () => {
-  it('a game saved and resumed three times through the pm.save.v1 payload ends in the uninterrupted state, and replay(seed, log) of each resumed sim matches it', () => {
+  it('a game saved and resumed three times through the pm.save.v2 payload ends in the uninterrupted state, and replay(seed, log) of each resumed sim matches it', () => {
     const data = dataFixture()
     const live = new Sim(data, 11)
     const lm = new Monitor(live, { allowPlayerStall: true })
@@ -547,7 +547,7 @@ function savedGame(): { sim: Sim; text: string } {
   }
 }
 
-describe('the pm.save.v1 payload under damage (plan.md §6.4, R9; autosave.ts)', () => {
+describe('the pm.save.v2 payload under damage (plan.md §6.4, R9; autosave.ts)', () => {
   it('600 seeded damages (truncations, flipped characters, fields deleted / retyped / out of range): checkSave never throws, and any payload it accepts loads and runs a minute with no throw and a clean audit', () => {
     const data = dataFixture()
     const { text } = savedGame()

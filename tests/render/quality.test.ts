@@ -186,3 +186,55 @@ describe('installQuality (the controller the city consumes)', () => {
     }
   })
 })
+
+describe('the sampler skips the attract Title (B2 §5)', () => {
+  it('judges nothing while skip() holds and starts a fresh window after it', () => {
+    const { game, emitted } = fakeGame(10)
+    const nav = (globalThis as { navigator?: { webdriver?: boolean } })
+      .navigator
+    const wasDriver = nav?.webdriver
+    try {
+      if (nav)
+        Object.defineProperty(nav, 'webdriver', {
+          value: false,
+          configurable: true,
+        })
+      let attract = true
+      const ctl = installQuality(game, { skip: () => attract })
+      const start = ctl.level
+      // 3 windows of 10 fps on the Title: no cut.
+      let t = 0
+      for (; t <= 3 * FPS_WINDOW_MS; t += 100) {
+        game.loop.now = t
+        game.step()
+      }
+      expect(ctl.level).toBe(start)
+      expect(emitted).toEqual([])
+      // In play at 60 fps: the first window holds only play frames.
+      attract = false
+      game.loop.actualFps = 60
+      for (const end = t + 2 * FPS_WINDOW_MS; t <= end; t += 100) {
+        game.loop.now = t
+        game.step()
+      }
+      expect(ctl.level).toBe(start)
+      ctl.dispose()
+    } finally {
+      if (nav)
+        Object.defineProperty(nav, 'webdriver', {
+          value: wasDriver,
+          configurable: true,
+        })
+    }
+  })
+
+  it('FpsWindow.reset drops the open window', () => {
+    const w = new FpsWindow()
+    for (let t = 0; t < FPS_WINDOW_MS - 100; t += 100) w.push(t, 10)
+    expect(w.count).toBeGreaterThan(0)
+    w.reset()
+    expect(w.count).toBe(0)
+    // The window restarts at the next push: no verdict 100 ms later.
+    expect(w.push(FPS_WINDOW_MS + 100, 10)).toBe(false)
+  })
+})

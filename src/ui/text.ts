@@ -8,7 +8,7 @@ import type Phaser from 'phaser'
 import { FONT_KEY } from '../render/atlases.ts'
 import { FONT_SIZE, THEME } from './theme.ts'
 
-/** m5x7 metrics at 16 px (art/final/font, public/assets/m5x7.xml). */
+/** m5x7 metrics at 16 px (art/final/font, src/assets/m5x7.xml). */
 export const LINE_H = 14
 /** Rows from a glyph cell's top to the cap top, and the cap height. */
 export const CAP_TOP = 4

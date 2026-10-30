@@ -12,8 +12,9 @@
 //      undecided only anchors are generated (G2), 4 candidates each;
 //    - budget guard: GET /balance before the batch; refuse when the
 //      estimate would leave fewer than PIXELLAB_RESERVE (default 300)
-//      generations or exceed the run budget PIXELLAB_RUN_BUDGET (default
-//      2,500, counted from the logged batches) or --max-gens N;
+//      generations or exceed the run budget PIXELLAB_RUN_BUDGET (build 2:
+//      1,500, counted over the batches since PIXELLAB_RUN_SINCE) or
+//      --max-gens N;
 //    - at most 8 background jobs in flight (pixellab.ts semaphore);
 //    - each candidate gets art/candidates/<id>/<n>/ with raw/<name>.png
 //      (every download), <frame>.png (normalize -> quantize -> outline,
@@ -31,7 +32,8 @@
 //    longer blocks the bulk pass, a chosen van's object_id becomes the
 //    style_object_id of bike/truck, chosen building anchors become style
 //    images. An install step applies choices.json later.
-// Other flags: --ids a,b  --n 1..8  --max-gens N  --seed N (seed base,
+// Other flags: --ids a,b  --n 1..8  --max-gens N  --fallback (B2 §6.2
+//    fallback subject)  --seed N (seed base,
 //    default 1000; seed = base + candidate number)  --sheet (rebuild the
 //    contact sheets from existing candidates, no network)  --anchors
 //    (force the anchor set as targets).
@@ -51,6 +53,7 @@ import {
   type Processed,
   frameStem,
   processBuilding,
+  processExterior,
   processMachine,
   processProp,
   processShelf,
@@ -78,6 +81,7 @@ import {
   frameSetSha256,
   loadManifest,
   saveManifest,
+  vehicleFoot,
 } from './manifest.ts'
 import {
   CONCURRENCY,
@@ -102,7 +106,21 @@ export const CANDIDATES = join(ROOT, 'art/candidates')
 export const GEN_LOG = join(CANDIDATES, 'gen-log.json')
 export const CHOICES = join(CANDIDATES, 'choices.json')
 export const RESERVE = Number(process.env.PIXELLAB_RESERVE ?? 300)
-export const RUN_BUDGET = Number(process.env.PIXELLAB_RUN_BUDGET ?? 2500)
+/**
+ * Build-2 run budget (the author's override of plan-build2 Q-B2-15: 1,500
+ * generations, 300 of them reserve): counted over the batches logged at or
+ * after RUN_SINCE, so playtest 1's 1,700 do not count against it.
+ */
+export const RUN_BUDGET = Number(process.env.PIXELLAB_RUN_BUDGET ?? 1500)
+export const RUN_SINCE =
+  process.env.PIXELLAB_RUN_SINCE ?? '2026-10-30T00:00:00Z'
+
+/** generations of the batches inside the current run (RUN_SINCE on) */
+export function runSpent(batches: readonly Batch[]): number {
+  return batches
+    .filter((b) => b.at >= RUN_SINCE)
+    .reduce((a, b) => a + b.generations, 0)
+}
 
 export function candidateDir(id: string, n: number): string {
   return join(CANDIDATES, id, String(n))
@@ -258,8 +276,33 @@ function sha(buf: Buffer): string {
   return createHash('sha256').update(buf).digest('hex')
 }
 
-function placeholderFrames(e: ManifestEntry): Map<string, Img> {
+/**
+ * The procedural frames a generated vehicle is aligned to (same road-line
+ * point per heading): drawn in memory at the entry's canvas and foot, so a
+ * canvas change (bike 24 -> 32, build 2) never aligns to stale finals.
+ */
+async function placeholderFrames(e: ManifestEntry): Promise<Map<string, Img>> {
   const out = new Map<string, Img>()
+  if (e.class.startsWith('vehicle-')) {
+    const { drawVehicleImg } = await import('./vehicles.ts')
+    for (const f of e.frames) {
+      const m = /^_(ne|se|sw|nw)_(\d)$/.exec(f)
+      if (!m) continue
+      out.set(
+        f,
+        drawVehicleImg(
+          e.id,
+          e.class,
+          e.canvas,
+          m[1] as 'ne' | 'se' | 'sw' | 'nw',
+          Number(m[2]),
+          e.bodyRamp,
+          vehicleFoot(e)[1],
+        ),
+      )
+    }
+    return out
+  }
   for (const f of e.frames) {
     const p = finalPath(e, e.id + f)
     if (existsSync(p)) out.set(f, readImg(p).img)
@@ -388,20 +431,26 @@ export async function processFromRaw(
       return { frames: new Map(), reject: 'lint:A03 no image', notes: [] }
     const img = await toImg(e, png, raw.get(`orig_${name}`))
     const pr =
-      e.class.startsWith('building') || e.class === 'warehouse-ext'
-        ? processBuilding(e, img)
-        : e.class === 'prop' || e.class === 'dock-prop'
-          ? processProp(e, img)
-          : e.class === 'fixture-shelf'
-            ? processShelf(e, img)
-            : processMachine(e, img)
+      e.class === 'warehouse-ext'
+        ? processExterior(e, img)
+        : e.class.startsWith('building')
+          ? processBuilding(e, img)
+          : e.class === 'prop' || e.class === 'dock-prop'
+            ? processProp(e, img)
+            : e.class === 'fixture-shelf'
+              ? processShelf(e, img)
+              : processMachine(e, img)
     // follow-up edits (wh_ext _t2): raw/edit_<frame>_<k>.png; every edit is
     // written as <frame>_<k>.png for review, the picked one as <frame>.png
     for (const [k, buf] of raw) {
       const em = /^edit_([a-z0-9]+)_(\d+)$/.exec(k)
       if (!em) continue
       const suffix = `_${em[1]}`
-      const ep = processBuilding(e, await toImg(e, buf), suffix)
+      const eimg = await toImg(e, buf)
+      const ep =
+        e.class === 'warehouse-ext'
+          ? processExterior(e, eimg, suffix)
+          : processBuilding(e, eimg, suffix)
       const fr = ep.frames.get(suffix)
       if (!fr) continue
       pr.frames.set(`${suffix}_${em[2]}`, fr)
@@ -428,7 +477,7 @@ export async function processFromRaw(
     list[Number(i)] = await toImg(e, png)
   }
   if (recipe === 'object8') {
-    return processVehicle(e, rot, placeholderFrames(e))
+    return processVehicle(e, rot, await placeholderFrames(e))
   }
   return processWorker(e, rot, anims)
 }
@@ -664,10 +713,7 @@ async function edits(
   const estimate = work.length * 9
   await assertPresetEnums()
   const before = await getBalance()
-  const spent = (staging ? log.batches : m.batches).reduce(
-    (a, b) => a + b.generations,
-    0,
-  )
+  const spent = runSpent(staging ? log.batches : m.batches)
   if (
     before.generations - estimate < RESERVE ||
     spent + estimate > RUN_BUDGET
@@ -733,7 +779,11 @@ async function edits(
     const cand = chosenOf(e, staging) as number
     const c = staging ? loadChoices()[id] : undefined
     const pick = c && 'candidate' in c ? (c.t2Edit ?? 0) : 0
-    const pr = await processFromRaw(e, readRaw(id, cand), pick)
+    const pr = await processFromRaw(
+      e,
+      readRaw(id, cand),
+      staging ? pick : (e.editPick ?? 0),
+    )
     writeProcessed(e, cand, pr)
     console.log(`gen: reprocessed ${id}#${cand} (${pr.notes.join('; ')})`)
   }
@@ -899,7 +949,12 @@ export async function run(opts: StepOpts): Promise<number> {
       const e = m.entries.find((x) => x.id === id)
       if (!e) continue
       const c = staging ? loadChoices()[id] : undefined
-      const pick = c && 'candidate' in c ? (c.t2Edit ?? 0) : 0
+      const pick =
+        c && 'candidate' in c
+          ? (c.t2Edit ?? 0)
+          : staging
+            ? 0
+            : (e.editPick ?? 0)
       for (const n of candidateNumbers(id)) {
         const pr = await processFromRaw(e, readRaw(id, n), pick)
         writeProcessed(e, n, pr)
@@ -983,6 +1038,7 @@ export async function run(opts: StepOpts): Promise<number> {
       anchors: sizes,
       style,
       ...(keyArg === null ? {} : { key: keyArg === 'on' }),
+      ...(args.includes('--fallback') ? { fallback: true } : {}),
       ...(parseStr(args, '--vehicle') === 'proflash'
         ? { vehicle: 'proflash' as const }
         : parseStr(args, '--vehicle') === 'object8'
@@ -1032,7 +1088,7 @@ export async function run(opts: StepOpts): Promise<number> {
   }
   const before = await getBalance()
   const batches = staging ? log.batches : m.batches
-  const spent = batches.reduce((a, b) => a + b.generations, 0)
+  const spent = runSpent(batches)
   const maxGens = parseNum(args, '--max-gens')
   const problems: string[] = []
   if (before.generations - estimate < RESERVE) {

@@ -178,7 +178,12 @@ export interface PlaytestRestore {
   offered: boolean
 }
 
-/** `pm.playtest.v1`: the profile and the accumulators that resume it. */
+/**
+ * `pm.playtest.v1` (`pm.playtest.v1:cfg:<name>` in a `?config=` session, so a
+ * config run never replaces the cold run's profile — src/boot/autosave.ts
+ * playtestKey, report-playtest1 §6.13): the profile and the accumulators
+ * that resume it.
+ */
 export interface StoredPlaytest extends Playtest {
   restore: PlaytestRestore
 }

@@ -25,6 +25,7 @@ import {
   createCanvas,
 } from '@napi-rs/canvas'
 import type { StepOpts } from './draw-api.ts'
+import { ATLAS_KEYS } from './atlas.ts'
 import { decodePng, writeIfChanged } from './iso.ts'
 import {
   type Manifest,
@@ -459,7 +460,12 @@ export function run(opts: StepOpts): number {
   })
   const index = {
     generated: 'tools/art/gallery.ts',
-    atlas: { png: '/assets/world.png', json: '/assets/world.json' },
+    // served raw by `vlr dev` from src/assets (builds hash them, B2 §6.8)
+    atlases: ATLAS_KEYS.map((key) => ({
+      key,
+      png: `/src/assets/${key}.png`,
+      json: `/src/assets/${key}.json`,
+    })),
     categories: CATEGORIES,
     sheets: [...CATEGORIES, 'city-sample'].map(
       (c) => `art/contact/${c}@4x.png`,

@@ -21,6 +21,7 @@ vi.mock('phaser', () => {
 
 const garage = await import('../../src/scenes/GarageSheet.ts')
 const zp = await import('../../src/ui/ZonePicker.ts')
+const { followIconPos } = await import('../../src/ui/FollowStrip.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { dataFixture, makeSim } = await import('../sim/helpers.ts')
 
@@ -56,16 +57,74 @@ function snap(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
 }
 
 describe('Garage sheet geometry (city-view §7, §7.2-§7.3)', () => {
-  it('sheet height is max(320, round(H × 0.6))', () => {
+  it('the sheet is capped at max(320, round(H × 0.6))', () => {
     expect(garage.garageSheetHeight(500)).toBe(320)
     expect(garage.garageSheetHeight(659)).toBe(395)
     expect(garage.garageSheetHeight(932)).toBe(559)
   })
 
-  it('the fleet list sits between the 56-px header and the buy block, above the safe area', () => {
+  it('the fleet list sits between the 56-px header and the buy block, above the safe area (at most)', () => {
     expect(garage.garageListHeight(659, 0)).toBe(395 - 56 - 120)
     expect(garage.garageListHeight(932, 34)).toBe(559 - 56 - 120 - 34)
     expect(garage.garageListHeight(500, 200)).toBe(garage.ROW_PITCH)
+  })
+
+  it('report §6.14: the list fits the fleet (one pitch per vehicle, one for the empty state), then scrolls', () => {
+    const P = garage.ROW_PITCH
+    const pad = garage.LIST_PAD
+    expect(garage.garageListHeight(932, 34, 0)).toBe(P + pad)
+    expect(garage.garageListHeight(932, 34, 1)).toBe(P + pad)
+    expect(garage.garageListHeight(932, 34, 3)).toBe(3 * P + pad)
+    // 349 px of list at 430×932 (safe 34): six rows fit, the seventh scrolls.
+    expect(garage.garageListHeight(932, 34, 6)).toBe(6 * P + pad)
+    expect(garage.garageListHeight(932, 34, 7)).toBe(
+      garage.garageListHeight(932, 34),
+    )
+    expect(garage.garageListHeight(604, 0, 40)).toBe(
+      garage.garageListHeight(604, 0),
+    )
+  })
+
+  it('report §6.14: the sheet height is header + list + buy block + safe area, never over the cap', () => {
+    const fit = (H: number, sb: number, n: number) =>
+      garage.garageFitHeight(H, sb, n)
+    // 430×932 with two vehicles: 56 + 116 + 120 + 34 (was 559, ~230 px empty).
+    expect(fit(932, 34, 2)).toBe(56 + 2 * garage.ROW_PITCH + 4 + 120 + 34)
+    for (const [H, sb] of [
+      [604, 0],
+      [659, 0],
+      [659, 34],
+      [932, 34],
+    ] as const) {
+      for (let n = 0; n <= 12; n++) {
+        const h = fit(H, sb, n)
+        expect(h, `${H}/${sb}/${n}`).toBeLessThanOrEqual(
+          Math.max(garage.garageSheetHeight(H), 56 + 56 + 120 + sb),
+        )
+        expect(h - 56 - 120 - sb).toBe(garage.garageListHeight(H, sb, n))
+        expect(fit(H, sb, n + 1)).toBeGreaterThanOrEqual(h)
+      }
+    }
+  })
+
+  it('plan-build2 §8.2 task 5: the buy-card sprite and row icon are placed from the frame size', () => {
+    // The bike's 24² playtest-1 canvas and its 32² build-2 one, the van, the truck.
+    expect(garage.cardSpritePos(24, 24)).toEqual({ x: 18, y: 12 })
+    expect(garage.cardSpritePos(32, 32)).toEqual({ x: 14, y: 4 })
+    expect(garage.cardSpritePos(48, 32)).toEqual({ x: 6, y: 4 })
+    // Larger than the 48×32 box: pinned to its top-left, never left of it.
+    expect(garage.cardSpritePos(64, 40)).toEqual({ x: 6, y: 4 })
+    // The 16² type icon keeps its playtest-1 spot (x 20, centred in 56).
+    expect(garage.rowIconPos(16, 16)).toEqual({ x: 20, y: 20 })
+    expect(garage.rowIconPos(24, 24)).toEqual({ x: 16, y: 16 })
+  })
+
+  it('plan-build2 §8.2 task 5: the follow strip places its type glyph from the frame size', () => {
+    // The 32-px strip at y 500: the 16² icon keeps its playtest-1 spot.
+    expect(followIconPos(16, 16, 500, 32)).toEqual({ x: 6, y: 508, textX: 26 })
+    // A 32² frame fills the strip and pushes the text right.
+    expect(followIconPos(32, 32, 500, 32)).toEqual({ x: 6, y: 500, textX: 42 })
+    expect(followIconPos(24, 24, 500, 32)).toEqual({ x: 6, y: 504, textX: 34 })
   })
 
   it('three buy cards with 8-px gaps fit inside W − 24 at every target width', () => {
@@ -191,7 +250,7 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
   it('the longest Sell / Re-hire and zone-chip labels keep Button.CONTENT_PAD of air in m5x7 (UX M3: `Re-hire $25` touched its 64-px face)', async () => {
     const { readFileSync } = await import('node:fs')
     const xml = readFileSync(
-      new URL('../../public/assets/m5x7.xml', import.meta.url),
+      new URL('../../src/assets/m5x7.xml', import.meta.url),
       'utf8',
     )
     const adv = new Map<number, number>()

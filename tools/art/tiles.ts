@@ -1,6 +1,7 @@
 // Ground tiles (style-guide.md §2.2, class `tile`, 64x32, all procedural):
 // lawns, rural ground, sand/shore, animated water, pavement/plaza, the
-// warehouse lot, the 16-mask road autotile, themed road edges, airport
+// warehouse lot and its foundation slab (lot_slab_a/b/c, lot_ramp; build 2,
+// B2 §6.1), the 16-mask road autotile, themed road edges, airport
 // ground, the tree-line filler and the district kerb overlays.
 //
 // Tiles are flat 16 x 16-unit floors (iso.ts) so every pattern repeats with
@@ -191,6 +192,49 @@ function lotQueue(k: Kit): void {
   })
 }
 
+/**
+ * The warehouse foundation slab (B2 §6.1, build 2): cast concrete one
+ * shade lighter than the lot, with an expansion joint along the tile's two
+ * upper edges, so a 4x4 stamp shows the footprint grid exactly. Variants:
+ * a plain, b a hairline crack, c a drain grate.
+ */
+function slabCell(u: number, v: number, variant: number): FloorCell {
+  const h = cellHash(u, v, 83 + variant)
+  // the joint is a 1-unit row of cells (edge marks on the tile border are
+  // clipped by the diamond)
+  const c: FloorCell = {
+    c: u === 0 || v === 0 || h % 41 === 0 ? 'grey3' : 'grey4',
+  }
+  if (variant === 1) {
+    // a hairline crack wandering across the tile
+    const w = 5 + (u >> 2) + (cellHash(u >> 2, 0, 89) % 2)
+    if (v === w && u >= 3 && u <= 12) c.c = 'grey3'
+  }
+  if (variant === 2 && u >= 9 && u <= 12 && v >= 9 && v <= 12) {
+    // a drain grate: dark slots in a steel frame
+    const edge = u === 9 || u === 12 || v === 9 || v === 12
+    c.c = edge ? 'grey2' : u % 2 === 0 ? 'grey1' : 'grey2'
+  }
+  return c
+}
+
+function lotSlab(k: Kit, variant: number): void {
+  all(k, (u, v) => slabCell(u, v, variant))
+}
+
+/**
+ * The slab edge where the dock tiles meet the lot (B2 §6.1): a ramp with
+ * hazard stripes on the tile's W side (-x, screen up-left; the side facing
+ * the lot entrance), a white kerb line, then slab.
+ */
+function lotRamp(k: Kit): void {
+  all(k, (u, v) => {
+    if (u < 4) return (u + v) % 4 < 2 ? 'yellow2' : 'grey1'
+    if (u === 4) return 'grey5'
+    return slabCell(u, v, 0)
+  })
+}
+
 function tarmac(k: Kit): void {
   all(k, (u, v) => {
     const c: FloorCell = { c: 'grey2' }
@@ -376,6 +420,8 @@ const PAINTERS: Record<string, Painter> = {
   lot_concrete: (k) => lotConcrete(k),
   lot_parking: (k) => lotParking(k),
   lot_queue: (k) => lotQueue(k),
+  lot_slab: (k, _f, i) => lotSlab(k, i),
+  lot_ramp: (k) => lotRamp(k),
   road: (k, f) => roadAutotile(k, Number(f.slice(1))),
   edge_quay_w: (k) => edgeQuayW(k),
   edge_beach_e: (k) => edgeBeachE(k),

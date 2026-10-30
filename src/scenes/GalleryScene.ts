@@ -1,7 +1,8 @@
 // Gallery (plan.md §12.3 task 14; dev-only: ?view=gallery&page=N with the dev
 // server or ?debug=1). The look is judged here before any mechanic exists:
 //   1  palette ramps + the reserved colours (art/palette.json via theme.ts)
-//   2  every atlas frame at 1x and 2x on a 64x32 grid over grass, labelled
+//   2  every frame of both atlases (`world`, then the interior-only frames
+//      of `interior`) at 1x and 2x over grass, labelled
 //   3  the full 48x48 map: baked ground (roads, trimmed avenues, themed edges,
 //      kerbs, `_locked` ground), every buildings.json row with its placeholder
 //      sprite (spriteMap.generated.json; `_locked` in locked regions), the
@@ -16,7 +17,7 @@ import type { GameData } from '../data/index.ts'
 import { mountOverlay } from '../debug/overlay.ts'
 import { debugEnabled, GALLERY_PAGES, params } from '../debug/params.ts'
 import { GestureClassifier } from '../input/GestureClassifier.ts'
-import { FONT_KEY, WORLD_ATLAS } from '../render/atlases.ts'
+import { ATLAS_KEYS, FONT_KEY, WORLD_ATLAS } from '../render/atlases.ts'
 import { CameraRig } from '../render/CameraRig.ts'
 import { buildingSprite, SIGN_LOCKED_FACE } from '../render/frames.ts'
 import { bakeGround, GROUND_Y } from '../render/ground.ts'
@@ -39,7 +40,7 @@ const MAP_TOP_PAD = 64
 const MAP_BOTTOM_PAD = 128
 /** Flat-fill tint for a locked sprite whose `_locked` frame is missing (city-view.md §1.4). */
 const LOCKED_FILL = 0xdfe6ea
-/** m5x7 metrics (public/assets/m5x7.xml): line pitch, cap top and height. */
+/** m5x7 metrics (src/assets/m5x7.xml): line pitch, cap top and height. */
 const SIGN_LINE_H = 14
 const SIGN_CAP_TOP = 4
 const SIGN_CAP_H = 7
@@ -201,8 +202,16 @@ export class GalleryScene extends Phaser.Scene {
     return t
   }
 
+  /** The atlas holding `frame` (`world` first), or null. */
+  private keyOf(frame: string): string | null {
+    for (const k of ATLAS_KEYS) {
+      if (this.textures.exists(k) && this.textures.get(k).has(frame)) return k
+    }
+    return null
+  }
+
   private has(frame: string): boolean {
-    return this.textures.get(WORLD_ATLAS).has(frame)
+    return this.keyOf(frame) !== null
   }
 
   private nine(
@@ -213,7 +222,18 @@ export class GalleryScene extends Phaser.Scene {
   ): Phaser.GameObjects.NineSlice | null {
     if (!this.has(frame)) return null
     const n = this.add
-      .nineslice(r.x, r.y, WORLD_ATLAS, frame, r.w, r.h, 4, 4, 4, 4)
+      .nineslice(
+        r.x,
+        r.y,
+        this.keyOf(frame) ?? WORLD_ATLAS,
+        frame,
+        r.w,
+        r.h,
+        4,
+        4,
+        4,
+        4,
+      )
       .setOrigin(0, 0)
       .setAlpha(alpha)
     layer.add(n)
@@ -224,7 +244,12 @@ export class GalleryScene extends Phaser.Scene {
     if (!this.has(frame)) return
     layer.add(
       this.add
-        .image(Math.round(x), Math.round(y), WORLD_ATLAS, frame)
+        .image(
+          Math.round(x),
+          Math.round(y),
+          this.keyOf(frame) ?? WORLD_ATLAS,
+          frame,
+        )
         .setOrigin(0, 0),
     )
   }
@@ -373,20 +398,32 @@ export class GalleryScene extends Phaser.Scene {
   }
 
   private buildFrames(W: number, top: number): Rect {
-    const tex = this.textures.get(WORLD_ATLAS)
+    // Every frame once: `world` first, then what only `interior` holds (the
+    // shared icons/parcels/fx/machines/workers are drawn from `world`).
     // Single-character names are the m5x7 glyph frames ParseFromAtlas adds.
-    const names = tex
-      .getFrameNames()
-      .filter((n) => n !== '__BASE' && n.length > 1)
-      .toSorted(
-        (a, b) => groupOf(a) - groupOf(b) || (a < b ? -1 : a > b ? 1 : 0),
-      )
+    const owner = new Map<string, string>()
+    for (const k of ATLAS_KEYS) {
+      if (!this.textures.exists(k)) continue
+      for (const n of this.textures.get(k).getFrameNames()) {
+        if (n !== '__BASE' && n.length > 1 && !owner.has(n)) owner.set(n, k)
+      }
+    }
+    const names = [...owner.keys()].toSorted(
+      (a, b) =>
+        Number(owner.get(a) !== WORLD_ATLAS) -
+          Number(owner.get(b) !== WORLD_ATLAS) ||
+        groupOf(a) - groupOf(b) ||
+        (a < b ? -1 : a > b ? 1 : 0),
+    )
     this.frameCount = names.length
+    const counts = ATLAS_KEYS.map(
+      (k) => `${[...owner.values()].filter((v) => v === k).length} ${k}`,
+    )
     this.text(
       this.worldLayer,
       PAD,
       top,
-      `${names.length} frames in "${WORLD_ATLAS}" - 1x over 2x`,
+      `${names.length} frames (${counts.join(' + ')}) - 1x over 2x`,
     )
     // Cells: the 1x frame, the 2x frame under it, the label at the bottom;
     // flowed left to right (a frame wider than the screen gets its own row).
@@ -396,7 +433,8 @@ export class GalleryScene extends Phaser.Scene {
     let rowH = 0
     let maxX = W
     for (const name of names) {
-      const f = tex.get(name)
+      const key = owner.get(name) ?? WORLD_ATLAS
+      const f = this.textures.getFrame(key, name)
       const fw = f.realWidth
       const fh = f.realHeight
       const label = this.text(this.worldLayer, 0, 0, name)
@@ -408,10 +446,10 @@ export class GalleryScene extends Phaser.Scene {
         y += rowH
         rowH = 0
       }
-      const one = this.add.image(x, y, WORLD_ATLAS, name).setOrigin(0, 0)
+      const one = this.add.image(x, y, key, name).setOrigin(0, 0)
       // 2x for review only: the game itself never scales art.
       const two = this.add
-        .image(x, y + fh + 2, WORLD_ATLAS, name)
+        .image(x, y + fh + 2, key, name)
         .setOrigin(0, 0)
         .setScale(2)
       this.worldLayer.add([one, two])
@@ -479,7 +517,7 @@ export class GalleryScene extends Phaser.Scene {
       const img = this.add.image(
         Math.round(x),
         Math.round(y),
-        WORLD_ATLAS,
+        this.keyOf(name) ?? WORLD_ATLAS,
         name,
       )
       img.setOrigin(0.5, 1).setDepth(depth)

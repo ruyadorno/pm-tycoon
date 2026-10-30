@@ -39,12 +39,13 @@ export function needsOutline(e: ManifestEntry): boolean {
   return isGenerated(e) && !NEVER.includes(e.class)
 }
 
-/** the §1.2 shadow strip: city building classes (not the mood overlays) */
+/**
+ * the §1.2 shadow strip: city building classes (not the mood overlays). The
+ * warehouse exterior paints no ground patch since build 2 (B2 §6.1: the
+ * slab is ground-bake tiles), so it has no base diamond to shade.
+ */
 export function needsShadow(e: ManifestEntry): boolean {
-  return (
-    (e.class.startsWith('building') || e.class === 'warehouse-ext') &&
-    !e.id.startsWith('mood_')
-  )
+  return e.class.startsWith('building') && !e.id.startsWith('mood_')
 }
 
 export function outlineFinal(e: ManifestEntry, img: Img): Img {

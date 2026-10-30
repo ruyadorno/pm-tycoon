@@ -7,13 +7,19 @@
 // for danger, §1.4 — van blue, truck yellow).
 //
 // Placement contract (for CityScene): the footprint centre of the vehicle
-// (the point on the road centre line) is at canvas (W/2, FOOT_Y): bike
-// (12, 18), van (16, 23), truck (24, 22) — within 2 px of setOrigin(0.5,
-// 0.75); every frame keeps a >= 1 px transparent margin (lint A05).
-// Headings from tile motion: +x -> se, +y -> sw, -x -> nw, -y -> ne.
+// (the point on the road centre line) is at the manifest row's `foot`
+// (manifest.ts vehicleFoot(); VEHICLE_FOOT in frames.generated.ts): bike
+// (16, 26) on its 32x32 canvas since build 2 (Q-B2-14: a courier with a
+// helmet stands tall on a narrow frame, so the wheels sit lower), van
+// (16, 23), truck (24, 22); every frame keeps a >= 1 px transparent margin
+// (lint A05). Headings from tile motion: +x -> se, +y -> sw, -x -> nw,
+// -y -> ne. The bike is a courier on a bicycle with a white helmet and a
+// rear cargo box (B2 §6.2, STYLE.md rule 6: the rider is the one person a
+// vehicle shows).
 
 import type { DrawnFrame, Drawer } from './draw-api.ts'
 import { registerDrawer } from './drawers.ts'
+import { VEHICLE_FOOT_BY_CLASS, vehicleFoot } from './manifest.ts'
 import {
   type Img,
   type Mat,
@@ -49,12 +55,10 @@ interface Model {
   parts: Part[]
 }
 
-/** footprint centre row per class (see header) */
-export const FOOT_Y: Record<string, number> = {
-  'vehicle-bike': 18,
-  'vehicle-van': 23,
-  'vehicle-truck': 22,
-}
+/** footprint centre row per class (see header; manifest.ts is the source) */
+export const FOOT_Y: Record<string, number> = Object.fromEntries(
+  Object.entries(VEHICLE_FOOT_BY_CLASS).map(([k, v]) => [k, v[1]]),
+)
 
 const TYRE = mat('grey1', 'grey0', 'grey0')
 const HUB = mat('grey3', 'grey3', 'grey2')
@@ -149,29 +153,35 @@ function truck(body: Mat, frame: number): Model {
 }
 
 function bike(body: Mat, frame: number): Model {
-  const L = 6
+  // a courier on a bicycle (B2 §6.2): two thin wheels, the orange frame, a
+  // cargo box over the rear wheel, the rider upright with a white helmet
+  const L = 8
   const Wd = 2
   const cargo = rampMat('brown', 1)
   const shirt = rampMat('blue', 0)
+  const helmet = mat('grey5', 'grey5', 'grey4')
   return {
     L,
     Wd,
-    H: 11,
+    H: 14,
     parts: [
-      // two wheels (centre line)
-      P(0, 0, 0, 2, 2, 2, TYRE),
-      P(4, 0, 0, 2, 2, 2, TYRE),
-      P(frame % 2, 0, 1, 1, 2, 1, HUB),
-      P(4 + (frame % 2), 0, 1, 1, 2, 1, HUB),
-      // frame + the cargo box over the front wheel
-      P(1, 0, 2, 4, 2, 1, body),
-      P(3, 0, 3, 3, 2, 4, cargo),
-      P(3, 0, 7, 3, 2, 1, body),
-      // rider: legs, torso, head with a cap
-      P(1, 0, 3, 1, 2, 2, shirt),
-      P(1, 0, 5, 2, 2, 3, body),
-      P(1, 0, 8, 2, 2, 2, M.skin),
-      P(1, 0, 10, 2, 2, 1, shirt),
+      // wheels: rear (f 0-1) and front (f 6-7), on the centre line
+      P(0, 0, 0, 2, 1, 2, TYRE),
+      P(6, 0, 0, 2, 1, 2, TYRE),
+      P(frame % 2, 0, 1, 1, 1, 1, HUB),
+      P(6 + (frame % 2), 0, 1, 1, 1, 1, HUB),
+      // frame tube + handlebar post
+      P(1, 0, 2, 6, 1, 1, body),
+      P(6, 0, 3, 1, 1, 3, body),
+      P(6, 0, 6, 1, 2, 1, M.metal),
+      // the rear cargo box over the rear wheel
+      P(0, 0, 3, 2, 2, 3, cargo),
+      // rider: legs, torso leaning to the bar, arms, head, white helmet
+      P(3, 0, 3, 1, 2, 2, shirt),
+      P(3, 0, 5, 2, 2, 3, body),
+      P(5, 0, 6, 1, 2, 1, M.skin),
+      P(3, 0, 8, 2, 2, 2, M.skin),
+      P(3, 0, 10, 2, 2, 2, helmet),
     ],
   }
 }
@@ -218,8 +228,9 @@ export function renderVehicle(
   const nu = along ? L : Wd
   const nv = along ? Wd : L
   // footprint centre (nu/2, nv/2) -> canvas (W/2, footY)
-  const ox = W / 2 - (nu - nv)
-  const oy = footY - (nu + nv) / 2
+  // integer origin (an odd nu + nv would put the voxels on half pixels)
+  const ox = Math.round(W / 2 - (nu - nv))
+  const oy = Math.round(footY - (nu + nv) / 2)
   const img = newImg(W, Hc)
   renderVox(img, vox, ox, oy)
   depthEdges(img, 4)
@@ -246,13 +257,13 @@ export function drawVehicleImg(
   heading: Heading,
   frame: number,
   bodyRamp?: string,
+  footY: number = FOOT_Y[cls] ?? Math.round(canvas[1] * 0.75),
 ): Img {
   const build = MODELS[id]
   if (!build) throw new Error(`vehicles: no model for ${id}`)
   const ramp = bodyRamp ?? DEFAULT_RAMP[id] ?? 'blue'
   const body = rampMat(ramp, ramp === 'yellow' || ramp === 'orange' ? 1 : 0)
   const model = build(body, frame)
-  const footY = FOOT_Y[cls] ?? Math.round(canvas[1] * 0.75)
   return renderVehicle(model, heading, canvas[0], canvas[1], footY)
 }
 
@@ -267,6 +278,7 @@ const vehicleDrawer: Drawer = (d): DrawnFrame[] =>
       m[1] as Heading,
       Number(m[2]),
       d.entry.bodyRamp,
+      vehicleFoot(d.entry)[1],
     )
     return { suffix, canvas: imgToCanvas(img, d) }
   })

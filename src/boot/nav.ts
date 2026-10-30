@@ -17,6 +17,12 @@
 // clock) skips the exit. A goto while one is in flight is
 // dropped; a transition that never completes switches anyway after
 // TRANSITION_TIMEOUT_MS of game time.
+//
+// Build 2 (B2 §5): the Title runs above the City in attract mode (the Title
+// launches City with {attract: true} and brings itself to the top); Continue
+// / New game swap the sims under a fade, launch the HUD and stop the Title —
+// the City is never restarted, it emits EV_ATTRACT_END instead (what
+// __pm.ready waits for when the City was created in attract mode).
 import Phaser from 'phaser'
 import { THEME } from '../ui/theme.ts'
 
@@ -31,6 +37,16 @@ export interface GotoPayload {
 
 export const EV_GOTO = 'pm:goto'
 export const EV_VIEW = 'pm:view'
+/** Game event: the City left attract mode (the player's sim is installed). */
+export const EV_ATTRACT_END = 'pm:attractEnd'
+/** Attract → game: each half of the 300-ms swap fade (out, then in; B2 §5). */
+export const ATTRACT_FADE_MS = 150
+
+/** CityScene start data (B2 §5). */
+export interface CityStartData {
+  /** The Title's attract city: no gestures, no HUD, the camera tour. */
+  attract?: boolean
+}
 
 /** Registry key: the City camera {zoom, scrollX, scrollY} before its exit snap. */
 export const REG_CITY_CAM = 'cityCam'

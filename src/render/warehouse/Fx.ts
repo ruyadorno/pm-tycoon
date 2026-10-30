@@ -8,7 +8,7 @@
 // rounded on every update (integer rest, notes §3). Effects live in the FX
 // layer (§1.13 depth 100) of the room container, in room px.
 import Phaser from 'phaser'
-import { FONT_KEY, WAREHOUSE_ATLAS } from '../atlases.ts'
+import { FONT_KEY, UI_ATLAS } from '../atlases.ts'
 import { addPanel } from '../../ui/Panel.ts'
 import { FONT_SIZE, PALETTE, THEME } from '../../ui/theme.ts'
 import { BANNER, ROOM_W, type Point, type Rect } from './RoomLayout.ts'
@@ -334,7 +334,7 @@ export class Fx {
   closeCall(text = 'CLOSE CALL!'): void {
     this.banner?.destroy()
     const img = this.scene.add
-      .image(0, 0, WAREHOUSE_ATLAS, 'ui_banner')
+      .image(0, 0, UI_ATLAS, 'ui_banner')
       .setOrigin(0, 0)
     const t = this.scene.add
       .bitmapText(0, 0, FONT_KEY, text, FONT_SIZE)

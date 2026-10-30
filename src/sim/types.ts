@@ -42,8 +42,15 @@ export interface TilePos {
   ty: number
 }
 
+/**
+ * The state / snapshot / save version (plan.md R9, spec-build2 §8): a
+ * state-shape change bumps it; Sim.load and the Title refuse any other value
+ * (no migrations). 2 = build 2 (`pm.save.v2`).
+ */
+export const STATE_VERSION = 2
+
 export interface SimState {
-  version: 1
+  version: typeof STATE_VERSION
   seed: number
   /** mulberry32 state word (uint32), advanced only through Rng (rng.ts). */
   rng: number

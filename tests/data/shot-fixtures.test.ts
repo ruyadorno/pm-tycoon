@@ -3,6 +3,11 @@
 // refused by __pm.load, so `vlr check` catches it before `vlr shots` does)
 // and still holds the scenario its shot needs. Regenerate with
 // `node tools/fixtures/late-waiting.ts` / `node tools/fixtures/warehouse.ts`.
+// Build 2 (B2 §5, plan-build2 §8.2 task 2): src/assets/attract.json, the
+// Title's attract city, must equal a fresh run of tools/fixtures/attract.ts
+// (`vlr fixtures:attract`; regenerated with every data or state-version
+// change, R19), load with ignoreDataHash like the Title does, show the M5 L2
+// city and keep delivering under the competent policy.
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -10,6 +15,18 @@ import { createPolicy } from '../../src/sim/policy.ts'
 import { replay, Sim, stateHash } from '../../src/sim/sim.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import { collect, dataFixture } from '../sim/helpers.ts'
+import {
+  ATTRACT_LEVEL,
+  ATTRACT_MIN_VEHICLES,
+  ATTRACT_MINUTES,
+  ATTRACT_OUT,
+  ATTRACT_SEED,
+  attractJson,
+  attractProblems,
+  attractSummary,
+  REGENERATE,
+  runAttract,
+} from '../../tools/fixtures/attract.ts'
 
 interface Fixture {
   dataHash: string
@@ -241,5 +258,59 @@ describe('l2-lane: L2 with four live slots and the Shaky shaker (warehouse-view 
     withPolicy(sim, 30)
     expect(ups).toEqual([])
     expect(lost).toEqual([])
+  })
+})
+
+/** The committed attract snapshot's text. */
+const attractText = (): string => readFileSync(ATTRACT_OUT, 'utf8')
+
+/** The committed snapshot as the Title loads it (ignoreDataHash). */
+const loadAttract = (): Sim =>
+  Sim.load(dataFixture(), JSON.parse(attractText()), { ignoreDataHash: true })
+
+describe('attract.json: the Title attract city (B2 §5)', () => {
+  it('equals a fresh run of tools/fixtures/attract.ts (else: vlr fixtures:attract)', () => {
+    const sim = runAttract(dataFixture())
+    expect(attractProblems(sim), attractSummary(sim)).toEqual([])
+    expect(
+      attractText() === attractJson(sim),
+      `src/assets/attract.json is stale: run \`${REGENERATE}\` (${attractSummary(sim)})`,
+    ).toBe(true)
+  }, 60_000)
+
+  it('is a plain snapshot: seed 7, 24 sim minutes, no fixture record', () => {
+    const snap = JSON.parse(attractText()) as Record<string, unknown> & {
+      seed: number
+      state: { tick: number }
+    }
+    expect(snap.seed).toBe(ATTRACT_SEED)
+    expect(snap.state.tick).toBe(ATTRACT_MINUTES * 60 * TICKS_PER_S)
+    expect(Object.keys(snap).toSorted()).toEqual(
+      ['commandLog', 'dataHash', 'seed', 'state', 'version'].toSorted(),
+    )
+  })
+
+  it('loads with ignoreDataHash and shows the M5 L2 city: ≥ 4 vehicles incl. a truck, Industrial live, the lane flowing', () => {
+    const sim = loadAttract()
+    const st = sim.state
+    expect(st.level.level).toBe(ATTRACT_LEVEL)
+    expect(st.vehicles.length).toBeGreaterThanOrEqual(ATTRACT_MIN_VEHICLES)
+    expect(st.vehicles.some((v) => v.type === 'truck')).toBe(true)
+    expect(st.districts.industrial!.live).toBe(true)
+    expect(st.lane.stalled).toBe(false)
+    expect(st.economy.gameOver).toBe(false)
+    expect(attractProblems(sim)).toEqual([])
+  })
+
+  it('under the competent policy the demo keeps delivering for 2 minutes: no stall, no life lost', () => {
+    const sim = loadAttract()
+    const delivered = collect(sim, 'parcel:delivered')
+    const lost = collect(sim, 'life:lost')
+    const stalls = collect(sim, 'lane:stalled')
+    withPolicy(sim, 120)
+    expect(delivered.length).toBeGreaterThan(0)
+    expect(lost).toEqual([])
+    expect(stalls).toEqual([])
+    expect(sim.state.economy.gameOver).toBe(false)
   })
 })

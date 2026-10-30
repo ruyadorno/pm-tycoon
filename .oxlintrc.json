@@ -8,7 +8,7 @@
     "dist",
     "shots",
     "art/candidates",
-    "public/assets",
+    "src/assets",
     "**/*.generated.*"
   ],
   "rules": {

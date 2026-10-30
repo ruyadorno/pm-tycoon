@@ -15,6 +15,17 @@
 // wall, nose in (`_ne_`) while docked. Quality (src/render/quality.ts) cut 5
 // pins the wheel frame to 0. The scene's `sortDepth` (vehicleDepth.ts) lifts
 // a vehicle over the multi-tile footprints it is in front of (M4).
+//
+// Parcel hops (spec-build2.md §6.3, the author's city #3): the pickup hop
+// sinks into the body centre (bodyCentre(): the foot point − BODY_LIFT) and
+// the delivery hop starts there, so no parcel icon ever rests on a roof; the
+// roof keeps only the zone dot. The foot point itself is the manifest's
+// VEHICLE_FOOT (frames.generated.ts: the row's `foot`, else the class
+// default — 32×32 for the courier bike since build 2), so a canvas change
+// needs no code here. The roof dot and the status glyph follow the frame's
+// first opaque row (probed once per frame from the atlas source): the
+// 32×32 bike has empty headroom above its rider, where a canvas-top rule
+// would float the dot in the air.
 import Phaser from 'phaser'
 import type { VehicleSnapshot } from '../sim/view-api.ts'
 import { WORLD_ATLAS } from './atlases.ts'
@@ -26,16 +37,75 @@ import type { SpriteRect } from './vehicleDepth.ts'
 
 /** Fallback origin y (Q24) for a type the manifest has no foot point for. */
 export const VEHICLE_ORIGIN_Y = 0.75
+/** Body centre above the foot point (world px, B2 §6.3: the hops' end / start). */
+export const BODY_LIFT = 4
+
+/** The body centre of a vehicle whose foot point is (x, y): (x, y − BODY_LIFT). */
+export function bodyCentreAt(
+  x: number,
+  y: number,
+  out: { x: number; y: number } = { x: 0, y: 0 },
+): { x: number; y: number } {
+  out.x = x
+  out.y = y - BODY_LIFT
+  return out
+}
 const BOB_PERIOD_MS = 300
 const BOB_UP_MS = 150
 const BELL_MS = 2000
 const GLYPH_GAP = 2
+/** Roof dot centre below the roof line (canvas rows; the van's roof is row 6). */
+const ROOF_DOT_ROW = 6
+
+/** First opaque row per vehicle frame (canvas px), probed once per name. */
+const CONTENT_TOP = new Map<string, number>()
+
+/**
+ * The first opaque row of an (untrimmed) vehicle frame, read once from the
+ * atlas source image through a scratch canvas; 0 when it cannot be read.
+ */
+export function contentTopRow(scene: Phaser.Scene, frameName: string): number {
+  const hit = CONTENT_TOP.get(frameName)
+  if (hit !== undefined) return hit
+  let top = 0
+  try {
+    const f = scene.textures.getFrame(WORLD_ATLAS, frameName)
+    const src: unknown = f?.source.image
+    if (
+      f &&
+      (src instanceof HTMLImageElement || src instanceof HTMLCanvasElement)
+    ) {
+      const w = f.cutWidth
+      const h = f.cutHeight
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      const ctx = c.getContext('2d', { willReadFrequently: true })
+      if (ctx && w > 0 && h > 0) {
+        ctx.drawImage(src, f.cutX, f.cutY, w, h, 0, 0, w, h)
+        const a = ctx.getImageData(0, 0, w, h).data
+        for (let i = 3; i < a.length; i += 4)
+          if (a[i]) {
+            top = Math.floor((i - 3) / 4 / w) + f.y
+            break
+          }
+      }
+    }
+  } catch {
+    top = 0
+  }
+  CONTENT_TOP.set(frameName, top)
+  return top
+}
 /** Roof dot frame (8×8 rounded square, FILL-tinted with the district colour). */
 const DOT_FRAME = 'ui_bar_track'
 
 type Glyph = 'ic_cross' | 'ic_alert' | 'ic_bell' | 'ic_honk' | null
 
-/** Where a docked vehicle is drawn (CityScene, from the warehouse anchor). */
+/**
+ * Where a docked vehicle is drawn (CityScene, from the warehouse anchor and
+ * the exterior frame's dockPose; one object, moved in place on a tier swap).
+ */
 export interface DockPose {
   /** The map dock tile the sim parks a docked vehicle on. */
   tile: readonly [number, number]
@@ -124,6 +194,17 @@ export class VehicleView {
   }
 
   /**
+   * Body centre of the last update (world px): the pickup hop's end point
+   * (with sink) and the delivery hop's start (B2 §6.3).
+   */
+  bodyCentre(out: { x: number; y: number } = { x: 0, y: 0 }): {
+    x: number
+    y: number
+  } {
+    return bodyCentreAt(this.img.x, this.img.y, out)
+  }
+
+  /**
    * Place from the snapshot: lerp prev → cur by the stepper alpha (notes §5).
    * `zoneColour` is the home district's colour, null for `any`.
    */
@@ -173,8 +254,14 @@ export class VehicleView {
     this.img.setAlpha(inactive ? 0.5 : 1)
 
     // Roof: the canvas top (the foot point is the road line).
-    const roofY = y - Math.round(this.img.displayOriginY)
-    this.updateDot(v.zone, zoneColour, x, roofY + 6, depth)
+    // Roof: the canvas top, lowered by any empty headroom above the art
+    // (the 32×32 bike); van / truck art starts within 6 rows of the top.
+    const headroom = Math.max(
+      0,
+      contentTopRow(this.scene, this.frameName) - ROOF_DOT_ROW,
+    )
+    const roofY = y - Math.round(this.img.displayOriginY) + headroom
+    this.updateDot(v.zone, zoneColour, x, roofY + ROOF_DOT_ROW, depth)
 
     let g: Glyph = null
     if (inactive) g = 'ic_cross'

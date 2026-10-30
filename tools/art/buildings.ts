@@ -1126,6 +1126,97 @@ const designs: Record<string, Design> = {
     void bx
   },
 
+  // build 2 modern port (B2 §6.4): procedural stand-ins for the PixelLab
+  // rows (shipped if their candidates fail lint, R18)
+  dk_terminal_a(k) {
+    plot(k, 'concrete')
+    // quay edge markings along the west side
+    floorRect(k, 0, 0, 3, 48, (u, v) =>
+      u === 2 && v % 6 < 3 ? { c: 'yellow2' } : groundCell('concrete', u, v),
+    )
+    // container rows (2 high) and the control booth: its unique feature
+    const cols = ['blue', 'orange', 'grass', 'yellow', 'purple', 'blue']
+    for (let r = 0; r < 3; r++) {
+      for (let i = 0; i < 2; i++) {
+        container(
+          k,
+          8 + i * 13,
+          6 + r * 9,
+          1,
+          12,
+          5,
+          cols[(r + i) % 6] as string,
+        )
+        if ((r + i) % 2 === 0) {
+          container(
+            k,
+            8 + i * 13,
+            6 + r * 9,
+            7,
+            12,
+            5,
+            cols[(r + i + 3) % 6] as string,
+          )
+        }
+      }
+    }
+    const booth = box(k, 36, 34, 0, 8, 8, 14, M.concrete)
+    k.vox.box(36, 41, 6, 8, 1, 5, M.glassLit)
+    k.vox.box(43, 34, 6, 1, 8, 5, M.glassLit)
+    k.vox.box(35, 33, 14, 10, 10, 1, M.roofFlat)
+    void booth
+    // the reach-stacker: a yellow body with its boom over a container
+    k.vox.box(12, 36, 1, 10, 5, 4, rampMat('yellow', 1))
+    k.vox.box(14, 36, 5, 4, 5, 3, M.glassLit)
+    k.vox.box(20, 37, 5, 10, 2, 2, rampMat('yellow', 1))
+    for (const u of [12, 20]) k.vox.box(u, 41, 0, 2, 1, 2, M.darkMetal)
+  },
+
+  dk_terminal_b(k) {
+    plot(k, 'concrete')
+    // the gantry crane rails and its steel base: the unique feature
+    floorRect(k, 0, 0, 48, 48, (u, v) =>
+      u === 4 || u === 14 ? { c: 'grey1' } : groundCell('concrete', u, v),
+    )
+    const legM = rampMat('blue', 0)
+    for (const v of [6, 36]) {
+      k.vox.box(3, v, 0, 3, 3, 30, legM)
+      k.vox.box(13, v, 0, 3, 3, 30, legM)
+      k.vox.box(3, v, 30, 13, 3, 3, legM)
+    }
+    k.vox.box(3, 6, 33, 3, 33, 3, legM)
+    k.vox.box(13, 6, 33, 3, 33, 3, legM)
+    // stacked containers and the reefer rack (white boxes, a power post)
+    const cols = ['orange', 'blue', 'grass', 'purple']
+    for (let r = 0; r < 3; r++) {
+      container(k, 22, 6 + r * 9, 1, 12, 5, cols[r % 4] as string)
+      container(k, 22, 6 + r * 9, 7, 12, 5, cols[(r + 2) % 4] as string)
+    }
+    for (let r = 0; r < 3; r++) container(k, 36, 8 + r * 9, 1, 8, 5, 'grey')
+    k.vox.box(45, 8, 0, 1, 1, 14, M.darkMetal)
+  },
+
+  dk_port_office(k) {
+    plot(k, 'concrete')
+    const bx = block(k, 6, 6, 18, 14, 2, M.concrete, {
+      roof: M.roofFlat,
+      sill: M.cream,
+      wh: 5,
+    })
+    // the glass front on the lit face
+    k.vox.box(7, 19, 1, 16, 1, top(bx) - 3, M.glassLit)
+    door(k, bx, 'left', 7, 3, 7, M.door)
+    // the radar mast: a lattice post with a spinning bar
+    const t0 = top(bx)
+    k.vox.box(20, 9, t0, 1, 1, 16, M.darkMetal)
+    k.vox.box(17, 9, t0 + 16, 7, 1, 1, M.white)
+    // the barrier gate in front: a post and an orange-and-white boom
+    k.vox.box(26, 26, 0, 2, 2, 4, M.concrete)
+    for (let t = 0; t < 8; t++) {
+      k.vox.set(26 - t, 27, 4, t % 2 ? M.white : rampMat('orange', 1))
+    }
+  },
+
   ap_terminal(k) {
     plot(k, 'concrete')
     const hall = box(k, 3, 18, 0, 42, 22, 22, M.glassLit)

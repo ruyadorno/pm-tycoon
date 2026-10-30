@@ -5,13 +5,67 @@
 //   - pm: helpers over window.__pm — open(url) waits for __pm.ready, the
 //     frozen-clock helpers (freeze / advance / settle / step / stamp),
 //     shot(name) = a `scale: 'device'` PNG in shots/ with the overlay hidden,
-//     and tap(x, y) = a real touch/mouse tap at logical game px.
+//     and tap(x, y) = a real touch/mouse tap at logical game px;
+//   - titleUp(page) / gameUp(page) (build 2, B2 §5): the Title is up over
+//     the attract city (or, with attract = false, the ?attract=0 Title), and
+//     the player's game is in after Continue / New game (ready, HUD up, the
+//     Title gone, no attract sim).
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
 
 export const SHOTS_DIR = 'shots'
 export const READY_TIMEOUT_MS = 45_000
+
+/**
+ * Wait for the Title. `attract` (the default flow): over the running attract
+ * city with its sim installed; false: just the Title scene (?attract=0).
+ */
+export async function titleUp(
+  page: Page,
+  attract = true,
+  timeoutMs = READY_TIMEOUT_MS,
+): Promise<void> {
+  await page.waitForFunction(
+    (a) => {
+      const pm = window.__pm
+      if (!pm || !pm.game.scene.isActive('Title')) return false
+      if (!a) return true
+      const city = pm.game.scene.getScene('City') as unknown as {
+        attract?: boolean
+      } | null
+      return (
+        pm.attractSim !== null &&
+        pm.game.scene.isActive('City') &&
+        city?.attract === true
+      )
+    },
+    attract,
+    { timeout: timeoutMs },
+  )
+}
+
+/** After Continue / New game: ready, the HUD up, the Title gone, no attract sim. */
+export async function gameUp(
+  page: Page,
+  timeoutMs = READY_TIMEOUT_MS,
+): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const pm = window.__pm
+      if (!pm?.ready) return false
+      const sm = pm.game.scene
+      return (
+        sm.isActive('City') &&
+        sm.isActive('HUD') &&
+        !sm.isActive('Title') &&
+        pm.attractSim === null
+      )
+    },
+    null,
+    { timeout: timeoutMs },
+  )
+}
 
 export interface PmHelpers {
   /** page.goto(url), then wait for window.__pm.ready. */
@@ -105,6 +159,11 @@ export const test = base.extend<{ consoleErrors: string[]; pm: PmHelpers }>({
       const errors: string[] = []
       page.on('console', (m) => {
         if (m.type() === 'error') errors.push(m.text())
+        // A frame asked of the wrong atlas (world vs interior, M5): Phaser
+        // only warns "Texture.frame missing: … has no frame …" and draws
+        // the atlas's first frame instead — a silent bug unless it fails here.
+        else if (m.type() === 'warning' && /has no frame/.test(m.text()))
+          errors.push(`warning: ${m.text()}`)
       })
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
       await use(errors)

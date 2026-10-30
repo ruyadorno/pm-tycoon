@@ -47,6 +47,7 @@ import {
   inside,
   newImg,
   opaque,
+  exteriorBaseOk,
   put,
   rgbaToImg,
   stairStepOk,
@@ -78,6 +79,7 @@ export function keyBackground(
   w: number,
   h: number,
   tol = 72,
+  out?: { key: number | null },
 ): number {
   for (let k = 3; k < rgba.length; k += 4)
     if ((rgba[k] as number) < 128) return 0
@@ -239,6 +241,7 @@ export function keyBackground(
     }
   }
   let total = 0
+  if (out) out.key = nKey > 0.15 * w * h ? key : null
   if (nKey > 0.15 * w * h) {
     const kr = key >> 16
     const kg = (key >> 8) & 255
@@ -286,6 +289,58 @@ export function keyBackground(
 }
 
 /**
+ * True for a key colour the prompts ask for (prompts.ts BG_KEY / the cyan
+ * key of pink subjects): a saturated, bright magenta-to-dusty-pink (hue
+ * 285°-345°: the model paints "magenta" anywhere from #ff00ff to #cd3e7b) or
+ * cyan (165°-205°). Any other detected background (a grey, white or green
+ * ground the model chose itself) is only border-flooded, so its colour
+ * inside the sprite stays (keyBackground's rule).
+ */
+export function isRequestedKey(key: number): boolean {
+  const r = key >> 16
+  const g = (key >> 8) & 255
+  const b = key & 255
+  const mx = Math.max(r, g, b)
+  const mn = Math.min(r, g, b)
+  const d = mx - mn
+  if (mx < 150 || d / mx < 0.5) return false
+  let hue: number
+  if (mx === r) hue = (((g - b) / d + 6) % 6) * 60
+  else if (mx === g) hue = ((b - r) / d + 2) * 60
+  else hue = ((r - g) / d + 4) * 60
+  return (hue >= 285 && hue <= 345) || (hue >= 165 && hue <= 205)
+}
+
+/**
+ * Clear (alpha 0) every opaque pixel within `tol` (RGB distance) of the key
+ * colour, connected to the border or not: the enclosed background pockets
+ * of a keyed download. Only for a requested key colour (isRequestedKey);
+ * otherwise nothing. Returns the number of pixels cleared.
+ */
+export function clearKeyPockets(
+  rgba: Buffer,
+  key: number | null,
+  tol: number,
+): number {
+  if (key === null || !isRequestedKey(key)) return 0
+  const kr = key >> 16
+  const kg = (key >> 8) & 255
+  const kb = key & 255
+  let n = 0
+  for (let k = 0; k < rgba.length; k += 4) {
+    if ((rgba[k + 3] as number) < 128) continue
+    const dr = (rgba[k] as number) - kr
+    const dg = (rgba[k + 1] as number) - kg
+    const db = (rgba[k + 2] as number) - kb
+    if (dr * dr + dg * dg + db * db < tol * tol) {
+      rgba[k + 3] = 0
+      n++
+    }
+  }
+  return n
+}
+
+/**
  * PNG (any flavour) -> Img snapped into the entry's palette subset. An
  * opaque (key background) download is keyed on its pre-palette original
  * `orig` when given: the original's background is near-uniform (the
@@ -308,7 +363,12 @@ export async function toImg(
       .raw()
       .toBuffer({ resolveWithObject: true })
     if (o.info.width === info.width && o.info.height === info.height) {
-      if (keyBackground(o.data, info.width, info.height, 30) > 0) {
+      const found: { key: number | null } = { key: null }
+      if (keyBackground(o.data, info.width, info.height, 30, found) > 0) {
+        // key pockets (build 2): background enclosed by the sprite (between
+        // a gantry's legs) is not reached by the border flood and used to
+        // quantize to pink0; clear every pixel of the key colour
+        clearKeyPockets(o.data, found.key, 40)
         for (let k = 3; k < data.length; k += 4) {
           if ((o.data[k] as number) < 128) data[k] = 0
         }
@@ -447,6 +507,70 @@ export function processBuilding(
     const dropped = dropFragments(out, 0.04)
     if (dropped > 0) notes.push(`${dropped} px detached fragments dropped`)
   }
+  const img = finishImg(e, out)
+  return { frames: new Map([[suffix, img]]), reject: prefilter(e, img), notes }
+}
+
+/**
+ * warehouse-ext (build 2, B2 §6.1): no ground patch. The walls' bottom
+ * vertex goes on the anchor (W/2-1..W/2, H-1), lifted by (256 - sprite
+ * width)/4 rows when narrower so the base is centred in the 4x4 diamond
+ * (the slab tiles show in the rim); everything outside the diamond's
+ * columns or below its lower edges is cleared (A04 strict); no ground
+ * diamond is painted underneath and no shadow strip is drawn.
+ */
+export function processExterior(
+  e: ManifestEntry,
+  src: Img,
+  suffix: string = e.frames[0] ?? '',
+): Processed {
+  const [W, H] = e.canvas
+  const fw = 64 * (e.footprint?.[0] ?? 4)
+  const notes: string[] = []
+  const b = bbox(src)
+  if (!b) return { frames: new Map(), reject: 'lint:A05 empty', notes }
+  const bw = b.x1 - b.x0 + 1
+  const low: number[] = []
+  for (let x = b.x0; x <= b.x1; x++) if (opaque(src, x, b.y1)) low.push(x)
+  const vx =
+    low.length <= 8
+      ? low.reduce((a, x) => a + x, 0) / low.length
+      : (b.x0 + b.x1) / 2
+  const cx = (b.x0 + b.x1) / 2
+  // a vertex far from the bbox centre: the model's base is lopsided (or a
+  // stray drawn lot); centre by the bbox
+  const ax = Math.abs(vx - cx) > 6 ? cx : vx
+  if (ax !== vx) {
+    notes.push(`lopsided base: bbox-centred (vertex ${Math.round(vx - cx)})`)
+  }
+  const lift = bw < fw ? Math.ceil((fw - bw) / 4) : 0
+  const dx = Math.round(W / 2 - 0.5 - ax)
+  const dy = H - 1 - lift - b.y1
+  const placed = shifted(src, W, H, dx, dy)
+  if (placed.lost > 0) notes.push(`${placed.lost} px outside the canvas`)
+  const out = placed.img
+  const spans = diamondSpans(fw)
+  const row0 = H - spans.length
+  const left = W / 2 - fw / 2
+  let clipped = 0
+  for (let y = 0; y < H; y++) {
+    const r = y - row0
+    const span = r >= spans.length / 2 ? spans[r] : undefined
+    for (let x = 0; x < W; x++) {
+      if (!opaque(out, x, y)) continue
+      const outCols = x < left || x > left + fw - 1
+      const below =
+        span !== undefined && (x < left + span[0] || x > left + span[1])
+      if (outCols || below) {
+        put(out, x, y, null)
+        clipped++
+      }
+    }
+  }
+  if (clipped > 0) notes.push(`${clipped} px clipped to the footprint prism`)
+  notes.push(`sprite ${bw}x${b.y1 - b.y0 + 1}, inset ${lift} rows, dx ${dx}`)
+  const dropped = dropFragments(out, 0.04)
+  if (dropped > 0) notes.push(`${dropped} px detached fragments dropped`)
   const img = finishImg(e, out)
   return { frames: new Map([[suffix, img]]), reject: prefilter(e, img), notes }
 }
@@ -1036,6 +1160,91 @@ export const WORKER_PICK: Record<string, [string, number][]> = {
   ],
 }
 
+/**
+ * Worker ids whose scan frames are scripted edits of the idle frames
+ * (build 2, report §6.24): PixelLab's picking-up template bent the
+ * inspector behind the desk, so scan_k = idle_k with the forearm raised to
+ * chest height holding a handheld scanner (east / west: held out front
+ * towards the belt; south: held in both hands at the chest; north: the
+ * back view, unchanged). Frame 1 bobs the scanner up 1 px and turns its
+ * lamp from yellow to red (the beep). Same height as idle: never below
+ * the desk.
+ */
+export const SCAN_FROM_IDLE = new Set(['worker'])
+
+/** the scripted scan pose of one idle frame (see SCAN_FROM_IDLE) */
+export function scanPose(idle: Img, dir: string, k: number): Img {
+  const out = cloneImg(idle)
+  if (dir === 'n') return out
+  const lamp = k === 1 ? 'red1' : 'yellow3'
+  const bob = k === 1 ? -1 : 0
+  const added: [number, number][] = []
+  const paint = (x: number, y: number, c: string) => {
+    if (!inside(out, x, y)) return
+    put(out, x, y, c)
+    added.push([x, y])
+  }
+  if (dir === 's') {
+    // both hands at the chest holding the scanner, a ring of outline round
+    // the device so it reads against the vest
+    const y0 = 15 + bob
+    for (let x = 9; x <= 14; x++) {
+      put(out, x, y0 - 1, 'outline')
+      put(out, x, y0 + 2, 'outline')
+    }
+    paint(9, y0, 'skin0')
+    paint(9, y0 + 1, 'skin0')
+    paint(14, y0, 'skin0')
+    paint(14, y0 + 1, 'skin0')
+    for (let x = 10; x <= 13; x++) {
+      paint(x, y0, 'grey2')
+      paint(x, y0 + 1, 'grey1')
+    }
+    paint(11, y0, lamp)
+    paint(12, y0, lamp)
+  } else {
+    // east / west: the front edge of the torso (rows 14-16), the forearm
+    // out from it, the hand, the scanner gun (grip + head) and its lamp
+    const sgn = dir === 'e' ? 1 : -1
+    let front = sgn > 0 ? -1 : out.w
+    for (let y = 14; y <= 16; y++) {
+      for (let x = 0; x < out.w; x++) {
+        if (!opaque(idle, x, y)) continue
+        front = sgn > 0 ? Math.max(front, x) : Math.min(front, x)
+      }
+    }
+    const at = (d: number) => front + sgn * d
+    const y = 15 + bob
+    for (let d = -1; d <= 2; d++) {
+      paint(at(d), y, 'grey4')
+      paint(at(d), y + 1, 'grey3')
+    }
+    paint(at(3), y, 'skin0')
+    paint(at(3), y + 1, 'skin0')
+    paint(at(4), y, 'grey1')
+    paint(at(4), y + 1, 'grey1')
+    for (let d = 4; d <= 7; d++) {
+      paint(at(d), y - 2, 'grey2')
+      paint(at(d), y - 1, 'grey1')
+    }
+    paint(at(7), y - 1, lamp)
+  }
+  // outward outline round the new pixels (transparent 4-neighbours)
+  for (const [x, y] of added) {
+    for (const [nx, ny] of [
+      [x - 1, y],
+      [x + 1, y],
+      [x, y - 1],
+      [x, y + 1],
+    ] as const) {
+      if (inside(out, nx, ny) && !opaque(out, nx, ny)) {
+        put(out, nx, ny, 'outline')
+      }
+    }
+  }
+  return out
+}
+
 export function processWorker(
   e: ManifestEntry,
   rotations: Map<string, Img>,
@@ -1110,6 +1319,15 @@ export function processWorker(
     frames.set(`_${d}_jump`, place(apex, 'jump'))
     if (lostBy.length) notes.push(`${d} clipped: ${lostBy.join(', ')}`)
   }
+  if (SCAN_FROM_IDLE.has(e.id)) {
+    for (const d of Object.keys(WORKER_DIR)) {
+      for (const k of [0, 1]) {
+        const idle = frames.get(`_${d}_idle_${k}`)
+        if (idle) frames.set(`_${d}_scan_${k}`, scanPose(idle, d, k))
+      }
+    }
+    notes.push('scan: scripted from idle (SCAN_FROM_IDLE)')
+  }
   for (const s of e.frames) {
     if (!frames.has(s)) reject ??= `lint:A06 missing ${s}`
   }
@@ -1125,7 +1343,12 @@ export function prefilter(e: ManifestEntry, img: Img | null): string | null {
   if (img.w !== W || img.h !== H) return 'lint:A03'
   const b = bbox(img)
   if (!b) return 'lint:A05 empty'
-  if (e.class.startsWith('building') || e.class === 'warehouse-ext') {
+  if (e.class === 'warehouse-ext') {
+    const fp = e.footprint?.[0] ?? Math.round(W / 64)
+    const p = exteriorBaseOk(img, 64 * fp)
+    if (p.length) return `lint:A04 ${p[0]}`
+  }
+  if (e.class.startsWith('building')) {
     const fp = e.footprint?.[0] ?? Math.round(W / 64)
     const p = stairStepOk(img, 64 * fp)
     if (p.length) return `lint:A04 ${p[0]}`

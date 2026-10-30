@@ -18,6 +18,9 @@
 //   objects. Vertical drag inside the viewport scrolls it (8-px threshold),
 //   with inertia (px/ms, 0.92^(dt/16) decay) and integer scroll at rest.
 // - Emits `ui:sheetOpen` / `ui:sheetClose` {id} on game.events.
+// - resize(height, listHeight?) re-fits a sheet to its content in place
+//   (report-playtest1 §6.14: the district panel and the Garage size to
+//   their rows instead of a fixed share of the canvas).
 import type Phaser from 'phaser'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { addPanel, type PanelFrame } from './Panel.ts'
@@ -154,6 +157,8 @@ export class Sheet {
   private origin = { x: 0, y: 0 }
   private scroll = 0
   private contentH = 0
+  /** List viewport height (opts.list.height until resize()). */
+  private listH = 0
   private listDrag: ListDrag | null = null
   private vy = 0
   private destroyed = false
@@ -165,6 +170,7 @@ export class Sheet {
     this.W = Math.round(opts.W ?? scene.scale.width)
     this.H = Math.round(opts.H ?? scene.scale.height)
     this.h = Math.round(opts.height)
+    this.listH = Math.round(opts.list?.height ?? 0)
     const depth = opts.depth ?? DEFAULT_DEPTH
 
     this.scrim = scene.add
@@ -377,6 +383,31 @@ export class Sheet {
     this.applyScroll(this.scroll)
   }
 
+  /**
+   * Change the sheet's height (and the list viewport's) in place, the canvas
+   * size unchanged: callers re-lay their own children. An open sheet moves
+   * its top at once; a running slide is re-aimed at the new top and a drag
+   * keeps the finger (the release snaps to the new top).
+   */
+  resize(height: number, listHeight?: number): void {
+    if (this.destroyed) return
+    this.h = Math.round(height)
+    if (listHeight !== undefined && this.opts.list)
+      this.listH = Math.max(1, Math.round(listHeight))
+    this.bg.setSize(this.W, this.h)
+    if (this.bg.input?.hitArea)
+      (this.bg.input.hitArea as Phaser.Geom.Rectangle).setSize(this.W, this.h)
+    if (this.listCam) {
+      const lr = this.listRect()
+      this.listCam.setSize(lr.w, lr.h)
+    }
+    if (this.opened && !this.drag) {
+      if (this.tween) this.slideTo(this.top, SNAP_BACK_MS, 'Cubic.easeOut')
+      else this.setY(this.top)
+    } else if (!this.opened && !this.tween) this.setY(this.H)
+    this.applyScroll(this.scroll)
+  }
+
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true
@@ -407,7 +438,7 @@ export class Sheet {
       x: Math.round(l.x ?? 0),
       top: Math.round(l.top),
       w: Math.round(l.w ?? this.W),
-      h: Math.max(1, Math.round(l.height)),
+      h: Math.max(1, this.listH),
     }
   }
 

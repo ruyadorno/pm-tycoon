@@ -12,7 +12,7 @@ music lines below.
 
 ## Art
 
-Every sprite in `public/assets/world.png` comes from one of two sources, recorded per id in `art/manifest.json`
+Every sprite in the two atlases (`src/assets/world.png`, `src/assets/interior.png`) comes from one of two sources, recorded per id in `art/manifest.json`
 (`source`), and is post-processed into the project's original 48-colour palette (`art/palette.json`; no third-party
 palette, no ready-made art pack):
 

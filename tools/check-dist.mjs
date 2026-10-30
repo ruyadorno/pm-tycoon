@@ -1,13 +1,18 @@
-// Playtest build check (plan.md §6.11 budget, §12.7 task 3): run after `vlr build`.
+// Playtest build check (plan.md §6.11 budget, §12.7 task 3; plan-build2 §8.2 task 8): run after `vlr build`.
 //   node tools/check-dist.mjs [distDir] [--json]
 // Asserts on <distDir> (default dist/):
 //   - the transfer size (every file the game can fetch: *.map excluded, the dev-only art gallery excluded)
-//     is ≤ 6 MB uncompressed — the worst case, `python3 -m http.server` sends no gzip — and prints the gzip
-//     estimate a CDN/GitHub Pages would send (text types gzipped, PNG/MP3 counted raw);
+//     is ≤ 8 MB uncompressed (Q-B2-10; 6 MB in build 1) — the worst case, `python3 -m http.server` sends no
+//     gzip — and prints the gzip estimate a CDN/GitHub Pages would send (text types gzipped, PNG/MP3 raw);
 //   - index.html uses relative asset URLs (vite base './', so the zip works at / and Pages under /pm-tycoon/);
-//   - the atlas (assets/world.{png,json} ≤ 2048², assets/m5x7.xml), configs/spicy.json (valid JSON, identical to
-//     public/configs/spicy.json), every vendored sample of public/audio/sf/ (same bytes count) + LICENSE.txt,
-//     and playtest-README.txt are present.
+//   - the content-hashed game assets (report-playtest1 §6.21; src/assets/* imported with `?url` by
+//     src/render/assetUrls.ts): assets/world-<hash>.{png,json} and assets/interior-<hash>.{png,json} (each
+//     PNG ≤ 2048², each JSON naming its frames), assets/m5x7-<hash>.xml, assets/logo-<hash>.png and
+//     assets/attract-<hash>.json, each exactly once and each named by a JS chunk (the bundle pairs with
+//     those bytes); no unhashed assets/world.png / world.json / m5x7.xml (the playtest-1 public/assets/
+//     copies) in dist/, and no public/assets/ in the repo;
+//   - configs/spicy.json (valid JSON, identical to public/configs/spicy.json), every vendored sample of
+//     public/audio/sf/ (same bytes count) + LICENSE.txt, and playtest-README.txt are present.
 // Lists the biggest files, the JS chunks with gzip estimates against the §6.11 targets, the samples, and any
 // dev-only files that slipped into dist/ (public/gallery/ is gitignored but copied when it exists locally).
 // Sourcemaps stay in the build (sourcemap: true): browsers fetch them only with devtools open, so the budget
@@ -18,8 +23,19 @@ import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const BUDGET = 6_000_000
+const BUDGET = 8_000_000
 const ATLAS_MAX = 2048
+/** The hashed game assets: [stem, ext] -> dist/assets/<stem>-<hash>.<ext> (src/render/assetUrls.ts). */
+const HASHED = [
+  ['world', 'png'],
+  ['world', 'json'],
+  ['interior', 'png'],
+  ['interior', 'json'],
+  ['m5x7', 'xml'],
+  ['logo', 'png'],
+  ['attract', 'json'],
+]
+const ATLASES = ['world', 'interior']
 /** plan.md §6.11 targets, for the printout. */
 const TARGETS = {
   phaserGz: 300_000,
@@ -90,7 +106,7 @@ const total = sum(transfer, 'size')
 const totalGz = sum(transfer, 'gz')
 
 if (total > BUDGET) {
-  fail(`transfer ${mb(total)} > ${mb(BUDGET)} budget (plan.md §6.11)`)
+  fail(`transfer ${mb(total)} > ${mb(BUDGET)} budget (Q-B2-10)`)
 }
 if (devOnly.length > 0) {
   warn(
@@ -113,15 +129,70 @@ if (!urls.some((u) => /^\.\/assets\/index-[\w-]+\.js$/.test(u))) {
   fail('index.html: no ./assets/index-<hash>.js entry script')
 }
 
-// The atlas + font descriptor.
-for (const p of ['assets/world.png', 'assets/world.json', 'assets/m5x7.xml']) {
-  if (!existsSync(join(dist, p))) fail(`${p} missing`)
+// The content-hashed assets: atlases, font descriptor, logo, attract snapshot.
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const jsText = transfer
+  .filter((f) => /^assets\/.+\.js$/.test(f.path))
+  .map((f) => readFileSync(f.abs, 'utf8'))
+  .join('\n')
+/** dist path of each hashed asset, by `<stem>.<ext>` (null when missing). */
+const hashed = {}
+for (const [stem, ext] of HASHED) {
+  const re = new RegExp(`^assets/${escapeRe(stem)}-[\\w-]{6,}\\.${ext}$`)
+  const hits = transfer.filter((f) => re.test(f.path))
+  const id = `${stem}.${ext}`
+  hashed[id] = hits[0] ?? null
+  if (hits.length === 0) fail(`assets/${stem}-<hash>.${ext} missing`)
+  else if (hits.length > 1) {
+    fail(
+      `${hits.length} copies of ${id}: ${hits.map((f) => f.path).join(', ')}`,
+    )
+  }
+  for (const f of hits) {
+    const name = f.path.slice('assets/'.length)
+    if (!jsText.includes(name))
+      fail(`${f.path} is not referenced by any JS chunk`)
+  }
+  if (existsSync(join(dist, 'assets', id))) {
+    fail(
+      `assets/${id} is unhashed (a public/assets/ leftover; src/assets is the source)`,
+    )
+  }
 }
-const atlas = existsSync(join(dist, 'assets/world.png'))
-  ? pngSize(join(dist, 'assets/world.png'))
-  : null
-if (atlas && (atlas.w > ATLAS_MAX || atlas.h > ATLAS_MAX)) {
-  fail(`world.png is ${atlas.w}×${atlas.h} > ${ATLAS_MAX}²`)
+if (existsSync(join(ROOT, 'public/assets'))) {
+  fail(
+    'public/assets/ exists: game assets live in src/assets/ (hashed by Vite, report §6.21)',
+  )
+}
+/** Per atlas: PNG size ≤ 2048², JSON frame count. */
+const atlases = {}
+for (const key of ATLASES) {
+  const png = hashed[`${key}.png`]
+  const desc = hashed[`${key}.json`]
+  if (!png || !desc) continue
+  const size = pngSize(png.abs)
+  if (!size) fail(`${png.path} is not a PNG`)
+  else if (size.w > ATLAS_MAX || size.h > ATLAS_MAX) {
+    fail(`${png.path} is ${size.w}×${size.h} > ${ATLAS_MAX}²`)
+  }
+  let frames = 0
+  try {
+    const j = JSON.parse(readFileSync(desc.abs, 'utf8'))
+    frames = (j.textures ?? []).reduce((n, t) => n + (t.frames?.length ?? 0), 0)
+  } catch (err) {
+    fail(`${desc.path} is not JSON: ${err.message}`)
+  }
+  if (frames === 0) fail(`${desc.path} has no frames`)
+  atlases[key] = {
+    png: png.path,
+    json: desc.path,
+    w: size?.w ?? 0,
+    h: size?.h ?? 0,
+    bytes: png.size,
+    jsonBytes: desc.size,
+    jsonGz: desc.gz,
+    frames,
+  }
 }
 
 // configs/spicy.json (?debug=1&config=spicy, plan.md §13.4 "How to play").
@@ -207,15 +278,10 @@ const report = {
   maps: { files: maps.length, bytes: sum(maps, 'size') },
   devOnly: { files: devOnly.length, bytes: sum(devOnly, 'size') },
   chunks,
-  atlas: atlas
-    ? {
-        w: atlas.w,
-        h: atlas.h,
-        bytes: statSync(join(dist, 'assets/world.png')).size,
-        jsonBytes: statSync(join(dist, 'assets/world.json')).size,
-        jsonGz: gzSize(join(dist, 'assets/world.json'), 'world.json'),
-      }
-    : null,
+  atlases,
+  hashed: Object.fromEntries(
+    Object.entries(hashed).map(([k, f]) => [k, f ? f.path : null]),
+  ),
   samples: {
     mp3: mp3s.length,
     presets: presets.length,
@@ -233,7 +299,7 @@ if (json) {
   console.log(`check-dist: ${report.dist}`)
   console.log(
     `  transfer   ${mb(total)} raw (python http.server) · ~${mb(totalGz)} gzip (Pages/CDN) · ` +
-      `${transfer.length} files · budget ${mb(BUDGET)} (plan.md §6.11)`,
+      `${transfer.length} files · budget ${mb(BUDGET)} (Q-B2-10)`,
   )
   console.log(
     `  excluded   ${maps.length} sourcemaps ${mb(report.maps.bytes)} (fetched only with devtools open)` +
@@ -252,13 +318,17 @@ if (json) {
       `    phaser gzip ${kb(phaser.gz)} vs the §6.11 estimate ~${kb(TARGETS.phaserGz)}`,
     )
   }
-  if (report.atlas) {
-    const a = report.atlas
+  for (const [key, a] of Object.entries(report.atlases)) {
     console.log(
-      `  atlas      world.png ${a.w}×${a.h} ${kb(a.bytes)} (≤ ${ATLAS_MAX}²) · world.json ${kb(a.jsonBytes)} ` +
-        `(gzip ${kb(a.jsonGz)})`,
+      `  atlas      ${pad(key, 8)} ${a.w}×${a.h} ${kb(a.bytes)} (≤ ${ATLAS_MAX}²) · ${a.frames} frames · ` +
+        `json ${kb(a.jsonBytes)} (gzip ${kb(a.jsonGz)})`,
     )
   }
+  console.log(
+    `  hashed     ${Object.values(report.hashed)
+      .map((p) => (p ? p.replace(/^assets\//, '') : 'MISSING'))
+      .join(' · ')}`,
+  )
   console.log(
     `  samples    ${mp3s.length} mp3 + ${presets.length} presets ${mb(samplesBytes)} ` +
       `(≤ ${mb(TARGETS.samplesMax)}, audio.md §8.1) · spicy.json ${existsSync(spicyDist) ? 'present' : 'MISSING'}`,

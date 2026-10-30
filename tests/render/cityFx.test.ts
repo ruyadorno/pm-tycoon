@@ -10,12 +10,13 @@ import {
   DOCK_POSE_CANVAS,
   dockBlend,
   dustFrame,
-  dustPoints,
   fadeK,
   grumbleDue,
   GRUMBLE_EVERY_MS,
   honkShown,
+  LEGACY_WH_ANCHORS,
   levelStampText,
+  manifestWarehouseAnchors,
   moodFor,
   SIGN_POP_MS,
   signCracked,
@@ -31,9 +32,17 @@ import {
   STAMP_RISE_PX,
   stampPose,
   UNLOCK_FADE_MS,
+  warehouseAnchors,
+  WH_ANCHOR_FRAME,
   WH_CANVAS,
 } from '../../src/render/cityFx.ts'
-import { buildGameData } from '../../src/data/index.ts'
+import { WH_ANCHORS } from '../../src/render/frames.generated.ts'
+import { blockRect, buildGameData } from '../../src/data/index.ts'
+import {
+  footprintAnchor,
+  originX,
+  screenToTileF,
+} from '../../src/render/iso.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
 
 const data = buildGameData(loadRawData())
@@ -88,26 +97,6 @@ describe('level-up moment (§9.6): fx_dust 4 × 250 ms, swap on the reveal, the 
     expect(late?.alpha).toBeLessThan(0.05)
     expect(stampPose(STAMP_MS)).toBeNull()
   })
-
-  it('dust puffs cover only the opaque part of the exterior', () => {
-    const rect = { x: 0, y: 86, w: 256, h: 170 }
-    const all = dustPoints(rect, () => true)
-    expect(all.length).toBeGreaterThan(30)
-    for (const p of all) {
-      expect(p.x).toBeGreaterThanOrEqual(rect.x)
-      expect(p.x).toBeLessThan(rect.x + rect.w)
-      expect(p.y).toBeGreaterThanOrEqual(rect.y)
-      expect(p.y).toBeLessThan(rect.y + rect.h)
-    }
-    const left = dustPoints(rect, (x) => x < 128)
-    expect(left.length).toBeGreaterThan(0)
-    expect(left.every((p) => p.x < 128)).toBe(true)
-  })
-
-  it('the dust cloud is the same every run (no Math.random)', () => {
-    const rect = { x: 10, y: 86, w: 256, h: 170 }
-    expect(dustPoints(rect, () => true)).toEqual(dustPoints(rect, () => true))
-  })
 })
 
 describe('mood overlays (spec §9.2): flower boxes ≥ 80, shutters < 30', () => {
@@ -157,17 +146,83 @@ describe('honking queue (§2): ic_honk 500 ms every 4 s, phase id mod 4', () => 
 })
 
 describe('warehouse exterior hand-off: bay lights and the docked pose', () => {
-  it('lights sit on the bay lamps of the 256-px exterior canvas', () => {
-    expect(BAY_LIGHTS).toEqual([
-      [47, 139],
-      [71, 151],
-      [96, 163],
-    ])
+  it('the anchors are the manifest-measured ones (frames.generated WH_ANCHORS)', () => {
+    const fromManifest = manifestWarehouseAnchors()
+    expect(fromManifest).not.toBeNull()
+    expect(BAY_LIGHTS).toEqual(fromManifest?.bayLights)
+    expect(DOCK_POSE_CANVAS).toEqual(fromManifest?.dockPose)
+    expect(warehouseAnchors(WH_ANCHOR_FRAME)).toEqual(fromManifest)
+    expect(WH_ANCHORS.wh_ext_t1).toEqual(fromManifest)
+    // t2 is an edit of t1 on the same footprint: its own set (frameAnchors).
+    expect(WH_ANCHORS.wh_ext_t2?.bayLights).toHaveLength(3)
+    expect(warehouseAnchors('wh_ext_t2')).toEqual(WH_ANCHORS.wh_ext_t2)
+  })
+
+  it('lights sit on the bay lamps of the visible SW face of the 256-px canvas', () => {
+    expect(BAY_LIGHTS).toHaveLength(3)
     for (const [x, y] of BAY_LIGHTS) {
+      expect(x).toBeGreaterThanOrEqual(0)
       expect(x).toBeLessThan(WH_CANVAS / 2) // the visible SW face
+      expect(y).toBeGreaterThanOrEqual(0)
       expect(y).toBeLessThan(WH_CANVAS)
     }
-    expect(DOCK_POSE_CANVAS).toEqual([40, 178])
+  })
+
+  it('the docked pose is on the canvas and on the lot, not the avenue', () => {
+    const [px, py] = DOCK_POSE_CANVAS
+    expect(px).toBeGreaterThanOrEqual(0)
+    expect(px).toBeLessThan(WH_CANVAS)
+    expect(py).toBeLessThanOrEqual(WH_CANVAS)
+    const map = data.map
+    const ox = originX(map.size[1])
+    const anchor = footprintAnchor(
+      lot.warehouse.tile,
+      lot.warehouse.footprint,
+      ox,
+    )
+    const t = screenToTileF(
+      anchor.x - WH_CANVAS / 2 + px,
+      anchor.y - WH_CANVAS + py,
+      ox,
+    )
+    const lotBlock = map.blocks.find((b) => b.kind === 'lot')
+    const rect = lotBlock
+      ? blockRect(map, lotBlock.block[0], lotBlock.block[1])
+      : null
+    expect(rect).not.toBeNull()
+    const [x0, y0, x1, y1] = rect ?? [0, 0, 0, 0]
+    expect(t.tx).toBeGreaterThan(x0 - 0.5)
+    expect(t.tx).toBeLessThan(x1 + 0.5)
+    expect(t.ty).toBeGreaterThan(y0 - 0.5)
+    expect(t.ty).toBeLessThan(y1 + 0.5)
+  })
+
+  it('reads the per-frame table: the frame, else tier 1', () => {
+    const row = { bayLights: [[10, 20]], dockPose: [30, 40] } as const
+    const t2 = { bayLights: [[11, 21]], dockPose: [31, 41] } as const
+    const table = { wh_ext_t1: row, wh_ext_t2: t2 }
+    expect(manifestWarehouseAnchors('wh_ext_t1', table)).toEqual(row)
+    expect(manifestWarehouseAnchors('wh_ext_t2', table)).toEqual(t2)
+    // A tier without its own set falls back to tier 1.
+    expect(manifestWarehouseAnchors('wh_ext_t3', table)).toEqual(row)
+  })
+
+  it('falls back to the playtest-1 set when the table has neither', () => {
+    for (const bad of [
+      {},
+      { wh_ext_t3: { bayLights: [], dockPose: [1, 2] } },
+    ] as const) {
+      expect(manifestWarehouseAnchors('wh_ext_t1', bad)).toBeNull()
+      expect(warehouseAnchors('wh_ext_t1', bad)).toEqual(LEGACY_WH_ANCHORS)
+    }
+    expect(LEGACY_WH_ANCHORS).toEqual({
+      bayLights: [
+        [47, 139],
+        [71, 151],
+        [96, 163],
+      ],
+      dockPose: [40, 178],
+    })
   })
 
   const dock = lot.docks[0] as [number, number]

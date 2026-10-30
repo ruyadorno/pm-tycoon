@@ -215,6 +215,38 @@
       "finalSha256": "8d96c4dc6c5de3e90cabfa3b4f98db780b7345edb2b3c7689a8684e75cc73fce"
     },
     {
+      "id": "lot_slab",
+      "class": "tile",
+      "source": "procedural",
+      "canvas": [64, 32],
+      "frames": ["_a", "_b", "_c"],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "B2 §6.1: the warehouse foundation slab, stamped by the ground bake on the lot 4x4 footprint + the dock tiles; three subtle variants",
+      "finalSha256": "02721a6af980b0f4ce678f683f30b39e048ee3c9ffa37c2bec87be070a56946d"
+    },
+    {
+      "id": "lot_ramp",
+      "class": "tile",
+      "source": "procedural",
+      "canvas": [64, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "B2 §6.1: slab tile with the ramp/edge on its W side (-x, screen up-left): the dock tiles where the slab meets the lot entrance",
+      "finalSha256": "4d96bc25bd300fcd02177dba7881470e6e26c60b517cfc1d9d8a10c63645853a"
+    },
+    {
       "id": "road",
       "class": "tile",
       "source": "procedural",
@@ -5174,212 +5206,6 @@
       "chosenCandidate": 0
     },
     {
-      "id": "dk_pier",
-      "class": "building3x3",
-      "source": "pixellab",
-      "canvas": [192, 224],
-      "footprint": [3, 3],
-      "frames": [""],
-      "variants": ["locked"],
-      "district": "docks",
-      "coversBuildings": ["dk_pier_1", "dk_pier_2"],
-      "priority": "P1",
-      "subject": "wooden cargo pier over water with bollards",
-      "placeholder": false,
-      "approved": false,
-      "gen": [
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1000,
-            "prompt": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "9fb2c2a1-1a07-5fa1-b687-f441aba1d1d5",
-            "source_image_id": "9fb2c2a1-1a07-5fa1-b687-f441aba1d1d5"
-          },
-          "jobId": "3fef67dc-865a-411c-849c-82c5e73c8038",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "69d3583ce88a3bc84485cac761e455c002a0c6563dfab86fcf166f05f1af3749",
-          "at": "2026-10-29T08:16:30.462Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1001,
-            "prompt": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "423d455c-319b-55db-89e6-f7304668de31",
-            "source_image_id": "423d455c-319b-55db-89e6-f7304668de31"
-          },
-          "jobId": "0813dd43-7466-4edd-88d5-f6f710bad4c7",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "be73218ecbd050bdd7badbb2d871444bff48008e85cdc26f4eba7cee12b72090",
-          "at": "2026-10-29T08:16:30.499Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1002,
-            "prompt": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "b7d64a71-e2ca-5be7-8f84-7192d7907278",
-            "source_image_id": "b7d64a71-e2ca-5be7-8f84-7192d7907278"
-          },
-          "jobId": "313be30c-16a6-45cf-b374-feabdd16c21a",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "5d708ffb2a6d55d0c8c77024133259135dae9cd9a091aba821682c0692245f05",
-          "at": "2026-10-29T08:16:31.679Z"
-        }
-      ],
-      "rejects": [
-        {
-          "candidate": 0,
-          "reason": "jetty smaller",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 2,
-          "reason": "busier roofs",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        }
-      ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "6dadaadc7ceaaa5aa1b138391b02ab7d01f85c9139e78165ef963ac21f5b3a59",
-      "chosenCandidate": 1
-    },
-    {
-      "id": "dk_customs",
-      "class": "building2x2",
-      "source": "pixellab",
-      "canvas": [128, 160],
-      "footprint": [2, 2],
-      "frames": [""],
-      "variants": ["locked"],
-      "district": "docks",
-      "coversBuildings": ["dk_customs"],
-      "priority": "P1",
-      "subject": "customs house, civic brick building by the harbour",
-      "placeholder": false,
-      "approved": false,
-      "gen": [
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1000,
-            "prompt": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "60589294-07ed-551b-adfe-eb81bb01fff0",
-            "source_image_id": "60589294-07ed-551b-adfe-eb81bb01fff0"
-          },
-          "jobId": "a4f0735b-26a7-4ba8-9077-c8eeb4dbf765",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "14ec867ecbf90ef4ce8954f183d6196a1c4494378b7841b78a26985eace7b397",
-          "at": "2026-10-29T08:16:35.388Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1001,
-            "prompt": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "ee04e5f2-0ed8-5606-b791-58ec0ebea6b9",
-            "source_image_id": "ee04e5f2-0ed8-5606-b791-58ec0ebea6b9"
-          },
-          "jobId": "26ad3ab7-1f91-40c3-ac2d-8917368117c0",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "da78480323ec796142f973a64822d5606cb62c162081a248e59378fdd0c757e2",
-          "at": "2026-10-29T08:16:40.663Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "a942d4a8-133d-5065-ae95-3b47441020ae",
-            "source_image_id": "a942d4a8-133d-5065-ae95-3b47441020ae"
-          },
-          "jobId": "76afe979-304b-49fc-97e8-5d07291aa4b9",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "29bebde419ec913f04851d8ed179729f48259db5b9b977073ab3b578f7aa00ad",
-          "at": "2026-10-29T08:16:55.856Z"
-        }
-      ],
-      "rejects": [
-        {
-          "candidate": 0,
-          "reason": "blue roof, less brick",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 2,
-          "reason": "smaller flag",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        }
-      ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "55c7f0fdccc1e418ff084a65fbb28eb6b22e2f99a08ca5a6cd53417b47b3ab2f",
-      "chosenCandidate": 1
-    },
-    {
       "id": "ap_terminal",
       "class": "building3x3",
       "source": "pixellab",
@@ -6056,6 +5882,286 @@
       "chosenCandidate": 2
     },
     {
+      "id": "dk_terminal_a",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "docks",
+      "coversBuildings": ["dk_pier_1"],
+      "priority": "P1",
+      "subject": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6002,
+            "prompt": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "4b72efbf-a051-5b5a-81e8-4682c32ad29f",
+            "source_image_id": "4b72efbf-a051-5b5a-81e8-4682c32ad29f"
+          },
+          "jobId": "518e404d-65e6-481f-b7ba-58a289f3752d",
+          "seed": 6002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "8da9ed5396afb93e9a3dfa0e2a7710496128a8c72bb595ad79a985ac35965905",
+          "at": "2026-10-30T01:02:41.900Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6003,
+            "prompt": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "00e004a0-9207-5435-89fa-fd38aaa398e3",
+            "source_image_id": "00e004a0-9207-5435-89fa-fd38aaa398e3"
+          },
+          "jobId": "a39e3a39-59f5-46c9-9d2b-99233c1d84d4",
+          "seed": 6003,
+          "candidate": 3,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "52de5a4ba2b2496097a54f913a2a1aff870e60ba94dde3cebc4806007c0d6382",
+          "at": "2026-10-30T01:11:28.697Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6004,
+            "prompt": "modern container terminal on a concrete quay: stacked shipping containers in rows, a yellow reach-stacker lifting a container, a lit terminal control booth, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "42de8b19-b2f5-5b67-81d0-2275a417ac7f",
+            "source_image_id": "42de8b19-b2f5-5b67-81d0-2275a417ac7f"
+          },
+          "jobId": "a20fab8d-5fa8-47e0-9416-6ad14ea7c61a",
+          "seed": 6004,
+          "candidate": 4,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "360e4746b14c0cfde37637137e3ea2744af9993477102884d1ae7dd72c0473cd",
+          "at": "2026-10-30T01:16:56.155Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 3,
+          "reason": "lopsided plot (964 px clipped), the gantry cut at the left edge",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
+        },
+        {
+          "candidate": 4,
+          "reason": "the model cropped the quay at the left edge: lopsided plot (1,222 px clipped), a bare painted diamond corner at the bottom right",
+          "by": "claude",
+          "at": "2026-10-30T01:20:55.474Z"
+        }
+      ],
+      "note": "agent pick #2 (2026-10-30): F5: modern container terminal on a concrete quay — stacked containers, a yellow reach-stacker lifting a container (its unique feature), a straddle gantry, a control tower with a glass cab, floodlights; reads modern at 1x",
+      "finalSha256": "7b43b539dcfa2b56b80430ecea4472edf545cd967a95134106378280aaa8498f",
+      "chosenCandidate": 2
+    },
+    {
+      "id": "dk_terminal_b",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "docks",
+      "coversBuildings": ["dk_pier_2"],
+      "priority": "P1",
+      "subject": "modern container terminal on a concrete quay: the steel base of a ship-to-shore gantry crane on rails, stacked shipping containers, a refrigerated container rack",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern container terminal on a concrete quay: the steel base of a ship-to-shore gantry crane on rails, stacked shipping containers, a refrigerated container rack, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6002,
+            "prompt": "modern container terminal on a concrete quay: the steel base of a ship-to-shore gantry crane on rails, stacked shipping containers, a refrigerated container rack, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "bb183b16-dc4a-5d52-9b71-9cf916c9b7bc",
+            "source_image_id": "bb183b16-dc4a-5d52-9b71-9cf916c9b7bc"
+          },
+          "jobId": "d4dfb76e-d406-4c3a-82c1-17d143e869ad",
+          "seed": 6002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "931645072fcc52e96e65aba61c52affa3fe7c2b92d9aec56c14273dbdae6cab8",
+          "at": "2026-10-30T01:02:41.900Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern container terminal on a concrete quay: the steel base of a ship-to-shore gantry crane on rails, stacked shipping containers, a refrigerated container rack, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6001,
+            "prompt": "modern container terminal on a concrete quay: the steel base of a ship-to-shore gantry crane on rails, stacked shipping containers, a refrigerated container rack, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "1703057e-aa65-5a4e-9ac1-a8e465134544",
+            "source_image_id": "1703057e-aa65-5a4e-9ac1-a8e465134544"
+          },
+          "jobId": "b29a3996-fdbd-4323-bc1f-ec8a3c5d5c0f",
+          "seed": 6001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "5b32ee73168bdac4ee75bf18dc20254d035f7b3880f1f40f91c91712a3fc6d0a",
+          "at": "2026-10-30T01:02:41.900Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 2,
+          "reason": "large magenta key areas inside the gantry sail (1,336 px pink before the pocket pass), cluttered",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
+        }
+      ],
+      "note": "agent pick #1 (2026-10-30): F5: container terminal with the blue steel base of a ship-to-shore gantry on rails (its unique feature), container stacks, a white reefer rack, an office block; key pockets cleared between the gantry legs",
+      "finalSha256": "44c5f10bbb1f6587d639acd1ddc5c32c87fa93a8dca82a89755a3710809d97db",
+      "chosenCandidate": 1
+    },
+    {
+      "id": "dk_port_office",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "docks",
+      "coversBuildings": ["dk_customs"],
+      "priority": "P1",
+      "subject": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 6000,
+            "prompt": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "03072a24-7cb9-57ff-a813-93016ddf5de4",
+            "source_image_id": "03072a24-7cb9-57ff-a813-93016ddf5de4"
+          },
+          "jobId": "1ab25a7e-ad24-4d27-8ae2-3bb188bf23b3",
+          "seed": 6000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "d66b4630b85de162c429185e151e4cbb2f2a393a63ac9987d8aec3c69aa2b428",
+          "at": "2026-10-30T01:02:41.900Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 6002,
+            "prompt": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "34989f1c-3d5b-5e21-9323-5344f330795d",
+            "source_image_id": "34989f1c-3d5b-5e21-9323-5344f330795d"
+          },
+          "jobId": "bee2269b-5c29-46b9-9918-b80b1d083b1f",
+          "seed": 6002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "7e5e28747321a1425feabdcaa2f81660f5ad4f200a7c1d05c7faf40e8f9a4a89",
+          "at": "2026-10-30T01:11:28.698Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 6001,
+            "prompt": "modern port authority office building with a blue glass front, a radar mast on the roof and an orange-and-white barrier gate at the entrance, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, modern 2020s harbour logistics, steel and glass, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no boats, no water, no grid lines, no anti-aliasing",
+            "image_id": "abfda273-e493-52fb-92b9-4925da9aa3f1",
+            "source_image_id": "abfda273-e493-52fb-92b9-4925da9aa3f1"
+          },
+          "jobId": "70075a0c-c5c6-41fc-ba87-e8451d5457ad",
+          "seed": 6001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "b52ac57eaa2a9c6956b42b2e7984e8cb5d35572dce98bd0eee1f3a1043a17ba3",
+          "at": "2026-10-30T01:11:28.698Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "glass box with a radar antenna and fenders; the barrier reads less",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "rounded glass front, radar dome, barrier + booth; containers at its side blur the silhouette",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): F5: modern port-authority office with a blue glass front, a radar dome on a lattice mast (its unique feature) and an orange-and-white barrier gate with a booth on the quay",
+      "finalSha256": "fe6625fc8444bf42efbee6009001879028dfc29da783971e2481a4d2db9ae1ae",
+      "chosenCandidate": 0
+    },
+    {
       "id": "dk_crane",
       "class": "prop",
       "source": "pixellab",
@@ -6720,6 +6826,22 @@
       "finalSha256": "ddd666dea2ed5df5bb8a14e2f3625f43ef32ee69f0b32318d8b12c4b5c410187"
     },
     {
+      "id": "bollard",
+      "class": "prop",
+      "source": "procedural",
+      "canvas": [16, 32],
+      "frames": ["_a", "_b"],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "B2 §6.1: safety bollards on the slab edge; prop rule: setOrigin(0.5, 1) at a tile bottom vertex stands the bollard on the tile centre (8, 16)",
+      "finalSha256": "1e5dad8df6810b677bc6ce0007e8f06f9f73207a1a63a0c6de7f907ab6bdbef8"
+    },
+    {
       "id": "sign_locked",
       "class": "prop",
       "source": "procedural",
@@ -6745,7 +6867,7 @@
       "variants": [],
       "district": "warehouse",
       "priority": "P0",
-      "subject": "corrugated tin delivery warehouse, loading dock doors on the west wall, flat roof, small office",
+      "subject": "corrugated tin delivery warehouse, loading dock doors on the south-west wall, low pitched roof, small office annex; no ground, no apron (the lot slab is ground-bake tiles)",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -6907,6 +7029,119 @@
           "downloadUrl": "",
           "sha256": "3336a2fe1646164c304b0d69d1eca02a958bf0e56e59113a3c1c314db8a8ff77",
           "at": "2026-10-29T08:27:17.603Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "corrugated tin delivery warehouse building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, a row of three loading dock doors on the left (south-west) wall near its far end, the first door open and two shuttered, a small amber lamp above each door, low pitched roof, small office annex built into the front corner, scrappy start-up look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6006,
+            "prompt": "corrugated tin delivery warehouse building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, a row of three loading dock doors on the left (south-west) wall near its far end, the first door open and two shuttered, a small amber lamp above each door, low pitched roof, small office annex built into the front corner, scrappy start-up look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "049bba86-f47c-589b-b24a-390a97f29df8",
+            "source_image_id": "049bba86-f47c-589b-b24a-390a97f29df8"
+          },
+          "jobId": "456ba820-ba74-4e75-b374-fa7cacf4155b",
+          "seed": 6006,
+          "candidate": 6,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "9ae41d48bc710649145bb183c4219808291f2efa02103f50ca63d42c04fe94e0",
+          "at": "2026-10-30T01:04:50.205Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "corrugated tin delivery warehouse building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, a row of three loading dock doors on the left (south-west) wall near its far end, the first door open and two shuttered, a small amber lamp above each door, low pitched roof, small office annex built into the front corner, scrappy start-up look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6008,
+            "prompt": "corrugated tin delivery warehouse building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, a row of three loading dock doors on the left (south-west) wall near its far end, the first door open and two shuttered, a small amber lamp above each door, low pitched roof, small office annex built into the front corner, scrappy start-up look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b4890f5e-4b52-525e-bd3a-084e00d65c34",
+            "source_image_id": "b4890f5e-4b52-525e-bd3a-084e00d65c34"
+          },
+          "jobId": "b82403c0-6454-46ea-9039-914bd3041bc3",
+          "seed": 6008,
+          "candidate": 8,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "ef391f11c9824493a2a342dc4d60c2d15a8808acad755120e79820d185f616ff",
+          "at": "2026-10-30T01:11:28.698Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "corrugated tin delivery warehouse building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, a row of three loading dock doors on the left (south-west) wall near its far end, the first door open and two shuttered, a small amber lamp above each door, low pitched roof, small office annex built into the front corner, scrappy start-up look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 6007,
+            "prompt": "corrugated tin delivery warehouse building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, a row of three loading dock doors on the left (south-west) wall near its far end, the first door open and two shuttered, a small amber lamp above each door, low pitched roof, small office annex built into the front corner, scrappy start-up look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "86d39cd1-d5b9-50e0-b9f9-6cfa5437ff11",
+            "source_image_id": "86d39cd1-d5b9-50e0-b9f9-6cfa5437ff11"
+          },
+          "jobId": "acab5d2f-3573-4dc2-8847-421c48e02986",
+          "seed": 6007,
+          "candidate": 7,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "25fd2cabd489b864102fac57a7582991e473799cfdeb465cdd46e5cc94c47603",
+          "at": "2026-10-30T01:11:28.698Z"
+        },
+        {
+          "tool": "edit-image-pro-flash",
+          "endpoint": "/edit-image-pro-flash",
+          "params": {
+            "method": "text",
+            "description": "repaint the corrugated walls bright blue with cream trim, add a plain yellow company sign board without any text over the loading doors, cleaner light grey roof, keep exactly the same building shape, base corners, doors and camera angle, no ground",
+            "no_background": true,
+            "frame": "_t2",
+            "edit": 1,
+            "source": "candidate 6 _t1",
+            "source_sha256": "73c31d57cbe765410c90a7036be1abc2c0c48d47a39c4f475b660b579863d6b4",
+            "image_id": "b02d1712-d801-5f4c-958b-70c3c5fc549f",
+            "source_image_id": "b02d1712-d801-5f4c-958b-70c3c5fc549f"
+          },
+          "jobId": "efa08a21-5fc6-4692-96b6-56a20890cb38",
+          "seed": 6101,
+          "candidate": 6,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "27e5a73000cdff12553da16dd3e783862469aaa8738deb9aa5efd07b362ba8b0",
+          "at": "2026-10-30T01:14:49.113Z"
+        },
+        {
+          "tool": "edit-image-pro-flash",
+          "endpoint": "/edit-image-pro-flash",
+          "params": {
+            "method": "text",
+            "description": "repaint the corrugated walls bright blue with cream trim, add a plain yellow company sign board without any text over the loading doors, cleaner light grey roof, keep exactly the same building shape, base corners, doors and camera angle, no ground",
+            "no_background": true,
+            "frame": "_t2",
+            "edit": 0,
+            "source": "candidate 6 _t1",
+            "source_sha256": "73c31d57cbe765410c90a7036be1abc2c0c48d47a39c4f475b660b579863d6b4",
+            "image_id": "71f7bfbd-ff20-5b6b-8c37-249698e7f106",
+            "source_image_id": "71f7bfbd-ff20-5b6b-8c37-249698e7f106"
+          },
+          "jobId": "064aa24c-04e7-4e3a-a70a-c85040b9f19f",
+          "seed": 6100,
+          "candidate": 6,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "5ad41a8f3248f00820f53f71e80b6e15f430f709a439f7d02048b715410beb57",
+          "at": "2026-10-30T01:14:49.113Z"
         }
       ],
       "rejects": [
@@ -6933,17 +7168,44 @@
           "reason": "lot drawn at another angle: wedge of plot visible",
           "by": "claude",
           "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 7,
+          "reason": "lint:A04 wall base ends at row 214 at the centre, more than 6 rows above the footprint's bottom vertex (row 255)",
+          "by": "claude",
+          "at": "2026-10-30T01:12:22.791Z"
+        },
+        {
+          "candidate": 7,
+          "reason": "a cropped close-up of one wall (lint A04: base 41 rows above the anchor)",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
+        },
+        {
+          "candidate": 8,
+          "reason": "clean shed on the diamond too, but flatter and darker (dark grey SE face), smaller annex, less character than #6",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
         }
       ],
-      "note": "_t1 P0, _t2 P1 (edit of _t1)",
-      "finalSha256": "e0b315c6eb6f08e4df84cbecfadb89ed64c6f1c67ec7c808b2085ac67db3f837",
-      "chosenCandidate": 4
+      "note": "agent pick #6 (2026-10-30): no apron (F2): corrugated shed whose front corner and SE base sit on the 4x4 diamond's bottom and right vertices; the SW face is set back so the slab tiles show as the loading apron before the three bay doors (first open with a leveller plate, two shuttered, amber lamp over each), office annex at the front corner; scrappy tier-1 look, reads at 1x; _t2 = edit-image-pro-flash edit 1 of this _t1 (blue corrugated walls kept, cream trim, a blank yellow sign board over the bays, light roof; edit 0 flattened the SE wall to one dark blue and lost the corrugation)",
+      "finalSha256": "5b4c5450bf0a7a88ba9910d5066893cbb0cfc85397cb609cf0d66e4f06eb8a69",
+      "chosenCandidate": 6,
+      "bayLights": [[21,106], [48,120], [75,135]],
+      "dockPose": [4, 166],
+      "editPick": 1,
+      "frameAnchors": {
+        "_t2": {
+          "bayLights": [[26,107], [54,121], [81,135]],
+          "dockPose": [4, 166]
+        }
+      }
     },
     {
       "id": "fx_dust",
       "class": "fx",
       "source": "procedural",
-      "canvas": [32, 32],
+      "canvas": [256, 224],
       "frames": ["_f0", "_f1", "_f2", "_f3"],
       "variants": [],
       "district": "warehouse",
@@ -6952,7 +7214,9 @@
       "approved": false,
       "gen": [],
       "rejects": [],
-      "finalSha256": "921f5d42cb82d17a54dbd9ef3281aa596712fefc931f49002a70c53a3f991181"
+      "finalSha256": "6c8174d9ec79e09cfd87c8dd6bc1d828c20fedb338052eccd482bcf70888156f",
+      "note": "build 2 (report §6.23): ONE cloud per frame over the whole exterior, 256x224, placed like wh_ext (setOrigin(0.5, 1) at the lot footprint anchor); replaces the 32x32 puff tiled in a grid",
+      "atlas": "world"
     },
     {
       "id": "wh_dock_light",
@@ -6989,12 +7253,12 @@
       "id": "bike",
       "class": "vehicle-bike",
       "source": "pixellab",
-      "canvas": [24, 24],
+      "canvas": [32, 32],
       "frames": ["_ne_0", "_ne_1", "_se_0", "_se_1", "_sw_0", "_sw_1", "_nw_0", "_nw_1"],
       "variants": [],
       "district": "map",
       "priority": "P0",
-      "subject": "delivery bicycle with a cargo box",
+      "subject": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box",
       "bodyRamp": "orange",
       "placeholder": false,
       "approved": false,
@@ -7148,6 +7412,81 @@
           "downloadUrl": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/b0f09e49-600b-4804-9ac8-bcbc300aab7e/56e2b864-741a-4264-ad16-448500f245d5/rotations/east.png",
           "sha256": "e97f9a055872a265d7caa77cf529c11c6a049e68496ade5e362f21a2fc08bd09",
           "at": "2026-10-29T08:20:47.798Z"
+        },
+        {
+          "tool": "create-object-pro-flash",
+          "endpoint": "/create-object-pro-flash",
+          "params": {
+            "description": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible, small delivery vehicle, toy-like proportions, simple clean shapes, 1px dark outline, flat fills, no text, no logo",
+            "n_directions": 8,
+            "view": "low top-down",
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 6008,
+            "prompt": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible, small delivery vehicle, toy-like proportions, simple clean shapes, 1px dark outline, flat fills, no text, no logo",
+            "object_id": "55b9af43-6f2b-4c56-b83b-8c38b7633e0e",
+            "source_image_id": "fb000f0c-b96a-5fb0-bb83-2417eeb7a19e",
+            "files": ["east", "west", "north", "south", "north-east", "north-west", "south-east", "south-west"]
+          },
+          "jobId": "a63675bf-0911-4b27-be55-64a35e3c4e6a",
+          "seed": 6008,
+          "candidate": 8,
+          "cost": 6,
+          "downloadUrl": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/b0f09e49-600b-4804-9ac8-bcbc300aab7e/55b9af43-6f2b-4c56-b83b-8c38b7633e0e/rotations/east.png",
+          "sha256": "6f2bce25cbdd80e0f50e995a2684fbd1deec6d2e4a4635bcc86d0a70c95dc769",
+          "at": "2026-10-30T01:04:50.205Z"
+        },
+        {
+          "tool": "create-object-pro-flash",
+          "endpoint": "/create-object-pro-flash",
+          "params": {
+            "description": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible, small delivery vehicle, toy-like proportions, simple clean shapes, 1px dark outline, flat fills, no text, no logo",
+            "n_directions": 8,
+            "view": "low top-down",
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 6006,
+            "prompt": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible, small delivery vehicle, toy-like proportions, simple clean shapes, 1px dark outline, flat fills, no text, no logo",
+            "object_id": "f88c3e87-200a-47a3-b9dc-03a90e773155",
+            "source_image_id": "148925eb-deb1-5749-8b99-14c8b6e37647",
+            "files": ["east", "west", "north", "south", "north-east", "north-west", "south-east", "south-west"]
+          },
+          "jobId": "f717decb-0650-4b2f-91cb-0f6d75802ee9",
+          "seed": 6006,
+          "candidate": 6,
+          "cost": 6,
+          "downloadUrl": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/b0f09e49-600b-4804-9ac8-bcbc300aab7e/f88c3e87-200a-47a3-b9dc-03a90e773155/rotations/east.png",
+          "sha256": "82acd928a0a595461088fc191a5a31a01eb67d1ed5862c58bb3a24fc14ca0fb1",
+          "at": "2026-10-30T01:04:50.205Z"
+        },
+        {
+          "tool": "create-object-pro-flash",
+          "endpoint": "/create-object-pro-flash",
+          "params": {
+            "description": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible, small delivery vehicle, toy-like proportions, simple clean shapes, 1px dark outline, flat fills, no text, no logo",
+            "n_directions": 8,
+            "view": "low top-down",
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 6009,
+            "prompt": "courier riding a delivery bicycle, white helmet, orange frame, rear cargo box, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible, small delivery vehicle, toy-like proportions, simple clean shapes, 1px dark outline, flat fills, no text, no logo",
+            "object_id": "b2c9415e-8880-48f2-9cc8-d19bf9087f37",
+            "source_image_id": "7e317ddd-d66c-5904-b473-2263b0a517e6",
+            "files": ["east", "west", "north", "south", "north-east", "north-west", "south-east", "south-west"]
+          },
+          "jobId": "eaaa1e90-689b-4c2b-b66d-cd3591bb8e8a",
+          "seed": 6009,
+          "candidate": 9,
+          "cost": 6,
+          "downloadUrl": "https://backblaze.pixellab.ai/file/pixellab-characters/objects/b0f09e49-600b-4804-9ac8-bcbc300aab7e/b2c9415e-8880-48f2-9cc8-d19bf9087f37/rotations/east.png",
+          "sha256": "1b4c6b6bccfdbb8057173a6d8a6d4ae1007e016964a789ccf0a1683740fbe1bd",
+          "at": "2026-10-30T01:16:56.155Z"
         }
       ],
       "rejects": [
@@ -7192,10 +7531,24 @@
           "reason": "20-px re-roll: reads as a quad",
           "by": "claude",
           "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 8,
+          "reason": "helmeted rider but the bike is hidden behind a big box: reads as a scooter/box, wheels lost, no wheel frame (hubs 0)",
+          "by": "claude",
+          "at": "2026-10-30T01:13:37.719Z"
+        },
+        {
+          "candidate": 9,
+          "reason": "bicycle + white helmet, but the rider is dressed in the frame's orange (merges with the bike at 1x), arms stuck out, 22x27 (bigger than the van reads)",
+          "by": "claude",
+          "at": "2026-10-30T01:20:55.474Z"
         }
       ],
-      "finalSha256": "575bf4b871833f16cb874d92e40bc3f10361b6f62f51e87bab4862fe9b2beaf7",
-      "chosenCandidate": 1
+      "foot": [16, 26],
+      "note": "agent pick #6 (2026-10-30): F3: a courier on a real bicycle (two visible spoked tyres, orange frame) with a white helmet and a rear cargo box, correct heading in all four diagonals, 19x25 inside the 32x32 margin; hub shift gives the second wheel frame",
+      "finalSha256": "a1e7a5d72c41e2a6adf4ba94c3642785d47d97b5f96ff0c8fd1a11e4b9ea0ecf",
+      "chosenCandidate": 6
     },
     {
       "id": "van",
@@ -7416,7 +7769,8 @@
       "rejects": [],
       "finalSha256": "d7cd4f17025c19927d1bc1935868e513ca6dd0e9414ce717a9d8942a29807cff",
       "chosenCandidate": 4,
-      "approvedBy": "agent"
+      "approvedBy": "agent",
+      "foot": [16, 23]
     },
     {
       "id": "truck",
@@ -7548,7 +7902,8 @@
         }
       ],
       "finalSha256": "151ed8820e9fcebd89f223fbf9d283cf6f6317f1edb6e38d27260f8f8191ad66",
-      "chosenCandidate": 3
+      "chosenCandidate": 3,
+      "foot": [24, 22]
     },
     {
       "id": "floor_t1",
@@ -9531,12 +9886,28 @@
           "downloadUrl": "",
           "sha256": "73391e59ad5d1e87e6f33646cba88d62024de1ac6f17209ad0d4ba27138846ed",
           "at": "2026-10-29T07:29:34.753Z"
+        },
+        {
+          "tool": "scripted-edit",
+          "endpoint": "tools/art/candidates.ts scanPose",
+          "params": {
+            "frames": ["_s_scan_0", "_s_scan_1", "_n_scan_0", "_n_scan_1", "_e_scan_0", "_e_scan_1", "_w_scan_0", "_w_scan_1"],
+            "from": "the idle_0 / idle_1 frames of candidate 1 (PixelLab breathing-idle)",
+            "why": "report §6.24: the picking-up template bent the inspector behind the desk"
+          },
+          "jobId": "",
+          "candidate": 1,
+          "cost": 0,
+          "downloadUrl": "",
+          "sha256": "5fbd75829dfc1be0e36a11d3401d49c0423acac37a7955e7ca8b673559d6f712",
+          "at": "2026-10-30T01:20:55.599Z"
         }
       ],
       "rejects": [],
-      "finalSha256": "093e637f2eaf9b0341db5eb4dd8e03460dac5f20a863e97269e0cb45be2c5632",
+      "finalSha256": "abdd9200bff2e4527f3653e43b448887c4fda84bc3e3c0c57bf66ca856921f61",
       "chosenCandidate": 1,
-      "approvedBy": "agent"
+      "approvedBy": "agent",
+      "note": "build 2 (report §6.24): the scan frames are scripted edits of the idle frames (candidates.ts SCAN_FROM_IDLE / scanPose), the rest is PixelLab candidate 1; approved/approvedBy is the G2 anchor approval of the PixelLab frames only: the 8 scan frames await the author's review (docs/art-todo.md)"
     },
     {
       "id": "metal_detector",
@@ -10343,6 +10714,22 @@
       "gen": [],
       "rejects": [],
       "finalSha256": "32d28d1767726edbbbf831834c04927a80fbb43ee8eed532d6305c66c00ff25f"
+    },
+    {
+      "id": "logo",
+      "class": "logo",
+      "source": "author",
+      "canvas": [352, 176],
+      "frames": [""],
+      "variants": [],
+      "district": "ui",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": true,
+      "approvedBy": "author",
+      "gen": [],
+      "rejects": [],
+      "note": "art/logo.png (512x256, the author) -> src/assets/logo.png 352x176 by tools/art/logo.ts (Lanczos, alpha kept; Q-B2-1 as-is); its own texture, never in an atlas; exempt from A01/A02/A07"
     },
     {
       "id": "ic_money",
@@ -11759,6 +12146,271 @@
       "usd": 0,
       "balanceBefore": 3305,
       "balanceAfter": 3300
+    },
+    {
+      "at": "2026-10-30T01:04:26.019Z",
+      "ids": ["dk_terminal_a", "dk_terminal_b", "dk_port_office", "wh_ext", "bike"],
+      "tool": "create-image-pro-flash+create-object-pro-flash",
+      "generations": 33,
+      "usd": 0,
+      "balanceBefore": 3299,
+      "balanceAfter": 3266
+    },
+    {
+      "at": "2026-10-30T01:09:36.982Z",
+      "ids": ["wh_ext", "bike"],
+      "tool": "create-image-pro-flash+create-object-pro-flash",
+      "generations": 21,
+      "usd": 0,
+      "balanceBefore": 3266,
+      "balanceAfter": 3245
+    },
+    {
+      "at": "2026-10-30T01:12:22.791Z",
+      "ids": ["dk_terminal_a", "dk_port_office", "wh_ext"],
+      "tool": "create-image-pro-flash",
+      "generations": 39,
+      "usd": 0,
+      "balanceBefore": 3245,
+      "balanceAfter": 3206
+    },
+    {
+      "at": "2026-10-30T01:12:58.114Z",
+      "ids": ["dk_terminal_b", "bike"],
+      "tool": "create-image-pro-flash+create-object-pro-flash",
+      "generations": 0,
+      "usd": 0,
+      "balanceBefore": 3206,
+      "balanceAfter": 3206
+    },
+    {
+      "at": "2026-10-30T01:13:45.100Z",
+      "ids": ["wh_ext"],
+      "tool": "edit-image-pro-flash",
+      "generations": 0,
+      "usd": 0,
+      "balanceBefore": 3206,
+      "balanceAfter": 3206
+    },
+    {
+      "at": "2026-10-30T01:14:49.113Z",
+      "ids": ["wh_ext"],
+      "tool": "edit-image-pro-flash",
+      "generations": 18,
+      "usd": 0,
+      "balanceBefore": 3206,
+      "balanceAfter": 3188
+    },
+    {
+      "at": "2026-10-30T01:20:30.692Z",
+      "ids": ["dk_terminal_a", "dk_terminal_b", "bike"],
+      "tool": "create-image-pro-flash+create-object-pro-flash",
+      "generations": 15,
+      "usd": 0,
+      "balanceBefore": 3188,
+      "balanceAfter": 3173
+    }
+  ],
+  "retired": [
+    {
+      "id": "dk_pier",
+      "class": "building3x3",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T00:59:06.280Z",
+      "reason": "medieval timber pier",
+      "replacedBy": ["dk_terminal_a", "dk_terminal_b"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9fb2c2a1-1a07-5fa1-b687-f441aba1d1d5",
+            "source_image_id": "9fb2c2a1-1a07-5fa1-b687-f441aba1d1d5"
+          },
+          "jobId": "3fef67dc-865a-411c-849c-82c5e73c8038",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "69d3583ce88a3bc84485cac761e455c002a0c6563dfab86fcf166f05f1af3749",
+          "at": "2026-10-29T08:16:30.462Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "423d455c-319b-55db-89e6-f7304668de31",
+            "source_image_id": "423d455c-319b-55db-89e6-f7304668de31"
+          },
+          "jobId": "0813dd43-7466-4edd-88d5-f6f710bad4c7",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "be73218ecbd050bdd7badbb2d871444bff48008e85cdc26f4eba7cee12b72090",
+          "at": "2026-10-29T08:16:30.499Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "wooden cargo pier over water with bollards, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b7d64a71-e2ca-5be7-8f84-7192d7907278",
+            "source_image_id": "b7d64a71-e2ca-5be7-8f84-7192d7907278"
+          },
+          "jobId": "313be30c-16a6-45cf-b374-feabdd16c21a",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "5d708ffb2a6d55d0c8c77024133259135dae9cd9a091aba821682c0692245f05",
+          "at": "2026-10-29T08:16:31.679Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "jetty smaller",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "busier roofs",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "medieval timber pier",
+          "by": "author",
+          "at": "2026-10-30T00:58:28.977Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "dk_customs",
+      "class": "building2x2",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T00:59:06.281Z",
+      "reason": "victorian customs house",
+      "replacedBy": ["dk_port_office"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "60589294-07ed-551b-adfe-eb81bb01fff0",
+            "source_image_id": "60589294-07ed-551b-adfe-eb81bb01fff0"
+          },
+          "jobId": "a4f0735b-26a7-4ba8-9077-c8eeb4dbf765",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "14ec867ecbf90ef4ce8954f183d6196a1c4494378b7841b78a26985eace7b397",
+          "at": "2026-10-29T08:16:35.388Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "ee04e5f2-0ed8-5606-b791-58ec0ebea6b9",
+            "source_image_id": "ee04e5f2-0ed8-5606-b791-58ec0ebea6b9"
+          },
+          "jobId": "26ad3ab7-1f91-40c3-ac2d-8917368117c0",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "da78480323ec796142f973a64822d5606cb62c162081a248e59378fdd0c757e2",
+          "at": "2026-10-29T08:16:40.663Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "customs house, civic brick building by the harbour, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, concrete quay, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "a942d4a8-133d-5065-ae95-3b47441020ae",
+            "source_image_id": "a942d4a8-133d-5065-ae95-3b47441020ae"
+          },
+          "jobId": "76afe979-304b-49fc-97e8-5d07291aa4b9",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "29bebde419ec913f04851d8ed179729f48259db5b9b977073ab3b578f7aa00ad",
+          "at": "2026-10-29T08:16:55.856Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "blue roof, less brick",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "smaller flag",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "victorian customs house",
+          "by": "author",
+          "at": "2026-10-30T00:58:29.242Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
     }
   ]
 }

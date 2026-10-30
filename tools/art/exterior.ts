@@ -12,6 +12,7 @@
 
 import type { DrawCtx, DrawnFrame, Drawer } from './draw-api.ts'
 import { registerDrawer } from './drawers.ts'
+import { Grid, gridFrames } from './icons.ts'
 import {
   type Box,
   type Img,
@@ -456,6 +457,39 @@ registerDrawer({ id: 'wh_ext' }, (d): DrawnFrame[] =>
     canvas: imgToCanvas(drawWarehouseExt(d, suffix === '_t2' ? 2 : 1), d),
   })),
 )
+// ---------------------------------------------------------------------------
+// Lot bollards (B2 §6.1, build 2): small safety posts on the slab edge,
+// prop rule on a 16x32 canvas — setOrigin(0.5, 1) at a tile's bottom
+// vertex stands the post on the tile centre (8, 16); the city may also
+// offset them along the slab edge. _a yellow steel post with a dark band,
+// _b grey concrete post with a yellow reflector band.
+
+export function bollard(variant: 'a' | 'b'): Grid {
+  const g = new Grid(16, 32)
+  const [lit, base, cap, band] =
+    variant === 'a'
+      ? ['yellow3', 'yellow2', 'grey4', 'grey1']
+      : ['grey5', 'grey4', 'grey3', 'yellow2']
+  // the post: x 6..9 (left half lit), rows 6..16, a rounded cap
+  for (let y = 7; y <= 16; y++) {
+    g.hline(6, 7, y, lit)
+    g.hline(8, 9, y, base)
+  }
+  g.hline(7, 8, 5, cap)
+  g.hline(6, 9, 6, cap)
+  g.hline(6, 7, 10, band)
+  g.hline(8, 9, 10, band)
+  g.hline(6, 9, 11, band)
+  g.outline()
+  // contact shadow: one row to the south-east of the foot
+  g.hline(10, 11, 17, 'outline')
+  return g
+}
+
+registerDrawer({ id: 'bollard' }, (d) =>
+  gridFrames(d, [bollard('a'), bollard('b')]),
+)
+
 registerDrawer({ id: 'tree_round' }, voxProp(treeRound))
 registerDrawer({ id: 'tree_pine' }, voxProp(treePine))
 registerDrawer({ id: 'bush' }, voxProp(bush))

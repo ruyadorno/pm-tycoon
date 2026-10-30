@@ -1,5 +1,9 @@
-// District half-sheet (city-view.md §5.1, spec §9.2): a Sheet in HudScene,
-// height max(280, round(H × 0.5)), opened by `pm:select {kind: 'district'}`.
+// District sheet (city-view.md §5.1, spec §9.2): a Sheet in HudScene opened
+// by `pm:select {kind: 'district'}`. Its height fits the rows it shows
+// (report-playtest1 §6.14: the fixed max(280, round(H × 0.5)) half-sheet
+// left ~200 px empty at 430×932): districtFitHeight() at open, growing — never
+// shrinking — while open, so a row that comes and goes (the mood note at a
+// band edge) cannot make the sheet bob.
 // Rows (16-px text, 28-px pitch, x 12; tap rows are 44 px):
 //   1 flavour name + the real name in grey (+ ic_lock when locked)
 //   2 satisfaction bar (green ≥ 70 / amber 40–69 / red < 40) + number + the
@@ -18,7 +22,7 @@
 // Locked regions replace rows 2–6 with `Unlocks at Lv 2 — $2,000 lifetime
 // earned`, the trucks-only line for Industrial and the locked sign art.
 // Opening emits pm:panTo {regionId, cover} so the City centres the label in
-// the uncovered top half. The panel never subscribes to the sim: HudScene
+// the part of the screen the sheet leaves uncovered. The panel never subscribes to the sim: HudScene
 // calls refresh() on the §5.1 events; it also re-reads at 2 Hz while open
 // (the oldest age ticks without an event).
 import type Phaser from 'phaser'
@@ -30,7 +34,7 @@ import { decayPhase, type DecayPhase } from '../render/decayPhase.ts'
 import { SIGN_LOCKED_FACE, type FrameName } from '../render/frames.ts'
 import { toggleGarage } from '../scenes/GarageSheet.ts'
 import { Button } from './Button.ts'
-import type { Layout } from './layout.ts'
+import { HUD_TOP_H, type Layout } from './layout.ts'
 import { addBar, barFrame, BAR_H, setBarFill, type BarColour } from './Panel.ts'
 import { Sheet } from './Sheet.ts'
 import {
@@ -49,9 +53,64 @@ import { addTapZone } from './ZonePicker.ts'
 export const DISTRICT_SHEET_ID = 'district'
 export const EV_PAN_TO = 'pm:panTo'
 
-/** Sheet height (city-view §5.1). */
+/** Row geometry (sheet-local px): text x, first row top, pitches. */
+const X = 12
+const TOP = 16
+const ROW = 28
+const TAP_ROW = 44
+
+/** The playtest-1 half-sheet height (city-view §5.1): now only a reference. */
 export function districtSheetHeight(H: number): number {
   return Math.max(280, Math.round(H * 0.5))
+}
+
+/** Space under the last row, above the safe-area inset. */
+export const DISTRICT_PAD_BOTTOM = 12
+
+/**
+ * The sheet height that fits rows ending at sheet-local `contentBottom`: the
+ * pad and the safe-area inset under them, never past the HUD's top band.
+ */
+export function districtFitHeight(
+  contentBottom: number,
+  L: { H: number; safeTop: number; safeBottom: number },
+): number {
+  const fit =
+    Math.round(contentBottom) + DISTRICT_PAD_BOTTOM + Math.max(0, L.safeBottom)
+  return Math.min(fit, L.H - Math.max(0, L.safeTop) - HUD_TOP_H)
+}
+
+/**
+ * Sheet-local bottom of the rows render() lays out (the same row pitches),
+ * for the sizing tests and the 360×604 / 393×659 fit checks.
+ */
+export function districtContentBottom(rows: {
+  locked: boolean
+  /** Locked: the sign's height (drawn 8 px under the text rows). */
+  signH?: number
+  /** Unlocked: a `district` (hubs have no satisfaction row). */
+  satisfaction?: boolean
+  moodNote?: boolean
+  favouredOrRule?: boolean
+  missing?: boolean
+  /** The waiting row is a 44-px tap row when anything waits. */
+  waiting?: boolean
+  /** Locked: the trucks-only line of a hard-rule district. */
+  rule?: boolean
+}): number {
+  let y = TOP + ROW
+  if (rows.locked) {
+    y += ROW
+    if (rows.rule) y += ROW
+    return y + 8 + (rows.signH ?? 0)
+  }
+  if (rows.satisfaction) y += ROW
+  if (rows.moodNote) y += ROW
+  if (rows.favouredOrRule) y += ROW
+  if (rows.missing) y += ROW
+  y += ROW // earned
+  y += rows.waiting ? TAP_ROW : ROW
+  return y + TAP_ROW // homed + Garage
 }
 
 /** Spec §9.4 bands for the satisfaction bar (display rule, same as the mood face). */
@@ -201,10 +260,6 @@ function typeName(data: GameData, id: string): string {
 
 // ---- view ------------------------------------------------------------------
 
-const X = 12
-const TOP = 16
-const ROW = 28
-const TAP_ROW = 44
 const BAR_W = 200
 const ICON = 16
 const GAP = 6
@@ -259,7 +314,7 @@ export class DistrictPanel {
     this.L = L
     this.vs = viewSim
     this.sheet = new Sheet(scene, {
-      height: districtSheetHeight(L.H),
+      height: districtFitHeight(districtContentBottom({ locked: false }), L),
       W: L.W,
       H: L.H,
       id: DISTRICT_SHEET_ID,
@@ -362,7 +417,7 @@ export class DistrictPanel {
     if (!this.vs.districtStats(districtId)) return
     const again = this.id === districtId && this.sheet.isOpen()
     this.id = districtId
-    this.refresh()
+    this.refresh(!again)
     if (!this.sheet.isOpen()) this.sheet.open()
     if (!again)
       this.scene.game.events.emit(EV_PAN_TO, {
@@ -377,19 +432,26 @@ export class DistrictPanel {
 
   relayout(L: Layout): void {
     this.L = L
-    this.sheet.relayout(L, districtSheetHeight(L.H))
+    this.sheet.relayout(L)
     this.garageBtn.setRect({ x: 0, y: 0, w: 76, h: ROW }, undefined, L.minHit)
-    this.refresh()
+    this.refresh(true)
   }
 
-  /** Re-read districtStats and re-lay the rows. */
-  refresh(): void {
+  /**
+   * Re-read districtStats and re-lay the rows; the sheet fits them (`exact`:
+   * shrink too — opening, a resize — else it only grows while open).
+   */
+  refresh(exact = false): void {
     const id = this.id
     if (!id) return
     const stats = this.vs.districtStats(id)
     const def = this.vs.data.districts.find((d) => d.id === id)
     if (!stats || !def) return
-    this.render(stats, def)
+    const bottom = this.render(stats, def)
+    const h = districtFitHeight(bottom, this.L)
+    const open = this.sheet.isOpen()
+    if (h > this.sheet.height || (h !== this.sheet.height && (exact || !open)))
+      this.sheet.resize(h)
   }
 
   destroy(): void {
@@ -400,7 +462,8 @@ export class DistrictPanel {
 
   // ---- internals -----------------------------------------------------------
 
-  private render(stats: DistrictStats, def: DistrictDef): void {
+  /** Lay the rows out; returns their sheet-local bottom. */
+  private render(stats: DistrictStats, def: DistrictDef): number {
     const data = this.vs.data
     const W = this.L.W
     const all: Phaser.GameObjects.GameObject[] = this.sheet.root.list.filter(
@@ -430,7 +493,7 @@ export class DistrictPanel {
         y += ROW
       }
       this.layoutSign(def, y + 8)
-      return
+      return y + 8 + Math.round(this.sign.height)
     }
 
     // 2 satisfaction (districts only: hubs have none)
@@ -559,6 +622,7 @@ export class DistrictPanel {
       { x: bx, y: by, w: this.garageBtn.btnWidth, h: ROW },
       { x: bx, y, w: this.garageBtn.btnWidth, h: TAP_ROW },
     )
+    return y + TAP_ROW
   }
 
   private layoutSign(def: DistrictDef, y: number): void {

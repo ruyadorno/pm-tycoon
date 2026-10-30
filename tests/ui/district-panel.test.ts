@@ -29,9 +29,78 @@ const district = (id: string) => {
 }
 
 describe('District panel (city-view §5.1)', () => {
-  it('sheet height is max(280, round(H × 0.5))', () => {
+  it('the playtest-1 half-sheet reference is max(280, round(H × 0.5))', () => {
     expect(dp.districtSheetHeight(500)).toBe(280)
     expect(dp.districtSheetHeight(659)).toBe(330)
+  })
+
+  it('report §6.14: the sheet fits its rows (pad + safe-area inset under the last one)', () => {
+    const full = dp.districtContentBottom({
+      locked: false,
+      satisfaction: true,
+      moodNote: true,
+      favouredOrRule: true,
+      missing: true,
+      waiting: true,
+    })
+    // header 16 + 28, sat, note, rule, missing, earned (5 × 28), waiting 44, homed 44
+    expect(full).toBe(16 + 28 + 5 * 28 + 44 + 44)
+    const hub = dp.districtContentBottom({ locked: false })
+    expect(hub).toBe(16 + 28 + 28 + 28 + 44)
+    expect(
+      dp.districtContentBottom({ locked: true, rule: true, signH: 64 }),
+    ).toBe(16 + 28 + 28 + 28 + 8 + 64)
+    const L = { H: 932, safeTop: 47, safeBottom: 34 }
+    expect(dp.districtFitHeight(full, L)).toBe(
+      full + dp.DISTRICT_PAD_BOTTOM + 34,
+    )
+    // 430×932: the old half-sheet was 466 px for ≤ 272 px of rows.
+    expect(dp.districtFitHeight(full, L)).toBeLessThan(
+      dp.districtSheetHeight(932) - 140,
+    )
+    // Never past the HUD's top band on a short canvas.
+    expect(
+      dp.districtFitHeight(full, { H: 300, safeTop: 0, safeBottom: 0 }),
+    ).toBe(300 - 64)
+  })
+
+  it('report §6.14: every district fits 360×604 and 393×659 (no taller than the old half-sheet)', () => {
+    for (const [H, sb] of [
+      [604, 0],
+      [659, 0],
+      [659, 34],
+    ] as const) {
+      for (const d of data.districts) {
+        // Every optional row at once (a sign 96 px tall when locked).
+        const open = dp.districtContentBottom({
+          locked: false,
+          satisfaction: d.kind === 'district',
+          moodNote: d.kind === 'district',
+          favouredOrRule: !!(
+            dp.favouredLine(d, data) || dp.vehicleRuleLine(d, data)
+          ),
+          missing: !!dp.missingVehicleLine(d, data, []),
+          waiting: true,
+        })
+        const locked = dp.districtContentBottom({
+          locked: true,
+          rule: d.hardRule,
+          signH: 96,
+        })
+        const bottom = d.unlockLevel > 1 ? Math.max(open, locked) : open
+        const h = dp.districtFitHeight(bottom, {
+          H,
+          safeTop: 0,
+          safeBottom: sb,
+        })
+        expect(h, `${d.id} at H ${H}`).toBe(
+          bottom + dp.DISTRICT_PAD_BOTTOM + sb,
+        )
+        expect(h, `${d.id} at H ${H}`).toBeLessThanOrEqual(
+          dp.districtSheetHeight(H),
+        )
+      }
+    }
   })
 
   it('satisfaction bar is green ≥ 70, amber 40–69, red < 40 (spec §9.4 bands)', () => {

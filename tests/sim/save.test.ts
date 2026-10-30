@@ -1,6 +1,7 @@
 // plan.md §6.4 "Save and load" + §6.9.1 save.test: snapshot → JSON → load →
 // deep-equal; 600 ticks after a load = the uninterrupted run; no non-JSON
-// values; version + dataHash gate (no migrations, R9). Also pins the M0 sim
+// values; version + dataHash gate (no migrations, R9; build 2 = version 2,
+// `pm.save.v2`, spec-build2 §8). Also pins the M0 sim
 // skeleton the save format rests on: the spec §7.1 start state, the tick
 // clock + day boundary, and the "handlers never dispatch" rule.
 
@@ -16,12 +17,14 @@ import {
   deserialise,
   isCompatible,
   restore,
+  SAVE_KEY,
+  SAVE_VERSION,
   SaveError,
   serialise,
 } from '../../src/sim/save.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
 import type { Command } from '../../src/sim/commands.ts'
-import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
+import { laneNode, STATE_VERSION, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   collect,
@@ -70,7 +73,7 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(JSON.parse(JSON.stringify(sim.state))).toEqual(sim.state)
   })
 
-  it('pm.save.v1 payload: serialise → deserialise → isCompatible → restore', () => {
+  it('pm.save.v2 payload: serialise → deserialise → isCompatible → restore', () => {
     const sim = playedSim()
     const onboarding = {
       step: 2,
@@ -81,7 +84,12 @@ describe('save round trip (plan.md §6.4)', () => {
     }
     const text = serialise(sim, { savedAt: 1234, build: 'test', onboarding })
     const payload = deserialise(text)
-    expect(payload.version).toBe(1)
+    expect(SAVE_KEY).toBe('pm.save.v2')
+    expect(SAVE_VERSION).toBe(2)
+    expect(STATE_VERSION).toBe(2)
+    expect(payload.version).toBe(2)
+    expect(payload.state.version).toBe(2)
+    expect(sim.snapshot().version).toBe(2)
     expect(payload.dataHash).toBe(sim.data.hash)
     expect(payload.onboarding).toEqual(onboarding)
     expect(isCompatible(payload, dataFixture())).toBe(true)
@@ -95,13 +103,58 @@ describe('save round trip (plan.md §6.4)', () => {
     const retuned = dataFixture({ economy: { startMoney: 600 } })
     expect(retuned.hash).not.toBe(payload.dataHash)
     expect(isCompatible(payload, retuned)).toBe(false)
-    expect(isCompatible({ ...payload, version: 2 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 1 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 3 }, dataFixture())).toBe(false)
     expect(() => Sim.load(retuned, payload)).toThrow(SimLoadError)
     expect(
       Sim.load(retuned, payload, { ignoreDataHash: true }).state.tick,
     ).toBe(payload.state.tick)
     expect(() => deserialise('{nope')).toThrow(SaveError)
-    expect(() => deserialise('{"version":1}')).toThrow(SaveError)
+    expect(() => deserialise('{"version":2}')).toThrow(SaveError)
+  })
+
+  it('save v2 rejects a v1 snapshot (plan.md R9: no migrations)', () => {
+    const sim = playedSim()
+    // A build-1 save: the same shape, version 1 on the payload and the state.
+    const v1 = structuredClone(sim.snapshot()) as unknown as {
+      version: number
+      state: { version: number }
+    }
+    v1.version = 1
+    v1.state.version = 1
+    let err: unknown = null
+    try {
+      Sim.load(dataFixture(), v1)
+    } catch (e) {
+      err = e
+    }
+    expect(err).toBeInstanceOf(SimLoadError)
+    const problems = (err as SimLoadError).problems
+    expect(problems).toContain('version: 1 ≠ 2')
+    expect(problems).toContain('state.version: 1 ≠ 2')
+    // validate.ts accepts version 2 only: a v1 state inside a v2 envelope
+    // is still refused, and so is a v2 state inside a v1 envelope.
+    const innerV1 = structuredClone(sim.snapshot()) as unknown as {
+      state: { version: number }
+    }
+    innerV1.state.version = 1
+    expect(() => Sim.load(dataFixture(), innerV1)).toThrow(/state.version/)
+    const outerV1 = { ...sim.snapshot(), version: 1 }
+    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 2/)
+    // The payload layer refuses it before Sim.load: deserialise throws.
+    const text = serialise(sim, { savedAt: 0, build: 'build-1' })
+    const p = JSON.parse(text) as {
+      version: number
+      state: { version: number }
+    }
+    p.version = 1
+    p.state.version = 1
+    expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
+    expect(isCompatible(p, dataFixture())).toBe(false)
+    // A v2 snapshot of the same run loads.
+    expect(Sim.load(dataFixture(), sim.snapshot()).state.tick).toBe(
+      sim.state.tick,
+    )
   })
 
   it('Sim.load rejects dangling ids and non-JSON numbers', () => {

@@ -33,6 +33,7 @@ import {
   TICKER_QUEUE_MAX,
   TickerQueue,
 } from '../../src/ui/Ticker.ts'
+import { formatMoney } from '../../src/ui/text.ts'
 import { THEME } from '../../src/ui/theme.ts'
 import type { VehicleSnapshot } from '../../src/sim/view-api.ts'
 import type { VehicleType } from '../../src/sim/types.ts'
@@ -127,6 +128,24 @@ describe('spec §8 / city-view §4.1: the level bar', () => {
       'Lv 2: Hoist Hill + trucks + Shaky shaker',
     )
     expect(nextUnlockLine(data, 2)).toBe('Lv 3 coming soon')
+  })
+
+  it('plan-build2 §8.2 task 11: "coming soon" vanishes by data once the cap rises', () => {
+    const top = Math.max(...data.levels.map((l) => l.level))
+    const open = dataFixture({ economy: { playtestMaxLevel: top } })
+    const l3 = open.levels.find((l) => l.level === 3)!
+    const p = levelProgress(open, 2, 3410, l3.threshold)
+    expect(p.atCap).toBe(false)
+    expect(p.text).toBe(`$3,410 / ${formatMoney(l3.threshold)}`)
+    expect(nextUnlockLine(open, 2)).toMatch(/^Lv 3: /)
+    expect(nextUnlockLine(open, 2)).not.toMatch(/coming soon/)
+    // The top level has nothing coming: no "Lv 6 coming soon".
+    expect(levelProgress(open, top, 20000, null)).toEqual({
+      frac: 1,
+      text: '$20,000',
+      atCap: false,
+    })
+    expect(nextUnlockLine(open, top)).toMatch(/top level$/)
   })
 })
 

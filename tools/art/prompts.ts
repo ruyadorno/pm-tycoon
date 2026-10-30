@@ -40,6 +40,28 @@ export const CITY_SUFFIX =
   'silhouette, centred, transparent background, no text, no people, no ' +
   'vehicles, no grid lines, no anti-aliasing'
 
+/**
+ * CITY_SUFFIX for sprites without a ground patch (the build-2 warehouse
+ * exterior): no cast shadow on a ground that is not drawn.
+ */
+export const EXTERIOR_SUFFIX =
+  ', 2:1 isometric pixel art, flat sunny daylight from the upper left, top ' +
+  'faces lightest, left wall lighter than right wall, 1px dark outline, ' +
+  'flat fills, saturated clean colours, strong readable silhouette, ' +
+  'centred, transparent background, no text, no people, no vehicles, no ' +
+  'grid lines, no anti-aliasing'
+
+/**
+ * Docks terminals (B2 §6.4) carry a reach-stacker / gantry, so the city
+ * template's "no vehicles" would fight the subject.
+ */
+export const PORT_SUFFIX =
+  ', 2:1 isometric pixel art, flat sunny daylight from the upper left, top ' +
+  'faces lightest, left wall lighter than right wall, small sharp shadow, ' +
+  '1px dark outline, flat fills, saturated clean colours, strong readable ' +
+  'silhouette, centred, transparent background, no text, no people, no ' +
+  'boats, no water, no grid lines, no anti-aliasing'
+
 export const INTERIOR_SUFFIX =
   ', top-down 3/4 view from the front and slightly above, light from the ' +
   'top-left, chunky, bright, 1px dark outline, flat fills, saturated clean ' +
@@ -111,6 +133,8 @@ export const SUBJECT_OVERRIDES: Record<string, string> = {
  * template's "a single chunky building" would fight them.
  */
 export const GROUP_SUBJECTS = new Set([
+  'dk_terminal_a',
+  'dk_terminal_b',
   'dt_peer_plaza',
   'dt_transpile_campus',
   'ru_farm',
@@ -120,6 +144,13 @@ export const GROUP_SUBJECTS = new Set([
   'in_rimraf_yard',
   'dk_containers',
   'cv_stadium',
+])
+
+/** the build-2 modern port rows (B2 §6.4) */
+export const PORT_IDS = new Set([
+  'dk_terminal_a',
+  'dk_terminal_b',
+  'dk_port_office',
 ])
 
 /** the plot wording per district (the ground patch the model paints) */
@@ -155,7 +186,8 @@ export const DISTRICT_ANCHOR: Record<string, string> = {
 export const PALETTE_HINTS: Record<string, string[]> = {
   worker: ['outline', 'grey', 'skin', 'yellow', 'blue', 'brown'],
   'vehicle-van': ['outline', 'grey', 'yellow', 'orange'],
-  'vehicle-bike': ['outline', 'grey', 'yellow', 'blue'],
+  // build 2: the courier (skin, white helmet = grey5, blue shirt)
+  'vehicle-bike': ['outline', 'grey', 'yellow', 'blue', 'skin', 'brown'],
   'vehicle-truck': ['outline', 'grey', 'blue', 'orange'],
   machine: ['outline', 'grey', 'blue', 'yellow', 'grass'],
   shaky_shaker: ['outline', 'grey', 'orange', 'yellow', 'blue'],
@@ -286,6 +318,16 @@ export interface PromptCtx {
   key?: boolean
   /** bike / truck tool: 'object8' (style object = van) or 'proflash' */
   vehicle?: 'object8' | 'proflash'
+  /** use FALLBACK_SUBJECTS (B2 §6.2: after three failed bicycle rounds) */
+  fallback?: boolean
+}
+
+/**
+ * Fallback subjects (gen --fallback): B2 §6.2 — if three rounds of the
+ * bicycle fail lint, the scooter comes back, but never riderless.
+ */
+export const FALLBACK_SUBJECTS: Record<string, string> = {
+  bike: 'orange delivery scooter with a rider wearing a white helmet',
 }
 
 /** the anchor a target borrows its look from (district match, must fit) */
@@ -413,11 +455,18 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
         e.district === 'industrial'
           ? ', chimneys without any smoke or steam'
           : ''
-      const text =
-        `${subject}${smoke}, ${what} ${fw}x${fw / 2} isometric diamond plot, ` +
-        `${YARD[e.district ?? ''] ?? 'small paved yard'}, ` +
-        `${storeysFor(e)} storeys, bright cheerful ` +
-        `city-builder style${CITY_SUFFIX}`
+      // build 2 port (B2 §6.4): modern, 'no vehicles' lifted (the
+      // reach-stacker), no water on the plot (they stand on the quay land)
+      const port = PORT_IDS.has(e.id)
+      const text = port
+        ? `${subject}, ${what} ${fw}x${fw / 2} isometric diamond plot, ` +
+          `${YARD[e.district ?? ''] ?? 'small paved yard'}, modern ` +
+          `2020s harbour logistics, steel and glass, bright cheerful ` +
+          `city-builder style${PORT_SUFFIX}`
+        : `${subject}${smoke}, ${what} ${fw}x${fw / 2} isometric diamond plot, ` +
+          `${YARD[e.district ?? ''] ?? 'small paved yard'}, ` +
+          `${storeysFor(e)} storeys, bright cheerful ` +
+          `city-builder style${CITY_SUFFIX}`
       const side = Math.max(W, H)
       const style = ctx.style ?? 'auto'
       if (
@@ -441,16 +490,22 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
       return proFlashImage(e, text, [], anchor, ctx.key ?? wantsKey(e))
     }
     case 'warehouse-ext': {
-      // v2 (bulk pass): v1 ('filling most of a 256x128 plot') drew a lot
-      // running off the picture with the building past the plot's NW edge
+      // v3 (build 2, F2 / B2 §6.1): no apron. v2 ('standing in the middle
+      // of a 256x128 isometric diamond concrete lot') drew its own lot,
+      // never on the grid; the slab is now ground-bake tiles (lot_slab),
+      // so the walls must stand on the 4x4 footprint diamond itself
       const text =
-        'corrugated tin delivery warehouse standing in the middle of a ' +
-        '256x128 isometric diamond concrete lot, all four corners of the ' +
-        'diamond lot visible inside the picture with a margin, a row of ' +
-        'three loading dock doors on the left (south-west) wall near its ' +
-        'far end, the first door open and two shuttered, low pitched roof, ' +
-        'small office annex at the front corner, scrappy start-up look' +
-        CITY_SUFFIX
+        'corrugated tin delivery warehouse building seen from a 2:1 ' +
+        'isometric angle, its rectangular base fills the whole 256x128 ' +
+        'isometric diamond footprint: the front corner of the walls touches ' +
+        'the bottom centre of the picture and the left and right corners ' +
+        'of the walls touch the left and right edges of the picture, a row ' +
+        'of three loading dock doors on the left (south-west) wall near its ' +
+        'far end, the first door open and two shuttered, a small amber lamp ' +
+        'above each door, low pitched roof, small office annex built into ' +
+        'the front corner, scrappy start-up look, no ground, no pavement, no ' +
+        'lot, no apron, no shadow outside the walls, nothing below the walls' +
+        EXTERIOR_SUFFIX
       const anchor = ctx.style === 'anchor' ? anchorFor(e, anchors) : null
       return {
         ...proFlashImage(e, text, [], anchor, ctx.key ?? wantsKey(e)),
@@ -460,8 +515,8 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
           description:
             'repaint the corrugated walls bright blue with cream trim, add a ' +
             'plain yellow company sign board without any text over the ' +
-            'loading doors, cleaner light grey roof, keep the same building ' +
-            'shape, doors, plot and camera angle',
+            'loading doors, cleaner light grey roof, keep exactly the same ' +
+            'building shape, base corners, doors and camera angle, no ground',
         },
       }
     }
@@ -479,16 +534,21 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
     case 'vehicle-bike':
     case 'vehicle-van':
     case 'vehicle-truck': {
+      // bike (build 2, F3): the courier rides it — a person is the point
       const colour =
         e.class === 'vehicle-bike'
-          ? `, bright ${e.bodyRamp ?? 'orange'} frame and cargo box, two thin wheels, narrow`
+          ? `, the rider sits upright on the saddle with hands on the handlebar, two thin wheels, narrow side profile, the rider's white helmet clearly visible`
           : e.class === 'vehicle-truck'
             ? `, bright ${e.bodyRamp ?? 'yellow'} long cargo box and a ${e.bodyRamp === 'yellow' ? 'light blue' : 'white'} cab with a lighter roof`
             : e.bodyRamp
               ? `, bright light ${e.bodyRamp} body with a lighter roof`
               : ''
+      const subj =
+        e.class === 'vehicle-bike' && ctx.fallback
+          ? (FALLBACK_SUBJECTS[e.id] ?? subject)
+          : subject
       const text =
-        `${subject}${colour}, small delivery vehicle, toy-like proportions, ` +
+        `${subj}${colour}, small delivery vehicle, toy-like proportions, ` +
         'simple clean shapes, 1px dark outline, flat fills, no text, no logo'
       // bike: the van style object cannot be used (its content is 27x23,
       // the bike canvas 24x24 — /create-8-direction-object fails fast with
@@ -499,11 +559,12 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
         (ctx.vehicle ??
           (e.class === 'vehicle-bike' ? 'proflash' : 'object8')) === 'proflash'
       if (viaProFlash) {
-        // bike 20: at 24 the model draws 24-px-tall sprites that break the
-        // 1-px margin of the 24x24 canvas (bulk pass, bike #0 / #2)
+        // bike 28 on the 32x32 canvas (build 2): the model draws about as
+        // tall as the requested size (playtest 1: 24 -> 24-px sprites that
+        // broke the 1-px margin of a 24x24 canvas), so 28 keeps rows 1..30
         const side =
           e.class === 'vehicle-bike'
-            ? 20
+            ? 28
             : e.class === 'vehicle-truck'
               ? 40
               : 32

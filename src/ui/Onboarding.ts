@@ -1,7 +1,7 @@
 // Onboarding tooltips (city-view.md §9.1, plan.md §9 "Onboarding"): a 240-px
 // `ui_panel` with the step text, a grey `Skip tour` link (44-px hit) and the
 // 16x16 `arrow` frame (an 8x8 down-pointing glyph, artUi hand-off) touching
-// its target. The state object is `pm.save.v1.onboarding` = {step, skipped,
+// its target. The state object is `pm.save.v2.onboarding` = {step, skipped,
 // sawFirstFlag, sawTossHint, wanted}: HudScene keeps it in the game registry
 // (REG_ONBOARDING, src/boot/autosave.ts), this class mutates it in place and
 // autosave.ts writes it; the sim never sees it, so a reload never repeats a

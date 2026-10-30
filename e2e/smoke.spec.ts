@@ -31,9 +31,17 @@
 //      error. Headless Chromium starts every AudioContext 'running', so the
 //      plan's `ctx.state === 'suspended'` cannot be observed here
 //      (e2e/audio.spec.ts has the full contract).
+//   M5 (plan-build2 §8.2 task 3 + acceptance, B2 §5) — the attract Title:
+//      the logo (texture 'logo', 352×176 at 1:1, centred, top safeTop + 48)
+//      over a moving city (the attract sim ticks, the camera tours) with no
+//      HUD, __pm.ready still false and no save written; the Credits card is
+//      modal (a tap on Reset under it only closes it; Esc closes it); a real
+//      New game tap swaps the sims (__pm.core !== the attract sim,
+//      __pm.attractSim null), the HUD wakes, the City leaves attract mode.
+//      The fps under SwiftShader is logged, not asserted.
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import { expect, test, type PmHelpers } from './fixtures.ts'
+import { expect, gameUp, test, titleUp, type PmHelpers } from './fixtures.ts'
 import {
   bayRect,
   expectRoomFits,
@@ -48,12 +56,14 @@ import {
 const BASE = '/?view=gallery&debug=1&seed=1&audio=0'
 const M1_URL = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1'
 const AUDIO_URL = '/?seed=7&debug=1&audio=1&audiolog=1'
+/** The attract Title (B2 §5): the default flow, no audio. */
+const TITLE_URL = '/?seed=7&debug=1&audio=0'
 /** tools/fixtures/m3.ts: 3 s before the policy's level:up {2}. */
 const LEVEL_UP_FIXTURE = 'tests/fixtures/level-up.json'
 /** plan.md §6.11: draw calls per frame with HUD + city + popups. */
 const MAX_DRAW_CALLS = 8
-/** src/boot/autosave.ts SAVE_KEY. */
-const SAVE_KEY = 'pm.save.v1'
+/** src/sim/save.ts SAVE_KEY (build 2: save v2, plan-build2 §8.2 task 9). */
+const SAVE_KEY = 'pm.save.v2'
 
 interface BootInfo {
   font: boolean
@@ -454,7 +464,7 @@ test.describe('M1 city smoke', () => {
       return { version: s.version, seed: s.seed, tick: s.state?.tick }
     }, SAVE_KEY)
     console.log(`smoke: autosave ${JSON.stringify(save)}`)
-    expect(save.version).toBe(1)
+    expect(save.version).toBe(2)
     expect(save.seed).toBe(7)
 
     // HUD hit rects at the profile width.
@@ -712,5 +722,319 @@ test.describe('M3 audio boot smoke', () => {
     expect(pre.sfx).toEqual(['tap:locked', 'buy:locked'])
     expect(pre.errors).toEqual([])
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M5 ------------------------------------------------------------------
+
+interface TitleProbe {
+  W: number
+  safeTop: number
+  logo: {
+    key: string
+    x: number
+    y: number
+    w: number
+    h: number
+    visible: boolean
+    scale: number
+  } | null
+  hud: boolean
+  cityAttract: boolean | null
+  coreIsAttract: boolean
+  ready: boolean
+  vehicles: number
+  tick: number
+  scroll: { x: number; y: number }
+  zoom: number
+  fps: number
+  drawCalls: number
+}
+
+function probeTitle(page: Page): Promise<TitleProbe> {
+  return page.evaluate((): TitleProbe => {
+    type Img = {
+      texture: { key: string }
+      x: number
+      y: number
+      width: number
+      height: number
+      visible: boolean
+      scaleX: number
+      getData?(k: string): unknown
+    }
+    const api = window.__pm!
+    const sm = api.game.scene
+    const title = sm.getScene('Title') as unknown as {
+      children: { list: Img[] }
+    }
+    const logo = title.children.list.find(
+      (o) => o.getData?.('id') === 'title:logo',
+    )
+    const city = sm.getScene('City') as unknown as {
+      attract?: boolean
+      cameras: { main: { scrollX: number; scrollY: number; zoom: number } }
+    }
+    const cam = city.cameras.main
+    return {
+      W: api.game.scale.width,
+      safeTop: (api.game.registry.get('safeTop') as number | undefined) ?? 0,
+      logo: logo
+        ? {
+            key: logo.texture.key,
+            x: logo.x,
+            y: logo.y,
+            w: logo.width,
+            h: logo.height,
+            visible: logo.visible,
+            scale: logo.scaleX,
+          }
+        : null,
+      hud: sm.isActive('HUD') && !sm.isSleeping('HUD'),
+      cityAttract: sm.isActive('City') ? city.attract === true : null,
+      coreIsAttract: api.attractSim !== null && api.core === api.attractSim,
+      ready: api.ready,
+      vehicles: api.core.state.vehicles.length,
+      tick: api.core.state.tick,
+      scroll: { x: cam.scrollX, y: cam.scrollY },
+      zoom: cam.zoom,
+      fps: Math.round(api.game.loop.actualFps * 10) / 10,
+      drawCalls: api.metrics().drawCalls,
+    }
+  })
+}
+
+interface FogProbe {
+  /** City lockState for Industrial. */
+  locked: boolean | null
+  /** Frame names of the Industrial buildings' images. */
+  frames: string[]
+  /** Smoke emitters built (only over live Industrial chimneys). */
+  smoke: number
+}
+
+/** Industrial's fog state as the City draws it (B2 §5 swap check). */
+function probeFog(page: Page): Promise<FogProbe> {
+  return page.evaluate((): FogProbe => {
+    const city = window.__pm!.game.scene.getScene('City') as unknown as {
+      lockState: Map<string, boolean>
+      byDistrict: Map<string, { image: { frame: { name: string } } | null }[]>
+      smoke: unknown[]
+    }
+    const views = city.byDistrict.get('industrial') ?? []
+    return {
+      locked: city.lockState.get('industrial') ?? null,
+      frames: views.flatMap((v) => (v.image ? [v.image.frame.name] : [])),
+      smoke: city.smoke.length,
+    }
+  })
+}
+
+function titleDialogOpen(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const t = window.__pm!.game.scene.getScene('Title') as unknown as {
+      dialog: { isOpen(): boolean } | null
+    }
+    return t.dialog?.isOpen() ?? false
+  })
+}
+
+function creditsOpen(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const t = window.__pm!.game.scene.getScene('Title') as unknown as {
+      creditsOpen(): boolean
+    }
+    return t.creditsOpen()
+  })
+}
+
+test.describe('M5 attract title smoke', () => {
+  test('the logo over a moving attract city, no HUD, modal Credits; New game swaps the sims and wakes the HUD', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await page.goto(TITLE_URL)
+    await page.evaluate(() => localStorage.clear())
+    await page.goto(TITLE_URL)
+    await titleUp(page)
+
+    const t0 = await probeTitle(page)
+    console.log(`smoke: attract title ${JSON.stringify(t0)}`)
+    expect(t0.logo, 'the logo image on the Title').not.toBeNull()
+    expect(t0.logo!.key).toBe('logo')
+    expect([t0.logo!.w, t0.logo!.h]).toEqual([352, 176])
+    expect(t0.logo!.scale, 'drawn at 1:1').toBe(1)
+    expect(t0.logo!.visible).toBe(true)
+    expect(t0.logo!.x).toBe(Math.round((t0.W - 352) / 2))
+    expect(t0.logo!.y).toBe(t0.safeTop + 48)
+    expect(t0.hud, 'no HUD on the Title').toBe(false)
+    expect(t0.cityAttract, 'the City runs in attract mode').toBe(true)
+    expect(t0.coreIsAttract, 'the attract sim is installed').toBe(true)
+    expect(t0.ready, '__pm.ready waits for the player’s game').toBe(false)
+    expect(t0.zoom).toBe(1)
+    expect(
+      t0.vehicles,
+      'the L2 attract city: ≥ 4 vehicles',
+    ).toBeGreaterThanOrEqual(4)
+
+    // A moving city: the sim ticks at 1× and the camera leaves the lot after
+    // its 1-s hold.
+    await page.waitForTimeout(2500)
+    const t1 = await probeTitle(page)
+    console.log(
+      `smoke: attract after 2.5 s: tick +${t1.tick - t0.tick}, camera ` +
+        `(${t0.scroll.x},${t0.scroll.y}) → (${t1.scroll.x},${t1.scroll.y}), ` +
+        `fps ${t1.fps} under SwiftShader (logged, not asserted), draw calls ${t1.drawCalls}`,
+    )
+    test.info().annotations.push({
+      type: 'attract fps (SwiftShader)',
+      description: String(t1.fps),
+    })
+    expect(t1.tick - t0.tick, 'the attract sim ticks').toBeGreaterThan(5)
+    expect(
+      t1.scroll.x !== t0.scroll.x || t1.scroll.y !== t0.scroll.y,
+      'the camera drifts',
+    ).toBe(true)
+    expect(t1.hud).toBe(false)
+    expect(
+      await page.evaluate(() =>
+        Object.keys(localStorage).filter((k) => k.startsWith('pm.save')),
+      ),
+      'the attract sim is never saved',
+    ).toEqual([])
+
+    // Credits is modal (report §6.11): a tap on Reset under it only closes
+    // the card, Esc closes it too.
+    await tapTarget(page, pm, 'Title', 'title:credits')
+    await expect.poll(() => creditsOpen(page)).toBe(true)
+    await tapTarget(page, pm, 'Title', 'title:reset')
+    await expect.poll(() => creditsOpen(page)).toBe(false)
+    expect(await titleDialogOpen(page), 'Reset did not open over Credits').toBe(
+      false,
+    )
+    await tapTarget(page, pm, 'Title', 'title:credits')
+    await expect.poll(() => creditsOpen(page)).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect.poll(() => creditsOpen(page)).toBe(false)
+    expect(await titleDialogOpen(page)).toBe(false)
+
+    // The attract city (L2) has Industrial live: colour frames, smoke on.
+    const fogBefore = await probeFog(page)
+    console.log(`smoke: attract Industrial ${JSON.stringify(fogBefore)}`)
+    expect(fogBefore.locked, 'Industrial is live in the attract city').toBe(
+      false,
+    )
+    expect(fogBefore.frames.length).toBeGreaterThan(0)
+    expect(fogBefore.frames.filter((f) => f.endsWith('_locked'))).toEqual([])
+
+    // New game: the player's sim replaces the attract sim under the fade.
+    await page.evaluate(() => {
+      ;(window as unknown as { pmAttract: unknown }).pmAttract =
+        window.__pm!.attractSim
+    })
+    await tapTarget(page, pm, 'Title', 'title:new-game')
+    await gameUp(page)
+    // The swap re-fogs what the demo had unlocked (B2 §5: applyLockState
+    // snaps + the ground re-bake): Industrial locked again, `_locked`
+    // frames, no chimney smoke.
+    const fogAfter = await probeFog(page)
+    console.log(`smoke: Industrial after New game ${JSON.stringify(fogAfter)}`)
+    expect(fogAfter.locked, 'Industrial is fogged again').toBe(true)
+    expect(fogAfter.frames.length).toBe(fogBefore.frames.length)
+    expect(
+      fogAfter.frames.filter((f) => !f.endsWith('_locked')),
+      'every Industrial building shows its _locked frame',
+    ).toEqual([])
+    expect(fogAfter.smoke, 'no smoke over a fogged Industrial').toBe(0)
+    const after = await page.evaluate(() => {
+      const api = window.__pm!
+      const sm = api.game.scene
+      const city = sm.getScene('City') as unknown as {
+        attract: boolean
+        vehicles: Map<number, unknown>
+        input: { enabled: boolean }
+        cameras: { main: { zoom: number } }
+      }
+      const prev = (window as unknown as { pmAttract: unknown }).pmAttract
+      return {
+        swapped: prev !== null && api.core !== prev,
+        attractSim: api.attractSim,
+        hud: sm.isActive('HUD') && !sm.isSleeping('HUD'),
+        title: sm.isActive('Title'),
+        cityAttract: city.attract,
+        cityInput: city.input.enabled,
+        zoom: city.cameras.main.zoom,
+        seed: api.seed,
+        tick: api.core.state.tick,
+        level: api.core.state.level.level,
+        views: city.vehicles.size,
+        simVehicles: api.core.state.vehicles.length,
+        policy: (api.stepper as unknown as { policy: unknown }).policy,
+      }
+    })
+    console.log(`smoke: after New game ${JSON.stringify(after)}`)
+    expect(after.swapped, '__pm.core !== the attract sim').toBe(true)
+    expect(after.attractSim).toBeNull()
+    expect(after.hud, 'the HUD is awake').toBe(true)
+    expect(after.title).toBe(false)
+    expect(after.cityAttract).toBe(false)
+    expect(after.cityInput).toBe(true)
+    expect(after.zoom).toBe(1)
+    expect(after.seed).toBe(7)
+    expect(after.level).toBe(1)
+    expect(after.tick, 'a fresh run').toBeLessThan(600)
+    expect(after.views, 'no attract vehicle left in the city').toBe(
+      after.simVehicles,
+    )
+    expect(after.policy, 'no policy drives the player’s game').toBeNull()
+
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('a failed policy chunk is never fatal: the Title on the plain backdrop', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    // The attract city's competent policy is a separate chunk (src/main.ts
+    // importPolicy); a flaky network or a redeploy race must not show the
+    // "Boot failed" card, and no policy-less demo city (its lane stalls).
+    let blocked = 0
+    await page.route(/\/assets\/policy-[\w-]+\.js$/, (route) => {
+      blocked++
+      return route.abort('failed')
+    })
+    await page.goto(TITLE_URL)
+    await titleUp(page, false)
+    await page.waitForTimeout(300)
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      const sm = api.game.scene
+      return {
+        card: document.getElementById('pm-card')?.textContent ?? null,
+        city: sm.isActive('City'),
+        attractSim: api.attractSim !== null,
+        createPolicy: api.game.registry.get('createPolicy') ?? null,
+        held: api.stepper.paused,
+      }
+    })
+    console.log(`smoke: policy chunk blocked ×${blocked} ${JSON.stringify(st)}`)
+    expect(blocked, 'the policy chunk was requested').toBeGreaterThan(0)
+    expect(st).toEqual({
+      card: null,
+      city: false,
+      attractSim: false,
+      createPolicy: null,
+      held: true,
+    })
+    // New game still works from the plain Title.
+    await tapTarget(page, pm, 'Title', 'title:new-game')
+    await gameUp(page)
+    // Only the aborted request's own network line, nothing from the game.
+    expect(
+      consoleErrors.filter((e) => !/Failed to load resource|policy-/.test(e)),
+      consoleErrors.join('\n'),
+    ).toEqual([])
   })
 })

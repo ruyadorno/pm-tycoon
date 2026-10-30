@@ -60,21 +60,28 @@ Stop the server with Ctrl-C.
   few minutes. ?debug=1 also shows the fps/draw-call overlay, allows 4x
   speed (key 4) and exposes window.__pm in the console, e.g.
   __pm.playtest() for the live playtest object and __pm.downloadPlaytest().
-  Use it after the cold run, not instead of it, and download the cold
-  run's playtest.json first: the spicy data replaces the cold run's save
-  and playtest profile in this browser.
+  Use it after the cold run, not instead of it. It keeps its own save and
+  playtest profile (keys ending in ":cfg:spicy", see 4), so the cold
+  run's save and profile stay as they were; downloading the cold run's
+  playtest.json first is still the safe habit.
 
 
 4. Where the data lives
 -----------------------
 
   localStorage on the page's origin (http://<host>:4173):
-    pm.save.v1      the autosave (every 10 s and when the tab hides)
+    pm.save.v2      the autosave (every 10 s and when the tab hides)
     pm.settings.v1  mute + speed
     pm.playtest.v1  the playtest profile (the same object as playtest.json)
-  Title -> Reset clears all three. ?newGame=1 starts fresh without the
-  Title's Continue. A different port or host is a different origin: the
-  save does not follow you between http://localhost and the LAN address.
+  A ?config=<name> session (e.g. spicy) uses its own two keys:
+    pm.save.v2:cfg:<name> and pm.playtest.v1:cfg:<name>
+  (settings are shared). A build-1 save (pm.save.v1) is never loaded: the
+  Title says "Save from an older build was reset" and removes it.
+  Title -> Reset clears all of them: the save and profile of the cold run
+  and of every config, the old pm.save.v1, and the settings. ?newGame=1
+  starts fresh without the Title's Continue. A different port or host is a
+  different origin: the save does not follow you between
+  http://localhost and the LAN address.
 
 
 5. Phone notes
@@ -96,7 +103,9 @@ Files
 
   index.html, assets/*.js      the game (Phaser 4) - *.js.map are source
                                maps, fetched only when devtools are open
-  assets/world.png/.json       the one sprite atlas (+ m5x7.xml font)
+  assets/world-<hash>.png/.json, assets/interior-<hash>.png/.json
+                               the two sprite atlases (+ m5x7-<hash>.xml
+                               font, logo-<hash>.png, attract-<hash>.json)
   audio/sf/                    FluidR3_GM instrument samples, CC-BY 3.0
                                (audio/sf/LICENSE.txt)
   configs/spicy.json           the optional short-session data override

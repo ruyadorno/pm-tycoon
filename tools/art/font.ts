@@ -1,6 +1,7 @@
 // `vlr font:build` (style-guide.md §3.1, phaser4-notes.md §7, plan.md M0
 // task 12, risk R7): the m5x7 TTF (CC0, Daniel Linssen) -> the `m5x7` glyph
-// sheet art/final/font/m5x7.png + its BMFont XML public/assets/m5x7.xml.
+// sheet art/final/font/m5x7.png + its BMFont XML src/assets/m5x7.xml (a
+// Vite `?url` import in src/render/assetUrls.ts, hashed in builds).
 //
 // - The TTF must match FONT_SHA256; it is registered with GlobalFonts and
 //   ASCII 32..126 plus '·' and '×' (both in the TTF) are rendered at 16 px,
@@ -41,7 +42,7 @@ import {
 
 export const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 export const TTF_PATH = join(ROOT, 'art/fonts/m5x7.ttf')
-export const XML_PATH = join(ROOT, 'public/assets/m5x7.xml')
+export const XML_PATH = join(ROOT, 'src/assets/m5x7.xml')
 export const FONT_SHA256 =
   '47c3f0b01f0fd417b3a44c2888a71d3072f750e76f3e6e946a6a9b188d988cbf'
 

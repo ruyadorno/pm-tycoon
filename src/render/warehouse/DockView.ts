@@ -16,8 +16,7 @@ import type { VehicleSnapshot, ViewSim } from '../../sim/view-api.ts'
 import { addPanel } from '../../ui/Panel.ts'
 import { addText, textTop } from '../../ui/text.ts'
 import { PALETTE, THEME } from '../../ui/theme.ts'
-import { WAREHOUSE_ATLAS } from '../atlases.ts'
-import { frameOrNull } from '../frames.ts'
+import { atlasOf, frameOrNull, roomAtlas } from '../frames.ts'
 import type { RoomLayers } from './LaneRenderer.ts'
 import {
   DOCK_LAMP,
@@ -91,9 +90,12 @@ export class DockView {
       y: number,
       f: string,
     ): Img => {
-      const img = scene.add
-        .image(x, y, WAREHOUSE_ATLAS, frameOrNull(f) ?? '__MISSING')
-        .setOrigin(0, 0)
+      const name = frameOrNull(f) ?? '__MISSING'
+      // back layers (walls, tail) batch from `interior`, the badges (with
+      // the dock panel and its text) from `world` (spec-build2 §6.8)
+      const back = layer === layers.walls || layer === layers.tail
+      const key = back ? roomAtlas(name) : atlasOf(name)
+      const img = scene.add.image(x, y, key, name).setOrigin(0, 0)
       layer.add(img)
       return img
     }

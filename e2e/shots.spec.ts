@@ -65,10 +65,30 @@
 //   summary-over    iPhone 16 (no PNG): one-life.json to game over, the
 //                   game-over card's `Run summary` → the card in `Back` mode
 //                   → Back returns to the game-over card
+//
+// M5 (plan-build2 §8.2 task 12 + acceptance; B2 §5, §6):
+//   title           the logo over the attract city (the Title is an overlay
+//                   on the City in attract mode, its camera still holding on
+//                   the lot), no HUD; also in the 430×932 column
+//                   (title-430x932)
+//   city-lot-zoom2  a new game at camera zoom 2 on the lot's front (S)
+//                   vertex with __pm.debugLotCorners(true): magenta crosses
+//                   on the footprint's corners (iso tileToScreen; the S one
+//                   and both front edges in frame) to read the slab against
+//                   the grid
+//   city-bike       policy 40 s, the camera following the first bike at
+//                   zoom 2 (the courier on a bicycle with a helmet, B2 §6.2)
+//   city-hop        policy: the first bike followed at zoom 2, its first
+//                   pickup rendered frame by frame, then ~210 ms into the
+//                   300-ms hop — the icon sinking into the vehicle body
+//                   (B2 §6.3) + city-hop-crop.png, the G4 sheet's hop cell
+//   docks-locked    a new game panned to the fogged Docks (pm:panTo): the
+//                   modern port sprites as `_locked` scenery (B2 §6.4)
+//   warehouse-l1    (kept; regenerated with the interior atlas)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
-import { expect, test, type PmHelpers } from './fixtures.ts'
+import { expect, test, titleUp, type PmHelpers } from './fixtures.ts'
 import {
   bayRect,
   openSheet,
@@ -233,15 +253,44 @@ async function openGarage(page: Page, pm: PmHelpers): Promise<void> {
 
 test.describe('M1 shots', () => {
   test('title', async ({ page, pm, consoleErrors }) => {
-    phoneOnly()
+    phoneAndColumn()
     await page.goto(BASE)
-    // __pm.ready waits for the world scene; the Title comes first.
-    await page.waitForFunction(
-      () => window.__pm?.game.scene.isActive('Title') === true,
-      null,
-      { timeout: 45_000 },
-    )
-    await pm.shot('title', 40)
+    // __pm.ready waits for the player's game; the Title over the attract
+    // city (B2 §5) comes first. Frozen at once: the tour holds 1 s on the lot.
+    await titleUp(page)
+    await pm.freeze()
+    await pm.shot(shotName('title'), 40)
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      const sm = api.game.scene
+      const title = sm.getScene('Title') as unknown as {
+        children: {
+          list: {
+            getData?(k: string): unknown
+            texture: { key: string }
+            visible: boolean
+          }[]
+        }
+      }
+      const logo = title.children.list.find(
+        (o) => o.getData?.('id') === 'title:logo',
+      )
+      return {
+        logo: logo ? logo.texture.key : null,
+        logoVisible: logo?.visible ?? false,
+        hud: sm.isActive('HUD'),
+        attract: api.attractSim !== null && api.core === api.attractSim,
+        vehicles: api.core.state.vehicles.length,
+      }
+    })
+    console.log(`shots: title ${JSON.stringify(st)}`)
+    expect(st).toMatchObject({
+      logo: 'logo',
+      logoVisible: true,
+      hud: false,
+      attract: true,
+    })
+    expect(st.vehicles).toBeGreaterThanOrEqual(4)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
@@ -1209,8 +1258,20 @@ test.describe('M4 shots', () => {
     expect(p.fps.samples).toBeGreaterThan(30)
     expect(p.firstDeliveryS).not.toBeNull()
     const st = await summaryState(page)
+    // The card shows elapsedS as of its opening (the recorder's
+    // summaryOpenedS, the same frame); the wall clock runs on until
+    // playtest() is read, so p.elapsedS can be a second further.
+    const shown = await page.evaluate(
+      (fallback) =>
+        (
+          window.__pm!.game.registry.get('playtest') as
+            | { summaryOpenedS: number | null }
+            | undefined
+        )?.summaryOpenedS ?? fallback,
+      p.elapsedS,
+    )
     expect(st.title).toBe(
-      `Run summary — seed 7 — ${Math.floor(p.elapsedS / 60)}:${String(Math.floor(p.elapsedS % 60)).padStart(2, '0')} played`,
+      `Run summary — seed 7 — ${Math.floor(shown / 60)}:${String(Math.floor(shown % 60)).padStart(2, '0')} played`,
     )
     expect(st.checks.map((c) => c.n)).toEqual([1, 2, 3, 4, 5])
     await pm.shot('summary-card', 20)
@@ -1273,6 +1334,302 @@ test.describe('M4 shots', () => {
     await pm.settle(8)
     st = await summaryState(page)
     expect(st).toMatchObject({ open: false, overOpen: true, paused: true })
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M5 ------------------------------------------------------------------
+
+test.describe('M5 shots', () => {
+  test('city-lot-zoom2', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(CITY)
+    await pm.freeze()
+    // The lot footprint's iso corners (iso.ts: tile centre = ox + (tx −
+    // ty)·32, (tx + ty)·16; the diamond's vertices ±32 / ±16 from it).
+    const info = await page.evaluate(() => {
+      const api = window.__pm!
+      const city = api.game.scene.getScene('City') as unknown as {
+        ox: number
+        rig: { zoomAt(z: 1 | 2, px: number, py: number): void }
+        focusOn(x: number, y: number, ms: number): void
+      }
+      const wh = api.data.map.lot.warehouse
+      const [tx, ty] = wh.tile
+      const x1 = tx + wh.footprint[0] - 1
+      const y1 = ty + wh.footprint[1] - 1
+      const at = (a: number, b: number): { x: number; y: number } => ({
+        x: city.ox + (a - b) * 32,
+        y: (a + b) * 16,
+      })
+      const n = at(tx, ty)
+      const e = at(x1, ty)
+      const s = at(x1, y1)
+      const w = at(tx, y1)
+      const corners = {
+        n: { x: n.x, y: n.y - 16 },
+        e: { x: e.x + 32, y: e.y },
+        s: { x: s.x, y: s.y + 16 },
+        w: { x: w.x - 32, y: w.y },
+      }
+      const { width: W, height: H } = api.game.scale
+      city.rig.zoomAt(2, Math.round(W / 2), Math.round(H / 2))
+      // A zoom-2 phone frame is ~196 world px wide (the diamond is 256):
+      // centre just above the front (S) vertex, so both front edges run
+      // out of it — the walls hide the back half of the slab anyway.
+      city.focusOn(corners.s.x, corners.s.y - 40, 0)
+      return { corners, on: api.debugLotCorners(true) }
+    })
+    await pm.settle(10)
+    const screen: Record<string, Pt> = {}
+    for (const [k, c] of Object.entries(info.corners))
+      screen[k] = await cityScreen(page, c)
+    console.log(
+      `shots: city-lot-zoom2 lot corners world ${JSON.stringify(info.corners)} → screen ${JSON.stringify(screen)}`,
+    )
+    expect(info.on, '__pm.debugLotCorners(true) drew the marks').toBe(true)
+    expect(
+      await page.evaluate(
+        () => window.__pm!.game.scene.getScene('City').cameras.main.zoom,
+      ),
+    ).toBe(2)
+    await pm.shot('city-lot-zoom2', 10)
+    expect(await page.evaluate(() => window.__pm!.debugLotCorners(false))).toBe(
+      false,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('city-bike', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(POLICY)
+    await runFor(page, pm, 40_000)
+    const id = await page.evaluate(
+      () =>
+        window.__pm!.sim.vehicles.find((v) => v.type === 'bike')?.id ?? null,
+    )
+    expect(id, 'the policy owns a bike').not.toBeNull()
+    await page.evaluate((vid) => {
+      const api = window.__pm!
+      const city = api.game.scene.getScene('City') as unknown as {
+        rig: { zoomAt(z: 1 | 2, px: number, py: number): void }
+      }
+      const { width: W, height: H } = api.game.scale
+      city.rig.zoomAt(2, Math.round(W / 2), Math.round(H / 2))
+      api.game.events.emit('pm:follow', { vehicleId: vid })
+    }, id!)
+    // shot(…, 0) renders no frame of its own: hide the overlay and stamp now.
+    await pm.overlay(false)
+    await pm.stamp('test')
+    await pm.settle(60)
+    // Ride on until nothing drawn in front of the bike (a building, the
+    // warehouse, a prop) overlaps its sprite, so the courier reads whole.
+    const clearAfter = await page.evaluate(
+      ({ vid, capFrames }) => {
+        const api = window.__pm!
+        type Img = {
+          depth: number
+          visible: boolean
+          getBounds(): { x: number; y: number; width: number; height: number }
+        }
+        const city = api.game.scene.getScene('City') as unknown as {
+          buildings: Map<string, { image: Img | null }>
+          props: { img: Img | null }[]
+          warehouse: Img | null
+          vehicles: Map<number, { img: Img }>
+        }
+        const overlaps = (a: Img, b: Img): boolean => {
+          const p = a.getBounds()
+          const q = b.getBounds()
+          return (
+            p.x < q.x + q.width &&
+            q.x < p.x + p.width &&
+            p.y < q.y + q.height &&
+            q.y < p.y + p.height
+          )
+        }
+        const clear = (): boolean => {
+          const v = city.vehicles.get(vid)
+          if (!v) return false
+          const front = [
+            ...[...city.buildings.values()].map((b) => b.image),
+            ...city.props.map((pr) => pr.img),
+            city.warehouse,
+          ]
+          return front.every(
+            (o) =>
+              !o || !o.visible || o.depth < v.img.depth || !overlaps(o, v.img),
+          )
+        }
+        for (let f = 0; f < capFrames; f++) {
+          if (clear()) return f
+          api.step(16)
+        }
+        return null
+      },
+      { vid: id!, capFrames: 3000 },
+    )
+    console.log(
+      `shots: city-bike clear of occluders after ${clearAfter} frames`,
+    )
+    const st = await page.evaluate((vid) => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        followId: number | null
+        vehicles: Map<
+          number,
+          { x: number; y: number; img: { frame: { name: string } } }
+        >
+        cameras: {
+          main: {
+            zoom: number
+            worldView: { contains(x: number, y: number): boolean }
+          }
+        }
+      }
+      const v = city.vehicles.get(vid)
+      const cam = city.cameras.main
+      return {
+        zoom: cam.zoom,
+        followId: city.followId,
+        onScreen: v ? cam.worldView.contains(v.x, v.y) : false,
+        frame: v?.img.frame.name ?? null,
+      }
+    }, id!)
+    console.log(`shots: city-bike ${JSON.stringify(st)}`)
+    expect(st.zoom).toBe(2)
+    expect(st.followId).toBe(id)
+    expect(st.onScreen, 'the bike is in view').toBe(true)
+    expect(st.frame ?? '').toMatch(/^bike_/)
+    await pm.shot('city-bike', 0)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('city-hop', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(180_000)
+    await pm.open(POLICY)
+    // The policy buys a bike in the first seconds: follow it at zoom 2 (a
+    // hop off screen is never spawned) and render every frame up to its
+    // first pickup, so the view (and so the hop's end point) is current.
+    await runFor(page, pm, 5_000)
+    const id = await page.evaluate(
+      () =>
+        window.__pm!.sim.vehicles.find((v) => v.type === 'bike')?.id ?? null,
+    )
+    expect(id, 'the policy owns a bike').not.toBeNull()
+    await page.evaluate((vid) => {
+      const api = window.__pm!
+      const city = api.game.scene.getScene('City') as unknown as {
+        rig: { zoomAt(z: 1 | 2, px: number, py: number): void }
+      }
+      const { width: W, height: H } = api.game.scale
+      city.rig.zoomAt(2, Math.round(W / 2), Math.round(H / 2))
+      api.game.events.emit('pm:follow', { vehicleId: vid })
+    }, id!)
+    // shot(…, 0) renders no frame of its own: hide the overlay and stamp now.
+    await pm.overlay(false)
+    await pm.stamp('test')
+    await pm.settle(30)
+    const hop = await page.evaluate(
+      ({ vid, capFrames, sinkFrames }) => {
+        const api = window.__pm!
+        type HopSlot = {
+          kind: string | null
+          sink: boolean
+          age: number
+          side: number
+          x1: number
+          y1: number
+          container: { x: number; y: number }
+        }
+        const city = api.game.scene.getScene('City') as unknown as {
+          popups: { slots: HopSlot[] }
+        }
+        const ev = api.core.events as unknown as {
+          on(n: string, f: (pl: { vehicleId: number }) => void): unknown
+          off(n: string, f: (pl: { vehicleId: number }) => void): unknown
+        }
+        const got = { picked: false }
+        const fn = (pl: { vehicleId: number }): void => {
+          if (pl.vehicleId === vid) got.picked = true
+        }
+        ev.on('parcel:pickedUp', fn)
+        let frames = 0
+        while (!got.picked && frames < capFrames) {
+          api.step(16)
+          frames++
+        }
+        ev.off('parcel:pickedUp', fn)
+        const s = city.popups.slots.find((x) => x.kind === 'hop' && x.sink)
+        const picked = got.picked
+        if (!picked || !s) return { picked, frames, slot: false }
+        for (let i = 0; i < sinkFrames; i++) api.step(16)
+        return {
+          picked,
+          frames,
+          slot: true,
+          age: s.age,
+          side: s.side,
+          end: { x: s.x1, y: s.y1 },
+          at: { x: s.container.x, y: s.container.y },
+        }
+      },
+      // ~210 ms into the 300-ms hop (the spawn frame + 12): k ≈ 0.7, a
+      // quarter into the sink (the icon cropped to ~12 of its 16 px).
+      { vid: id!, capFrames: 6000, sinkFrames: 12 },
+    )
+    console.log(`shots: city-hop ${JSON.stringify(hop)}`)
+    expect(hop.picked, 'the bike picked a parcel up').toBe(true)
+    expect(hop.slot, 'a sinking pickup hop is in flight').toBe(true)
+    expect(hop.side, 'the icon is shrinking').toBeLessThan(16)
+    expect(hop.side, 'the icon is still visible').toBeGreaterThan(0)
+    const end = await cityScreen(page, hop.end ?? { x: 0, y: 0 })
+    console.log(`shots: city-hop end point on screen ${JSON.stringify(end)}`)
+    const path = await pm.shot('city-hop', 0)
+    // The G4 sheet's hop cell (`node tools/art/contact.ts fixes --hop
+    // shots/city-hop-crop.png`): 96×64 logical px around the end point.
+    const clip = await page.evaluate((p) => {
+      const game = window.__pm!.game
+      const r = game.canvas.getBoundingClientRect()
+      const z = game.scale.zoom
+      return {
+        x: r.left + (p.x - 48) * z,
+        y: r.top + (p.y - 38) * z,
+        width: 96 * z,
+        height: 64 * z,
+      }
+    }, end)
+    await page.screenshot({
+      path: path.replace(/\.png$/, '-crop.png'),
+      clip,
+      scale: 'device',
+    })
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('docks-locked', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(CITY)
+    await pm.freeze()
+    expect(
+      await page.evaluate(() => window.__pm!.sim.regionState('docks')),
+    ).toBe('locked')
+    await emit(page, 'pm:panTo', { regionId: 'docks' })
+    await pm.settle(40) // the 350-ms pan
+    const frames = await page.evaluate(() => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        byDistrict: Map<
+          string,
+          { id: string; image: { frame: { name: string } } | null }[]
+        >
+      }
+      return (city.byDistrict.get('docks') ?? []).map(
+        (v) => `${v.id}:${v.image?.frame.name ?? '-'}`,
+      )
+    })
+    console.log(`shots: docks-locked frames ${frames.join(' ')}`)
+    expect(frames.length).toBeGreaterThan(0)
+    await pm.shot('docks-locked', 10)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

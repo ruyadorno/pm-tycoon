@@ -11,7 +11,9 @@
 // with the R4 trigger `p50 < 50 or p5 < 30` and cuts one more level per bad
 // window; it never raises the level again (no oscillation). The sampler
 // skips frames while the loop is not running (the __pm.freeze test clock),
-// while the page is hidden, and entirely under automation
+// while the page is hidden, while the caller's `skip` says so (the Title's
+// attract city, B2 §5: its idle time, sample decode and swap are not play;
+// the open window starts afresh), and entirely under automation
 // (navigator.webdriver: SwiftShader frame rates are not a phone's).
 //
 // The controller lives in game.registry 'quality' (installQuality is
@@ -126,6 +128,13 @@ export class FpsWindow {
     return bad
   }
 
+  /** Drop the open window (the next push starts a new one). */
+  reset(): void {
+    this.samples = []
+    this.windowStart = null
+    this.lastSample = -Infinity
+  }
+
   /** Samples in the open window (tests / overlay). */
   get count(): number {
     return this.samples.length
@@ -173,12 +182,20 @@ function pageHidden(): boolean {
   return g.document?.hidden === true
 }
 
+export interface QualityOptions {
+  /** True while frames must not be judged (the window restarts afterwards). */
+  skip?: () => boolean
+}
+
 /**
  * Install (once per game) the quality controller: boot level from the core
  * count, then the fps sampler on every game step. Returns the existing one
- * when already installed.
+ * when already installed (its options stay the first call's).
  */
-export function installQuality(game: QualityGame): QualityController {
+export function installQuality(
+  game: QualityGame,
+  opts: QualityOptions = {},
+): QualityController {
   const existing = game.registry.get(REG_QUALITY) as
     | QualityController
     | undefined
@@ -203,6 +220,10 @@ export function installQuality(game: QualityGame): QualityController {
     if (!sampler || level >= MAX_QUALITY_LEVEL) return
     const loop = game.loop
     if (!loop.running || pageHidden()) return
+    if (opts.skip?.()) {
+      sampler.reset()
+      return
+    }
     if (sampler.push(loop.now, loop.actualFps))
       set(level + 1, `fps window at ${Math.round(loop.now / 1000)} s`)
   }

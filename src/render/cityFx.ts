@@ -7,12 +7,20 @@
 // B, their countdown ring, the gold hop icon) and of the M8 docks 2–3
 // (design-m8-m9 §6.2: bay lights and docked poses by dock NUMBER, the dock
 // run mapping the hidden dock column onto the SW face's bays; the overseas
-// hubs' ring and vessel live in cityHub.ts). No Phaser, no DOM: CityScene /
+// hubs' ring and vessel live in cityHub.ts) and of the M9 ground fog
+// (groundRegionAt: a scenery row may belong to a region — the runway fogs
+// with the Airport). No Phaser, no DOM: CityScene /
 // BuildingView / VehicleView / DistrictLabel / ground.ts drive their sprites
 // from these and Vitest pins them under Node (tests/render/cityFx.test.ts,
 // tests/render/ground-slab.test.ts). Every time is ms on the scene clock
 // (frozen-clock friendly: __pm.freeze steps it).
-import { isRoadTile, mapBlockAt, type MapData, type XY } from '../data/index.ts'
+import {
+  inRect,
+  isRoadTile,
+  mapBlockAt,
+  type MapData,
+  type XY,
+} from '../data/index.ts'
 import type { BuildingId, Parcel } from '../sim/types.ts'
 import type { QuestView } from '../sim/view-api.ts'
 import { WH_ANCHORS, type WarehouseAnchorSet } from './frames.generated.ts'
@@ -39,6 +47,40 @@ export function signPopFrame(msSincePop: number): number | null {
     SIGN_POP_FRAMES - 1,
     Math.floor((msSincePop / SIGN_POP_MS) * SIGN_POP_FRAMES),
   )
+}
+
+/**
+ * A map.ground.scenery row as the ground bake reads it: M9 lets a row name
+ * the region it belongs to (optional `region`, a districts.json id).
+ */
+type SceneryRow = MapData['ground']['scenery'][number] & {
+  region?: string | null
+}
+
+/**
+ * M9 (style-guide.md §2.2: `tarmac` / `runway` / `runway_stripe` are the
+ * Airport's locked scenery; design-m8-m9 §6.2: the L4/L5 regions unlock
+ * through the M3 crossfade and its ground re-bake): the region whose lock
+ * state fogs ground tile (x, y) — a region block's district; else, on a
+ * non-road tile outside every block, the `region` of the first
+ * map.ground.scenery row covering it (groundAt's first-match rule), so the
+ * runway strip east of the Airport blocks is drawn `_locked` until the
+ * Airport opens and crossfades with it; else null (roads, the lot, the lake
+ * and beach blocks, scenery rows naming no region such as the sea and the
+ * tree lines: never fogged).
+ */
+export function groundRegionAt(
+  map: MapData,
+  x: number,
+  y: number,
+): string | null {
+  if (isRoadTile(map, x, y)) return null
+  const block = mapBlockAt(map, x, y)
+  if (block) return block.kind === 'region' ? block.region : null
+  const row = map.ground.scenery.find((r) => inRect(r.rect, x, y)) as
+    | SceneryRow
+    | undefined
+  return row?.region ?? null
 }
 
 // ---------------------------------------------------------------- level-up moment (§9.6)

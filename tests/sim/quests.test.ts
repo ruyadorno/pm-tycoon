@@ -7,7 +7,10 @@
 // counts toward lifetime earned, lives capped at 5, star applicant appears
 // with fee 0 and leaves after 2 days", satisfaction outside the cap, the
 // voucher), every command failure, determinism with saves mid-quest, and the
-// no-double-counting property test over 200 seeded random feeds.
+// no-double-counting property test over 200 seeded random feeds. M9 (design-
+// m8-m9 §4.5, §7 M9 6): the Golden Release at the real L5 — the shipped cap
+// 5, the threshold earned — offered on `level:up {5}`, kept by Later, its
+// 60 / 0 / 90 % counters, Victory.
 
 import { describe, expect, it } from 'vitest'
 import type { SimEventName, SimEventPayloads } from '../../src/sim/events.ts'
@@ -475,21 +478,21 @@ describe('goal counters on a scripted event feed (design-m7 §3.3, §3.4)', () =
     expect(sim.state.quests.history.at(-1)?.outcome).toBe('completed')
   })
 
-  it('satisfactionAtLeast: the target’s satisfaction reaches 60 (already there → done next step)', () => {
+  it('satisfactionAtLeast: the target’s satisfaction reaches 52 (already there → done next step)', () => {
     const sim = noOffers(quietSim(1))
     sim.state.districts.downtown!.satisfaction = 45
     const q = startQuest(sim, 'cheer_up')
-    expect(q).toMatchObject({ target: 'downtown', goal: 60 })
+    expect(q).toMatchObject({ target: 'downtown', goal: 52 })
     expect(q.progress).toEqual({
       kind: 'satisfactionAtLeast',
       start: 45,
       satisfaction: 45,
     })
-    sim.state.districts.downtown!.satisfaction = 58
+    sim.state.districts.downtown!.satisfaction = 50
     runTicks(sim, 1)
-    expect(q.progress).toMatchObject({ satisfaction: 58 })
-    expect(createViewSim(sim).quests().active?.progress01).toBeCloseTo(13 / 15)
-    sim.state.districts.downtown!.satisfaction = 60
+    expect(q.progress).toMatchObject({ satisfaction: 50 })
+    expect(createViewSim(sim).quests().active?.progress01).toBeCloseTo(5 / 7)
+    sim.state.districts.downtown!.satisfaction = 52
     runTicks(sim, 1)
     expect(sim.state.quests.history.at(-1)?.outcome).toBe('completed')
   })
@@ -1337,5 +1340,80 @@ describe('no quest counts an event twice (plan-build2 §8.4 acceptance; design-m
     }
     expect(completedMidFeed).toBeGreaterThan(20)
     expect(failedMidFeed).toBeGreaterThan(0) // the ultimate's malware fail
+  })
+})
+
+describe('the Golden Release at the real L5 (M9: the shipped cap 5; design-m8-m9 §4.5, §7 M9 6)', () => {
+  it('offered on the level:up {5} tick of an earned L5; Later keeps it (no expiry, no Decline); 60 deliveries, 0 malware, 90 % on time → Victory: economy.victory, stats.victoryTick, game:victory', () => {
+    const L5 = data.levels.find((l) => l.level === 5)!
+    const u = L5.ultimateQuest!
+    expect(u).toMatchObject({
+      deliveries: 60,
+      maxMalwareDelivered: 0,
+      minOnTimeRate: 0.9,
+    })
+    expect(data.economy.playtestMaxLevel).toBe(5)
+    const sim = noOffers(quietSim(21))
+    const log = eventLog(sim)
+    sim.state.economy.lifetimeEarned = L5.threshold
+    runTicks(sim, 1)
+    const at = sim.state.tick
+    expect(sim.state.level.level).toBe(5)
+    expect(sim.commandLog).toEqual([])
+    const up5 = log.findIndex(
+      (e) => e.name === 'level:up' && (e.p as { level: number }).level === 5,
+    )
+    const offered = log.findIndex((e) => e.name === 'quest:offered')
+    expect(up5).toBeGreaterThanOrEqual(0)
+    expect(offered).toBeGreaterThan(up5)
+    expect(log[offered]).toMatchObject({
+      tick: at,
+      p: { templateId: u.id, ultimate: true, target: null },
+    })
+    const q = sim.state.quests.offer!
+    expect(q).toMatchObject({ templateId: u.id, expiresTick: null })
+    // Later: nothing to do — it waits; Decline is refused.
+    expect(sim.dispatch({ kind: 'declineQuest', questId: q.id })).toEqual({
+      ok: false,
+      reason: 'invalid',
+    })
+    for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+    runTicks(sim, 3 * DAY)
+    expect(sim.state.quests.offer?.id).toBe(q.id)
+    expect(acceptOffer(sim).id).toBe(q.id)
+    const parcels = Array.from({ length: u.deliveries }, (_, i) =>
+      injectParcel(
+        sim,
+        i % 2 ? 'hr_towers_a' : 'dt_registry_tower',
+        i % 2 ? 'dt_cache_cafe' : 'hr_towers_b',
+      ),
+    )
+    parcels.slice(0, 6).forEach((p) => deliver(sim, p, false))
+    parcels.slice(6, -1).forEach((p) => deliver(sim, p))
+    runTicks(sim, 1)
+    expect(sim.state.quests.active?.progress).toEqual({
+      kind: 'ultimate',
+      delivered: 59,
+      onTime: 53,
+      malware: 0,
+    })
+    expect(sim.state.economy.victory).toBe(false)
+    const victory = collect(sim, 'game:victory')
+    deliver(sim, parcels.at(-1)!) // 54 / 60 = 90 %
+    runTicks(sim, 1)
+    const t = sim.state.tick
+    expect(victory).toEqual([{ day: sim.state.day }])
+    expect(sim.state.economy.victory).toBe(true)
+    expect(sim.state.stats.victoryTick).toBe(t)
+    expect(sim.state.quests.history.at(-1)).toMatchObject({
+      templateId: u.id,
+      outcome: 'completed',
+      tick: t,
+    })
+    expect(createViewSim(sim).quests()).toMatchObject({
+      victory: true,
+      victoryTick: t,
+    })
+    expect(auditState(sim.state, sim.data)).toEqual([])
   })
 })

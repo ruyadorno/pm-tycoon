@@ -526,3 +526,91 @@ M7 review fixes (rules the M7 contract did not state, or stated against the spec
   terminal + cargo hangar re-rolled, tower, plane; ten Park & civic uniques with `cv_changelog_stadium` re-rolled without
   townhouses); five old shared rows retired; world atlas 80.1 % (over M5's 75 % target, under the R13 trigger of 90 % —
   no shared locked silhouettes, no `city2`).
+
+## Run decisions and deviations (M9 — L4 + L5 Tycoon)
+
+- **The level cap reaches 5** (`economy.json playtestMaxLevel`, B2 §9 end value): the at-cap escalation never fires on
+  shipped data; only Victory starts the endless ramp (M7 Q16). The Airport hub row and props joined `map.json hubs`;
+  the schema now requires a hub row for every overseas district live at or below the cap.
+- **Balance pass (plan-build2 §8.6 task 5, B2 §7.3 order), seeds 1–10 medians:**
+  - L4 threshold $9,000 → $5,200 and L5 $16,000 → $7,400 (`levels.json`; rows `level4Min`, `level5Min` — "a late level →
+    lower its threshold"): before, L4 31.84 min with 3/10 seeds reaching it by 30 min and no L5 by 35 min; after, L4
+    22.35, L5 26.91 on the balance lane's tree — the final gate (with X-ray first below) reads L4 22.35, L5 27.70. A scan of L4 5,000–5,800 × L5 7,400–8,600 rejected 5,800/8,600 (L5 30.2) and 5,400/7,400 (35-min
+    lives 0.5); over 100 seeds L4 22.13, L5 27.31. spec-core §7.6's $9,000 / $16,000 are superseded by the data.
+  - `customs_run` count 6 → 3, limitDays 4 → 5 (row `questsCompletedBy30MinMin`; B2 §3.2 bound at ~0.9 clearances/min):
+    0/5 completed at M8 → 3/3.
+  - `cheer_up` goal 60 → 52 (same row; targets start at 36–48 and the policy never steers a district; 55 gave 0/8, 52 gives
+    2/8; the schema keeps the goal above the 50 target threshold). Closes M7's open item.
+  - Dock 3 $2,000 → $1,000 (`economy.json docks`; informational rows `dock3Min`, `victoryMaxMin`, "dock late → price";
+    spec-core §7.6 places dock 3 before L5): bought at 33.4 → 31.5 min over 40 seeds; victories by 48 min 7 → 18 of 40.
+    Supersedes spec-core Q-SP9's $2,000.
+  - `postVictoryPerDay` 0.005 → 0.01 (back to B2 §3.4's +0.01/day): with the cap at 5 it only drives endless after Victory;
+    no row moves.
+- **Policy L4/L5 plan** (B2 §7.2): L4 X-ray → dock 3 → the Sorter Arm into the empty station → 2nd van → counters; L5
+  accept the Golden Release → 3rd truck → counters. Once the Arm holds the Hold Bay the policy stops tossing by hand
+  (`armHoldsBay`), so the Arm's 3-s auto-Toss does the work. **X-ray first** (policy extension, like COUNTERS): when L4
+  arrives the X-ray is bought before any L3 step still pending — a competent player covers the newly announced `dense`
+  strain first; over seeds 1–10 × 48 min lives lost 15 → 7, over 40 seeds × 30 min the share losing a life 43 % → 35 %.
+  Only the X-ray moves (the L3 tail keeps its order behind it). **Its cost is on Victory**: the van and 2nd truck come
+  ~4 min later, so the fleet is thinner when the Golden Release runs — seeds 1–10 × 48 min, wins by 45 min 2 → 0 (M9 sim
+  review, rule toggled off vs on); L5 +0.7 min (26.91 → 27.70). Kept: lives is a gated row, victory informational.
+- **Victory by 45 min on seeds 1–3 (plan-build2 §8.6 acceptance) is not met — waived pending the author's call.**
+  `victoryMaxMin` is informational (B2 §7.3). Competent policy, current tree, seeds 1–40 × 48 min: 10/40 win, 0 by 45 min
+  (seed 2 at 45.70, seeds 1 and 3 none). The Golden Release is accepted at L5 (~27 min) while the fleet is 5–7 vehicles;
+  attempts fail its 90 % on-time rule (seed 3: 43 %, 43 %, 88.6 %, then a pass) — the economy, not a counting bug (the
+  quest's counters match an independent event count). Plan orders measured (seeds 1–10, 40 for the first two): L4 X-ray →
+  Sorter Arm → 2nd van, L5 3rd truck → dock 3 — 14/40 win, 4/40 by 45 min (seeds 2 at 43.93 and 3 at 42.40; seed 1
+  never by 48 min); vans before dock 3 (X-ray → 2nd van → dock 3 → Arm) 2/10 by 45; X-ray → 2nd van → Arm, dock 3 after the
+  3rd truck 0/10. No order reaches seed 1, so the plan keeps B2 §7.2's order; the levers are balance (the ultimateQuest
+  on-time rate / window, or L5 fleet cost — §7.6 order) and were not touched in the M9 fix pass. The long test
+  (`victory.long.test.ts`) now asserts at least one of seeds 1–3 wins by 48 min (seed 2 does), so its chain checks are
+  never vacuous; the 45-min target stays printed.
+- **The CLI's stuck rule** (`tools/sim/cli.ts stuckKey`, also `tests/sim/robust.ts` `stuck: 'progress'`): "no vehicle in
+  one state > 120 s" (plan.md §6.9.2) flagged genuine L4–L5 delivering legs (12–19 stops, ~110 s on the road), so since M9
+  it is "no progress for 120 s" — progress = a change of state, cargo count, stop index, wait timer or reservation count,
+  never position (a vehicle looping on a bad route moves every tick but is still stuck). The longest stretch without a
+  key change measured over 6 runs × 60 min, both policies, is 28–33 s; the chaos, policy and delegating sweeps pass.
+- **Room growth** (B2 §4.4, design R2/R10/R21/R22): rows 14/14/14/16/**18** (six slots at the 64-px pitch need 18 rows;
+  B2 says 16/16); slots 5–6 unroll below slot 4 and everything at y ≥ 352 moves down 64/128 px; the room scrolls (integer,
+  clamped) only when it does not fit — tier 4 by 64 px at 360×604 and 9 px at 393×659, tier 5 by 128 / 73 px — with the
+  readout fixed above it; a vertical move > 8 px before the 450-ms lift scrolls, a lifted fixture never scrolls; cards
+  opened from the room scroll their target toward view (as far as the range goes: a BuySheet still covers slot 6 at
+  max scroll, as it covers the lowest slots of a room that fits — no overscroll); a level-up inside the room rebuilds it on
+  the next frame under the tier fade, the old room fading on the new room's origin so what they share lines up with the
+  taps. The scroll moves the room container (no second camera); a mouse wheel scrolls 32 px per notch.
+  - **The cover** over the bands outside the viewport is two world-atlas `ui_panel_dark` nine-slices FILL-tinted the
+    camera's background colour, their rounded corners bled off screen (`coverRects`), so it batches with the readout and
+    the HUD: tier 4–5 at 393×659 drew 9 calls with a Graphics cover (M9 review), 6 now in `dist.spec`'s tier-5
+    scrolled check (budget 7).
+  - **Slack**: a room block up to 4 px too tall fits, the readout moving up into its 4-px top margin (`ROOM_SLACK`) — at
+    375×667 tier 4 overflows by 1 px, which scrolled 1 px and raised the cover for it.
+  - **Gestures**: a press whose pointer-up a HUD band caught (the HUD scene is on top) is dropped on the next frame or the
+    next pointer-down (another `downTime`), so a lifted ghost snaps back; tooltips anchor on a picked rect's top clamped
+    into the viewport, popovers below the HUD's top band; the readout's tap flash draws in the readout's own container.
+  - **No scroll affordance** (no bar, fade or hint): R22's cut order; a shelf stall is announced by the fixed readout.
+    Open UX item for the author (M9 mobile review: the tier-5 shelf is off screen at scroll 0 on both phones).
+  - The HUD toast lane follows the room's height on a level-up or a sim swap inside the warehouse (was only on a view
+    switch or resize).
+- **Map data**: the Airport `labelTile` moved [39,10] → [41,10] so the pan to the Airport frames the plane at its stand,
+  the terminal, the tower and the hangar door; `map.ground.scenery[]` rows take an optional `region` (schema-checked
+  against the districts) and fog with that district — the runway, its apron and thresholds (airport), the field rows
+  (rural) and the fountain (civic).
+- **Dock price tag**: a buyable dock's price sits on a `ui_badge` pill (dark text) under the door's "+" — the tier-4
+  steel and tier-5 glass walls are too light for the white `Lv3` text style.
+- **Attract fixture**: the scan window runs 24 → 34 min (design R15 said 24 → 30): with X-ray first seed 7's van comes at
+  ≈ 29 min and its 2nd truck at ≈ 32 min, and the fixture still needs a van and two trucks.
+- **`?level=N` strain lines**: a level forced at tick 0 announces its strains at tick 0, which the start strain's
+  "no spotted line" rule silenced; now only the first levels.json row's strain is silent, so a debug `?level=5` session
+  shows "New strain spotted" for rattle, battery and dense newStrainDelayS in (debug builds only; no gate row moves).
+- **City**: the plane crosses the runway nose first and fades over the last 20 % of its climb; every clearance stamp
+  (`CLEARED +$N`, `SHIP HAS SAILED`, `PLANE HAS LEFT`) rises from above the office's ring; the runway is Airport scenery
+  that fogs with its region; `dk_ship` was re-rolled with its bow toward its exit (48 generations incl. an `xray`
+  re-roll).
+- **HUD/Title**: at the top level the bar drops "coming soon"; after Victory the tap toast reads `Tycoon ✓ — endless mode`;
+  the Title's Continue line shows `Tycoon ✓` for a save with Victory (✓ is a new m5x7 glyph, like ★ in M7); the
+  lost-life route for an Airport clearance ends "— the plane has left" (R11).
+- **Tier art**: tier 4 charcoal floor and steel walls with racking and a forklift; tier 5 white terrazzo, glass walls and
+  pink neon (`neon_strip` replaces the strip lights), lane lines pink.
+- **Fixtures/shots**: `l3-docks.json` is taken at a real L4 (seed 7 has no Docks hand-off between dock 2 and L4); M9 shots
+  skip the tour hints so region and room art are not covered; `golden-release-offer` abandons the policy's active quest
+  first.

@@ -29,7 +29,8 @@
 //      playtest-1 paths; both atlases are textures, the logo a texture and
 //      the snapshot in the JSON cache. Draw calls (plan-build2 §6 / §8.2 task
 //      8, iPhone profile = one texture per batch): City + HUD ≤ 3, Warehouse
-//      + HUD ≤ 7 after 60 s of the policy.
+//      + HUD ≤ 7 after 60 s of the policy, and ≤ 7 again at tier 5 scrolled
+//      (M9 review: the cover over the bands batches with the readout).
 import { readFileSync } from 'node:fs'
 import type { CDPSession, Page } from '@playwright/test'
 import sharp from 'sharp'
@@ -466,6 +467,38 @@ test.describe('dist build (vite preview of dist/)', () => {
     expect(warehouse, 'Warehouse + HUD draw calls').toBeLessThanOrEqual(
       WAREHOUSE_DRAW_CALLS,
     )
+
+    // M9 review: tier 5 on this phone scrolls, so the cover over the bands
+    // is up — it must batch with the readout and the HUD (≤ 7 still).
+    expect(
+      await page.evaluate(
+        () => window.__pm!.dispatch({ kind: 'debugForceLevel', level: 5 }).ok,
+      ),
+    ).toBe(true)
+    await pm.settle(24)
+    const t5 = await page.evaluate(() => {
+      const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+        stats(): { tier: number; maxScroll: number }
+        scrollTo(y: number): number
+      }
+      wh.scrollTo(30)
+      return wh.stats()
+    })
+    expect(t5.tier).toBe(5)
+    expect(t5.maxScroll, 'tier 5 scrolls at 393×659').toBeGreaterThan(0)
+    await pm.settle(4)
+    const warehouse5 = await page.evaluate(
+      () => window.__pm!.metrics().drawCalls,
+    )
+    console.log(`dist: draw calls warehouse tier 5 (scrolled) ${warehouse5}`)
+    test.info().annotations.push({
+      type: 'draw calls tier 5',
+      description: `warehouse ${warehouse5}`,
+    })
+    expect(
+      warehouse5,
+      'Warehouse tier 5 (cover up) + HUD draw calls',
+    ).toBeLessThanOrEqual(WAREHOUSE_DRAW_CALLS)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

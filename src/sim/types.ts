@@ -874,6 +874,17 @@ export function malwareShare(
   return overseas ? Math.min(m.cap, share * m.overseasMult) : share
 }
 
+/**
+ * M9 endless mode (spec-build2 §3.4, design-m8-m9 §4.7): the `state.day` of
+ * the first day boundary after Victory — the day malwareShare's post-Victory
+ * escalation starts and the tick.ts day step emits the endless ticker line —
+ * or null before Victory.
+ */
+export function endlessFirstDay(state: SimState): number | null {
+  const v = state.stats.victoryTick
+  return v === null ? null : Math.floor(v / TICKS_PER_DAY) + 1
+}
+
 /** §9.4 global mood: mean satisfaction of live (non-hub) districts, rounded. */
 export function meanSatisfaction(state: SimState, data: GameData): number {
   let sum = 0

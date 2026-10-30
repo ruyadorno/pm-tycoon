@@ -26,7 +26,7 @@ export const SIM_FEATURES = {
   people: true,
   quests: true,
   levels3plus: true,
-  levels45: false,
+  levels45: true,
 }
 
 export type SimFeature = keyof typeof SIM_FEATURES

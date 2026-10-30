@@ -2,7 +2,7 @@
 // loud districts), §9.4 (70 / 40 bands), §3.3 + §4.1 (Industrial trucks
 // only), §3.5 + §8 (unlock line from levels.json); M7 (spec-build2 §3.1,
 // design-m7 §6.5) the quest row; M8 (design-m8-m9 §6.3) the overseas hub
-// rows. Pure helpers only; Phaser is stubbed because DistrictPanel imports
+// rows (M9: the live Airport at the real L5). Pure helpers only; Phaser is stubbed because DistrictPanel imports
 // the Button kit.
 import { describe, expect, it, vi } from 'vitest'
 
@@ -425,10 +425,41 @@ describe('M8 (design-m8-m9 §6.3): the overseas hub variant', () => {
     expect(createViewSim(sim).hub('docks')?.clearing).toEqual([])
   })
 
-  it('a hub with no map.hubs row yet (the Airport before M9) reads its districts.json row, nothing clearing', () => {
+  it('M9: the Airport from vs.hub() at the real L5 — "pays ×2", its 20-s clearance, "Sizes: S M"; locked before (Lv 5 line)', () => {
     const airport = district('airport')
     if (airport.kind !== 'overseas') throw new Error('airport is not a hub')
-    expect(createViewSim(makeSim(1)).hub('airport')).toBeNull()
+    const L5 = data.levels.find((l) => l.level === 5)!
+    // M9 ships its map.hubs row: listed (not live) from the start.
+    expect(createViewSim(makeSim(1)).hub('airport')?.live).toBe(false)
+    expect(dp.lockedLine(airport, data)).toBe(
+      `Unlocks at Lv 5 — $${L5.threshold.toLocaleString('en-US')} lifetime earned`,
+    )
+    const sim = quietSim(1)
+    sim.state.economy.lifetimeEarned = L5.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(5)
+    for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+    fund(sim)
+    const vs = createViewSim(sim)
+    expect(vs.hub('airport')?.live).toBe(true)
+    expect(dp.districtHubRows(vs.hub('airport'), airport, vs.tick)).toEqual({
+      pay: 'Overseas hub · pays ×2',
+      clearance: `Clearance ${airport.clearanceS} s · nothing clearing`,
+      sizes: 'Sizes: S M',
+    })
+    const p = injectParcel(sim, 'hr_towers_a', 'ap_cargo_hangar')
+    p.mult = airport.valueMult
+    const b = sim.state.buildings[p.origin]!
+    b.waiting.splice(b.waiting.indexOf(p.id), 1)
+    handOff(sim, null, p)
+    runTicks(sim, 50)
+    const live = createViewSim(sim)
+    expect(live.districtStats('airport')?.kind).toBe('overseas')
+    expect(
+      dp.districtHubRows(live.hub('airport'), airport, live.tick).clearance,
+    ).toBe(`Clearance ${airport.clearanceS} s · 1 clearing · next 0:15`)
+    // A hub without a map.hubs row (a data override) still reads its
+    // districts.json row, nothing clearing.
     expect(dp.districtHubRows(null, airport, 0)).toEqual({
       pay: 'Overseas hub · pays ×2',
       clearance: `Clearance ${airport.clearanceS} s · nothing clearing`,

@@ -6,7 +6,9 @@
 // clearance that pays the locked value — or, for malware, costs a life at
 // clearance and never before ("the ship has sailed") — `hub:departure`, save
 // / load mid-clearance, a sold vehicle, game over at a clearance,
-// conservation with `cleared`, and debug.forceOverseasMalware.
+// conservation with `cleared`, and debug.forceOverseasMalware. M9 (design
+// §7 M9 2): the Airport at the real L5 — ×2, 20 s, S/M only, a vehicle's
+// hand-off at the terminal, `hub:departure {hub: 'airport'}`.
 
 import { describe, expect, it } from 'vitest'
 import type { BuildingDef } from '../../src/data/types.ts'
@@ -245,7 +247,18 @@ describe('hand-off and clearance (spec §5.6)', () => {
     const c = handedOff(sim, 'ap_terminal', { ageS: 0 })
     expect(c.clearTick).toBe(a.clearTick)
     const vs = createViewSim(sim)
-    expect(vs.hubs().map((h) => h.id)).toEqual(['docks'])
+    // map.hubs order (M9 ships the Airport row).
+    expect(vs.hubs().map((h) => h.id)).toEqual(['docks', 'airport'])
+    expect(vs.hub('airport')!.clearing).toEqual([
+      {
+        parcelId: c.id,
+        buildingId: 'ap_terminal',
+        size: 'S',
+        handOffTick: c.clearTick! - airTicks,
+        clearTick: c.clearTick,
+        lockedValue: 40,
+      },
+    ])
     expect(vs.hub('docks')!.clearing).toEqual([
       {
         parcelId: a.id,
@@ -597,5 +610,182 @@ describe('hand-off and clearance (spec §5.6)', () => {
     expect(lost).toHaveLength(1)
     expect(lost[0]!.report.viaClearance).toBe(true)
     expect(lost[0]!.report.path.at(-1)?.what).toBe('customsCleared')
+  })
+})
+
+describe('the Airport at the real L5 (spec-build2 §4.3; design-m8-m9 §7 M9 2)', () => {
+  const AIR_TICKS = airportDef.clearanceS * TICKS_PER_S
+  const L5 = data.levels.find((l) => l.level === 5)!
+
+  /** A quiet funded game at L5 the levels.json way (lifetime earned, the shipped cap 5), every spawn timer stopped. */
+  function atRealL5(seed = 1): Sim {
+    const sim = quietSim(seed)
+    expect(sim.data.economy.playtestMaxLevel).toBe(5)
+    sim.state.economy.lifetimeEarned = L5.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(5)
+    expect(sim.state.districts.airport!.live).toBe(true)
+    for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+    return fund(sim)
+  }
+
+  it('×2 and 20 s: an S parcel aged 60 s locks round(20 × 2 × f(60)) = $40 at the terminal, pays it at +200 ticks, then hub:departure {airport, 1}', () => {
+    const sim = atRealL5()
+    expect(AIR_TICKS).toBe(200)
+    expect(airportDef.valueMult).toBe(2)
+    expect(decayFactor(data, 60)).toBe(1)
+    const p = handedOff(sim, 'ap_terminal', { ageS: 60 })
+    expect(p).toMatchObject({
+      state: 'handed_off',
+      destRegion: 'airport',
+      mult: 2,
+      lockedValue: 40,
+      clearTick: sim.state.tick + AIR_TICKS,
+    })
+    expect(p.trace.at(-1)).toEqual({
+      tick: sim.state.tick,
+      what: 'handedOff',
+      ref: 'ap_terminal',
+      text: `Handed off at ${building('ap_terminal').name}`,
+    })
+    const vs = createViewSim(sim)
+    expect(vs.hub('airport')!.clearing.map((c) => c.parcelId)).toEqual([p.id])
+    const log = eventLog(sim)
+    const lifetime = sim.state.economy.lifetimeEarned
+    runTicks(sim, AIR_TICKS - 1)
+    expect(log.filter((e) => e.name === 'parcel:cleared')).toEqual([])
+    runTicks(sim, 1)
+    expect(
+      log
+        .filter(
+          (e) => e.name === 'parcel:cleared' || e.name === 'hub:departure',
+        )
+        .map((e) => [e.name, e.p]),
+    ).toEqual([
+      [
+        'parcel:cleared',
+        {
+          id: p.id,
+          paid: 40,
+          malware: false,
+          hub: 'airport',
+          buildingId: 'ap_terminal',
+          onTime: true,
+        },
+      ],
+      ['hub:departure', { hub: 'airport', count: 1 }],
+    ])
+    expect(sim.state.economy.lifetimeEarned).toBe(lifetime + 40)
+    expect(sim.state.districts.airport!.earned).toBe(40)
+    expect(vs.hub('airport')).toMatchObject({ earned: 40, clearing: [] })
+    expect(auditState(sim.state, data)).toEqual([])
+  })
+
+  it('the size rule at the real L5: spawns bound for the Airport are S or M only (L/XL go to the Docks), Docks:Airport S/M ≈ 2:1', () => {
+    const sim = atRealL5(2)
+    const s = sim.state
+    const sizes: Record<string, Record<Size, number>> = {
+      docks: { S: 0, M: 0, L: 0, XL: 0 },
+      airport: { S: 0, M: 0, L: 0, XL: 0 },
+    }
+    for (let i = 0; i < 3000; i++) {
+      for (const def of data.districts) {
+        const d = s.districts[def.id]!
+        if (d.live && def.kind === 'district') d.nextSpawnTick = s.tick
+      }
+      const before = s.nextId.parcel
+      spawnStep(sim)
+      for (let id = before; id < s.nextId.parcel; id++) {
+        const p = s.parcels[String(id)]!
+        const hub = sizes[p.destRegion]
+        if (hub) hub[p.size] += 1
+        const b = s.buildings[p.origin]!
+        b.waiting.splice(b.waiting.indexOf(p.id), 1)
+        delete s.parcels[String(id)]
+      }
+    }
+    const air = sizes.airport!
+    const dk = sizes.docks!
+    expect(air.L + air.XL).toBe(0)
+    expect(air.S + air.M).toBeGreaterThan(300)
+    expect(dk.L + dk.XL).toBeGreaterThan(100)
+    const ratio = (dk.S + dk.M) / (air.S + air.M)
+    expect(
+      Math.abs(ratio - docksDef.hubWeight / airportDef.hubWeight),
+    ).toBeLessThan(0.3)
+  })
+
+  it('a bike hands an S parcel off at the terminal anchor (a handoff stop) and the plane leaves with it 20 s later', () => {
+    const sim = atRealL5(3)
+    const bike = buy(sim, 'bike')
+    fund(sim)
+    noCheckers(sim)
+    const p = injectParcel(sim, 'hr_towers_a', 'ap_terminal')
+    p.mult = airportDef.valueMult
+    const handed = collect(sim, 'parcel:handedOff')
+    const departures = collect(sim, 'hub:departure')
+    expect(runUntil(sim, () => handed.length > 0, 6000)).toBeGreaterThan(0)
+    const at = sim.state.tick
+    expect(bike.stops[bike.stopIndex]).toMatchObject({
+      kind: 'handoff',
+      buildingId: 'ap_terminal',
+    })
+    expect(bike.pos).toEqual({
+      tx: building('ap_terminal').anchor[0],
+      ty: building('ap_terminal').anchor[1],
+    })
+    expect(handed[0]).toMatchObject({
+      id: p.id,
+      hub: 'airport',
+      buildingId: 'ap_terminal',
+    })
+    expect(p.clearTick).toBe(at + AIR_TICKS)
+    runTicks(sim, AIR_TICKS)
+    expect(departures).toEqual([{ hub: 'airport', count: 1 }])
+    expect(sim.state.stats.cleared).toBe(1)
+    expect(sim.state.stats.deliveries).toBe(0)
+    expect(auditState(sim.state, data)).toEqual([])
+  })
+
+  it('debug.forceOverseasMalware("airport") at the real L5: a dense malware parcel (the latest announced strain) handed off at the terminal after a six-slot route, a life lost 20 s later — the plane has left', () => {
+    const sim = atRealL5(4)
+    buy(sim, 'van')
+    fund(sim)
+    const dbg = createViewSim(sim, { debug: true }).debug!
+    const handed = collect(sim, 'parcel:handedOff')
+    expect(dbg.forceOverseasMalware('airport')).toEqual({ ok: true })
+    const p = sim.state.parcels[String(handed[0]!.id)]!
+    expect(p).toMatchObject({
+      state: 'handed_off',
+      malware: true,
+      strain: 'dense',
+      dest: 'ap_terminal',
+      destRegion: 'airport',
+      mult: airportDef.valueMult,
+      clearTick: sim.state.tick + AIR_TICKS,
+    })
+    expect(
+      p.trace.filter((t) => /^slot[1-6]$/.test(t.ref ?? '')).map((t) => t.ref),
+    ).toEqual(['slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6'])
+    expect(p.trace.at(-1)).toMatchObject({
+      what: 'handedOff',
+      ref: 'ap_terminal',
+    })
+    expect(auditState(sim.state, data)).toEqual([])
+    const lost = collect(sim, 'life:lost')
+    runTicks(sim, AIR_TICKS - 1)
+    expect(lost).toEqual([])
+    runTicks(sim, 1)
+    expect(lost).toHaveLength(1)
+    expect(lost[0]!.report).toMatchObject({
+      viaClearance: true,
+      destBuildingId: 'ap_terminal',
+      strain: 'dense',
+    })
+    expect(lost[0]!.report.path.at(-1)).toMatchObject({
+      what: 'customsCleared',
+      ref: 'airport',
+      text: 'Cleared',
+    })
   })
 })

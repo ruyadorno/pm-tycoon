@@ -24,6 +24,9 @@
 // activity with one dock or `2 docks` + `1 unloading` with more, the shared
 // queue, and one progress bar per owned dock. Dock 3 may be owned without
 // dock 2 (bought at L4 first): everything is keyed by the dock number.
+// M9: the price of a buyable dock sits on a `ui_badge` tag (dark text on
+// the light pill, like the shelf count) — the tier-4 steel and tier-5 glass
+// walls are too light for the white `Lv3` style (priceTagRect).
 import type Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type {
@@ -148,6 +151,22 @@ export function badgeTextX(door: { x: number; w: number }, w: number): number {
   return Math.max(0, Math.round(door.x + (door.w - w) / 2))
 }
 
+/** The `ui_badge` price tag (40 × 16, the shelf badge's pill). */
+export const PRICE_TAG = { w: 40, h: 16, dy: 30 } as const
+
+/**
+ * Where a buyable door's price tag sits: centred on the door below the "+",
+ * never left of the room's west wall (x 0) — `$1,000` (33 px) fits inside.
+ */
+export function priceTagRect(door: { x: number; y: number; w: number }): Rect {
+  return {
+    x: Math.max(0, Math.round(door.x + (door.w - PRICE_TAG.w) / 2)),
+    y: door.y + PRICE_TAG.dy,
+    w: PRICE_TAG.w,
+    h: PRICE_TAG.h,
+  }
+}
+
 /** The look of a bay for its DockSlotView (+ a vehicle docked or a tail moving). */
 export function dockBayLook(
   slot: Pick<
@@ -258,6 +277,8 @@ interface Bay {
   tail: Img
   lamp: Img
   badge: Img
+  /** The buyable door's price tag (ui_badge) under badgeText. */
+  tag: Img
   badgeText: Txt
   panelLamp: Img
   barTrack: Rectangle
@@ -365,6 +386,9 @@ export class DockView {
     const lamp = this.add(L.badges, g.lamp.x, g.lamp.y, 'lamp_off')
     const badge = this.add(L.badges, g.door.x + 8, g.door.y + 12, 'ic_lock')
     badge.setVisible(false)
+    const tagR = priceTagRect(g.door)
+    const tag = this.add(L.badges, tagR.x, tagR.y, 'ui_badge')
+    tag.setVisible(false)
     const badgeText = addText(this.scene, 0, g.door.y + 32, '', {
       tint: PALETTE.grey5,
       shadow: true,
@@ -394,6 +418,7 @@ export class DockView {
       tail,
       lamp,
       badge,
+      tag,
       badgeText,
       panelLamp,
       barTrack,
@@ -644,10 +669,28 @@ export class DockView {
         .setOrigin(0.5, 0.5)
         .setPosition(g.x + g.w / 2, g.y + 20)
     }
+    const buy = look.badge === 'buy'
+    b.tag.setVisible(buy)
     b.badgeText.setVisible(look.badgeText !== null)
     if (look.badgeText !== null) {
       b.badgeText.setText(look.badgeText)
-      b.badgeText.setX(badgeTextX(g, b.badgeText.width))
+      if (buy) {
+        // Dark on the light tag, no shadow (the price tag, M9).
+        const r = priceTagRect(g)
+        b.tag.setPosition(r.x, r.y)
+        b.badgeText
+          .setTint(THEME.textDark)
+          .setDropShadow(0, 0, THEME.shadow, 0)
+          .setPosition(
+            Math.round(r.x + (r.w - b.badgeText.width) / 2),
+            textTop(r.y, r.h),
+          )
+      } else {
+        b.badgeText
+          .setTint(PALETTE.grey5)
+          .setDropShadow(1, 1, THEME.shadow, 1)
+          .setPosition(badgeTextX(g, b.badgeText.width), g.y + 32)
+      }
     }
   }
 

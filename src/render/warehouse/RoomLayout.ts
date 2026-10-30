@@ -36,7 +36,24 @@
 // tier. `new FixedLaneLayout(tier)`: tiers ≥ 3 use the 20 × 5 @ 11 px shelf
 // grid (100 cells ≥ the L3–L5 caps 60 / 80 / 100), tiers 1–2 the 18 × 3 @ 12
 // one; `propsFor(tier)` places the tier's props. The room keeps 14 rows
-// through tier 3 (room growth is M9).
+// through tier 3.
+//
+// M9 (spec-build2 §4.2-§4.4; design-m8-m9 §6.1, R2, R10, R22): room growth.
+// Slots 5–6 unroll in the belt column below slot 4 at the same 64-px pitch
+// (`BELT_SLOTS_BY_TIER` 4/4/4/5/6), so the room grows to `rowsForTier` 14 /
+// 14 / 14 / 16 / 18 rows and everything at y ≥ 352 of the tier-1 table (the
+// gap belt tile, the chute's foot, the shelf with its grid, badge and plate,
+// the bin with its counter and plate, the Clear path, the ext strip) moves
+// down by `shiftForTier` Δ = 64 × (beltSlots − 4). The Hold Bay rack, its
+// station, the wanted poster, the props and the docks never move. The ext
+// strip exists only while a lane slot lies past the belt column (`Slots
+// 5–6` at tiers 1–3, `Slot 6` at tier 4, none at tier 5). `roomPlacement`
+// takes the room height: a room that does not fit between the HUD bands
+// keeps its readout strip fixed at the top of the band and scrolls
+// vertically (integer, clamped to `maxScroll`); `scrollForDrag` /
+// `scrollToShow` / `dragScrolls` are the pure halves of the scene's gesture.
+// The exported constants keep their tier-1 values (ROOM_H, ROOM_ROWS,
+// ROOM_BLOCK_H, CHUTE_BOTTOM, SHELF_BADGE, BIN_COUNTER, SIGNAGE).
 
 export interface Point {
   x: number
@@ -111,9 +128,64 @@ export const READOUT_H = 20
 export const READOUT_GAP = 24
 /** Height the room + strip need (roomY formula: 476 = 448 + 28). */
 export const ROOM_BLOCK_H = ROOM_H + 28
+/**
+ * The strip's top margin (ROOM_BLOCK_H − ROOM_H − READOUT_GAP = 4 px): a room
+ * block at most this much too tall for the bands still fits (roomPlacement).
+ */
+export const ROOM_SLACK = ROOM_BLOCK_H - ROOM_H - READOUT_GAP
 /** Minimum viewport that fits without scrolling (§1.1). */
 export const MIN_VIEW_W = 360
 export const MIN_VIEW_H = 604
+
+/** The lane's slot nodes (`slot1` … `slot6`, plan.md §5 node ids). */
+export const SLOT_COUNT = 6
+/** Slot pitch in the belt column (64 px, spec-build2 §4.4). */
+export const SLOT_PITCH = 64
+/** Warehouse tiers (levels.json warehouseTier 1..5). */
+export const MAX_TIER = 5
+/**
+ * Slots drawn in the belt column per tier (index tier − 1, design-m8-m9
+ * §6.1): slots past it share the dashed ext strip.
+ */
+export const BELT_SLOTS_BY_TIER = [4, 4, 4, 5, 6] as const
+
+/** `tier` clamped to 1..MAX_TIER (integer). */
+export function clampTier(tier: number): number {
+  const t = Number.isFinite(tier) ? Math.floor(tier) : 1
+  return Math.min(MAX_TIER, Math.max(1, t))
+}
+
+/** Belt-column slots of warehouse tier `tier` (4, 4, 4, 5, 6). */
+export function beltSlotsForTier(tier: number): number {
+  return BELT_SLOTS_BY_TIER[clampTier(tier) - 1] ?? 4
+}
+
+/**
+ * How far everything below slot 4 moves at tier `tier`: Δ = 64 ×
+ * (beltSlots − 4) = 0, 0, 0, 64, 128 (design-m8-m9 §6.1).
+ */
+export function shiftForTier(tier: number): number {
+  return SLOT_PITCH * (beltSlotsForTier(tier) - 4)
+}
+
+/**
+ * Room rows of tier `tier`: 14 / 14 / 14 / 16 / 18 (design-m8-m9 R2: slot 6
+ * ends at y 480, + the 32-px belt gap + the 64-px shelf = 576 = 18 rows; B2
+ * §4.4's "16 / 16" holds only five belt slots at the 64-px pitch).
+ */
+export function rowsForTier(tier: number): number {
+  return ROOM_ROWS + shiftForTier(tier) / TILE
+}
+
+/** Room height in px of tier `tier` (rows × 32: 448, 512, 576). */
+export function roomHeightForTier(tier: number): number {
+  return rowsForTier(tier) * TILE
+}
+
+/** Height the room + readout strip need at tier `tier` (rows × 32 + 28: 476 / 540 / 604). */
+export function roomBlockH(tier: number): number {
+  return roomHeightForTier(tier) + (ROOM_BLOCK_H - ROOM_H)
+}
 
 /** The belt column c4 (x 128–159) and its centre line. */
 export const BELT_X = 128
@@ -394,19 +466,23 @@ function slotDef(k: number): NodeDef {
   }
 }
 
-/** The one-dashed-outline extension strip for slots 5–6 (§1.3 `ext`). */
+/**
+ * The one-dashed-outline extension strip for the slots past the belt column
+ * (§1.3 `ext`; tier-1 rects, moved down by Δ at tier 4).
+ */
 const EXT_RECT: Rect = { x: 72, y: 356, w: 56, h: 24 }
 const EXT_HIT: Rect = { x: 72, y: 352, w: 56, h: 32 }
 
-function extDef(k: number): NodeDef {
+function extDef(k: number, dy: number): NodeDef {
+  const y = 368 + dy
   return {
     label: `Slot ${k}`,
-    rect: EXT_RECT,
-    hit: EXT_HIT,
+    rect: { ...EXT_RECT, y: EXT_RECT.y + dy },
+    hit: { ...EXT_HIT, y: EXT_HIT.y + dy },
     anchors: {
-      buffer: [{ x: BELT_CX, y: 368 }],
-      stations: [{ x: BELT_CX, y: 368 }],
-      entry: { x: BELT_CX, y: 368 },
+      buffer: [{ x: BELT_CX, y }],
+      stations: [{ x: BELT_CX, y }],
+      entry: { x: BELT_CX, y },
     },
   }
 }
@@ -444,9 +520,10 @@ function addDockDefs(t: Map<string, NodeDef>, k: number): void {
   })
 }
 
-function buildTable(tier: number): Map<string, NodeDef> {
+function buildTable(tier: number, grid: ShelfGrid): Map<string, NodeDef> {
   const t = new Map<string, NodeDef>()
-  const grid = shelfGrid(tier)
+  const belt = beltSlotsForTier(tier)
+  const dy = shiftForTier(tier)
   t.set('dock1', {
     label: 'Dock 1',
     rect: { x: 0, y: 32, w: 160, h: 64 },
@@ -468,9 +545,8 @@ function buildTable(tier: number): Map<string, NodeDef> {
     },
   })
   for (let k = 2; k <= DOCK_COUNT; k++) addDockDefs(t, k)
-  for (let k = 1; k <= 4; k++) t.set(`slot${k}`, slotDef(k))
-  t.set('slot5', extDef(5))
-  t.set('slot6', extDef(6))
+  for (let k = 1; k <= SLOT_COUNT; k++)
+    t.set(`slot${k}`, k <= belt ? slotDef(k) : extDef(k, dy))
   t.set('hold', {
     label: 'Hold Bay',
     rect: { ...RACK },
@@ -486,21 +562,21 @@ function buildTable(tier: number): Map<string, NodeDef> {
   })
   t.set('bin', {
     label: 'Quarantine Bin',
-    rect: { x: 256, y: 384, w: 64, h: 64 },
-    hit: { x: 256, y: 384, w: 64, h: 64 },
-    anchors: { buffer: [], stations: [], entry: { x: 288, y: 404 } },
+    rect: { x: 256, y: 384 + dy, w: 64, h: 64 },
+    hit: { x: 256, y: 384 + dy, w: 64, h: 64 },
+    anchors: { buffer: [], stations: [], entry: { x: 288, y: 404 + dy } },
   })
   t.set('shelf', {
     label: 'Shelf',
-    rect: { x: 32, y: 384, w: 224, h: 64 },
-    hit: { x: 32, y: 384, w: 224, h: 64 },
+    rect: { x: 32, y: 384 + dy, w: 224, h: 64 },
+    hit: { x: 32, y: 384 + dy, w: 224, h: 64 },
     anchors: {
       buffer: Array.from({ length: grid.cols * grid.rows }, (_, i) => {
         const c = shelfCellIn(grid, i)
         return { x: c.x + 5, y: c.y + 5 }
       }),
       stations: [],
-      entry: { x: BELT_CX, y: 388 },
+      entry: { x: BELT_CX, y: 388 + dy },
     },
   })
   return t
@@ -511,21 +587,34 @@ const containsPt = (r: Rect, x: number, y: number): boolean =>
 
 /**
  * The fixed lane (spec §6.1-§6.2): docks 1–3 (dock 1's belt, docks 2–3's
- * pads), slots 1–4 in the belt column, slots 5–6 as the dashed extension
- * strip, the Hold Bay rack, the Quarantine Bin and the shelf. `tier` (the
- * levels.json warehouseTier, default 1) picks the shelf grid and the props.
+ * pads), the belt-column slots (1–4, 1–5 at tier 4, 1–6 at tier 5), the
+ * rest as the dashed extension strip, the Hold Bay rack, the Quarantine Bin
+ * and the shelf. `tier` (the levels.json warehouseTier, default 1; clamped
+ * to 1..5) picks the shelf grid, the props and — M9 — the room's rows.
  */
 export class FixedLaneLayout implements LaneLayout {
   readonly width = ROOM_W
-  readonly height = ROOM_H
+  /** rows × 32: 448 at tiers 1–3, 512 at tier 4, 576 at tier 5. */
+  readonly height: number
   readonly tier: number
+  /** Room rows (rowsForTier): 14, 16, 18. */
+  readonly rows: number
+  /** Slots drawn in the belt column (BELT_SLOTS_BY_TIER). */
+  readonly beltSlots: number
+  /** How far everything below slot 4 moved (shiftForTier: 0, 64, 128). */
+  readonly shift: number
   private readonly grid: ShelfGrid
   private readonly table: Map<string, NodeDef>
 
   constructor(tier = 1) {
-    this.tier = Math.max(1, Math.floor(tier))
-    this.grid = shelfGrid(this.tier)
-    this.table = buildTable(this.tier)
+    this.tier = clampTier(tier)
+    this.rows = rowsForTier(this.tier)
+    this.height = this.rows * TILE
+    this.beltSlots = beltSlotsForTier(this.tier)
+    this.shift = shiftForTier(this.tier)
+    const g = shelfGrid(this.tier)
+    this.grid = { ...g, origin: { x: g.origin.x, y: g.origin.y + this.shift } }
+    this.table = buildTable(this.tier, this.grid)
   }
 
   /** Loading dock `dockId`'s parts (`dock2`, or its conveyor `conv2`), else null. */
@@ -558,6 +647,62 @@ export class FixedLaneLayout implements LaneLayout {
   /** Top-left of this tier's props (propsFor). */
   props(): readonly Point[] {
     return propsFor(this.tier)
+  }
+
+  /** Top-left of tier `tier`'s props (design-m8-m9 §6.1 API; the props never move with Δ). */
+  propsFor(tier: number): readonly Point[] {
+    return propsFor(tier)
+  }
+
+  /** The Quarantine Bin (64 × 64, Δ below the tier-1 spot). */
+  binRect(): Rect {
+    return this.rectFor('bin') as Rect
+  }
+
+  /** Centre of the bin counter (`×N`). */
+  binCounter(): Point {
+    return { x: BIN_COUNTER.x, y: BIN_COUNTER.y + this.shift }
+  }
+
+  /** The shelf's count badge (`57/60`). */
+  shelfBadge(): Rect {
+    return { ...SHELF_BADGE, y: SHELF_BADGE.y + this.shift }
+  }
+
+  /** The tier-2+ signage plates: INTAKE / HOLD stay, SHELF / QUARANTINE follow the shelf and the bin. */
+  plates(): readonly { text: string; x: number; y: number }[] {
+    return SIGNAGE.map((p) => ({
+      ...p,
+      y: p.y >= CHUTE_BOTTOM ? p.y + this.shift : p.y,
+    }))
+  }
+
+  /** Bottom of the chute rail (352 + Δ). */
+  chuteBottom(): number {
+    return CHUTE_BOTTOM + this.shift
+  }
+
+  /** Top-left of the belt gap tile between the last belt slot and the shelf (nodeId `shelf`). */
+  gapTileY(): number {
+    return slotY(this.beltSlots + 1)
+  }
+
+  /** The baseboard (2 px) along the room's south edge. */
+  baseboardY(): number {
+    return this.height - 2
+  }
+
+  /** Slot ids past the belt column (the ext strip's slots), in order. */
+  extSlotIds(): string[] {
+    const out: string[] = []
+    for (let k = this.beltSlots + 1; k <= SLOT_COUNT; k++) out.push(`slot${k}`)
+    return out
+  }
+
+  /** The ext strip's caption: `5–6`, `6`, or '' at tier 5. */
+  extCaption(): string {
+    const ks = this.extSlotIds().map((id) => id.replace(/\D+/g, ''))
+    return ks.length > 1 ? `${ks[0]}–${ks[ks.length - 1]}` : (ks[0] ?? '')
   }
 
   has(nodeId: string): boolean {
@@ -621,17 +766,18 @@ export class FixedLaneLayout implements LaneLayout {
       const y = from.anchors.outlet?.y ?? to.y
       return [{ x: CHUTE_CX, y }, { x: CHUTE_CX, y: to.y }, to]
     }
+    const dy = this.shift
     if (fromKind === 'slot' && toKind === 'shelf') {
-      return [{ x: BELT_CX, y: 388 }, to]
+      return [{ x: BELT_CX, y: 388 + dy }, to]
     }
     if (fromNodeId === 'hold' && toKind === 'shelf') {
       // Clear (§3.4): bay → chute → down → belt bottom → the shelf cell.
       const bayY = (start ?? this.arrival('hold')).y
       return [
         { x: CHUTE_CX, y: bayY },
-        { x: CHUTE_CX, y: 368 },
-        { x: BELT_CX, y: 368 },
-        { x: BELT_CX, y: 388 },
+        { x: CHUTE_CX, y: 368 + dy },
+        { x: BELT_CX, y: 368 + dy },
+        { x: BELT_CX, y: 388 + dy },
         to,
       ]
     }
@@ -647,21 +793,14 @@ export class FixedLaneLayout implements LaneLayout {
   }
 
   nodeAt(x: number, y: number): string | null {
-    // Most specific first: slots (incl. the desk's west hit strip is the
-    // caller's), bays, bin, shelf, extension, dock.
-    const order = [
-      'slot1',
-      'slot2',
-      'slot3',
-      'slot4',
-      'hold',
-      'bin',
-      'shelf',
-      'slot5',
-      'dock1',
-      'dock2',
-      'dock3',
-    ]
+    // Most specific first: belt slots (incl. the desk's west hit strip is
+    // the caller's), bays, bin, shelf, extension, dock.
+    const order: string[] = []
+    for (let k = 1; k <= this.beltSlots; k++) order.push(`slot${k}`)
+    order.push('hold', 'bin', 'shelf')
+    const ext = this.extSlotIds()[0]
+    if (ext) order.push(ext)
+    order.push('dock1', 'dock2', 'dock3')
     for (const id of order) {
       const h = this.hitFor(id)
       if (h && containsPt(h, x, y)) return id
@@ -757,14 +896,16 @@ export class FixedLaneLayout implements LaneLayout {
     return { x: 160, y: r.y + 34 }
   }
 
-  /** Slot ids drawn in the belt column (1–4); 5–6 share the ext strip. */
+  /** Slot ids drawn in the belt column (1..beltSlots); the rest share the ext strip. */
   isBeltSlot(nodeId: string): boolean {
-    return /^slot[1-4]$/.test(nodeId)
+    const m = /^slot([1-9]\d*)$/.exec(nodeId)
+    return m !== null && Number(m[1]) <= this.beltSlots
   }
 
-  /** The dashed extension strip (slots past the belt column). */
-  extRect(): Rect {
-    return { ...EXT_RECT }
+  /** The dashed extension strip (slots past the belt column), or null at tier 5. */
+  extRect(): Rect | null {
+    const id = this.extSlotIds()[0]
+    return id ? this.rectFor(id) : null
   }
 
   /** Belt tiles of the fixed lane (dock belt, corner, the column). */
@@ -776,20 +917,20 @@ export class FixedLaneLayout implements LaneLayout {
     // The 16 px between the corner (ends y 80) and slot 1 (y 96): a full
     // tile at y 80 partly covered by slot 1's first tile.
     out.push({ x: BELT_X, y: 80, stem: 'belt_v', nodeId: 'conv1' })
-    for (let k = 1; k <= 4; k++) {
+    for (let k = 1; k <= this.beltSlots; k++) {
       const y = slotY(k)
       out.push({ x: BELT_X, y, stem: 'belt_v', nodeId: `slot${k}` })
       out.push({ x: BELT_X, y: y + TILE, stem: 'belt_v', nodeId: `slot${k}` })
     }
-    out.push({ x: BELT_X, y: 352, stem: 'belt_v', nodeId: 'shelf' })
+    out.push({ x: BELT_X, y: this.gapTileY(), stem: 'belt_v', nodeId: 'shelf' })
     return out
   }
 
-  /** Chute rail segments (16 × 32 at x 172, top-left). */
+  /** Chute rail segments (16 × 32 at x 172, top-left), down to chuteBottom(). */
   chuteSegments(): Point[] {
     const out: Point[] = []
-    for (let y = CHUTE_TOP; y < CHUTE_BOTTOM; y += TILE)
-      out.push({ x: CHUTE_X, y })
+    const bottom = this.chuteBottom()
+    for (let y = CHUTE_TOP; y < bottom; y += TILE) out.push({ x: CHUTE_X, y })
     return out
   }
 }
@@ -807,37 +948,136 @@ function isSlotId(id: string): boolean {
   return /^slot\d+$/.test(id)
 }
 
-// ---- screen placement (§1.1) ---------------------------------------------------
+// ---- screen placement (§1.1) and the vertical scroll (M9) ----------------------
 
 export interface RoomPlacement {
-  /** Room container top-left in screen px. */
+  /** Room container top-left in screen px (unscrolled: room px 0 at scroll 0). */
   roomX: number
   roomY: number
-  /** Readout strip (screen px). */
+  /** Readout strip (screen px): glued 24 px above the room, fixed while it scrolls (R10). */
   readout: Rect
-  /** True when the room + strip fit between the HUD bands. */
+  /** True when the room + strip fit between the HUD bands (no scroll). */
   fits: boolean
+  /** Screen px the room is visible in: the room itself when it fits, else the band below the strip. */
+  viewport: Rect
+  /** Largest scroll (room px; 0 when it fits). */
+  maxScroll: number
 }
 
 /**
  * Where the room goes on a W × H canvas between the HUD bands (top band
  * ends at `bandTop`, bottom band starts at `bandBottom`; with no safe-area
- * insets these are HUD_TOP_H = 64 and H − HUD_BOTTOM_H):
- * roomX = floor((W − 352) / 2),
- * roomY = bandTop + 28 + floor(max(0, bandBottom − bandTop − 476) / 2).
+ * insets these are HUD_TOP_H = 64 and H − HUD_BOTTOM_H), for a room
+ * `roomH` px tall (default the tier-1 448):
+ * roomX = floor((W − 352) / 2); when roomH + 28 fits,
+ * roomY = bandTop + 28 + floor((bandBottom − bandTop − roomH − 28) / 2)
+ * (exactly playtest 1's placement); a block up to ROOM_SLACK px too tall
+ * still fits, the strip moved up into its 4-px top margin (M9 review: at
+ * 375 × 667 tier 4 overflows by 1 px — no scroll, no cover for it); else
+ * (M9, B2 §4.4, R10) the strip sits at bandTop + 4, the room's top at
+ * bandTop + 28 and the viewport is the band below the strip: maxScroll =
+ * roomH − viewport.h (tier 4: 64 at 360 × 604, 9 at 393 × 659; tier 5:
+ * 128 / 73).
  */
 export function roomPlacement(
   W: number,
   bandTop: number,
   bandBottom: number,
+  roomH: number = ROOM_H,
 ): RoomPlacement {
   const roomX = Math.floor((W - ROOM_W) / 2)
-  const free = bandBottom - bandTop - ROOM_BLOCK_H
-  const roomY = bandTop + 28 + Math.floor(Math.max(0, free) / 2)
+  const block = roomH + (ROOM_BLOCK_H - ROOM_H)
+  const free = bandBottom - bandTop - block
+  const fitsV = free >= -ROOM_SLACK
+  const roomY =
+    bandTop + 28 + (free >= 0 ? Math.floor(free / 2) : fitsV ? free : 0)
+  const viewH = fitsV ? roomH : Math.max(0, bandBottom - roomY)
   return {
     roomX,
     roomY,
     readout: { x: roomX, y: roomY - READOUT_GAP, w: ROOM_W, h: READOUT_H },
-    fits: free >= 0 && roomX >= 0,
+    fits: fitsV && roomX >= 0,
+    viewport: fitsV
+      ? { x: roomX, y: roomY, w: ROOM_W, h: roomH }
+      : { x: 0, y: roomY, w: W, h: viewH },
+    maxScroll: fitsV ? 0 : Math.max(0, roomH - viewH),
   }
+}
+
+/** An integer scroll in [0, maxScroll]. */
+export function clampScroll(y: number, maxScroll: number): number {
+  const m = Math.max(0, Math.floor(maxScroll))
+  if (!Number.isFinite(y)) return 0
+  return Math.min(m, Math.max(0, Math.round(y)))
+}
+
+/**
+ * R22: a press drags the room (scrolls) when it travelled more than `slop`
+ * px vertically and has not lifted a fixture; a lifted fixture never
+ * scrolls (the 450-ms hold lifts only a press that has not moved).
+ */
+export function dragScrolls(
+  dy: number,
+  lifted: boolean,
+  maxScroll: number,
+  slop: number,
+): boolean {
+  return !lifted && maxScroll > 0 && Math.abs(dy) > slop
+}
+
+/** The scroll while dragging 1:1 (no inertia): the room follows the finger from the press. */
+export function scrollForDrag(
+  scroll0: number,
+  dy: number,
+  maxScroll: number,
+): number {
+  return clampScroll(scroll0 - dy, maxScroll)
+}
+
+/**
+ * The smallest scroll change that shows room rect `r` inside the visible
+ * window [scrollY, scrollY + viewH) — `viewH` may be cut short by an open
+ * sheet; a rect taller than the window shows its top. Clamped.
+ */
+export function scrollToShow(
+  r: Rect,
+  scrollY: number,
+  viewH: number,
+  maxScroll: number,
+  margin = 4,
+): number {
+  if (maxScroll <= 0) return 0
+  let s = scrollY
+  const top = r.y - margin
+  const bottom = r.y + r.h + margin
+  if (bottom > s + viewH) s = bottom - viewH
+  if (top < s) s = top
+  return clampScroll(s, maxScroll)
+}
+
+/**
+ * The cover over everything outside the scrolling room's viewport (M9,
+ * R10), as screen rects on a W × H canvas: the band above the viewport and
+ * the one below it, each `bleed` px past the canvas edges on the outer sides
+ * (the cover is a ui nine-slice whose rounded corner texels must stay off
+ * screen); none while the room fits.
+ */
+export function coverRects(
+  p: RoomPlacement,
+  W: number,
+  H: number,
+  bleed: number,
+): Rect[] {
+  if (p.maxScroll <= 0) return []
+  const v = p.viewport
+  const below = v.y + v.h
+  return [
+    { x: -bleed, y: -bleed, w: W + 2 * bleed, h: v.y + bleed },
+    {
+      x: -bleed,
+      y: below,
+      w: W + 2 * bleed,
+      h: Math.max(0, H - below) + bleed,
+    },
+  ]
 }

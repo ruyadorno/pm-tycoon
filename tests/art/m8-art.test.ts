@@ -292,8 +292,9 @@ describe('L5 regions (plan-build2 §6, B2 §6.5): one unique sprite per building
     expect(plane).toMatch(/nose pointing to the lower right/)
     expect(plane).not.toMatch(/no vehicles/)
     expect(promptFor(getEntry(m, 'cv_fire')).text).not.toMatch(/no vehicles/)
+    // M9 re-roll: the ship sails west along -x, bow first (m9-art.test.ts)
     expect(promptFor(getEntry(m, 'dk_ship')).text).toMatch(
-      /bow pointing to the lower left/,
+      /bow pointing to the upper left/,
     )
     // the re-rolled stadium asks for nothing around the pitch (report §6.25)
     expect(promptFor(getEntry(m, 'cv_changelog_stadium')).text).toMatch(

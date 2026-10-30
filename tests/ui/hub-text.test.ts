@@ -3,7 +3,9 @@
 // the clearance line, the port office), the tag joining the name only when
 // it fits the 200-px tooltip in m5x7, the vessel wording (ship / plane,
 // design R11), the dock-bought toast — read from a real Sim's vs.hubs()
-// where it matters. hubText.ts is pure: no Phaser stub needed.
+// where it matters; M9: the Airport's map.hubs row (a plane) and the live
+// Airport's terminal / hangar at the real L5. hubText.ts is pure: no Phaser
+// stub needed.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { Sim } from '../../src/sim/sim.ts'
@@ -100,8 +102,14 @@ describe('design-m8-m9 §6.3: the building tooltip of a hub', () => {
     handOffAt(sim, 'dk_pier_1')
     const vs = createViewSim(sim)
     const hubs = vs.hubs()
-    expect(hubs.map((h) => h.id)).toEqual(['docks'])
+    // Every map.hubs row in order, live or not (M9 ships the Airport's row;
+    // at L3 it is locked with nothing clearing).
+    expect(hubs.map((h) => [h.id, h.live])).toEqual([
+      ['docks', true],
+      ['airport', false],
+    ])
     expect(hubs[0]!.clearing).toHaveLength(3)
+    expect(hubs[1]!.clearing).toEqual([])
     const tick = vs.tick
     // Pier 2: two clearing, the first handed off 190 ticks ago → 26 s left.
     expect(hubTip(hubs, building('dk_pier_2'), tick)).toEqual({
@@ -261,13 +269,92 @@ describe('design-m8-m9 §6.3: the building tooltip of a hub', () => {
   })
 })
 
+describe('M9 (design-m8-m9 §6.3, B2 §4.3): the live Airport at the real L5', () => {
+  const airport = data.districts.find((d) => d.id === 'airport')!
+  if (airport.kind !== 'overseas') throw new Error('airport is not a hub')
+
+  /** A quiet game at L5 the levels.json way (lifetime earned, the shipped cap), funded. */
+  function atL5(seed = 1): Sim {
+    const sim = quietSim(seed)
+    const L5 = data.levels.find((l) => l.level === 5)!
+    sim.state.economy.lifetimeEarned = L5.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(5)
+    for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+    return fund(sim)
+  }
+
+  /** Hand a fresh S parcel off at the Airport building `dest` now (no vehicle). */
+  function handOffAirport(sim: Sim, dest: string): Parcel {
+    const p = injectParcel(sim, 'hr_towers_a', dest)
+    p.mult = airport.kind === 'overseas' ? airport.valueMult : 1
+    const b = sim.state.buildings[p.origin]!
+    b.waiting.splice(b.waiting.indexOf(p.id), 1)
+    p.trace.push({ tick: p.spawnedTick, what: 'spawned', ref: p.origin })
+    handOff(sim, null, p)
+    return p
+  }
+
+  it('both hubs live; the terminal (the office, receiving) shows the tag and the hub-wide count, the hangar its own', () => {
+    const sim = atL5()
+    expect(
+      createViewSim(sim)
+        .hubs()
+        .map((h) => [h.id, h.live]),
+    ).toEqual([
+      ['docks', true],
+      ['airport', true],
+    ])
+    // Nothing clearing: the clearance time (20 s at the Airport).
+    let hubs = createViewSim(sim).hubs()
+    expect(hubTip(hubs, building('ap_cargo_hangar'), sim.state.tick)).toEqual({
+      tag: 'overseas ×2',
+      line: `Clears in ${airport.clearanceS} s`,
+    })
+    handOffAirport(sim, 'ap_cargo_hangar')
+    runTicks(sim, 80)
+    handOffAirport(sim, 'ap_terminal')
+    const vs = createViewSim(sim)
+    hubs = vs.hubs()
+    expect(hubs[1]!.clearing).toHaveLength(2)
+    expect(hubTip(hubs, building('ap_terminal'), vs.tick)).toEqual({
+      tag: 'overseas ×2',
+      line: '2 clearing · next 0:12',
+    })
+    expect(hubTip(hubs, building('ap_cargo_hangar'), vs.tick)).toEqual({
+      tag: 'overseas ×2',
+      line: '1 clearing · next 0:12',
+    })
+    // The long-named terminal: the tag leads the second row (200-px tooltip).
+    const rows = hubTipRows(
+      building('ap_terminal').name,
+      hubTip(hubs, building('ap_terminal'), vs.tick)!,
+      fits,
+    )
+    expect(rows).toEqual({
+      name: 'Prefetch International Terminal',
+      line: 'overseas ×2 · 2 clearing · next 0:12',
+      extra: null,
+    })
+  })
+})
+
 describe('design R11: ship or plane', () => {
-  it('the Docks sail a ship; the Airport (no map.hubs row before M9) flies a plane', () => {
+  it('the Docks sail a ship; the Airport (its map.hubs row since M9: ap_plane) flies a plane', () => {
+    expect(
+      data.map.hubs.find((h) => h.district === 'airport')?.vessel,
+    ).toMatchObject({
+      frame: 'ap_plane',
+    })
     expect(sailedText(data, 'docks')).toBe('the ship has sailed')
     expect(sailedText(data, 'airport')).toBe('the plane has left')
     expect(hubIcon(data, 'docks')).toBe('ic_ship')
     expect(hubIcon(data, 'airport')).toBe('ic_plane')
     expect(isPlaneHub(data, null)).toBe(false)
+    // A hub without a map.hubs row (a data override) falls back on its id.
+    const bare = { map: { hubs: [] } } as unknown as Pick<typeof data, 'map'>
+    expect(sailedText(bare, 'airport')).toBe('the plane has left')
+    expect(sailedText(bare, 'docks')).toBe('the ship has sailed')
   })
 
   it('a map.hubs row decides by its vessel frame', () => {

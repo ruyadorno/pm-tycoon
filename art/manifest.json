@@ -372,6 +372,38 @@
       "finalSha256": "347b1adbe3ccca67b384b0e3598b75a4680d008f9ffd78137876f3d8ca552db4"
     },
     {
+      "id": "runway_threshold",
+      "class": "tile",
+      "source": "procedural",
+      "canvas": [64, 32],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "airport",
+      "priority": "P2",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4) (plan-build2 §6 Airport \"runway themed tiles\"): white piano-key threshold bars along the runway (y) on the runway grey — the runway's north and south end rows (x 45-47, y 3 and y 19)",
+      "finalSha256": "0bb00dbb11ab049ce7ea8e8bf4b82ca6a825f525d5c48c8135b82a2fcb674abc"
+    },
+    {
+      "id": "taxiway",
+      "class": "tile",
+      "source": "procedural",
+      "canvas": [64, 32],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "airport",
+      "priority": "P2",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4) (plan-build2 §6 Airport): tarmac with a yellow taxi line along x (the plane's exit, design-m8-m9 §1.2 exit [4, 0]) and blue edge lights — the apron tile beside the parked plane (44, 10)",
+      "finalSha256": "216105a3425788bfc6b4c56011cc69e799f6b68b386f455a82902dc31ab16bf6"
+    },
+    {
       "id": "tree_line",
       "class": "tile",
       "source": "procedural",
@@ -8073,6 +8105,75 @@
           "downloadUrl": "",
           "sha256": "10b7a3fd64cb7cdc584643b839e3a15e9a3da2a4bcbca1a0602e4896a7781606",
           "at": "2026-10-29T08:18:24.071Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cargo ship with a red hull and stacked containers, moored, seen from a 2:1 isometric angle, bow pointing to the upper left, the stern with the white bridge tower at the lower right nearest the viewer, the long hull running from the lower right to the upper left, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 9004,
+            "prompt": "small cargo ship with a red hull and stacked containers, moored, seen from a 2:1 isometric angle, bow pointing to the upper left, the stern with the white bridge tower at the lower right nearest the viewer, the long hull running from the lower right to the upper left, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "6247e535-81bd-500b-b50a-0d0d033f0c71",
+            "source_image_id": "6247e535-81bd-500b-b50a-0d0d033f0c71"
+          },
+          "jobId": "03d0636d-aac1-4aa3-8172-371396d5fb32",
+          "seed": 9004,
+          "candidate": 4,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "6dd1c762b1fc29564f2408a93e8fe45572e37c055ed5af346f25012f39283cdf",
+          "at": "2026-10-30T11:24:27.126Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cargo ship with a red hull and stacked containers, moored, seen from a 2:1 isometric angle, bow pointing to the upper left, the stern with the white bridge tower at the lower right nearest the viewer, the long hull running from the lower right to the upper left, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 9005,
+            "prompt": "small cargo ship with a red hull and stacked containers, moored, seen from a 2:1 isometric angle, bow pointing to the upper left, the stern with the white bridge tower at the lower right nearest the viewer, the long hull running from the lower right to the upper left, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f0bf8e08-a664-5502-bff1-bdcfaf0b010d",
+            "source_image_id": "f0bf8e08-a664-5502-bff1-bdcfaf0b010d"
+          },
+          "jobId": "40fc9576-a1d6-40eb-87a1-cb51a98a3a06",
+          "seed": 9005,
+          "candidate": 5,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "c5fe8e28ab8dc606714320599bbbd773d90acaea7abc03f7f2819bbad5915af0",
+          "at": "2026-10-30T11:24:27.126Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cargo ship with a red hull and stacked containers, moored, seen from a 2:1 isometric angle, bow pointing to the upper left, the stern with the white bridge tower at the lower right nearest the viewer, the long hull running from the lower right to the upper left, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 9003,
+            "prompt": "small cargo ship with a red hull and stacked containers, moored, seen from a 2:1 isometric angle, bow pointing to the upper left, the stern with the white bridge tower at the lower right nearest the viewer, the long hull running from the lower right to the upper left, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "3d8182c0-0968-5850-88c0-a2a3503d6fa8",
+            "source_image_id": "3d8182c0-0968-5850-88c0-a2a3503d6fa8"
+          },
+          "jobId": "c5a223f7-6db5-4857-b937-ada3f625b63d",
+          "seed": 9003,
+          "candidate": 3,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "c4a53bc47e2481cb2ad130a2be25a2531e4b556209a58d45c554dbc3a0b98a39",
+          "at": "2026-10-30T11:24:27.125Z"
         }
       ],
       "rejects": [
@@ -8087,10 +8188,29 @@
           "reason": "dark grey hull",
           "by": "claude",
           "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "M5 pick: bow to the lower left (+y), so the -x departure slid it broadside; a mooring buoy that would sail with it",
+          "by": "claude",
+          "at": "2026-10-30T11:29:16.905Z"
+        },
+        {
+          "candidate": 3,
+          "reason": "bow upper left but an anchor chain and buoy hang off the bow (they would travel with the ship); long rusty hull",
+          "by": "claude",
+          "at": "2026-10-30T11:29:16.905Z"
+        },
+        {
+          "candidate": 4,
+          "reason": "bow upper left, the longest hull (108 px) with a grey deck; reads as a bigger ship than the quay",
+          "by": "claude",
+          "at": "2026-10-30T11:29:16.905Z"
         }
       ],
-      "finalSha256": "5fdd26443aa6cf3d053ffdb7dc211cb526b6c1becd3e61b27c6e0f134fef048b",
-      "chosenCandidate": 1
+      "finalSha256": "6f0673bf3bbae1d72dff0c6d464895634b0c3aa0b3f1da0fe2b8af3271c7450c",
+      "chosenCandidate": 5,
+      "note": "agent pick #5 (2026-10-30): M9 re-roll (bow first on the departure): red-hulled feeder with a block of blue / green / orange containers, bow to the upper left (-x, the map.hubs exit [-5, 0]), white bridge at the stern nearest the viewer; compact like the M5 pick, no buoy to drag along"
     },
     {
       "id": "dk_containers",
@@ -9995,6 +10115,70 @@
       "finalSha256": "cf478c964b5fbdac6c5fa5a23894d5ceca9d21c58f05d3a2d9a8c8491addfd05"
     },
     {
+      "id": "floor_t4",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 4 \"National\" floor — charcoal anti-slip epoxy with 32-px slab joints and a 16-px saw cut, a few grit specks",
+      "finalSha256": "3117c23aba5630f238e9b74da1fa137a2c57d28ac41e2c1ed52a1db892944069"
+    },
+    {
+      "id": "floor_t4_lane",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): floor_t4 with the 2-px yellow lane lines at x 0-1 / 30-31 (belt column c4), as floor_t3_lane",
+      "finalSha256": "db20f151173a76c13e71d2af04ea0fcade424e7fe4f9f0cfd5a6ffac39c8c3da"
+    },
+    {
+      "id": "floor_t5",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 5 \"Tycoon\" floor — polished white terrazzo with coloured chips and a pale sheen, 32-px joints",
+      "finalSha256": "042831978df3c0e3a804e18765b6df2eca0e67186e81a2f7d227ac517a57041b"
+    },
+    {
+      "id": "floor_t5_lane",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): floor_t5 with 2-px pink lane lines at x 0-1 / 30-31 (belt column c4; the HQ's neon colour)",
+      "finalSha256": "5c4bf9c47f0c2a806204defd20608114326e2743ee849d64ba4f01a470eba905"
+    },
+    {
       "id": "wall_t1",
       "class": "interior-tile",
       "source": "procedural",
@@ -10041,6 +10225,38 @@
       "finalSha256": "384b93bb711ce6dc225c0a0250a3bf87946cf2c5034680ef17e776189431dbd8"
     },
     {
+      "id": "wall_t4",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): side wall top, grey ribbed steel cladding with a blue band between two copings (wh_ext_t4 from inside)",
+      "finalSha256": "8a326364b92955ab032b6312e7599c33d9d3778dd245bd58b75e80380269fe13"
+    },
+    {
+      "id": "wall_t5",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): side wall top, blue glass curtain wall in white mullions (wh_ext_t5 from inside)",
+      "finalSha256": "83d610a120aab120d452275989a5dabd2a7aee53ff37c98e6ac502788b6ffb12"
+    },
+    {
       "id": "wallface_t1",
       "class": "interior-tile",
       "source": "procedural",
@@ -10085,6 +10301,38 @@
       "rejects": [],
       "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): north wall face, red brick over a cream painted dado",
       "finalSha256": "4380937491de1620d528d2605f3ad3627e40c169e1e2aa8ab700834825c55ed4"
+    },
+    {
+      "id": "wallface_t4",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): north wall face, grey ribbed steel cladding with a blue band over a yellow kick rail",
+      "finalSha256": "79b916830d50616235210ab6fd32801e8abbafe6da5d77c825ea6855c1969f7e"
+    },
+    {
+      "id": "wallface_t5",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): north wall face, blue glass panes in white mullions over a white dado with a pink neon line",
+      "finalSha256": "43e9b381a14e286ccbad23622a87f6304168884362754c1730f80eaeef866b37"
     },
     {
       "id": "belt_h",
@@ -10602,6 +10850,38 @@
       "rejects": [],
       "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): tier 3 pallet racking — five wire-deck rows matching the 20x5 @11 mini grid (parcels at x 3 + 11c, y 4 + 11r inside the canvas), blue uprights, orange front beam",
       "finalSha256": "302358d244303721c42792d947067d9eb347be36b4ae359f69bab2b8c1d45a5c"
+    },
+    {
+      "id": "shelf_t4",
+      "class": "fixture-shelf",
+      "source": "procedural",
+      "canvas": [224, 64],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 4 high-bay racking — the 20x5 @11 grid of shelf_t3 (minis at x 3 + 11c, y 4 + 11r) on steel decks, yellow uprights, blue front beam",
+      "finalSha256": "9807ed041a6cde426ac2312c30e517702b416396a3e6514a48ccaf274871396a"
+    },
+    {
+      "id": "shelf_t5",
+      "class": "fixture-shelf",
+      "source": "procedural",
+      "canvas": [224, 64],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 5 white gloss racking — the same 20x5 @11 grid, white decks, chrome uprights, a pink neon front beam",
+      "finalSha256": "dc999cb9f4b9562af0ce21278964fcbc18723507db4b0447151df2a95a50503f"
     },
     {
       "id": "desk",
@@ -12546,6 +12826,144 @@
           "downloadUrl": "",
           "sha256": "8825ee77aba48a475207a102986eba15749c6d5b2eddd31511cbb1192cfce6ea",
           "at": "2026-10-30T02:58:51.429Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner, a long deep boxy light grey tunnel housing seen from above, its long flat roof shows how deep the tunnel is, a big dark blue monitor screen on a stand at the right side showing a bright light blue x-ray picture of a box, a small yellow and black radiation warning sticker on the left wall, purple trim, a glowing light strip along the front edge of the roof, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 9003,
+            "prompt": "chunky airport x-ray baggage scanner, a long deep boxy light grey tunnel housing seen from above, its long flat roof shows how deep the tunnel is, a big dark blue monitor screen on a stand at the right side showing a bright light blue x-ray picture of a box, a small yellow and black radiation warning sticker on the left wall, purple trim, a glowing light strip along the front edge of the roof, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "cb121c7e-080c-56dd-a98e-367288588664",
+            "source_image_id": "cb121c7e-080c-56dd-a98e-367288588664"
+          },
+          "jobId": "4c455ffd-a856-4bad-9f76-2a4e293503a4",
+          "seed": 9003,
+          "candidate": 3,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "dd9776f3f1abbdf847acc388f2ab76c6e999a33d28401484a69a4481175cfa84",
+          "at": "2026-10-30T11:24:27.126Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner, a long deep boxy light grey tunnel housing seen from above, its long flat roof shows how deep the tunnel is, a big dark blue monitor screen on a stand at the right side showing a bright light blue x-ray picture of a box, a small yellow and black radiation warning sticker on the left wall, purple trim, a glowing light strip along the front edge of the roof, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 9004,
+            "prompt": "chunky airport x-ray baggage scanner, a long deep boxy light grey tunnel housing seen from above, its long flat roof shows how deep the tunnel is, a big dark blue monitor screen on a stand at the right side showing a bright light blue x-ray picture of a box, a small yellow and black radiation warning sticker on the left wall, purple trim, a glowing light strip along the front edge of the roof, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "28fdb757-33e8-5df6-84eb-f02ae5af97f1",
+            "source_image_id": "28fdb757-33e8-5df6-84eb-f02ae5af97f1"
+          },
+          "jobId": "d52e6e43-c0ce-4ada-9a16-34df801d9ff3",
+          "seed": 9004,
+          "candidate": 4,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "d1b1038c53f59a7459c8e0d41b23dd88447f7389723347f9e8ce67ad3199a5a8",
+          "at": "2026-10-30T11:24:27.126Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner, a long deep boxy light grey tunnel housing seen from above, its long flat roof shows how deep the tunnel is, a big dark blue monitor screen on a stand at the right side showing a bright light blue x-ray picture of a box, a small yellow and black radiation warning sticker on the left wall, purple trim, a glowing light strip along the front edge of the roof, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 9005,
+            "prompt": "chunky airport x-ray baggage scanner, a long deep boxy light grey tunnel housing seen from above, its long flat roof shows how deep the tunnel is, a big dark blue monitor screen on a stand at the right side showing a bright light blue x-ray picture of a box, a small yellow and black radiation warning sticker on the left wall, purple trim, a glowing light strip along the front edge of the roof, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "019d2b51-6650-5d86-b562-9997d227a5e9",
+            "source_image_id": "019d2b51-6650-5d86-b562-9997d227a5e9"
+          },
+          "jobId": "2ca0b772-e76f-49a5-9213-bbeb3818750e",
+          "seed": 9005,
+          "candidate": 5,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "95bb7e0b7d1ff4e7cd11c81b3ca22fd265481867de933561a0aef72c642a63ec",
+          "at": "2026-10-30T11:24:27.126Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner gate, two slim light grey pillars carrying a thick deep boxy roof block, on the front face of the roof block a wide dark blue screen showing a bright light blue x-ray outline of a parcel, a glowing light strip under the screen, a small yellow and black radiation warning sticker on the left pillar, purple trim, the space between the pillars under the roof block is completely empty and open down to the floor, nothing between the pillars, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 9107,
+            "prompt": "chunky airport x-ray baggage scanner gate, two slim light grey pillars carrying a thick deep boxy roof block, on the front face of the roof block a wide dark blue screen showing a bright light blue x-ray outline of a parcel, a glowing light strip under the screen, a small yellow and black radiation warning sticker on the left pillar, purple trim, the space between the pillars under the roof block is completely empty and open down to the floor, nothing between the pillars, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "08c83856-37e7-5b0c-b9c7-b51262efbc59",
+            "source_image_id": "08c83856-37e7-5b0c-b9c7-b51262efbc59"
+          },
+          "jobId": "6bedb0c9-c6bf-4812-b988-13d41b383024",
+          "seed": 9107,
+          "candidate": 7,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "8c33eded2988d93e93fcfed507a4cae2bdf7d9c5a13c70d36d806ccabe61e686",
+          "at": "2026-10-30T11:27:00.259Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner gate, two slim light grey pillars carrying a thick deep boxy roof block, on the front face of the roof block a wide dark blue screen showing a bright light blue x-ray outline of a parcel, a glowing light strip under the screen, a small yellow and black radiation warning sticker on the left pillar, purple trim, the space between the pillars under the roof block is completely empty and open down to the floor, nothing between the pillars, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 9106,
+            "prompt": "chunky airport x-ray baggage scanner gate, two slim light grey pillars carrying a thick deep boxy roof block, on the front face of the roof block a wide dark blue screen showing a bright light blue x-ray outline of a parcel, a glowing light strip under the screen, a small yellow and black radiation warning sticker on the left pillar, purple trim, the space between the pillars under the roof block is completely empty and open down to the floor, nothing between the pillars, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "4acd4b67-f597-507d-9afd-6c69383be76d",
+            "source_image_id": "4acd4b67-f597-507d-9afd-6c69383be76d"
+          },
+          "jobId": "178326f8-7d3e-468f-a7f8-22aaeda8ee24",
+          "seed": 9106,
+          "candidate": 6,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "ff2382819c84b0c0b0997e050fa6d96e266b8d3bd00ea6138f69f735e575c48e",
+          "at": "2026-10-30T11:27:00.258Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner gate, two slim light grey pillars carrying a thick deep boxy roof block, on the front face of the roof block a wide dark blue screen showing a bright light blue x-ray outline of a parcel, a glowing light strip under the screen, a small yellow and black radiation warning sticker on the left pillar, purple trim, the space between the pillars under the roof block is completely empty and open down to the floor, nothing between the pillars, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 9108,
+            "prompt": "chunky airport x-ray baggage scanner gate, two slim light grey pillars carrying a thick deep boxy roof block, on the front face of the roof block a wide dark blue screen showing a bright light blue x-ray outline of a parcel, a glowing light strip under the screen, a small yellow and black radiation warning sticker on the left pillar, purple trim, the space between the pillars under the roof block is completely empty and open down to the floor, nothing between the pillars, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "92d4f603-c6b6-5955-be51-ca1fd4a5d2e8",
+            "source_image_id": "92d4f603-c6b6-5955-be51-ca1fd4a5d2e8"
+          },
+          "jobId": "57b5d9f7-49c4-4bc7-abac-ed719deece7a",
+          "seed": 9108,
+          "candidate": 8,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "b7f2c8b2b32e40df5b99fe3c089377ce0568cf07f5643349069d4097d287af10",
+          "at": "2026-10-30T11:27:00.259Z"
         }
       ],
       "rejects": [
@@ -12560,6 +12978,42 @@
           "reason": "contract: belt opening (warehouse-view §1.3)",
           "by": "claude",
           "at": "2026-10-30T02:59:29.839Z"
+        },
+        {
+          "candidate": 3,
+          "reason": "contract: belt opening (warehouse-view §1.3)",
+          "by": "claude",
+          "at": "2026-10-30T11:25:05.468Z"
+        },
+        {
+          "candidate": 4,
+          "reason": "contract: belt opening (warehouse-view §1.3)",
+          "by": "claude",
+          "at": "2026-10-30T11:25:05.468Z"
+        },
+        {
+          "candidate": 6,
+          "reason": "contract: belt opening (warehouse-view §1.3)",
+          "by": "claude",
+          "at": "2026-10-30T11:27:38.547Z"
+        },
+        {
+          "candidate": 0,
+          "reason": "M6 pick: a grey arch with a small monitor on the right post; reads as an arch, not a scanner",
+          "by": "claude",
+          "at": "2026-10-30T11:29:16.905Z"
+        },
+        {
+          "candidate": 5,
+          "reason": "deep roof but squashed: a purple left post, the monitor cut off at the right edge",
+          "by": "claude",
+          "at": "2026-10-30T11:29:16.905Z"
+        },
+        {
+          "candidate": 8,
+          "reason": "same header screen layout but the picture is a blank rounded box with two dots",
+          "by": "claude",
+          "at": "2026-10-30T11:29:16.905Z"
         }
       ],
       "id": "xray",
@@ -12570,9 +13024,9 @@
       "district": "warehouse",
       "priority": "P1",
       "subject": "x-ray scanner tunnel over a conveyor with a monitor screen",
-      "note": "agent pick #0 (2026-10-30): boxy light-grey tunnel housing with depth, purple trim and a dark blue monitor on the right wall (its unique feature); open passage over the belt",
-      "finalSha256": "a36708b5d5fdd55f9d6efbc0e45deeecd8fd5ae5d65b1f8d34b6e737079ff641",
-      "chosenCandidate": 0
+      "note": "agent pick #7 (2026-10-30): M9 re-roll (the M6 pick read as a plain arch): slim pillars under a deep dark header whose wide screen shows a light-blue x-ray outline of a parcel (the scan frame turns it yellow), a light strip under it, a radiation sticker on the left pillar, purple trim; belt opening per the contract",
+      "finalSha256": "2eebdbeccfb4da5fe9539b919cc9f4aa1ecf772c653b3b18afe13736932021f5",
+      "chosenCandidate": 7
     },
     {
       "variants": [],
@@ -12786,6 +13240,38 @@
       "finalSha256": "9bb950351c131e736fa440163178874b4100919a91cd79db86bf0f1a47ae91cb"
     },
     {
+      "id": "sign_t4",
+      "class": "sign",
+      "source": "procedural",
+      "canvas": [200, 24],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 4 sign — a pale face (dark text, as t2/t3) in a blue band with yellow chevron end caps; text area x 8..191, y 4..19",
+      "finalSha256": "cc41c27f21d324f6eebd8dfdbec9186cb9950c809b05e643d8aedaa383f7b0d8"
+    },
+    {
+      "id": "sign_t5",
+      "class": "sign",
+      "source": "procedural",
+      "canvas": [200, 24],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 5 sign — a white lightbox face (dark text) in a dark board with a pink neon tube border and yellow corner studs; text area x 8..191, y 4..19",
+      "finalSha256": "a5d3fa8ae5609350b4c6ba44d78e324f1f7a6278f9152bbc5cc4646f949b8596"
+    },
+    {
       "id": "sign_crack",
       "class": "sign",
       "source": "procedural",
@@ -12829,6 +13315,22 @@
       "gen": [],
       "rejects": [],
       "finalSha256": "048167c57f512b1881306e06f355e7452c2994d9a852c4c9ea5eb15f89dccfd9"
+    },
+    {
+      "id": "neon_strip",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [64, 8],
+      "frames": ["_f0", "_f1"],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): tier 5 replaces strip_light (same 64x8 spots, RoomLayout STRIP_LIGHTS): a pink neon tube in a white channel; _f0 lit, _f1 the dimmer flicker frame",
+      "finalSha256": "4cd249f25550663df49bea81f0f8b6e5829c6deec928e5acedf04b95288c1595"
     },
     {
       "id": "props_t1",
@@ -12879,6 +13381,38 @@
       "finalSha256": "9f58d02f9f0821730cfc9f0a117380e4204de13a805bdb79ab9189f2288dd172"
     },
     {
+      "id": "props_t4",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [48, 64],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): a yellow forklift with a pallet of blue totes on its forks (48x64, the props_t3 canvas)",
+      "finalSha256": "7345b34fde2302ab100ba271dbb9cceba9720d18c5320e6669aafb928ec8099c"
+    },
+    {
+      "id": "props_t5",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [48, 64],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): a tall potted palm in a white planter beside a small white delivery robot carrying a parcel (48x64)",
+      "finalSha256": "00c39a8dae448567cb8637b94b188da1d8a2097d05aedaa6e44fdcffa1c63441"
+    },
+    {
       "id": "wanted_poster_t1",
       "class": "interior-prop",
       "source": "procedural",
@@ -12923,6 +13457,38 @@
       "rejects": [],
       "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): corkboard with a pinned WANTED sheet whose mugshot is the battery-strain parcel (L3) and a yellow sticky note",
       "finalSha256": "2ba19792172a9f8650eac794e9cc52869baac309199e0c10b41e449a1a33a7b4"
+    },
+    {
+      "id": "wanted_poster_t4",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): steel notice board with a printed WANTED sheet whose mugshot is the dense-strain parcel (L4) and a blue magnet",
+      "finalSha256": "64efc70977321191247000b74174788caf03017bffe70c475ffec3df940eb34e"
+    },
+    {
+      "id": "wanted_poster_t5",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M9 (B2 §4.2-§4.4, §6.6; design-m8-m9 §6.4): a wall screen in a white bezel showing MOST WANTED: the four strains' mugshots in a 2x2 grid on a dark blue display, a pink status LED",
+      "finalSha256": "225be546f22fec27b45fa1a2f37afffa83a0ef427ecc77a507aa38ca341c3a3d"
     },
     {
       "id": "parcel_s",
@@ -14800,7 +15366,7 @@
       "gen": [],
       "rejects": [],
       "note": "glyph sheet from vlr font:build (art/final/font/m5x7.png); canvas 0x0 = variable",
-      "finalSha256": "ed705a783c74757773be2e1e78be8da459aa72fce16e458a877e8604a73d543f"
+      "finalSha256": "0158f4c8637912cea68e311bec33b370ee0fe2841b71a897ea4b974c29e8ceac"
     }
   ],
   "batches": [
@@ -15154,6 +15720,24 @@
       "usd": 0,
       "balanceBefore": 2690,
       "balanceAfter": 2470
+    },
+    {
+      "at": "2026-10-30T11:25:05.468Z",
+      "ids": ["dk_ship", "xray"],
+      "tool": "create-image-pro-flash",
+      "generations": 33,
+      "usd": 0,
+      "balanceBefore": 2470,
+      "balanceAfter": 2437
+    },
+    {
+      "at": "2026-10-30T11:27:38.547Z",
+      "ids": ["xray"],
+      "tool": "create-image-pro-flash",
+      "generations": 15,
+      "usd": 0,
+      "balanceBefore": 2437,
+      "balanceAfter": 2422
     }
   ],
   "retired": [

@@ -264,6 +264,34 @@ function runwayStripe(k: Kit): void {
   })
 }
 
+/**
+ * Build 2 M9 (plan-build2 §6 Airport "runway themed tiles"): the runway's
+ * threshold — white piano-key bars along the runway (v) across the whole
+ * tile, on the runway grey with its edge lines; laid on the end rows.
+ */
+function runwayThreshold(k: Kit): void {
+  all(k, (u, v) => {
+    if (u === 0 || u === 15) return 'grey2'
+    if (v >= 2 && v <= 13 && u % 4 !== 0 && u % 4 !== 3) return 'grey5'
+    return 'grey1'
+  })
+}
+
+/**
+ * Build 2 M9: the apron tile beside the parked plane — tarmac with a yellow
+ * taxi line along u (+x, the plane's exit) and blue edge lights.
+ */
+function taxiway(k: Kit): void {
+  all(k, (u, v) => {
+    const c: FloorCell = { c: 'grey2' }
+    if (u % 8 === 0) c.nw = 'grey1'
+    if (v % 8 === 0) c.ne = 'grey1'
+    if (v === 7 || v === 8) c.c = 'yellow2'
+    if ((v === 2 || v === 13) && u % 5 === 2) c.c = 'blue2'
+    return c
+  })
+}
+
 function treeLine(k: Kit): void {
   grass(k, 71)
   pine(k, 7, 12, 8, 2.4)
@@ -430,6 +458,8 @@ const PAINTERS: Record<string, Painter> = {
   tarmac: (k) => tarmac(k),
   runway: (k) => runway(k),
   runway_stripe: (k) => runwayStripe(k),
+  runway_threshold: (k) => runwayThreshold(k),
+  taxiway: (k) => taxiway(k),
   tree_line: (k) => treeLine(k),
   kerb_n: (k) => kerb(k, 'n'),
   kerb_e: (k) => kerb(k, 'e'),

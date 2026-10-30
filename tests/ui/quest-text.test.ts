@@ -134,13 +134,13 @@ describe('design-m7 §6.2: the objective in one sentence, per goal kind', () => 
   it('every template and the Golden Release', () => {
     const want: Record<string, string> = {
       rush_district: 'Deliver 6 parcels sent from Registry Row',
-      cheer_up: 'Bring Node Heights to 60 satisfaction',
+      cheer_up: 'Bring Node Heights to 52 satisfaction',
       magic_parcel: 'Deliver the golden parcel across town in 2:00',
       clean_sweep: 'Toss 3 malware in a row — a clean parcel tossed resets it',
       on_time_day: 'One full day at 85% on time (6+ deliveries)',
       big_haul: 'Deliver 3 XL parcels',
       night_shift: 'Make 6 Hold Bay calls without a full bay',
-      customs_run: 'Clear 6 parcels through Shrinkwrap Shore',
+      customs_run: 'Clear 3 parcels through Shrinkwrap Shore',
       inspector_general: 'Hold 95% detection on every strain for a day',
       express_lane: 'Clear 4 parcels through Prefetch International',
       golden_release: 'In 5 days: 60 deliveries, no malware, 90% on time',
@@ -242,14 +242,14 @@ describe('design-m7 §6.2: the chip — progress text and the label', () => {
       '5/6',
     )
     expect(qt.chipProgressText(active('customs_run', { count: 1 }, 900))).toBe(
-      '1/6',
+      '1/3',
     )
     expect(qt.chipProgressText(active('clean_sweep', { streak: 2 }, 900))).toBe(
       '2/3',
     )
     expect(
-      qt.chipProgressText(active('cheer_up', { satisfaction: 58.7 }, 900)),
-    ).toBe('58/60')
+      qt.chipProgressText(active('cheer_up', { satisfaction: 50.7 }, 900)),
+    ).toBe('50/52')
     expect(
       qt.chipProgressText(
         active('on_time_day', { deliveries: 5, onTime: 4 }, 900),

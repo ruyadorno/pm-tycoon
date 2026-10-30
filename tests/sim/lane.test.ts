@@ -6,10 +6,12 @@
 // stall propagates upstream to the conveyor and the docked vehicle; a full
 // shelf stalls the last slot; a busy desk is backpressure, not a stall;
 // lane:stalled / lane:resumed; nothing is ever lost (conservation identity).
+// M9 (design-m8-m9 §7 M9 4): the slot-6 lane at the real L5 — six live
+// slots, conveyor → slot1 … slot6 → shelf, six slot results in one trace.
 
 import { describe, expect, it } from 'vitest'
 import { auditState, conservation } from '../../src/sim/sim.ts'
-import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
+import { laneNode, liveSlotIds, TICKS_PER_S } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   buy,
@@ -17,6 +19,7 @@ import {
   dataFixture,
   eventLog,
   feeder,
+  fund,
   hireInspector,
   injectParcel,
   laneParcel,
@@ -24,6 +27,7 @@ import {
   noCheckers,
   openingA,
   placeMachine,
+  quiet,
   quietSim,
   runTicks,
   runUntil,
@@ -344,5 +348,67 @@ describe('conservation (plan.md §12.5 acceptance)', () => {
     }
     expect(sim.state.lane.docks).toHaveLength(1)
     expect(sim.state.stats.deliveries).toBeGreaterThan(20)
+  })
+})
+
+/** A quiet funded game at L5 the levels.json way (lifetime earned, the shipped cap). */
+function atL5(seed = 1): ReturnType<typeof quietSim> {
+  const sim = quietSim(seed)
+  sim.state.economy.lifetimeEarned = data.levels.find(
+    (l) => l.level === 5,
+  )!.threshold
+  runTicks(sim, 1)
+  expect(sim.state.level.level).toBe(5)
+  return fund(quiet(sim))
+}
+
+describe('the slot-6 lane (M9, spec-build2 §4.3; design-m8-m9 §7 M9 4)', () => {
+  const SIX = ['slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6']
+
+  it('six live slots: a parcel flows conveyor → slot1 … slot6 → shelf, one node per tick through empty slots', () => {
+    const sim = noCheckers(atL5())
+    const lane = sim.state.lane
+    expect(lane.slotNodeIds).toEqual(SIX)
+    expect(liveSlotIds(lane)).toEqual(SIX)
+    expect(laneNode(lane, 'slot6')!.next).toEqual(['shelf'])
+    const p = laneParcel(sim, 'conv1')
+    const log = eventLog(sim)
+    runTicks(sim, 10)
+    const flow = log.filter(
+      (e) =>
+        (e.name === 'parcel:enteredSlot' || e.name === 'parcel:shelved') &&
+        (e.p as { id: number }).id === p.id,
+    )
+    const t0 = flow[0]!.tick
+    expect(
+      flow.map((e) => [
+        (e.p as { nodeId?: string }).nodeId ?? 'shelf',
+        e.tick - t0,
+      ]),
+    ).toEqual([...SIX.map((id, i) => [id, i]), ['shelf', 6]])
+    expect(p.state).toBe('on_shelf')
+    expect(p.trace.filter((t) => t.what === 'empty').map((t) => t.ref)).toEqual(
+      SIX,
+    )
+    expect(auditState(sim.state, data)).toEqual([])
+  })
+
+  it('one parcel collects six slot results in its trace, in flow order (the start desk + five machines, X-ray included)', () => {
+    const sim = atL5(2)
+    placeMachine(sim, 'metal_detector', 'slot2')
+    placeMachine(sim, 'shaky_shaker', 'slot3')
+    placeMachine(sim, 'battery_checker', 'slot4')
+    placeMachine(sim, 'xray', 'slot5')
+    placeMachine(sim, 'metal_detector', 'slot6')
+    const p = laneParcel(sim, 'conv1')
+    expect(runUntil(sim, () => p.state === 'on_shelf', 600)).toBeGreaterThan(0)
+    const results = p.trace.filter((t) => SIX.includes(t.ref ?? ''))
+    expect(results.map((t) => [t.ref, t.what])).toEqual(
+      SIX.map((id) => [id, 'passed']),
+    )
+    expect(results[0]!.text).toMatch(/^Slot 1 desk — /)
+    expect(results[4]!.text).toBe('Slot 5 X-ray: passed')
+    expect(results[5]!.text).toBe('Slot 6 Metal detector: passed')
+    expect(auditState(sim.state, data)).toEqual([])
   })
 })

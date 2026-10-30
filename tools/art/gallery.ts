@@ -333,7 +333,7 @@ function citySample(m: Manifest): Canvas | null {
  * the frame cells.
  */
 function withPort(m: Manifest, frames: Canvas): Canvas {
-  const port = portScene(m, false)
+  const port = portScene(m, false, [0.35, 0.7])
   const P = 2
   const gap = 6 * S
   const head = 16 * S
@@ -346,7 +346,9 @@ function withPort(m: Manifest, frames: Canvas): Canvas {
   ctx.fillRect(0, 0, W, H)
   label(
     ctx,
-    'the port on the map (tiles x 0-12, y 26-38), in colour: live from L3 (M8)',
+    'the port on the map (tiles x 0-12, y 26-38), in colour: live from L3 ' +
+      '(M8); faint: dk_ship at 35 % / 70 % of its sail-out along the ' +
+      'map.hubs exit [-5, 0] (M9 re-roll: bow first)',
     gap,
     gap / 2,
   )

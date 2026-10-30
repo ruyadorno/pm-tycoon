@@ -19,6 +19,14 @@
 // before) from `node tools/fixtures/m8.ts`; the attract city is the L3 one
 // (level ≥ 3, ≥ 6 vehicles incl. a van and two trucks, Docks live) at the
 // first whole minute in 24–30 that shows it.
+// Build 2, M9 (plan-build2 §8.6 task 7; design-m8-m9 §8 lane G):
+// level-up-4.json / level-up-5.json (3 s before the policy's real L4 / L5),
+// l4-room.json (60 s past the real L4: tier 4, slots 1-5), l5-tycoon.json
+// (on the level:up {5} tick: the Golden Release offered; the first Airport
+// departure `airportDepartureInS` later under the policy) and victory.json
+// (3 s before game:victory) from `node tools/fixtures/m9.ts`; l3-docks.json
+// is at a real L4 since M9 (seed 7's first Docks hand-off after dock 2 comes
+// after its L4), and the attract city (same assertions) is the L5 one.
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -88,6 +96,11 @@ describe('shot fixtures load under the shipped data hash', () => {
     'level-up-3',
     'l3-docks',
     'overseas-malware',
+    'level-up-4',
+    'l4-room',
+    'level-up-5',
+    'l5-tycoon',
+    'victory',
   ]) {
     it(`${name}.json is current (else: its fixture.regenerate)`, () => {
       const { fx } = read(name)
@@ -97,7 +110,7 @@ describe('shot fixtures load under the shipped data hash', () => {
   }
 })
 
-describe('the M2/M3/M6/M8 fixtures are plain runs (seed + command log, no state patching)', () => {
+describe('the M2/M3/M6/M8/M9 fixtures are plain runs (seed + command log, no state patching)', () => {
   for (const name of [
     'holdbay-full',
     'malware-cleared',
@@ -109,6 +122,11 @@ describe('the M2/M3/M6/M8 fixtures are plain runs (seed + command log, no state 
     'level-up-3',
     'l3-docks',
     'overseas-malware',
+    'level-up-4',
+    'l4-room',
+    'level-up-5',
+    'l5-tycoon',
+    'victory',
   ]) {
     it(`${name}.json replays to the same state hash`, () => {
       const { sim } = load(name)
@@ -432,12 +450,19 @@ describe('level-up-3: lifetime just under the L3 threshold, one payout from L3 (
   })
 })
 
-describe('l3-docks: two docks at L3 and a Docks clearance ahead (B2 §4.1, §4.4; design §4.1-§4.2)', () => {
-  it('is at L3, tier 3, docks 1 and 2 owned with their conveyors, the fixture parcel the soonest Docks clearance', () => {
+describe('l3-docks: two docks at L3+ and a Docks clearance ahead (B2 §4.1, §4.4; design §4.1-§4.2)', () => {
+  it('is at L3+ (a real L4 since M9), its tier, docks 1 and 2 owned with their conveyors, the fixture parcel the soonest Docks clearance', () => {
     const { sim, fx } = load('l3-docks')
     const st = sim.state
     expect(st.level.level).toBe(fx.fixture.level)
-    expect(st.level.warehouseTier).toBe(3)
+    expect(st.level.level).toBeGreaterThanOrEqual(3)
+    expect(st.level.warehouseTier).toBe(fx.fixture.tier)
+    expect(st.level.warehouseTier).toBe(
+      sim.data.levels.find((l) => l.level === st.level.level)!.warehouseTier,
+    )
+    expect(sim.commandLog.some((e) => e.cmd.kind.startsWith('debug'))).toBe(
+      false,
+    )
     expect(st.lane.docks.map((d) => d.id)).toEqual(fx.fixture.docks)
     expect(fx.fixture.docks).toEqual(['dock1', 'dock2'])
     for (const id of ['dock1', 'conv1', 'dock2', 'conv2'])
@@ -530,6 +555,279 @@ describe('overseas-malware: a handed-off malware parcel costs a life at clearanc
   })
 })
 
+/** The live slot ids of a state, lane order. */
+const liveSlots = (sim: Sim): string[] =>
+  sim.state.lane.nodes
+    .filter((n) => n.kind === 'slot' && !n.locked)
+    .map((n) => n.id)
+
+/** Under ?policy=1 until `level`: the level-up tick, events in order (level, regions, quest offers). */
+function levelUpUnderPolicy(
+  sim: Sim,
+  level: number,
+  capS: number,
+): { upTick: number; t0: number; order: string[] } {
+  const order: string[] = []
+  sim.events.on('level:up', (p) => order.push(`level:${p.level}`))
+  sim.events.on('region:unlocked', (p) => order.push(`region:${p.district}`))
+  sim.events.on('quest:offered', (p) =>
+    order.push(`offer:${p.templateId}:${String(p.ultimate)}`),
+  )
+  const t0 = sim.state.tick
+  let upTick = -1
+  withPolicy(sim, capS, () => {
+    if (upTick < 0 && sim.state.level.level === level) upTick = sim.state.tick
+    return upTick >= 0
+  })
+  return { upTick, t0, order }
+}
+
+describe('level-up-4: lifetime just under the L4 threshold, one payout from L4 (B2 §4.2, plan-build2 §8.6 tasks 1, 7)', () => {
+  it('is at a real L3, tier 3, four live slots, Low-density and Rural locked, lifetime earned just under the L4 threshold', () => {
+    const { sim, fx } = load('level-up-4')
+    const st = sim.state
+    expect(st.level.level).toBe(3)
+    expect(st.level.warehouseTier).toBe(3)
+    expect(fx.fixture.threshold).toBe(st.level.nextThreshold)
+    expect(st.economy.lifetimeEarned).toBe(fx.fixture.lifetime)
+    const next = st.level.nextThreshold ?? Infinity
+    expect(st.economy.lifetimeEarned).toBeLessThan(next)
+    expect(st.economy.lifetimeEarned).toBeGreaterThanOrEqual(next - 200)
+    expect(fx.fixture.regions).toEqual(['lowres', 'rural'])
+    for (const d of fx.fixture.regions as string[])
+      expect(st.districts[d]!.live, d).toBe(false)
+    expect(liveSlots(sim)).toHaveLength(4)
+    expect(sim.commandLog.some((e) => e.cmd.kind.startsWith('debug'))).toBe(
+      false,
+    )
+  })
+
+  it('under ?policy=1 level:up {4} lands at fixture.levelUpInS, then region:unlocked lowres + rural on the same tick: tier 4, slot 5 live, shelf 80', () => {
+    const { sim, fx } = load('level-up-4')
+    const { upTick, t0, order } = levelUpUnderPolicy(sim, 4, 10)
+    expect(order).toEqual([
+      'level:4',
+      ...(fx.fixture.regions as string[]).map((r) => `region:${r}`),
+    ])
+    expect((upTick - t0) / TICKS_PER_S).toBe(fx.fixture.levelUpInS)
+    const st = sim.state
+    expect(st.level.warehouseTier).toBe(4)
+    expect(liveSlots(sim)).toEqual([
+      'slot1',
+      'slot2',
+      'slot3',
+      'slot4',
+      'slot5',
+    ])
+    expect(laneNode(st.lane, 'shelf')!.cap).toBe(80)
+    expect(st.districts.lowres!.live).toBe(true)
+    expect(st.districts.rural!.live).toBe(true)
+  })
+})
+
+describe('l4-room: the tier-4 room at a real L4 (B2 §4.4, plan-build2 §8.6 task 2)', () => {
+  it('is at a real L4, tier 4, slots 1-5 live holding fixture.fixtures, slot 6 locked, shelf 80, the fixture docks', () => {
+    const { sim, fx } = load('l4-room')
+    const st = sim.state
+    expect(st.level.level).toBe(4)
+    expect(st.level.warehouseTier).toBe(fx.fixture.tier)
+    expect(st.level.warehouseTier).toBe(4)
+    expect(st.stats.levelTick['4']).toBe(fx.fixture.levelTick)
+    expect(liveSlots(sim)).toEqual(fx.fixture.slots)
+    expect(laneNode(st.lane, 'slot6')!.locked).toEqual({ level: 5 })
+    const fixtures = fx.fixture.fixtures as Record<string, string | null>
+    for (const [id, want] of Object.entries(fixtures)) {
+      const f = laneNode(st.lane, id)!.fixture
+      const got = !f ? null : f.kind === 'machine' ? f.checker.defId : f.kind
+      expect(got, id).toBe(want)
+    }
+    expect(laneNode(st.lane, 'shelf')!.cap).toBe(fx.fixture.shelfCap)
+    expect(fx.fixture.shelfCap).toBe(80)
+    expect(st.lane.docks.map((d) => d.id)).toEqual(fx.fixture.docks)
+    expect(st.lane.holdStation.fixture).toBe(fx.fixture.station)
+    expect(sim.commandLog.some((e) => e.cmd.kind.startsWith('debug'))).toBe(
+      false,
+    )
+    expect(auditState(st, sim.data)).toEqual([])
+  })
+
+  it('under ?policy=1 no level:up and no life lost in the next 30 s', () => {
+    const { sim } = load('l4-room')
+    const ups = collect(sim, 'level:up')
+    const lost = collect(sim, 'life:lost')
+    withPolicy(sim, 30)
+    expect(ups).toEqual([])
+    expect(lost).toEqual([])
+    expect(auditState(sim.state, sim.data)).toEqual([])
+  })
+})
+
+describe('level-up-5: lifetime just under the L5 threshold, one payout from Tycoon (B2 §3.4, §4.3)', () => {
+  it('is at a real L4, tier 4, five live slots, the Airport and Park & civic locked, no ultimate offered yet', () => {
+    const { sim, fx } = load('level-up-5')
+    const st = sim.state
+    expect(st.level.level).toBe(4)
+    expect(st.level.warehouseTier).toBe(4)
+    expect(fx.fixture.threshold).toBe(st.level.nextThreshold)
+    expect(st.economy.lifetimeEarned).toBe(fx.fixture.lifetime)
+    const next = st.level.nextThreshold ?? Infinity
+    expect(st.economy.lifetimeEarned).toBeLessThan(next)
+    expect(st.economy.lifetimeEarned).toBeGreaterThanOrEqual(next - 200)
+    expect(fx.fixture.regions).toEqual(['airport', 'civic'])
+    for (const d of fx.fixture.regions as string[])
+      expect(st.districts[d]!.live, d).toBe(false)
+    expect(liveSlots(sim)).toHaveLength(5)
+    expect(st.quests.offer?.ultimate ?? false).toBe(false)
+    expect(st.quests.active?.ultimate ?? false).toBe(false)
+  })
+
+  it('under ?policy=1 level:up {5} lands at fixture.levelUpInS, then region:unlocked airport + civic and quest:offered {golden_release} on that tick: tier 5, six slots, no next threshold', () => {
+    const { sim, fx } = load('level-up-5')
+    const offerTicks: number[] = []
+    sim.events.on('quest:offered', (p) => {
+      if (p.ultimate) offerTicks.push(sim.state.tick)
+    })
+    const { upTick, t0, order } = levelUpUnderPolicy(sim, 5, 10)
+    expect(order).toEqual([
+      'level:5',
+      ...(fx.fixture.regions as string[]).map((r) => `region:${r}`),
+      `offer:${String(fx.fixture.ultimate)}:true`,
+    ])
+    expect(offerTicks).toEqual([upTick])
+    expect((upTick - t0) / TICKS_PER_S).toBe(fx.fixture.levelUpInS)
+    const st = sim.state
+    expect(st.level.warehouseTier).toBe(5)
+    expect(st.level.nextThreshold).toBeNull()
+    expect(liveSlots(sim)).toEqual([
+      'slot1',
+      'slot2',
+      'slot3',
+      'slot4',
+      'slot5',
+      'slot6',
+    ])
+    expect(laneNode(st.lane, 'shelf')!.cap).toBe(100)
+  })
+})
+
+describe('l5-tycoon: L5 on its level-up tick, the Golden Release offered (B2 §3.4; design §4.5)', () => {
+  it('is on the level:up {5} tick: L5, tier 5, six live slots, the Airport live, the Golden Release offered (no expiry) beside the active regular quest', () => {
+    const { sim, fx } = load('l5-tycoon')
+    const st = sim.state
+    expect(st.level.level).toBe(5)
+    expect(st.level.warehouseTier).toBe(5)
+    expect(st.stats.levelTick['5']).toBe(st.tick)
+    expect(st.level.nextThreshold).toBeNull()
+    expect(liveSlots(sim)).toHaveLength(6)
+    for (const d of fx.fixture.regions as string[])
+      expect(st.districts[d]!.live, d).toBe(true)
+    const o = st.quests.offer!
+    expect(o.id).toBe(fx.fixture.questId)
+    expect(o.templateId).toBe(fx.fixture.templateId)
+    expect(o.templateId).toBe('golden_release')
+    expect(o.ultimate).toBe(true)
+    expect(o.goal).toBe(fx.fixture.goal)
+    expect(o.offeredTick).toBe(st.tick)
+    expect(o.expiresTick).toBeNull()
+    expect(st.quests.active?.id ?? null).toBe(fx.fixture.activeQuestId)
+    expect(st.quests.active?.templateId ?? null).toBe(
+      fx.fixture.activeTemplateId,
+    )
+    expect(fx.fixture.officeId).toBe(
+      sim.data.map.hubs.find((h) => h.district === 'airport')!.office,
+    )
+    expect(auditState(st, sim.data)).toEqual([])
+  })
+
+  it('without the policy the offer stands; the active quest abandoned, it is accepted: 0/60, its deadline set', () => {
+    const { sim, fx } = load('l5-tycoon')
+    for (let i = 0; i < 5 * TICKS_PER_S; i++) sim.tick()
+    expect(sim.state.quests.offer?.id).toBe(fx.fixture.questId)
+    if (sim.state.quests.active)
+      expect(sim.dispatch({ kind: 'abandonQuest' }).ok).toBe(true)
+    const r = sim.dispatch({
+      kind: 'acceptQuest',
+      questId: fx.fixture.questId as string,
+    })
+    expect(r.ok).toBe(true)
+    const a = sim.state.quests.active!
+    expect(a.id).toBe(fx.fixture.questId)
+    expect(a.progress).toEqual({
+      kind: 'ultimate',
+      delivered: 0,
+      onTime: 0,
+      malware: 0,
+    })
+    expect(a.deadlineTick).not.toBeNull()
+  })
+
+  it('under ?policy=1 the first hub:departure {airport} (the plane) lands at fixture.airportDepartureInS', () => {
+    const { sim, fx } = load('l5-tycoon')
+    const t0 = sim.state.tick
+    let tick = -1
+    let count = 0
+    sim.events.on('hub:departure', (p) => {
+      if (p.hub !== 'airport' || tick >= 0) return
+      tick = sim.state.tick
+      count = p.count
+    })
+    withPolicy(
+      sim,
+      (fx.fixture.airportDepartureInS as number) + 5,
+      () => tick >= 0,
+    )
+    expect((tick - t0) / TICKS_PER_S).toBe(fx.fixture.airportDepartureInS)
+    expect(count).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('victory: 3 s before the Golden Release ships (B2 §3.4, plan-build2 §8.6 task 3)', () => {
+  it('is at L5 with the Golden Release active and one delivery short, no victory yet', () => {
+    const { sim, fx } = load('victory')
+    const st = sim.state
+    expect(st.level.level).toBe(5)
+    const q = st.quests.active!
+    expect(q.id).toBe(fx.fixture.questId)
+    expect(q.ultimate).toBe(true)
+    expect(q.goal).toBe(fx.fixture.goal)
+    expect(q.progress).toEqual({
+      kind: 'ultimate',
+      delivered: fx.fixture.delivered,
+      onTime: fx.fixture.onTime,
+      malware: fx.fixture.malware,
+    })
+    expect(fx.fixture.delivered).toBe((fx.fixture.goal as number) - 1)
+    expect(st.economy.victory).toBe(false)
+    expect(st.stats.victoryTick).toBeNull()
+    expect(st.economy.gameOver).toBe(false)
+    expect(sim.commandLog.some((e) => e.cmd.kind.startsWith('debug'))).toBe(
+      false,
+    )
+  })
+
+  it('under ?policy=1 quest:completed {golden_release} and game:victory land on one tick at fixture.victoryInS: economy.victory, stats.victoryTick', () => {
+    const { sim, fx } = load('victory')
+    const t0 = sim.state.tick
+    let doneTick = -1
+    let winTick = -1
+    let day = -1
+    sim.events.on('quest:completed', (p) => {
+      if (p.questId === fx.fixture.questId) doneTick = sim.state.tick
+    })
+    sim.events.on('game:victory', (p) => {
+      winTick = sim.state.tick
+      day = p.day
+    })
+    withPolicy(sim, (fx.fixture.victoryInS as number) + 5, () => winTick >= 0)
+    expect(doneTick).toBe(winTick)
+    expect((winTick - t0) / TICKS_PER_S).toBe(fx.fixture.victoryInS)
+    expect(day).toBe(fx.fixture.victoryDay)
+    expect(sim.state.economy.victory).toBe(true)
+    expect(sim.state.stats.victoryTick).toBe(winTick)
+    expect(sim.state.quests.active).toBeNull()
+  })
+})
+
 /** The committed attract snapshot's text. */
 const attractText = (): string => readFileSync(ATTRACT_OUT, 'utf8')
 
@@ -537,7 +835,7 @@ const attractText = (): string => readFileSync(ATTRACT_OUT, 'utf8')
 const loadAttract = (): Sim =>
   Sim.load(dataFixture(), JSON.parse(attractText()), { ignoreDataHash: true })
 
-describe('attract.json: the Title attract city (B2 §5; M8: the L3 city)', () => {
+describe('attract.json: the Title attract city (B2 §5; M8: the L3 city, M9: L3+)', () => {
   it('equals a fresh run of tools/fixtures/attract.ts (else: vlr fixtures:attract)', () => {
     const sim = runAttract(dataFixture())
     expect(attractProblems(sim), attractSummary(sim)).toEqual([])

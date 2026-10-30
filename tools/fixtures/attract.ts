@@ -18,6 +18,14 @@
 // the first minute that holds (seed 7's 2nd truck comes at ~30:00 at M8);
 // if none does, the script exits 1 and writes nothing — tune the policy, not
 // the fixture. (M5 asserted the L2 city at exactly 24 min.)
+// M9 (design-m8-m9 §8 lane G): the cap is L5, so the same assertions hold
+// a later city — seed 7 reaches L4 at ≈ 22.7 min and L5 at ≈ 27.6 min, and
+// its van (≈ 25 min) and 2nd truck (≈ 28 min) come later than at M8, so the
+// scan stops at the first minute past the 2nd truck: an L5 city with every
+// region live. Regenerated with every milestone (the data always changes).
+// M9 integration (NEW STRAIN FIRST, src/sim/policies/levelPlan.ts): at L4
+// the X-ray goes ahead of the L3 van and 2nd truck, so seed 7's van comes
+// at ≈ 29 min and its 2nd truck at ≈ 32 min — the scan runs to 34 min.
 //
 // The JSON is JSON.stringify(sim.snapshot()) + "\n": the run is deterministic
 // (seeded PRNG, no clock), so the same tables give the same bytes.
@@ -34,8 +42,8 @@ import { loadGameData } from '../sim/load.node.ts'
 export const ATTRACT_SEED = 7
 /** The scan's first and last whole sim minute (design R15). */
 export const ATTRACT_MIN_MINUTES = 24
-export const ATTRACT_MAX_MINUTES = 30
-/** M8 expectations: at least this level (L4 is fine at M9). */
+export const ATTRACT_MAX_MINUTES = 34
+/** M8 expectations: at least this level (L4/L5 are fine at M9). */
 export const ATTRACT_MIN_LEVEL = 3
 export const ATTRACT_MIN_VEHICLES = 6
 /** At least this many of each vehicle type. */

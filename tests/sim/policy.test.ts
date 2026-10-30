@@ -37,6 +37,18 @@
 // (informational in --quick and on a shorter run), level4Min / level5Min
 // stay informational (M9); a non-30-minute gate writes latest-<N>min.*.
 // tests/sim/levels3.long.test.ts has the seeds 1-10 × 25 min L3 window.
+//
+// Build 2, M9 (spec-build2 §7.2 L4-L5 rows, §7.3; plan-build2 §8.6 tasks 4 +
+// 6 and its acceptance; design-m8-m9 §5.1-§5.3, §7 M9 item 8): with
+// SIM_FEATURES.levels45 the plan buys at L4 the X-ray → dock 3 → the Sorter
+// Arm into the empty station → a 2nd van, and at L5 the 3rd truck (the
+// Golden Release is accepted by the quest rule), each at price + $50;
+// COUNTERS then takes slot 6. Once the Arm holds the station the policy
+// leaves the Hold Bay to it and Tosses by hand only with every bay taken.
+// The report gates level4Min (20-25 min) and level5Min (25-30 min); the
+// Golden Release / victory rows and armTosses print as informational; the
+// gate table gains GR_min. tests/sim/victory.long.test.ts has the seeds 1-3
+// victory run.
 
 import { describe, expect, it } from 'vitest'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
@@ -46,6 +58,7 @@ import {
   sorterOnDuty,
 } from '../../src/sim/policies/delegating.ts'
 import {
+  armHoldsBay,
   LEVEL_PLAN,
   levelPlanDone,
   levelPlanStep,
@@ -55,6 +68,7 @@ import {
   replaceSlot,
   slotForPurchase,
   stepStatus,
+  strainCounterStep,
 } from '../../src/sim/policies/levelPlan.ts'
 import {
   POLICY_PARAMS,
@@ -74,12 +88,19 @@ import type {
   Role,
   VehicleType,
 } from '../../src/sim/types.ts'
-import { laneNode, liveSlotIds, TICKS_PER_DAY } from '../../src/sim/types.ts'
+import {
+  laneNode,
+  liveSlotIds,
+  TICKS_PER_DAY,
+  TICKS_PER_S,
+  ticksFromS,
+} from '../../src/sim/types.ts'
 import {
   gateFileBase,
   parseCli,
   questsLine,
   runSeed,
+  stuckKey,
   UsageError,
 } from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
@@ -92,6 +113,7 @@ import {
   computeMetrics,
   DELEGATING_NOTE,
   formatGate,
+  Highlights,
   gateMarkdown,
   levelWindowMinutes,
   median,
@@ -102,10 +124,12 @@ import {
   withinBand,
 } from '../../tools/sim/report.ts'
 import {
+  collect,
   dataFixture,
   fund,
   heldParcel,
   makeSim,
+  noOffers,
   quiet,
   quietSim,
   runTicks,
@@ -115,11 +139,40 @@ import {
 const data = dataFixture()
 const targets = data.economy.pacingTargets
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-/** A vehicles.json / machines.json price by id, or economy.docks' by `dock<index>`. */
+/** A vehicles.json / machines.json (checkers, upgrades) price by id, or economy.docks' by `dock<index>`. */
 const price = (k: string): number =>
   data.vehicles.types.find((t) => t.id === k)?.price ??
   data.economy.docks.find((d) => `dock${d.index}` === k)?.price ??
+  data.machines.upgrades.find((u) => u.id === k)?.price ??
   data.machines.checkers.find((c) => c.id === k)!.price
+
+/**
+ * Every purchase of the competent policy's plan in order (B2 §7.2): opening
+ * A, the bikes, COUNTERS' 2nd Metal detector, the L2 truck + shaker; L3
+ * REPLACE → Battery checker → dock 2 → van → 2nd truck; L4 X-ray → dock 3 →
+ * the Sorter Arm → 2nd van; L5 the 3rd truck. COUNTERS (slot 6 at L5)
+ * follows it. M9 NEW STRAIN FIRST (levelPlan.ts): the X-ray moves ahead of
+ * whatever L3 step is still pending when L4 arrives.
+ */
+const PLAN_BUYS = [
+  'bike',
+  'metal_detector@slot2',
+  'bike',
+  'bike',
+  'metal_detector@slot3', // COUNTERS: the weakest strain (metal) after the 3rd bike
+  'truck',
+  'shaky_shaker@slot4',
+  'remove@slot3', // L3: REPLACE the duplicate, then the plan
+  'battery_checker@slot3',
+  'dock2',
+  'van',
+  'truck',
+  'xray@slot5', // L4
+  'dock3',
+  'sorter_arm@hold',
+  'van',
+  'truck', // L5
+] as const
 
 let gateRuns: RunResult[] | null = null
 /** The 10-seed × 30-min policy runs (computed once for this file). */
@@ -129,7 +182,7 @@ function runs(): RunResult[] {
 }
 
 describe('competent policy (spec §7) [gate]', () => {
-  it("opening A at t = 0: a bike with the best driver + a Metal detector, $100 − the driver's fee left; then bikes at price + $50 until 3; a 2nd Metal detector (COUNTERS); at L2 the truck, then the Shaky shaker; at L3 (M8) the Battery checker REPLACEs the 2nd Metal detector, then dock 2, a van, a 2nd truck — each at price + $50 (a REPLACE counts its refund), each vehicle with the best driver for its type", () => {
+  it("opening A at t = 0: a bike with the best driver + a Metal detector, $100 − the driver's fee left; then bikes at price + $50 until 3; a 2nd Metal detector (COUNTERS); at L2 the truck, then the Shaky shaker; at L3 (M8) the Battery checker REPLACEs the 2nd Metal detector, then dock 2, a van, a 2nd truck; at L4 (M9) the X-ray, dock 3, the Sorter Arm, a 2nd van; at L5 a 3rd truck — each at price + $50 (a REPLACE counts its refund, a voucher makes a machine free), each vehicle with the best driver for its type (seed 1 × 35 min)", () => {
     const sim = makeSim(1)
     const policy = createPolicy(sim, 'competent')
     const first = bestApplicant(sim, 'driver', 'bike')!
@@ -139,9 +192,14 @@ describe('competent policy (spec §7) [gate]', () => {
       { kind: 'buyMachine', defId: 'metal_detector', nodeId: 'slot2' },
     ])
     expect(sim.state.economy.balance).toBe(100 - hireFeeOf(data, first, 'bike'))
-    for (let i = 0; i < 18000; i++) {
+    let l4Tick: number | null = null
+    for (let i = 0; i < 35 * TICKS_PER_DAY; i++) {
+      if (l4Tick === null && sim.state.level.level >= 4) {
+        l4Tick = sim.state.tick
+      }
       const before = sim.commandLog.length
       const balance = sim.state.economy.balance
+      const vouchers = [...sim.state.quests.vouchers]
       const picks: Partial<Record<VehicleType, number | undefined>> = {
         bike: bestApplicant(sim, 'driver', 'bike')?.id,
         van: bestApplicant(sim, 'driver', 'van')?.id,
@@ -176,51 +234,71 @@ describe('competent policy (spec §7) [gate]', () => {
                 ? `dock${e.cmd.index}`
                 : null
         if (k !== null) {
+          const free = e.cmd.kind === 'buyMachine' && vouchers.includes(k)
           expect(balance + refund, `${k} at ${e.tick}`).toBeGreaterThanOrEqual(
-            price(k) + POLICY_PARAMS.purchaseBuffer,
+            (free ? 0 : price(k)) + POLICY_PARAMS.purchaseBuffer,
           )
         }
       }
       sim.tick()
     }
-    const buys = sim.commandLog
-      .map((e) => e.cmd)
+    const tagged = sim.commandLog
       .filter(
-        (c) =>
-          c.kind === 'buyVehicle' ||
-          c.kind === 'buyMachine' ||
-          c.kind === 'buyDock' ||
-          c.kind === 'removeFixture' ||
-          c.kind === 'placeDesk',
+        (e) =>
+          e.cmd.kind === 'buyVehicle' ||
+          e.cmd.kind === 'buyMachine' ||
+          e.cmd.kind === 'buyDock' ||
+          e.cmd.kind === 'removeFixture' ||
+          e.cmd.kind === 'placeDesk',
       )
-      .map((c) => {
-        if (c.kind === 'buyVehicle') return c.type
-        if (c.kind === 'buyMachine') return `${c.defId}@${c.nodeId}`
-        if (c.kind === 'buyDock') return `dock${c.index}`
-        if (c.kind === 'removeFixture') return `remove@${c.nodeId}`
-        return `desk${c.index}@${c.nodeId}`
+      .map((e) => {
+        const c = e.cmd
+        const k =
+          c.kind === 'buyVehicle'
+            ? c.type
+            : c.kind === 'buyMachine'
+              ? `${c.defId}@${c.nodeId}`
+              : c.kind === 'buyDock'
+                ? `dock${c.index}`
+                : c.kind === 'removeFixture'
+                  ? `remove@${c.nodeId}`
+                  : c.kind === 'placeDesk'
+                    ? `desk${c.index}@${c.nodeId}`
+                    : '?'
+        return { k, tick: e.tick }
       })
-    const head = [
-      'bike',
-      'metal_detector@slot2',
-      'bike',
-      'bike',
-      'metal_detector@slot3', // COUNTERS: the weakest strain (metal) after the 3rd bike
-      'truck',
-      'shaky_shaker@slot4',
-      // M8, L3 (17:05 on seed 1): REPLACE the duplicate, then the plan.
-      'remove@slot3',
-      'battery_checker@slot3',
-      'dock2',
-      'van',
-    ]
-    expect(buys.slice(0, head.length)).toEqual(head)
-    // The 2nd truck closes the L3 plan (29:31 on seed 1); nothing else.
-    expect(buys.slice(head.length)).toEqual(['truck'])
+    const buys = tagged.map((b) => b.k)
+    // The plan's order, as far as the run got (a retune moves the minutes,
+    // never the order): at least through the L3 van (M8: L3 at 17:05 on
+    // seed 1); past the plan only COUNTERS' slot 6 at L5. The X-ray is
+    // compared on its own (NEW STRAIN FIRST): the first purchase once L4
+    // has arrived, ahead of any L3 step still pending.
+    const XRAY = 'xray@slot5'
+    const noX = (a: readonly string[]) => a.filter((k) => k !== XRAY)
+    const planNoX = noX(PLAN_BUYS)
+    const buysNoX = noX(buys)
+    const n = Math.min(buysNoX.length, planNoX.length)
+    expect(buysNoX.slice(0, n)).toEqual(planNoX.slice(0, n))
+    expect(n).toBeGreaterThanOrEqual(planNoX.indexOf('dock2') + 2)
+    for (const extra of buysNoX.slice(planNoX.length)) {
+      expect(extra).toMatch(/@slot6$/)
+    }
+    const level = sim.state.level.level
+    const afterL4 = tagged.filter((b) => l4Tick !== null && b.tick >= l4Tick)
+    if (afterL4.length > 0) expect(afterL4[0]!.k).toBe(XRAY)
+    expect(buys.filter((k) => k === XRAY)).toHaveLength(
+      level >= 4 && afterL4.length > 0 ? 1 : 0,
+    )
+    // Every plan step of the levels reached is bought or waiting on money:
+    // the level-4 rows start only once the run is at L4, and so on.
+    if (level < 4) expect(n).toBeLessThanOrEqual(planNoX.indexOf('dock3'))
+    if (level < 5) expect(n).toBeLessThan(planNoX.length)
     expect(sim.state.vehicles.every((v) => v.zone === 'any')).toBe(true)
     expect(sim.state.vehicles.every((v) => v.driverId !== null)).toBe(true)
-    expect(sim.state.level.level).toBe(3)
-    expect(levelPlanDone(sim)).toBe(true)
+    expect(level).toBeGreaterThanOrEqual(3)
+    console.log(
+      `[policy] seed 1 × 35 min: L${level}, ${n + (buys.includes(XRAY) ? 1 : 0)}/${PLAN_BUYS.length} plan purchases (${buys.slice(PLAN_BUYS.indexOf('dock2')).join(' → ')})`,
+    )
   }, 30_000)
 
   it("COUNTERS picks the weakest announced strain's counter (rattle → the Shaky shaker when it is the weakest)", () => {
@@ -379,26 +457,74 @@ describe('competent policy (spec §7) [gate]', () => {
     expect(median(d)!).toBeGreaterThanOrEqual(targets.holdBayEventsPer10MinMin)
   }, 60_000)
 
-  it('the policy Tosses every flag on the tick it is held; nothing waits in the Hold Bay', () => {
-    const r = runs()[2]!
-    const held = r.events.filter((e) => e.name === 'parcel:held')
-    expect(held.length).toBeGreaterThan(5)
-    for (const h of held) {
-      const t = r.events.find(
-        (e) => e.name === 'parcel:tossed' && e.id === h.id,
+  it('the policy Tosses every flag on the tick it is held — until the Sorter Arm (M9) holds the station, which Tosses it autoTossDelayS later; nothing else waits in the Hold Bay', () => {
+    const arm = data.machines.upgrades.find((u) => u.id === 'sorter_arm')!
+    const delay = Math.round(arm.autoTossDelayS * TICKS_PER_S)
+    // The smallest Hold Bay of the levels the Arm exists at.
+    const armBayCap = Math.min(
+      ...data.levels
+        .filter((l) => l.level >= arm.unlockLevel)
+        .map((l) => l.holdBayCap),
+    )
+    for (const r of runs()) {
+      const held = r.events.filter((e) => e.name === 'parcel:held')
+      expect(held.length, `seed ${r.seed}`).toBeGreaterThan(5)
+      const tossOf = new Map(
+        r.events
+          .filter((e) => e.name === 'parcel:tossed')
+          .map((e) => [e.id as number, e]),
       )
-      expect(t?.tick, `parcel ${String(h.id)}`).toBe(h.tick)
-    }
-    // A minute row is built inside its last tick, before the policy's next
-    // step: only parcels held on that very tick may show (M7: seed 3 holds
-    // #283 on tick 16800, the minute-28 boundary, and Tosses it at once).
-    for (const row of r.rows) {
-      const heldNow = held.filter((h) => h.tick === row.tick).length
-      expect(row.held, `minute ${row.min}`).toBeLessThanOrEqual(heldNow)
+      const firstArm = r.events.find(
+        (e) => e.name === 'parcel:tossed' && e.source === 'arm',
+      )
+      for (const h of held) {
+        const t = tossOf.get(h.id as number)
+        const why = `seed ${r.seed} parcel ${String(h.id)}`
+        if (t === undefined) {
+          // Still in the bay at the end: held within the Arm's delay.
+          expect(r.rows.at(-1)!.tick - h.tick, why).toBeLessThan(delay)
+          continue
+        }
+        if (t.source === 'arm') expect(t.tick - h.tick, why).toBe(delay)
+        else {
+          expect(t.source, why).toBe('player')
+          expect(t.tick, why).toBe(h.tick)
+          // With the Arm in the station a hand Toss means every bay was taken.
+          if (firstArm !== undefined && h.tick > firstArm.tick) {
+            expect(
+              held.filter(
+                (x) =>
+                  x.tick <= h.tick &&
+                  (tossOf.get(x.id as number)?.tick ?? Infinity) >= h.tick,
+              ).length,
+              why,
+            ).toBeGreaterThanOrEqual(armBayCap)
+          }
+        }
+      }
+      // A minute row is built inside its last tick, before the policy's next
+      // step: only parcels held on that very tick may show (M7: seed 3 holds
+      // #283 on tick 16800, the minute-28 boundary, and Tosses it at once),
+      // plus — with the Arm — those held less than its delay before.
+      for (const row of r.rows) {
+        const inBay = held.filter((h) => {
+          const t = tossOf.get(h.id as number)
+          return (
+            h.tick <= row.tick &&
+            (t === undefined ||
+              t.tick > row.tick ||
+              (t.tick === row.tick && t.source === 'player'))
+          )
+        }).length
+        expect(
+          row.held,
+          `seed ${r.seed} minute ${row.min}`,
+        ).toBeLessThanOrEqual(inBay)
+      }
     }
   }, 60_000)
 
-  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows; M8: the L3 rows — L4-L5 informational until M9)', () => {
+  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows; M8: the L3 rows; M9: the L4-L5 rows)', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -417,7 +543,7 @@ describe('competent policy (spec §7) [gate]', () => {
       people: true,
       quests: true,
       levels3plus: true,
-      levels45: false,
+      levels45: true,
     })
     expect(g.checks.map((c) => [c.key, c.note])).toEqual([
       ['firstDeliveryS', null],
@@ -431,10 +557,14 @@ describe('competent policy (spec §7) [gate]', () => {
       ['questsCompletedBy30MinMin', null],
       ['level3Min', null],
       ['firstOverseasClearedAfterLevel3MaxMin', null],
-      ['level4Min', 'informational (M9)'],
-      ['level5Min', 'informational (M9)'],
+      ['level4Min', null],
+      ['level5Min', null],
     ])
-    expect(g.checks.filter((c) => c.note === null && !c.pass)).toEqual([])
+    expect(
+      g.checks
+        .filter((c) => c.note === null && !c.pass)
+        .map((c) => [c.key, c.value]),
+    ).toEqual([])
     expect(g.checks.every(checkOk)).toBe(true)
     expect(g.pass).toBe(true)
   }, 60_000)
@@ -458,6 +588,32 @@ describe('competent policy (spec §7) [gate]', () => {
     ).toBeLessThanOrEqual(targets.firstOverseasClearedAfterLevel3MaxMin)
   }, 60_000)
 
+  it('M9 acceptance (plan-build2 §8.6): L4 median in [20, 25] min and L5 median in [25, 30] min; L4 never before L3, L5 never before L4 (per-seed minutes printed)', () => {
+    const m = runs().map((r) => r.result.metrics)
+    console.log(
+      `[policy] L3/L4/L5 min by seed: ${m.map((x) => `${x.seed}:${x.level3Min ?? '—'}/${x.level4Min ?? '—'}/${x.level5Min ?? '—'}`).join(' ')}`,
+    )
+    for (const x of m) {
+      if (x.level4Min !== null) {
+        expect(x.level4Min, `seed ${x.seed}`).toBeGreaterThanOrEqual(
+          x.level3Min!,
+        )
+      }
+      if (x.level5Min !== null) {
+        expect(x.level5Min, `seed ${x.seed}`).toBeGreaterThanOrEqual(
+          x.level4Min!,
+        )
+      }
+    }
+    for (const key of ['level4Min', 'level5Min'] as const) {
+      const [lo, hi] = targets[key]
+      const med = median(m.map((x) => x[key]))
+      expect(med, key).not.toBeNull()
+      expect(med!, key).toBeGreaterThanOrEqual(lo)
+      expect(med!, key).toBeLessThanOrEqual(hi)
+    }
+  }, 60_000)
+
   it('L2 median in [8, 15] min (lifetime earned reaches the levels.json threshold)', () => {
     const l2 = runs().map((r) => r.result.metrics.level2Min)
     for (const [i, m] of l2.entries()) {
@@ -476,19 +632,22 @@ describe('competent policy (spec §7) [gate]', () => {
     expect(median(t)!).toBeLessThanOrEqual(targets.truckAfterLevel2MaxMin)
   }, 60_000)
 
-  it('level:up {2} then {3} on every seed, never {4} (the M8 cap, design-m8-m9 R1); the post-cap escalation from L3 is printed (malwareShareAt30Min)', () => {
-    expect(data.economy.playtestMaxLevel).toBe(3)
+  it('level:up 2, 3, 4, 5 in order on every seed, at least L3 (M9: the cap is the top level, B2 §9); no malware escalation before Victory (malwareShareAt30Min = base + perLevel × (level − 1))', () => {
+    const top = data.levels.reduce((n, l) => Math.max(n, l.level), 0)
+    expect(data.economy.playtestMaxLevel).toBe(top)
+    const m = data.parcels.malware
     for (const r of runs()) {
-      const ups = r.events.filter((e) => e.name === 'level:up')
-      expect(
-        ups.map((e) => e.level),
-        `seed ${r.seed}`,
-      ).toEqual([2, 3])
-      const m = data.parcels.malware
-      expect(r.result.metrics.malwareShareAtEnd).toBeGreaterThan(
-        m.baseShare + 2 * m.perLevel,
+      const ups = r.events
+        .filter((e) => e.name === 'level:up')
+        .map((e) => e.level as number)
+      expect(ups.length, `seed ${r.seed}`).toBeGreaterThanOrEqual(2)
+      expect(ups, `seed ${r.seed}`).toEqual(ups.map((_, i) => i + 2))
+      const last = r.rows.at(-1)!
+      if (r.events.some((e) => e.name === 'game:victory')) continue
+      expect(r.result.metrics.malwareShareAtEnd, `seed ${r.seed}`).toBeCloseTo(
+        Math.min(m.cap, m.baseShare + m.perLevel * (last.lvl - 1)),
+        9,
       )
-      expect(r.result.metrics.malwareShareAtEnd).toBeLessThanOrEqual(m.cap)
     }
   }, 60_000)
 
@@ -559,6 +718,29 @@ describe('competent policy (spec §7) [gate]', () => {
       expect(r.conservation.ok, `seed ${r.seed}`).toBe(true)
     }
   }, 60_000)
+
+  it('the stuck rule (stuckKey, M9 review): moving is not progress — a vehicle driving a loop keeps its key; a stop, cargo, timer, reservation or state change resets it', () => {
+    const sim = makeSim(1)
+    const policy = createPolicy(sim, 'competent')
+    for (let i = 0; i < 6000 && sim.state.vehicles.length === 0; i++) {
+      policy.step()
+      sim.tick()
+    }
+    const v = sim.state.vehicles[0]!
+    const key = stuckKey(v)
+    const moved = { ...v, pos: { tx: v.pos.tx + 7, ty: v.pos.ty - 3 } }
+    expect(stuckKey(moved)).toBe(key)
+    expect(stuckKey({ ...v, stopIndex: v.stopIndex + 1 })).not.toBe(key)
+    expect(stuckKey({ ...v, cargo: [...v.cargo, 999] })).not.toBe(key)
+    expect(stuckKey({ ...v, waitUntilTick: 12345 })).not.toBe(key)
+    expect(stuckKey({ ...v, reserved: [...v.reserved, 999] })).not.toBe(key)
+    expect(
+      stuckKey({
+        ...v,
+        state: v.state === 'inactive' ? 'idle_lot' : 'inactive',
+      }),
+    ).not.toBe(key)
+  })
 
   it('the policy acts only through dispatch and never mid-tick (it steps before each tick)', () => {
     const sim = makeSim(3)
@@ -836,7 +1018,7 @@ describe('the L3 plan (B2 §7.2 L3 row; design-m8-m9 §5.1, R9)', () => {
     price('metal_detector') * data.machines.removalRefund,
   )
 
-  it('LEVEL_PLAN is B2 §7.2 verbatim; the M8 build runs L3 only (levels3plus), M9 adds L4-L5 (levels45); nothing below L3', () => {
+  it('LEVEL_PLAN is B2 §7.2 verbatim; the M8 build ran L3 only (levels3plus), M9 adds L4-L5 (levels45, on); nothing below L3', () => {
     expect(LEVEL_PLAN[3]).toEqual([
       { kind: 'machine', defId: 'battery_checker' },
       { kind: 'dock', index: 2 },
@@ -852,14 +1034,31 @@ describe('the L3 plan (B2 §7.2 L3 row; design-m8-m9 §5.1, R9)', () => {
     expect(LEVEL_PLAN[5]).toEqual([
       { kind: 'vehicle', type: 'truck', count: 3 },
     ])
-    expect(planMaxLevel()).toBe(3)
+    expect(planMaxLevel()).toBe(5)
+    expect(planMaxLevel({ levels3plus: true, levels45: false })).toBe(3)
     expect(planMaxLevel({ levels3plus: true, levels45: true })).toBe(5)
     expect(planMaxLevel({ levels3plus: false, levels45: false })).toBe(2)
     const sim = fund(quietSim(1))
     expect(planSteps(sim)).toEqual([])
     expect(levelPlanStep(sim, buffer)).toBe('done')
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
+    expect(planSteps(sim)).toEqual(LEVEL_PLAN[3])
+    // NEW STRAIN FIRST: each level's strain counter (levels.json strain +
+    // machines) ahead of the rest, newest first; B2 §7.2's order within a
+    // level. L3's counter (the Battery checker) is already its first step.
+    expect(strainCounterStep(sim, 3)).toEqual(LEVEL_PLAN[3]![0])
+    expect(strainCounterStep(sim, 4)).toEqual(LEVEL_PLAN[4]![0])
+    expect(strainCounterStep(sim, 5)).toBeNull() // L5 announces no strain
     expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
-    expect(planSteps(sim)).toEqual(LEVEL_PLAN[3]) // L4 rows wait for M9
+    const [xray, ...l4rest] = LEVEL_PLAN[4]!
+    expect(planSteps(sim)).toEqual([xray, ...LEVEL_PLAN[3]!, ...l4rest])
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 5 }).ok).toBe(true)
+    expect(planSteps(sim)).toEqual([
+      xray,
+      ...LEVEL_PLAN[3]!,
+      ...l4rest,
+      ...LEVEL_PLAN[5]!,
+    ])
   })
 
   it('on a funded forced-L3 sim: the Battery checker REPLACEs the duplicate Metal detector → dock 2 → van → 2nd truck, each at price + $50 (the REPLACE counts its refund), one per step; nothing is bought while the next step is unaffordable', () => {
@@ -1074,6 +1273,281 @@ describe('the L3 plan (B2 §7.2 L3 row; design-m8-m9 §5.1, R9)', () => {
   })
 })
 
+/** Buy a `type` with the best driver (a standard one when the pool is empty). */
+function buyWithBest(sim: Sim, type: VehicleType): void {
+  const a =
+    bestApplicant(sim, 'driver', type) ?? standardApplicant(sim, 'driver')
+  expect(sim.dispatch({ kind: 'buyVehicle', type, applicantId: a.id }).ok).toBe(
+    true,
+  )
+}
+
+/**
+ * A quiet sim forced to L4 with the L3 plan done (desk 1, Metal detector,
+ * Battery checker, Shaky shaker; dock 2; 3 bikes, a truck, a van, a 2nd
+ * truck) and `balance` dollars; slot 5 is empty and the station free.
+ */
+function l4Sim(balance: number): Sim {
+  const sim = l3Sim(1_000_000)
+  expect(sim.dispatch({ kind: 'removeFixture', nodeId: 'slot3' }).ok).toBe(true)
+  expect(
+    sim.dispatch({
+      kind: 'buyMachine',
+      defId: 'battery_checker',
+      nodeId: 'slot3',
+    }).ok,
+  ).toBe(true)
+  expect(sim.dispatch({ kind: 'buyDock', index: 2 }).ok).toBe(true)
+  buyWithBest(sim, 'van')
+  buyWithBest(sim, 'truck')
+  expect(levelPlanDone(sim)).toBe(true)
+  expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+  quiet(sim)
+  sim.state.economy.balance = balance
+  return sim
+}
+
+describe('the L4-L5 plan (B2 §7.2 L4-L5 rows; design-m8-m9 §5.1, §7 M9 item 8)', () => {
+  const buffer = POLICY_PARAMS.purchaseBuffer
+
+  it('NEW STRAIN FIRST (M9 policy extension): L4 arrives with the L3 van and 2nd truck unbought → the X-ray (the dense strain’s counter) is bought first, then the L3 steps resume in order, then dock 3; nothing is bought while the X-ray is $1 short', () => {
+    const sim = l3Sim(1_000_000)
+    // The L3 plan half done: the Battery checker REPLACE and dock 2 only.
+    expect(sim.dispatch({ kind: 'removeFixture', nodeId: 'slot3' }).ok).toBe(
+      true,
+    )
+    expect(
+      sim.dispatch({
+        kind: 'buyMachine',
+        defId: 'battery_checker',
+        nodeId: 'slot3',
+      }).ok,
+    ).toBe(true)
+    expect(sim.dispatch({ kind: 'buyDock', index: 2 }).ok).toBe(true)
+    expect(levelPlanDone(sim)).toBe(false)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+    quiet(sim)
+    const policy = createPolicy(sim, 'competent')
+    // One purchase's worth (the X-ray and the van both cost price + $50):
+    // the X-ray, not the L3 van; $1 short, nothing at all.
+    expect(price('van')).toBeLessThanOrEqual(price('xray'))
+    sim.state.economy.balance = price('xray') + buffer - 1
+    expect(stepCmds(sim, policy)).toEqual([])
+    sim.state.economy.balance += 1
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'buyMachine', defId: 'xray', nodeId: 'slot5' },
+    ])
+    expect(sim.state.economy.balance).toBe(buffer)
+    sim.state.economy.balance = 1_000_000
+    for (const type of ['van', 'truck'] as const) {
+      if (!bestApplicant(sim, 'driver', type)) standardApplicant(sim, 'driver')
+      const a = bestApplicant(sim, 'driver', type)!
+      expect(stepCmds(sim, policy), type).toEqual([
+        { kind: 'buyVehicle', type, applicantId: a.id },
+      ])
+    }
+    expect(stepCmds(sim, policy)).toEqual([{ kind: 'buyDock', index: 3 }])
+  })
+
+  it('on a funded forced-L4 sim: the X-ray into slot 5 → dock 3 → the Sorter Arm into the empty station → a 2nd van, each at price + $50, one per step; nothing is bought while the next step is unaffordable; then COUNTERS has no slot', () => {
+    const sim = l4Sim(0)
+    const policy = createPolicy(sim, 'competent')
+    expect(liveSlotIds(sim.state.lane)).toHaveLength(5)
+    expect(planSteps(sim).filter((st) => !LEVEL_PLAN[3]!.includes(st))).toEqual(
+      LEVEL_PLAN[4],
+    )
+    const hold = sim.state.lane.holdBayNodeId
+    const steps: [number, Command][] = [
+      [price('xray'), { kind: 'buyMachine', defId: 'xray', nodeId: 'slot5' }],
+      [price('dock3'), { kind: 'buyDock', index: 3 }],
+      [
+        price('sorter_arm'),
+        { kind: 'buyMachine', defId: 'sorter_arm', nodeId: hold },
+      ],
+      [
+        price('van'),
+        { kind: 'buyVehicle', type: 'van', applicantId: Number.NaN },
+      ],
+    ]
+    for (const [cost, cmd] of steps) {
+      sim.state.economy.balance = cost + buffer - 1
+      expect(stepCmds(sim, policy), `${cmd.kind} $1 short`).toEqual([])
+      sim.state.economy.balance += 1
+      if (cmd.kind === 'buyVehicle' && !bestApplicant(sim, 'driver', 'van')) {
+        standardApplicant(sim, 'driver')
+      }
+      const want =
+        cmd.kind === 'buyVehicle'
+          ? {
+              ...cmd,
+              applicantId: bestApplicant(sim, 'driver', cmd.type)!.id,
+            }
+          : cmd
+      expect(stepCmds(sim, policy)).toEqual([want])
+    }
+    expect(laneNode(sim.state.lane, 'slot5')?.fixture).toMatchObject({
+      checker: { defId: 'xray' },
+    })
+    expect(sim.state.lane.docks.map((d) => d.id)).toEqual([
+      'dock1',
+      'dock2',
+      'dock3',
+    ])
+    expect(sim.state.lane.holdStation.fixture).toBe('sorter_arm')
+    expect(sim.state.vehicles.filter((v) => v.type === 'van')).toHaveLength(2)
+    expect(levelPlanDone(sim)).toBe(true)
+    expect(levelPlanStep(sim, buffer)).toBe('done')
+    // The plan is done and no slot is free: a fortune buys nothing more.
+    sim.state.economy.balance = 1_000_000
+    expect(stepCmds(sim, policy)).toEqual([])
+  })
+
+  it('L5: the Golden Release, offered on the level:up {5} tick, is accepted on the next policy step with the 3rd truck at price + $50 in the same step; COUNTERS then fills slot 6 with the weakest strain’s counter at price + $50', () => {
+    const sim = l4Sim(1_000_000)
+    const policy = createPolicy(sim, 'competent')
+    for (let i = 0; i < 4; i++) policy.step()
+    expect(levelPlanDone(sim)).toBe(true)
+    noOffers(sim)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 5 }).ok).toBe(true)
+    quiet(sim)
+    runTicks(sim, 1)
+    const offer = sim.state.quests.offer
+    expect(offer).toMatchObject({
+      ultimate: true,
+      templateId: 'golden_release',
+    })
+    expect(planSteps(sim).at(-1)).toEqual(LEVEL_PLAN[5]![0])
+    if (!bestApplicant(sim, 'driver', 'truck')) {
+      standardApplicant(sim, 'driver')
+    }
+    sim.state.economy.balance = price('truck') + buffer - 1
+    // Unaffordable truck: the accept still happens (the quest rule comes first).
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'acceptQuest', questId: offer!.id },
+    ])
+    expect(sim.state.quests.active?.ultimate).toBe(true)
+    sim.state.economy.balance += 1
+    const driver = bestApplicant(sim, 'driver', 'truck')!
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'buyVehicle', type: 'truck', applicantId: driver.id },
+    ])
+    expect(sim.state.vehicles.filter((v) => v.type === 'truck')).toHaveLength(3)
+    expect(levelPlanDone(sim)).toBe(true)
+    // COUNTERS: slot 6 (the L5 slot) gets the weakest announced strain's counter.
+    expect(liveSlotIds(sim.state.lane)).toHaveLength(6)
+    const counter = weakestCounter(sim)!
+    sim.state.economy.balance = counter.price + buffer - 1
+    expect(stepCmds(sim, policy)).toEqual([])
+    sim.state.economy.balance += 1
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'buyMachine', defId: counter.id, nodeId: 'slot6' },
+    ])
+    // Never a decline or an abandon of the ultimate.
+    expect(
+      sim.commandLog.filter(
+        (e) => e.cmd.kind === 'declineQuest' || e.cmd.kind === 'abandonQuest',
+      ),
+    ).toEqual([])
+  })
+
+  it('the same step accepts the Golden Release and buys the 3rd truck when both can happen', () => {
+    const sim = l4Sim(1_000_000)
+    const policy = createPolicy(sim, 'competent')
+    for (let i = 0; i < 4; i++) policy.step()
+    noOffers(sim)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 5 }).ok).toBe(true)
+    quiet(sim)
+    runTicks(sim, 1)
+    if (!bestApplicant(sim, 'driver', 'truck')) {
+      standardApplicant(sim, 'driver')
+    }
+    sim.state.economy.balance = price('truck') + buffer
+    const driver = bestApplicant(sim, 'driver', 'truck')!
+    const offer = sim.state.quests.offer!
+    expect(offer.ultimate).toBe(true)
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'acceptQuest', questId: offer.id },
+      { kind: 'buyVehicle', type: 'truck', applicantId: driver.id },
+    ])
+  })
+
+  it('with the Sorter Arm in the station the policy leaves the Hold Bay to it (no hand Toss while a bay is free; the Arm Tosses 3 s later, source arm); with every bay taken it Tosses by hand; without the Arm it Tosses at once', () => {
+    const sim = l4Sim(1_000_000)
+    const policy = createPolicy(sim, 'competent')
+    for (let i = 0; i < 4; i++) policy.step()
+    expect(sim.state.lane.holdStation.fixture).toBe('sorter_arm')
+    expect(armHoldsBay(sim)).toBe(true)
+    const tossed = collect(sim, 'parcel:tossed')
+    const first = heldParcel(sim, { malware: true, strain: 'metal' })
+    expect(stepCmds(sim, policy)).toEqual([])
+    const delay = ticksFromS(
+      data.machines.upgrades.find((u) => u.id === 'sorter_arm')!.autoTossDelayS,
+    )
+    for (let t = 0; t < delay; t++) {
+      expect(stepCmds(sim, policy)).toEqual([])
+      sim.tick()
+    }
+    expect(tossed).toEqual([
+      expect.objectContaining({ id: first.id, source: 'arm' }),
+    ])
+    // Every bay taken: the policy Tosses them all by hand on its next step.
+    const hold = laneNode(sim.state.lane, sim.state.lane.holdBayNodeId)!
+    const cap = hold.cap!
+    const full = Array.from({ length: cap }, () =>
+      heldParcel(sim, { malware: true, strain: 'metal' }),
+    )
+    expect(armHoldsBay(sim)).toBe(false)
+    expect(stepCmds(sim, policy)).toEqual(
+      full.map((p) => ({ kind: 'toss', parcelId: p.id })),
+    )
+    expect(armHoldsBay(sim)).toBe(true)
+    // Without the Arm (removed for its refund): Toss on the step it is held.
+    expect(
+      sim.dispatch({
+        kind: 'removeFixture',
+        nodeId: sim.state.lane.holdBayNodeId,
+      }).ok,
+    ).toBe(true)
+    sim.state.economy.balance = 0 // the plan would buy it back
+    expect(armHoldsBay(sim)).toBe(false)
+    const again = heldParcel(sim, { malware: true, strain: 'metal' })
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'toss', parcelId: again.id },
+    ])
+  })
+
+  it('the delegating kind never buys the Arm (its sorter holds the station) and runs the rest of the L4-L5 plan', () => {
+    const sim = l4Sim(1_000_000)
+    const a = bestApplicant(sim, 'sorter')!
+    expect(
+      sim.dispatch({
+        kind: 'hire',
+        role: 'sorter',
+        applicantId: a.id,
+        target: { station: 'hold' },
+      }).ok,
+    ).toBe(true)
+    const policy = createPolicy(sim, 'delegating')
+    const cmds: Command[] = []
+    for (let i = 0; i < 4; i++) cmds.push(...stepCmds(sim, policy))
+    const buys = cmds.filter(
+      (c) =>
+        c.kind === 'buyMachine' ||
+        c.kind === 'buyDock' ||
+        c.kind === 'buyVehicle',
+    )
+    expect(buys.map((c) => c.kind)).toEqual([
+      'buyMachine',
+      'buyDock',
+      'buyVehicle',
+    ])
+    expect(buys[0]).toMatchObject({ defId: 'xray', nodeId: 'slot5' })
+    expect(typeof sim.state.lane.holdStation.fixture).toBe('number')
+    expect(armHoldsBay(sim)).toBe(false)
+    expect(levelPlanDone(sim)).toBe(true)
+  })
+})
+
 const meta = (policy: string) => ({
   dataHash: data.hash,
   config: null,
@@ -1132,7 +1606,7 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     ).toBeNull()
   })
 
-  it('the competent gate prints the people rows, the M8 overseas / dock rows, the M9 quest rows and the M7 quest printout as informational; no delegating row', () => {
+  it('the competent gate prints the people rows, the M8 overseas / dock rows, the M9 rows (dock 3, armTosses, Golden Release, victory) and the M7 quest printout as informational; no delegating row', () => {
     const g = summarise(
       runs().map((r) => r.result),
       meta('competent'),
@@ -1162,17 +1636,29 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     expect(info.dock2Min!.median!).toBeGreaterThan(
       median(runs().map((r) => r.result.metrics.level3Min))! - 1e-9,
     )
-    expect(info.dock3Min).toMatchObject({
-      median: null,
-      note: 'informational (M9)',
-    })
-    // The sim caps at L3 until M9: no Golden Release, no victory.
-    for (const k of ['goldenReleaseOfferedMaxMin', 'victoryMaxMin']) {
-      expect(info[k], k).toMatchObject({
-        median: null,
-        note: 'informational (M9)',
-      })
+    // M9: printed only, without the "(M9)" tag.
+    for (const k of [
+      'dock3Min',
+      'armTosses',
+      'goldenReleaseOfferedMaxMin',
+      'victoryMaxMin',
+    ]) {
+      expect(info[k]?.note, k).toBe('informational')
     }
+    const meds = g.medians
+    if (meds.dock3Min !== null) {
+      expect(meds.dock3Min).toBeGreaterThanOrEqual(meds.level4Min! - 1e-9)
+    }
+    expect(info.goldenReleaseOfferedMaxMin?.median).toBe(
+      meds.goldenReleaseOfferedMin,
+    )
+    expect(info.goldenReleaseOfferedMaxMin?.target).toContain(
+      `≤ ${targets.goldenReleaseOfferedMaxMin} min`,
+    )
+    expect(info.victoryMaxMin?.target).toContain(
+      `≤ ${targets.victoryMaxMin} min`,
+    )
+    expect(info.armTosses?.median).toBe(meds.armTosses)
     const n = runs().filter(
       (r) => r.result.metrics.questActive7to13 === 1,
     ).length
@@ -1411,7 +1897,7 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
     expect(noClear.overseasCleared).toBe(0)
   })
 
-  it('level3Min / firstOverseasClearedAfterLevel3MaxMin gate behind levels3plus, level4Min / level5Min behind levels45 (M9); informational in --quick and on a run shorter than the window end', () => {
+  it('level3Min / firstOverseasClearedAfterLevel3MaxMin gate behind levels3plus, level4Min / level5Min behind levels45 (on since M9); informational in --quick and on a run shorter than the window end', () => {
     const inputs = {
       firstDeliveryS: 40,
       firstMalwareCaughtS: 100,
@@ -1424,8 +1910,8 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
       questsCompleted30: 3,
       level3Min: 17.5 as number | null,
       firstOverseasClearedAfterLevel3Min: 2.5 as number | null,
-      level4Min: null,
-      level5Min: null,
+      level4Min: null as number | null,
+      level5Min: null as number | null,
     }
     const rows = (
       over: Partial<typeof inputs> & { minutes?: number; quick?: boolean },
@@ -1446,8 +1932,8 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
     expect(rows({ minutes: 30 })).toEqual({
       level3Min: [null, true],
       firstOverseasClearedAfterLevel3MaxMin: [null, true],
-      level4Min: ['informational (M9)', false],
-      level5Min: ['informational (M9)', false],
+      level4Min: [null, false],
+      level5Min: [null, false],
     })
     expect(
       rows({ level3Min: 20.5, firstOverseasClearedAfterLevel3Min: 3.1 }),
@@ -1484,8 +1970,31 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
       'informational (M8)',
       true,
     ])
-    const m9 = { ...SIM_FEATURES, levels45: true }
-    expect(rows({ minutes: 30 }, m9).level4Min).toEqual([null, false])
+    // M9: levels45 on — L4/L5 gate (null = never reached = fail).
+    expect(SIM_FEATURES.levels45).toBe(true)
+    expect(rows({ minutes: 30, level4Min: 22, level5Min: 28 })).toMatchObject({
+      level4Min: [null, true],
+      level5Min: [null, true],
+    })
+    expect(
+      rows({ minutes: 30, level4Min: 25.5, level5Min: 24.9 }),
+    ).toMatchObject({
+      level4Min: [null, false],
+      level5Min: [null, false],
+    })
+    expect(rows({ minutes: 20, quick: true }).level5Min).toEqual([
+      'informational (quick)',
+      false,
+    ])
+    expect(rows({ minutes: 29 }).level5Min).toEqual([
+      'informational (run < 30 min)',
+      false,
+    ])
+    const m8 = { ...SIM_FEATURES, levels45: false }
+    expect(rows({ minutes: 30 }, m8).level4Min).toEqual([
+      'informational (M9)',
+      false,
+    ])
     expect(windowNote('level3Min', SIM_FEATURES, 20, { quick: true })).toBe(
       'informational (quick)',
     )
@@ -1512,17 +2021,17 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
     )
   }, 60_000)
 
-  it('the gate table carries L3_min, ovs+min, L4_min, L5_min', () => {
+  it('the gate table carries L3_min, ovs+min, L4_min, L5_min and (M9) GR_min', () => {
     const g = summarise(
       runs().map((r) => r.result),
       meta('competent'),
     )
     const head = formatGate(g)[1]!
-    for (const col of ['L3_min', 'ovs+min', 'L4_min', 'L5_min']) {
+    for (const col of ['L3_min', 'ovs+min', 'L4_min', 'L5_min', 'GR_min']) {
       expect(head).toContain(col)
     }
     const md = gateMarkdown(g, 'vlr sim:gate')
-    expect(md).toContain('| L3_min | ovs+min | L4_min | L5_min |')
+    expect(md).toContain('| L3_min | ovs+min | L4_min | L5_min | GR_min |')
     expect(md).toContain('| `level3Min` |')
   }, 60_000)
 
@@ -1545,5 +2054,86 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
         '35',
       ]).minutes,
     ).toBe(35)
+  })
+})
+
+/** A malware clearance at `hub` (the narrative's loss line). */
+const lostAt = (hub: string): RecordedEvent =>
+  ({
+    tick: 1200,
+    name: 'parcel:cleared',
+    id: 9,
+    paid: 0,
+    malware: true,
+    hub,
+    buildingId: 'x',
+    onTime: true,
+  }) as RecordedEvent
+
+describe('the gate report, M9 (tools/sim/report.ts; design-m8-m9 §5.3, R11)', () => {
+  it('armTosses counts parcel:tossed with source arm; the Golden Release offer and the victory minutes come from the quest events', () => {
+    const stats = makeSim(1).state.stats
+    const events = [
+      ev('parcel:tossed', { tick: at(24), id: 1, source: 'player' }),
+      ev('parcel:tossed', { tick: at(24.5), id: 2, source: 'arm' }),
+      ev('parcel:tossed', { tick: at(25), id: 3, source: 'arm' }),
+      ev('parcel:tossed', { tick: at(25), id: 4, source: 'sorter' }),
+      q(at(27.5), 'quest:offered', 'q9', 'golden_release', { ultimate: true }),
+      { tick: at(31.25), name: 'game:victory', day: 31 } as RecordedEvent,
+    ]
+    const m = computeMetrics(1, 35, events, [], stats)
+    expect(m).toMatchObject({
+      armTosses: 2,
+      goldenReleaseOfferedMin: 27.5,
+      victoryMin: 31.25,
+    })
+    expect(computeMetrics(1, 35, [], [], stats).armTosses).toBe(0)
+  })
+
+  it('the narrative names the Sorter Arm purchase (once), its first Toss, and an Airport loss as "the plane has left" (a Docks one: "the ship has sailed")', () => {
+    const sim = fund(quietSim(1))
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+    const h = new Highlights()
+    const armPrice = price('sorter_arm')
+    const buyArm = {
+      tick: 5,
+      name: 'money:changed',
+      delta: -armPrice,
+      reason: 'purchase',
+      balance: 0,
+    } as RecordedEvent
+    // Before the Arm is seated a purchase of the same price is not the Arm.
+    expect(h.line(buyArm, sim)).toBeNull()
+    expect(
+      sim.dispatch({
+        kind: 'buyMachine',
+        defId: 'sorter_arm',
+        nodeId: sim.state.lane.holdBayNodeId,
+      }).ok,
+    ).toBe(true)
+    expect(h.line(buyArm, sim)).toBe(
+      `!  0:00 bought the Sorter Arm into the Hold Bay station ($${armPrice})`,
+    )
+    expect(h.line(buyArm, sim)).toBeNull()
+    const armToss = {
+      tick: 600,
+      name: 'parcel:tossed',
+      id: 7,
+      wasMalware: true,
+      bounty: 15,
+      source: 'arm',
+    } as RecordedEvent
+    // The hand Tosses of L1-L3 came first (the first malware Toss line).
+    expect(h.line({ ...armToss, id: 3, source: 'player' }, sim)).toBe(
+      '!  1:00 first malware tossed #3 (+$15)',
+    )
+    expect(h.line(armToss, sim)).toBe('!  1:00 first Sorter Arm toss #7 (+$15)')
+    expect(h.line({ ...armToss, id: 8 }, sim)).toBeNull()
+    expect(h.line(lostAt('airport'), sim)).toBe(
+      '!  2:00 malware cleared at airport #9 (the plane has left)',
+    )
+    expect(h.line(lostAt('docks'), sim)).toBe(
+      '!  2:00 malware cleared at docks #9 (the ship has sailed)',
+    )
   })
 })

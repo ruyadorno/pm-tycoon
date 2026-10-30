@@ -1,5 +1,109 @@
 # Art to-do (playtest 1, build 2)
 
+## Build 2 — M9 (L4 National + L5 Tycoon, plan-build2 §6 / §8.6, design-m8-m9 §6.1, §6.4, §8 lane F, B2 §4.2-§4.4, §6.6)
+
+Sheets (G5 / G6, plan-build2 §6 approval gates):
+
+- G5 regions, live in colour in context (`node tools/art/contact.ts lowres|rural|airport|civic`; the new
+  `contact.ts contextScene` bakes the window as the city does at that level — `schema.ts groundAt` block grounds and
+  accents, scenery, roads — with every building and prop in it, each district in colour once its `unlockLevel` ≤ the
+  level and `_locked` otherwise): `art/contact/lowres@4x.png` and `rural@4x.png` at level 4,
+  `airport@4x.png` and `civic@4x.png` at level 5, each followed by the fogged look before the unlock and the close-ups.
+  `art/contact/docks@4x.png` (gallery) now draws `dk_ship` faint at 35 % / 70 % of its sail-out along `map.hubs` exit
+  [-5, 0], so the bow-first departure is visible on the sheet.
+- G6: `art/contact/tiers@4x.png` (`contact.ts tiers`: `wh_ext_t1` … `_t5` on the lot slab, tiers 3-5 with their bay
+  lights / docked poses) and the new `art/contact/g6-tiers-machines-people@4x.png` (`contact.ts g6`): 1x room mocks of
+  tiers 3 / 4 / 5 in the M9 geometry (14 / 16 / 18 rows, design-m8-m9 R2; slots 5-6 in the belt column, shelf and bin
+  moved down 64 / 128, docks 2-3 owned from tier 4, the Sorter Arm in the station from tier 4, neon at tier 5), every
+  tier-4 / tier-5 piece on its own floor (shelves at 80 / 100), the four belt machines idle / scan, the Sorter Arm f0-f2,
+  faces / pips / the star, the station with the sorter, `worker` vs `worker_sorter`.
+
+Atlas fill after M9: world 80.3 % (513 frames; 80.1 % after M8), interior 37.1 % (297 frames, 2048×512; 31.8 % after
+M8). Under plan-build2 §8.8 R13's 90 % trigger (`tests/render/atlases.test.ts WORLD_FILL_R13`): no `city2` atlas, the
+`_locked` twins stay per building. The L4 / L5 uniques, `wh_ext_t4` / `_t5`, `ap_plane`, `ap_tower`, `fence`,
+`hay_bale`, `fountain` (+ `_locked`), `xray` and `sorter_arm_f0-f2` (`"atlas": "both"`) were already packed (M6-M8);
+M9 adds 18 interior frames and 4 world tiles.
+
+Procedural (by design, no PixelLab id; interior atlas, the room's back layers unless noted) — the frame names are the
+contract for the warehouse lane (LaneRenderer `tierFrame` resolves `<stem>_t4` / `_t5` with no code change; only the
+neon needs `tierParts(5)`):
+
+- Tier 4 "National" (wh_ext_t4 from inside): `floor_t4` (charcoal anti-slip epoxy, 32-px joints with a lit bevel, grit
+  specks), `floor_t4_lane` (+ the 2-px yellow lane lines at x 0-1 / 30-31), `wall_t4` (ribbed grey steel cladding with
+  a blue band), `wallface_t4` (ribbed cladding, a blue band, a yellow kick rail), `sign_t4` (200×24: a cream face in a
+  blue band, yellow chevron caps at x 4-7 / 192-195 outside the text area — dark text, `signDark` as t2 / t3),
+  `shelf_t4` (high-bay racking on the shelf_t3 geometry: 20 × 5 @ 11 from canvas (3, 4), row tops grey5 / seams grey2,
+  yellow uprights, blue beams), `props_t4` (48×64: a yellow forklift seen from behind with a pallet of blue totes on
+  its forks), `wanted_poster_t4` (a steel notice board, the WANTED sheet for the L4 `dense` strain — a grey weight —
+  with a yellow typosquat tag and a blue magnet).
+- Tier 5 "Tycoon" (the glass HQ of wh_ext_t5): `floor_t5` (white terrazzo with pink / blue / yellow chips and a sheen
+  streak), `floor_t5_lane` (pink lane lines), `wall_t5` (blue glass in white mullions from above), `wallface_t5` (glass
+  panes over a white dado with a pink neon line), `sign_t5` (a white lightbox face in a dark board ringed by a pink
+  neon tube with white-hot corners — dark text), `shelf_t5` (white gloss racking, same grid, chrome uprights, pink
+  beams), `props_t5` (a potted palm and a small white delivery robot carrying a parcel), `wanted_poster_t5` (a MOST
+  WANTED wall screen: the four strains' mugshots on a dark blue display, a pink status LED).
+- `neon_strip_f0` / `_f1` (interior-prop 64×8, the `strip_light` canvas and spots `STRIP_LIGHTS`): tier 5 replaces the
+  strip lights (B2 §6.6 "strip lights → neon"); f0 lit (white-hot core), f1 the dimmer flicker frame. Interior classes
+  have no `water` / `gold` ramps (palette.ts RAMP_RULES), so the glass is the blue ramp and the trim pink / yellow.
+- Runway themed tiles (plan-build2 §6 Airport; class `tile` + `_locked`, world): `runway_threshold` (white piano-key
+  bars along the runway on its end rows) and `taxiway` (tarmac with a yellow taxi line along +x — the plane's exit — and
+  blue edge lights). Not on the map until Lane A adds the `ground.scenery` rows (`contact.ts AIRPORT_M9_SCENERY`,
+  drawn on `airport@4x.png`).
+- Slots 5-6 need no new pieces: `belt_v`, `chute_v`, `slot_empty_outline` / `slot_locked_outline`, `ext_outline` +
+  `ic_lock` cover the grown column and the `Slot 6 — unlocks at Lv 5` strip.
+
+PixelLab (agent picks, `node tools/art/decide.ts --manifest`; `approved: false` until the author's gates):
+
+- `dk_ship` #5 (M9 re-roll, `prompts.ts DOCK_PROP_HEADING`: "bow pointing to the upper left"): a red-hulled feeder with
+  a block of blue / green / orange containers, bow to the upper left (-x, the hub exit [-5, 0]), white bridge at the
+  stern nearest the viewer — it now sails bow first (the M5 pick pointed to the lower left and slid broadside).
+  Rejected: #1 (the M5 pick), #3 (an anchor chain and buoy that would sail along), #4 (the longest hull, reads bigger
+  than the quay).
+- `xray` #7 (M9 re-roll, second round; `SUBJECT_OVERRIDES.xray` now asks for a screen on the header): slim pillars under
+  a deep dark header whose wide screen shows a light-blue x-ray outline of a parcel (the scan frame turns it yellow), a
+  radiation sticker on the left pillar; the belt opening holds (`OPENINGS.xray`). Rejected: #0 (the M6 pick, a plain
+  arch), #5 (squashed, monitor cut off), #8 (a blank screen); #3, #4, #6 failed the belt-opening contract in the
+  pre-filter.
+
+PixelLab spend (M9 cap 150; run budget 1,500 / 300 reserve): 48 generations in 2 batches (`m9-rerolls` 33: dk_ship 3 +
+xray 3; `m9-xray2` 15: xray 3), balance 2,470 → 2,422, $0 credits, run spent 829 → 877. No failed jobs; no PixelLab id
+fell back to procedural.
+
+The author's gates (approve = `approvedBy: 'author'`, no image change; reject = logs the reason, then re-roll as in
+"Re-roll a sprite" below):
+
+- **G4 — the four fixes** (`art/contact/fixes@4x.png`): `vlr art:approve -- wh_ext bike dk_terminal_a dk_terminal_b
+  dk_port_office` (`wh_ext` covers `_t1` and its `_t2` edit).
+- **G5 — the five live regions** (`lowres@4x`, `rural@4x`, `airport@4x`, `civic@4x`, `docks@4x`):
+  - `vlr art:approve -- lr_major_house lr_patch_bungalow lr_prerelease_villa lr_range_ranch_house lr_caret_cottage
+    lr_tilde_terrace lr_minor_cottage lr_exact_pin lr_wildcard_shop lr_buildmeta_bungalow`
+  - `vlr art:approve -- ru_peer_pasture ru_dev_dairy ru_range_ranch ru_optional_orchard ru_hay_barn ru_grain_coop
+    ru_caret_mill ru_tilde_tractors ru_semver_stables ru_farmhouse_once`
+  - `vlr art:approve -- ap_terminal ap_cargo_hangar ap_tower ap_plane`
+  - `vlr art:approve -- cv_town_hall cv_lint_school cv_museum cv_changelog_stadium cv_patch_hospital cv_police cv_fire
+    cv_readme_library cv_courthouse cv_park_pavilion fountain`
+  - `vlr art:approve -- dk_ship dk_crane dk_containers`
+- **G6 — tiers, machines, people** (`tiers@4x`, `g6-tiers-machines-people@4x`): `vlr art:approve -- wh_ext_t3
+  wh_ext_t4 wh_ext_t5 battery_checker xray sorter_arm`. The interiors t3-t5, faces, pips, the star and
+  `worker_sorter` are procedural (no approval flag): a "no" is a note for the next build, redrawn in `tools/art/*.ts`.
+- Reject any one with `vlr art:reject -- <id> "<reason>"`.
+
+Follow-ups / for other lanes:
+
+- Lane A (`src/data/map.json`, optional): the runway dressing rows, listed before "runway apron" (first match wins):
+  `{"name": "runway north threshold", "rect": [45, 3, 47, 3], "frame": "runway_threshold"}`, `{"name": "runway south
+  threshold", "rect": [45, 19, 47, 19], "frame": "runway_threshold"}`, `{"name": "taxi line", "rect": [44, 10, 44, 10],
+  "frame": "taxiway"}`; and the fountain prop `{"frame": "fountain", "tile": [22, 41], "region": "civic"}` (still not
+  placed; `civic@4x.png` shows it there).
+- Lane C: tier 5 swaps `strip_light` for `neon_strip_f0` (f1 as an optional flicker) at `STRIP_LIGHTS`; every other
+  tier-4 / tier-5 frame resolves through `tierFrame` as named above.
+- Lane G: `dk_ship` and `xray` changed, so the shots that show them (docks-live, ship-departure, warehouse-tier4/5)
+  change.
+- The ship at its home tile (1, 29) now lies along the quay with its stern by Prefetch Pier 1's west corner; the
+  departure moves it along its own axis.
+- `ap_plane` still faces +x across the runway (which runs along y); a plane rolling along the runway would need a
+  second heading sprite.
+
 ## Build 2 — M8 (L3 Regional, plan-build2 §6 / §8.5, design-m8-m9 §6.1-§6.4, B2 §4.1, §6.5, §6.6)
 
 Sheets: `art/contact/warehouse-tier3@4x.png` (`node tools/art/contact.ts tier3`: room mocks t1 / t2 / t3 with the M8

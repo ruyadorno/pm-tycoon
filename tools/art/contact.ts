@@ -34,8 +34,16 @@
 //   art/contact/warehouse-tier3@4x.png    M8 / G6 (build 2): `node
 //     tools/art/contact.ts tier3` — room mocks t1 / t2 / t3 with the M8
 //     dock geometry, the tier-3 pieces, the overseas icons.
+//   art/contact/g6-tiers-machines-people@4x.png  M9 / G6 (build 2): `node
+//     tools/art/contact.ts g6` — room mocks t3 / t4 / t5 in the M9
+//     geometry (roomMockM9), the tier-4 / tier-5 pieces, the machines, the
+//     Sorter Arm, faces / pips / star, worker vs worker_sorter.
+//   M9 (G5): lowres / rural / airport / civic show the region live in
+//     colour in context (contextScene: the window baked as the city does
+//     at level 4 / 5, every district's buildings and props in it).
 //   art/contact/docks@4x.png is the gallery's docks category (gallery.ts):
-//     since M8 it opens with the port on the map in colour (live at L3).
+//     since M8 it opens with the port on the map in colour (live at L3);
+//     since M9 with dk_ship faint along its departure (portScene).
 // Never writes art/final, the manifest or public/.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -62,6 +70,8 @@ import {
   dockPosesOf,
   finalPath,
 } from './manifest.ts'
+import { groundAt, isRoadTile, mapBlockAt } from '../../src/data/schema.ts'
+import type { MapData } from '../../src/data/types.ts'
 import { PALETTE } from './palette.ts'
 import { fogImg } from './variants.ts'
 
@@ -1047,7 +1057,11 @@ export function lotScene(
  * coversBuildings), the crane, ship and container props at their map
  * tiles; `locked` draws the fogged frames the region shows until M8.
  */
-export function portScene(m: Manifest, locked: boolean): Canvas {
+export function portScene(
+  m: Manifest,
+  locked: boolean,
+  departure: readonly number[] = [],
+): Canvas {
   const X0 = 0
   const Y0 = 26
   const nx = 13
@@ -1117,6 +1131,36 @@ export function portScene(m: Manifest, locked: boolean): Canvas {
   }
   draws.sort((a, b) => a.d - b.d)
   for (const d of draws) d.f()
+  // build 2 M9: ghosts of the vessel along its map.hubs exit at fractions
+  // `departure` of the sail-out (cityHub.ts vesselOffset: tile-space
+  // translation, no turn), so the sheet shows whether it sails bow first
+  const hub = (
+    dataJson('map.json') as {
+      hubs?: {
+        district: string
+        vessel: {
+          frame: string
+          tile: [number, number]
+          exit: [number, number]
+        }
+      }[]
+    }
+  ).hubs?.find((h) => h.district === 'docks')
+  const ship = hub ? frameOf(hub.vessel.frame) : null
+  if (hub && ship) {
+    ctx.globalAlpha = 0.55
+    for (const t of departure) {
+      const tx = hub.vessel.tile[0] + hub.vessel.exit[0] * t - X0
+      const ty = hub.vessel.tile[1] + hub.vessel.exit[1] * t - Y0
+      const p = scr(ox, top, tx, ty)
+      ctx.drawImage(
+        ship,
+        Math.round(p.x + 32 - ship.width / 2),
+        Math.round(p.y + 32 - ship.height),
+      )
+    }
+    ctx.globalAlpha = 1
+  }
   return cv
 }
 
@@ -1491,7 +1535,12 @@ export function regionScene(
   for (const pr of map.props.filter((x) => x.region === district)) {
     put(pr.frame, pr.tile[0], pr.tile[1])
   }
-  for (const pr of opts.extraProps ?? []) put(pr.frame, pr.tile[0], pr.tile[1])
+  // extra props not on the map yet (M9: map.json carries the Airport's own)
+  const placed = new Set(map.props.map((p) => `${p.frame}@${p.tile.join(',')}`))
+  for (const pr of opts.extraProps ?? []) {
+    if (placed.has(`${pr.frame}@${pr.tile.join(',')}`)) continue
+    put(pr.frame, pr.tile[0], pr.tile[1])
+  }
   draws.sort((a, b) => a.d - b.d)
   for (const d of draws) d.f()
   return cv
@@ -1515,6 +1564,136 @@ function sceneryAt(x: number, y: number): string | null {
   return r?.frame ?? null
 }
 
+/** a ground.scenery row drawn by a sheet before the map's own rows */
+export interface SceneryRow {
+  rect: [number, number, number, number]
+  frame: string
+}
+
+/**
+ * Build 2 M9 (G5 "in context"): tiles [x0, x0 + nx) x [y0, y0 + ny) as the
+ * city bakes them at `level` (src/data/schema.ts groundAt: block grounds
+ * and accents, scenery, roads), every building and map prop in the window
+ * whatever its district, each district drawn in colour when its
+ * unlockLevel <= `level` and `_locked` otherwise; `extraScenery` rows win
+ * over the map's and `extraProps` are drawn like map props (suggested rows
+ * not in map.json yet, named in the sheet title).
+ */
+export function contextScene(
+  m: Manifest,
+  x0: number,
+  y0: number,
+  nx: number,
+  ny: number,
+  level: number,
+  opts: {
+    extraScenery?: readonly SceneryRow[]
+    extraProps?: readonly {
+      frame: string
+      tile: [number, number]
+      region: string
+    }[]
+  } = {},
+): Canvas {
+  const extraScenery = opts.extraScenery ?? []
+  const top = 160
+  const W = (nx + ny) * 32
+  const H = (nx + ny) * 16 + top
+  const cv = createCanvas(W, H)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('water1')
+  ctx.fillRect(0, 0, W, H)
+  const ox = ny * 32 - 32
+  const map = dataJson('map.json') as MapData
+  const districts = dataJson('districts.json') as {
+    id: string
+    unlockLevel: number
+  }[]
+  const lockedD = new Set(
+    districts.filter((d) => d.unlockLevel > level).map((d) => d.id),
+  )
+  const groundFin = (stem: string, locked: boolean): Canvas | null => {
+    const e = entry(m, stem)
+    if (!e) return null
+    const f = e.frames[0] ?? ''
+    const L = locked && e.variants.includes('locked') ? '_locked' : ''
+    return fin(m, stem, f + L) ?? fin(m, stem, f)
+  }
+  const roadIs = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < map.size[0] && y < map.size[1]
+      ? isRoadTile(map, x, y)
+      : false
+  for (let ty = 0; ty < ny; ty++) {
+    for (let tx = 0; tx < nx; tx++) {
+      const x = x0 + tx
+      const y = y0 + ty
+      const block = mapBlockAt(map, x, y)
+      const locked =
+        block !== null && block.kind === 'region' && lockedD.has(block.region)
+      let t: Canvas | null
+      const extra = extraScenery.find(
+        (r) =>
+          x >= r.rect[0] && x <= r.rect[2] && y >= r.rect[1] && y <= r.rect[3],
+      )
+      if (extra && !block) t = groundFin(extra.frame, locked)
+      else if (roadIs(x, y)) {
+        const k =
+          (roadIs(x, y - 1) ? 1 : 0) |
+          (roadIs(x + 1, y) ? 2 : 0) |
+          (roadIs(x, y + 1) ? 4 : 0) |
+          (roadIs(x - 1, y) ? 8 : 0)
+        const f = `_${String(k).padStart(2, '0')}`
+        t = fin(m, 'road', f)
+      } else t = groundFin(groundAt(map, x, y), locked)
+      if (!t) continue
+      const p = scr(ox, top, tx, ty)
+      ctx.drawImage(t, p.x, p.y)
+    }
+  }
+  const buildings = dataJson('buildings.json') as {
+    id: string
+    district: string
+    footprint: [number, number]
+    tile: [number, number]
+  }[]
+  const sprite = new Map<string, string>()
+  for (const e of m.entries) {
+    for (const b of e.coversBuildings ?? []) sprite.set(b, e.id)
+  }
+  const inWin = (x: number, y: number) =>
+    x >= x0 && x < x0 + nx && y >= y0 && y < y0 + ny
+  const draws: { d: number; f: () => void }[] = []
+  const put = (id: string, ax: number, ay: number, locked: boolean) => {
+    const e = entry(m, id)
+    const im =
+      fin(m, id, locked && e?.variants.includes('locked') ? '_locked' : '') ??
+      fin(m, id)
+    if (!im) return
+    const p = scr(ox, top, ax - x0, ay - y0)
+    draws.push({
+      d: ax + ay,
+      f: () => ctx.drawImage(im, p.x + 32 - im.width / 2, p.y + 32 - im.height),
+    })
+  }
+  for (const b of buildings) {
+    const ax = b.tile[0] + b.footprint[0] - 1
+    const ay = b.tile[1] + b.footprint[1] - 1
+    if (!inWin(b.tile[0], b.tile[1]) && !inWin(ax, ay)) continue
+    put(sprite.get(b.id) ?? b.id, ax, ay, lockedD.has(b.district))
+  }
+  const onMap = new Set(map.props.map((p) => `${p.frame}@${p.tile.join(',')}`))
+  const extraP = (opts.extraProps ?? []).filter(
+    (p) => !onMap.has(`${p.frame}@${p.tile.join(',')}`),
+  )
+  for (const pr of [...map.props, ...extraP]) {
+    if (!inWin(pr.tile[0], pr.tile[1])) continue
+    put(pr.frame, pr.tile[0], pr.tile[1], lockedD.has(pr.region))
+  }
+  draws.sort((a, b) => a.d - b.d)
+  for (const d of draws) d.f()
+  return cv
+}
+
 /** the ten Low-density uniques (buildings.json district lowres) */
 export function lowresIds(): string[] {
   const rows = dataJson('buildings.json') as { id: string; district: string }[]
@@ -1535,17 +1714,19 @@ export function lowresSheet(m: Manifest): string {
   const sections: Section[] = [
     {
       title:
-        'Low-density (Semver St) on the map, tiles x 18-36, y 2-12 (2x = ' +
-        'camera zoom 2): colour (live from M9)',
+        'G5 — Low-density (Semver St) live from L4 (M9), in context: tiles ' +
+        'x 17-37, y 0-13 as the city bakes them at level 4 (2x = camera ' +
+        'zoom 2; Rural live beside it, Downtown below, the Airport still ' +
+        'fogged until L5)',
       blocks: [
         {
-          cv: regionScene(m, 'lowres', 18, 2, 19, 11, false),
-          label: 'in colour',
+          cv: contextScene(m, 17, 0, 21, 14, 4),
+          label: 'level 4, in colour',
         },
       ],
     },
     {
-      title: 'as shipped until M9: the _locked frames',
+      title: 'before L4: the _locked look (fog)',
       blocks: [
         {
           cv: regionScene(m, 'lowres', 18, 2, 19, 11, true),
@@ -1590,17 +1771,18 @@ export function ruralSheet(m: Manifest): string {
   const sections: Section[] = [
     {
       title:
-        'Rural (Pasture Peer Fields) on the map, tiles x 2-20, y 2-20 (2x = ' +
-        'camera zoom 2): colour (live from M9)',
+        'G5 — Rural (Pasture Peer Fields) live from L4 (M9), in context: ' +
+        'tiles x 0-20, y 0-21 as the city bakes them at level 4 (2x = ' +
+        'camera zoom 2; Low-density live beside it, Hoist Hill below)',
       blocks: [
         {
-          cv: regionScene(m, 'rural', 2, 2, 19, 19, false),
-          label: 'in colour',
+          cv: contextScene(m, 0, 0, 21, 22, 4),
+          label: 'level 4, in colour',
         },
       ],
     },
     {
-      title: 'as shipped until M9: the _locked frames',
+      title: 'before L4: the _locked look (fog)',
       blocks: [
         {
           cv: regionScene(m, 'rural', 2, 2, 19, 19, true),
@@ -1713,8 +1895,9 @@ function closeupsOf(m: Manifest, ids: readonly string[]): Block[] {
 }
 
 /**
- * The Airport's M9 props (design-m8-m9 §1.2, map.json rows Lane A adds at
- * M9): the parked plane on the runway apron and the control tower.
+ * The Airport's M9 props (design-m8-m9 §1.2; map.json carries them since
+ * M9 — kept as a cross-check, deduped against the map's own props): the
+ * parked plane on the runway and the control tower.
  */
 export const AIRPORT_M9_PROPS: readonly {
   frame: string
@@ -1724,34 +1907,65 @@ export const AIRPORT_M9_PROPS: readonly {
   { frame: 'ap_tower', tile: [44, 16] },
 ]
 
+/**
+ * The M9 runway dressing (plan-build2 §6 Airport "runway themed tiles"):
+ * the map.json ground.scenery rows (since M9, listed before the runway rows
+ * — the first matching row wins) — piano-key thresholds on the runway's end
+ * rows and the taxi line on the apron tile beside the parked plane.
+ */
+export const AIRPORT_M9_SCENERY: readonly SceneryRow[] = [
+  { rect: [45, 3, 47, 3], frame: 'runway_threshold' },
+  { rect: [45, 19, 47, 19], frame: 'runway_threshold' },
+  { rect: [44, 10, 44, 10], frame: 'taxiway' },
+]
+
 export function airportSheet(m: Manifest): string {
   const S = 2
-  const scene = (locked: boolean) =>
-    regionScene(m, 'airport', 33, 2, 15, 19, locked, {
-      scenery: true,
-      extraProps: AIRPORT_M9_PROPS,
-    })
   const sections: Section[] = [
     {
       title:
-        'Airport on the map, tiles x 33-47, y 2-20 (2x = camera zoom 2), ' +
-        'with the M9 props (ap_plane at (45, 10), ap_tower at (44, 16), ' +
-        'design-m8-m9 §1.2): colour (live from M9)',
-      blocks: [{ cv: scene(false), label: 'in colour' }],
+        'G5 — Airport live from L5 (M9), in context: tiles x 32-47, y 0-21 ' +
+        'at level 5 (2x = camera zoom 2), ap_plane (45, 10) and ap_tower ' +
+        '(44, 16) from map.json, the runway dressing rows of map.json ' +
+        '(runway_threshold on y 3 / 19, taxiway at (44, 10); the runway ' +
+        'fogs with the Airport)',
+      blocks: [
+        {
+          cv: contextScene(m, 32, 0, 16, 22, 5, {
+            extraScenery: AIRPORT_M9_SCENERY,
+            extraProps: AIRPORT_M9_PROPS.map((p) => ({
+              ...p,
+              region: 'airport',
+            })),
+          }),
+          label: 'level 5, in colour',
+        },
+      ],
     },
     {
-      title: 'as shipped until M9: the _locked frames',
-      blocks: [{ cv: scene(true), label: '_locked' }],
+      title: 'before L5: the _locked look (fog)',
+      blocks: [
+        {
+          cv: regionScene(m, 'airport', 33, 2, 15, 19, true, {
+            scenery: true,
+            extraProps: AIRPORT_M9_PROPS,
+          }),
+          label: '_locked',
+        },
+      ],
     },
     {
       title:
-        'ap_terminal (re-rolled), ap_cargo_hangar, ap_tower, ap_plane (2x): ' +
-        'colour | _locked',
-      blocks: closeupsOf(m, [
-        ...districtIds('airport'),
-        'ap_tower',
-        'ap_plane',
-      ]),
+        'ap_terminal, ap_cargo_hangar, ap_tower, ap_plane (2x): colour | ' +
+        '_locked; the runway tiles (runway, runway_stripe, runway_threshold, ' +
+        'tarmac, taxiway)',
+      blocks: [
+        ...closeupsOf(m, [...districtIds('airport'), 'ap_tower', 'ap_plane']),
+        ...['runway', 'runway_stripe', 'runway_threshold', 'tarmac', 'taxiway']
+          .map((id) => ({ cv: fin(m, id), id }))
+          .filter((b): b is { cv: Canvas; id: string } => b.cv !== null)
+          .map((b) => ({ cv: b.cv, label: b.id })),
+      ],
     },
   ]
   const out = join(CONTACT, 'airport@4x.png')
@@ -1759,26 +1973,37 @@ export function airportSheet(m: Manifest): string {
   return out.replace(ROOT, '')
 }
 
-/** a free tile of the civic park block [2, 4] (pavilion, trees, benches) for the fountain prop — suggested map.json row for M9 */
+/** the fountain prop's tile in the civic park block [2, 4] (pavilion, trees, benches) — the map.json row since M9 */
 export const CIVIC_FOUNTAIN_TILE: [number, number] = [22, 41]
 
 export function civicSheet(m: Manifest): string {
   const S = 2
-  const scene = (locked: boolean) =>
-    regionScene(m, 'civic', 10, 26, 19, 18, locked, {
-      extraProps: [{ frame: 'fountain', tile: CIVIC_FOUNTAIN_TILE }],
-    })
+  const fountain = [
+    { frame: 'fountain', tile: CIVIC_FOUNTAIN_TILE, region: 'civic' },
+  ]
   const sections: Section[] = [
     {
       title:
-        'Park & civic (Commons) on the map, tiles x 10-28, y 26-43 (2x = ' +
-        'camera zoom 2), the fountain at a suggested tile ' +
-        `(${CIVIC_FOUNTAIN_TILE.join(', ')}): colour (live from M9)`,
-      blocks: [{ cv: scene(false), label: 'in colour' }],
+        'G5 — Park & civic (Commons) live from L5 (M9), in context: tiles ' +
+        'x 8-29, y 24-45 at level 5 (2x = camera zoom 2), the fountain at ' +
+        `(${CIVIC_FOUNTAIN_TILE.join(', ')}) from map.json`,
+      blocks: [
+        {
+          cv: contextScene(m, 8, 24, 22, 22, 5, { extraProps: fountain }),
+          label: 'level 5, in colour',
+        },
+      ],
     },
     {
-      title: 'as shipped until M9: the _locked frames',
-      blocks: [{ cv: scene(true), label: '_locked' }],
+      title: 'before L5: the _locked look (fog)',
+      blocks: [
+        {
+          cv: regionScene(m, 'civic', 10, 26, 19, 18, true, {
+            extraProps: fountain,
+          }),
+          label: '_locked',
+        },
+      ],
     },
     {
       title: 'the ten uniques + the fountain prop (2x): colour | _locked',
@@ -2000,6 +2225,261 @@ export function warehouseTier3Sheet(m: Manifest): string {
   return out.replace(ROOT, '')
 }
 
+// ---------------------------------------------------------------------------
+// M9 (build 2): art/contact/g6-tiers-machines-people@4x.png — the G6 sheet
+// (plan-build2 §6 approval gates): the grown rooms of tiers 3-5, the M9
+// pieces, the three machines, the Sorter Arm, faces / pips / ★ and
+// worker_sorter
+
+/** rows of the room per tier (design-m8-m9 §9 R2: 14 / 14 / 14 / 16 / 18) */
+const ROWS_BY_TIER = [14, 14, 14, 16, 18] as const
+/** belt slots per tier (design-m8-m9 §6.1 BELT_SLOTS_BY_TIER) */
+const BELT_SLOTS = [4, 4, 4, 5, 6] as const
+
+/**
+ * A room of tier `t` in the M9 geometry (design-m8-m9 §6.1 "Room growth"):
+ * rows 14 / 16 / 18, slots 5-6 unrolled in the belt column at y 352 / 416,
+ * everything at y >= 352 of the tier-1 table moved down by Δ = 64 x
+ * (beltSlots - 4); docks 2-3 owned from tier 4 (dock 3 is an L4 buy), the
+ * Sorter Arm in the Hold Bay station from tier 4, neon_strip at tier 5; the
+ * ext strip (`Slots 5-6` / `Slot 6`) where a lane slot lies past the belt
+ * column. Machines: desk, detector, battery checker, shaker, X-ray (slot
+ * 5); slot 6 shows its empty outline. An art mock, not the renderer.
+ */
+export function roomMockM9(m: Manifest, t: number, shelfN: number): Canvas {
+  const rows = ROWS_BY_TIER[t - 1] ?? 14
+  const slots = BELT_SLOTS[t - 1] ?? 4
+  const dy = 64 * (slots - 4)
+  const cv = createCanvas(352, rows * 32)
+  const ctx = cv.getContext('2d')
+  const draw = (im: Canvas | null, x: number, y: number) => {
+    if (im) ctx.drawImage(im, x, y)
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < 11; c++) {
+      let im: Canvas | null
+      if (c === 0 || c === 10) im = tierPiece(m, 'wall', t)
+      else if (r === 0) im = tierPiece(m, 'wallface', t)
+      else if (t === 1) im = fin(m, 'floor_t1', `_${(c + r) % 3}`)
+      else if (c === 4)
+        im = fin(m, `floor_t${t}_lane`) ?? tierPiece(m, 'floor', t)
+      else im = tierPiece(m, 'floor', t)
+      draw(im, c * 32, r * 32)
+    }
+  }
+  // baseboard at height - 2 (LaneRenderer)
+  ctx.fillStyle = PALETTE.hex('outline')
+  ctx.fillRect(0, rows * 32 - 2, 352, 2)
+  // the belt down to the shelf, the chute, the rack, the station
+  for (let x = 32; x < 128; x += 32) draw(fin(m, 'belt_h', '_0'), x, 48)
+  draw(fin(m, 'belt_corner', '_0'), 128, 48)
+  for (let y = 80; y <= 352 + dy; y += 32) draw(fin(m, 'belt_v', '_0'), 128, y)
+  for (let y = 96; y < 352 + dy; y += 32) draw(fin(m, 'chute_v'), 172, y)
+  draw(fin(m, 'holdbay_rack'), 192, 96)
+  for (let i = 0; i < 5; i++) draw(fin(m, 'bay_pad'), 194, 98 + 48 * i)
+  draw(fin(m, 'hold_station'), 264, 300)
+  draw(fin(m, 'bin', '_closed'), 256, 384 + dy)
+  // north wall dressing: bulb t1, strip lights t2-t4, neon t5
+  draw(tierPiece(m, 'sign', t), 76, 4)
+  if (t === 1) draw(fin(m, 'bulb', '_0'), 296, 6)
+  else {
+    const light = t >= 5 ? fin(m, 'neon_strip', '_f0') : fin(m, 'strip_light')
+    draw(light, 8, 2)
+    draw(light, 280, 2)
+  }
+  draw(tierPiece(m, 'wanted_poster', t), 272, 120)
+  if (t === 1) {
+    draw(fin(m, 'props_t1'), 264, 164)
+    draw(fin(m, 'props_t1'), 264, 236)
+  } else draw(tierPiece(m, 'props', t), 264, 196)
+  // docks: 1 open (van), 2 bought (pad + minis), 3 locked until tier 4,
+  // then open with a truck
+  const three = t >= 4
+  draw(fin(m, 'dock_door', '_open'), 0, 36)
+  draw(fin(m, 'dock_tail_van', '_open'), 0, 44)
+  draw(fin(m, 'dock_door', '_closed'), 0, 100)
+  draw(fin(m, 'dock_pad'), 32, 100)
+  draw(fin(m, 'dock_door', three ? '_open' : '_locked'), 0, 164)
+  if (three) {
+    draw(fin(m, 'dock_tail_truck', '_open'), 0, 172)
+    draw(fin(m, 'dock_pad'), 32, 164)
+  }
+  const pads = three ? [100, 164] : [100]
+  pads.forEach((py, k) => {
+    PAD_SPOTS.slice(0, 4 - k).forEach(([x, y], i) => {
+      draw(fin(m, `parcel_mini_${MINI[(i + k) % 4]}`), 32 + x - 8, py + y - 8)
+    })
+  })
+  draw(fin(m, 'lamp', '_green'), 12, 24)
+  draw(fin(m, 'lamp', '_amber'), 12, 92)
+  draw(fin(m, 'lamp', three ? '_green' : '_lock'), 12, 156)
+  // slots 1..beltSlots
+  draw(fin(m, 'desk'), 80, 112)
+  const machines = ['metal_detector', 'battery_checker', 'shaky_shaker', 'xray']
+  for (let k = 2; k <= slots; k++) {
+    const id = machines[k - 2]
+    if (k === 6 || !id)
+      draw(fin(m, 'slot_empty_outline'), 96, 96 + 64 * (k - 1))
+    else draw(fin(m, id, '_f0'), 120, 40 + 64 * k)
+  }
+  // the ext strip for a lane slot past the belt column
+  if (slots < 6) {
+    draw(fin(m, 'ext_outline'), 72, 356 + dy)
+    draw(fin(m, 'ic_lock'), 78, 360 + dy)
+  }
+  draw(fin(m, 'worker', '_e_idle_0'), 56, 114)
+  // the Sorter Arm (L4) in the station, else the sorter on duty
+  if (t >= 4) draw(fin(m, 'sorter_arm', '_f0'), 256, 284)
+  else draw(fin(m, 'worker_sorter', '_w_idle_0'), 284, 308)
+  // the shelf and its minis (20 x 5 @ 11 from (35, 388 + Δ) at t >= 3)
+  draw(tierPiece(m, 'shelf', t), 32, 384 + dy)
+  const cols = t >= 3 ? 20 : 18
+  const rowsN = t >= 3 ? 5 : 3
+  const pitch = t >= 3 ? 11 : 12
+  const [sx, sy] = t >= 3 ? [35, 388 + dy] : [38, 390]
+  for (let i = 0; i < Math.min(shelfN, cols * rowsN); i++) {
+    const c = i % cols
+    const r = Math.floor(i / cols)
+    draw(
+      fin(m, `parcel_mini_${MINI[(i * 7) % 4]}`),
+      sx + c * pitch - 3,
+      sy + r * pitch - 3,
+    )
+  }
+  return cv
+}
+
+/** one piece on a patch of its own tier's floor (1x) */
+function onTierFloor(
+  m: Manifest,
+  t: number,
+  im: Canvas | null,
+  pad = 8,
+): Canvas {
+  const w = (im?.width ?? 32) + 2 * pad
+  const h = (im?.height ?? 32) + 2 * pad
+  const cv = createCanvas(w, h)
+  const ctx = cv.getContext('2d')
+  const f = tierPiece(m, 'floor', t)
+  for (let y = 0; y < h; y += 32) {
+    for (let x = 0; x < w; x += 32) if (f) ctx.drawImage(f, x, y)
+  }
+  if (im) ctx.drawImage(im, pad, pad)
+  return cv
+}
+
+/** shelf_t<t> with n minis on the 20 x 5 @ 11 grid, on its floor */
+function shelfWith(m: Manifest, t: number, n: number): Canvas {
+  const cv = onTierFloor(m, t, fin(m, `shelf_t${t}`))
+  const ctx = cv.getContext('2d')
+  for (let i = 0; i < n; i++) {
+    const mini = fin(m, `parcel_mini_${MINI[(i * 7) % 4]}`)
+    if (mini)
+      ctx.drawImage(
+        mini,
+        8 + 3 + (i % 20) * 11 - 3,
+        8 + 4 + Math.floor(i / 20) * 11 - 3,
+      )
+  }
+  return cv
+}
+
+export function g6Sheet(m: Manifest): string {
+  const S = 4
+  const blocks = (id: string): Block[] => {
+    const e = entry(m, id)
+    return e ? blocksFor(m, e, finals(m, id, id)) : []
+  }
+  const arm = entry(m, 'sorter_arm')
+  const piece = (t: number, id: string, f = ''): Block => ({
+    cv: onTierFloor(m, t, fin(m, id, f)),
+    label: `${id}${f}`,
+  })
+  const sections: Section[] = [
+    {
+      title:
+        'G6 — interiors t3 / t4 / t5 (1x mocks of the M9 room growth, ' +
+        'design-m8-m9 §6.1 + R2: 14 / 16 / 18 rows, slots 5-6 in the belt ' +
+        'column, shelf / bin moved down 64 / 128): t3 shelf 57/60, t4 ' +
+        '(X-ray in slot 5, dock 3, the Sorter Arm) 76/80, t5 (slot 6 open, ' +
+        'neon) 98/100',
+      blocks: [
+        { cv: roomMockM9(m, 3, 57), label: 'tier 3 "Regional" (14 rows)' },
+        { cv: roomMockM9(m, 4, 76), label: 'tier 4 "National" (16 rows)' },
+        { cv: roomMockM9(m, 5, 98), label: 'tier 5 "Tycoon" (18 rows)' },
+      ],
+    },
+    {
+      title: 'the tier-4 pieces at 1x on floor_t4',
+      blocks: [
+        piece(4, 'floor_t4'),
+        piece(4, 'floor_t4_lane'),
+        piece(4, 'wall_t4'),
+        piece(4, 'wallface_t4'),
+        piece(4, 'sign_t4'),
+        piece(4, 'props_t4'),
+        piece(4, 'wanted_poster_t4'),
+        piece(4, 'strip_light'),
+        { cv: shelfWith(m, 4, 80), label: 'shelf_t4 80/80' },
+      ],
+    },
+    {
+      title:
+        'the tier-5 pieces at 1x on floor_t5 (neon_strip replaces the strip lights)',
+      blocks: [
+        piece(5, 'floor_t5'),
+        piece(5, 'floor_t5_lane'),
+        piece(5, 'wall_t5'),
+        piece(5, 'wallface_t5'),
+        piece(5, 'sign_t5'),
+        piece(5, 'props_t5'),
+        piece(5, 'wanted_poster_t5'),
+        piece(5, 'neon_strip', '_f0'),
+        piece(5, 'neon_strip', '_f1'),
+        { cv: shelfWith(m, 5, 100), label: 'shelf_t5 100/100' },
+      ],
+    },
+    {
+      title:
+        'machines on the belt (idle f0 / scan f1): metal_detector + ' +
+        'shaky_shaker for scale, battery_checker (L3), xray (L4, M9 re-roll #7)',
+      blocks: [
+        ...blocks('metal_detector').slice(0, 1),
+        ...blocks('shaky_shaker').slice(0, 1),
+        ...blocks('battery_checker'),
+        ...blocks('xray'),
+      ],
+    },
+    {
+      title:
+        'sorter_arm (fixture 64x64, L4): f0 rest, f1 reach (-x), f2 toss (+x)',
+      blocks: arm ? fixtureFrames(m, arm) : [],
+    },
+    {
+      title:
+        'people: face_00-11 (skins x hair / hats), a hire-card mock with ' +
+        'pips and the star (ic_star), the Hold Bay station with the sorter ' +
+        'on duty',
+      blocks: [
+        { cv: faceGridScene(m), label: 'face_NN' },
+        { cv: cardMock(m, 0, false, [3, 3, 0]), label: 'applicant 3 / 3 / 0' },
+        { cv: cardMock(m, 6, true, [4, 2, 2]), label: 'star applicant' },
+        { cv: stationScene(m, 'worker_sorter'), label: 'sorter on duty' },
+      ],
+    },
+    {
+      title: 'worker (inspector, yellow vest) vs worker_sorter (orange vest)',
+      blocks: [
+        ...blocks('worker').slice(0, 4),
+        ...blocks('worker_sorter').slice(0, 4),
+      ],
+    },
+  ]
+  const out = join(CONTACT, 'g6-tiers-machines-people@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grey4'), 1200, S))
+  return out.replace(ROOT, '')
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2)
@@ -2022,10 +2502,12 @@ if (isMain) {
     console.log(`contact: ${civicSheet(loadManifest())}`)
   } else if (cmd === 'tier3') {
     console.log(`contact: ${warehouseTier3Sheet(loadManifest())}`)
+  } else if (cmd === 'g6') {
+    console.log(`contact: ${g6Sheet(loadManifest())}`)
   } else {
     console.error(
       'usage: node tools/art/contact.ts fixes [--hop <crop.png>] | people | ' +
-        'lowres | rural | tiers | tier3 | airport | civic',
+        'lowres | rural | tiers | tier3 | g6 | airport | civic',
     )
     process.exitCode = 1
   }

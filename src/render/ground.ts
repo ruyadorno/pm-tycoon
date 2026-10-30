@@ -1,7 +1,9 @@
 // Ground bake (city-view.md §1.2, §1.4; phaser4-notes.md §2, §8): every tile
 // of the 48x48 map stamped into ONE DynamicTexture('ground', 3072, 1536), one
 // Image at depth -1. Per tile, in order: the base frame (map.json ground rules
-// via groundAt; `_locked` inside a locked region's blocks), the road autotile
+// via groundAt; `_locked` inside a locked region's blocks and, M9, on the
+// scenery rows that name a locked region — cityFx.groundRegionAt: the runway
+// with the Airport, style-guide.md §2.2), the road autotile
 // `road_<mask>` from the trimmed avenue set (+ the themed one-sided edge
 // overlays), then the 2-px district kerb along every block edge that faces a
 // road or the map edge, tinted with the region's palette colour. Re-baked on
@@ -29,7 +31,7 @@ import {
 } from '../data/index.ts'
 import { PALETTE, paletteColour } from '../ui/theme.ts'
 import { GROUND_H, GROUND_TEXTURE, GROUND_W, WORLD_ATLAS } from './atlases.ts'
-import { slabStamps, type LotStamp } from './cityFx.ts'
+import { groundRegionAt, slabStamps, type LotStamp } from './cityFx.ts'
 import { HH, HW, originX, tileToScreen, tileTopLeft } from './iso.ts'
 
 /**
@@ -185,8 +187,10 @@ export function bakeGround(
     for (let y = 0; y < mapH; y++) {
       for (let x = 0; x < mapW; x++) {
         const block = mapBlockAt(map, x, y)
-        const locked =
-          block !== null && block.kind === 'region' && isLocked(block.region)
+        // A region block's tiles, or a scenery row naming a region (M9: the
+        // runway with the Airport), fog while that region is locked.
+        const region = groundRegionAt(map, x, y)
+        const locked = region !== null && isLocked(region)
         const lot = lotTiles.get(`${x},${y}`)
         const lotFrame = lot ? frame(lot.frame, locked) : null
         stamp(lotFrame ?? frame(groundAt(map, x, y), locked), x, y)

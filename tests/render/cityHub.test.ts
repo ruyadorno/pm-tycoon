@@ -1,5 +1,8 @@
 // M8 overseas hubs in the city (spec-build2 §4.1; spec-core §5.6;
-// design-m8-m9 §6.2, §7 M8 8): the vessel's departure timeline (out 4 s →
+// design-m8-m9 §6.2, §7 M8 8; M9 §7 M9 11: the Airport's plane — the
+// shipped map.hubs row, its taxi path across the runway, the climb and the
+// fade, the 20-s ring on ap_terminal through a forced-L5 sim, the
+// clearance stamps rising out of the ring): the vessel's departure timeline (out 4 s →
 // away 10 s → back 4 s, a departure while away ignored, reduced motion),
 // its tile-space offsets (integer endpoints = map.hubs `exit`, integer
 // screen px every frame, the M9 plane's climb), the 45-s clearance ring
@@ -10,24 +13,35 @@
 // tile, found at 1× (the snapshot cached before the tick) and at 2×+ (the
 // cache rebuilt mid-tick).
 import { describe, expect, it } from 'vitest'
-import type { MapHubDef } from '../../src/data/index.ts'
+import {
+  footprintRect,
+  groundAt,
+  inRect,
+  isRoadTile,
+  mapBlockAt,
+  type MapHubDef,
+} from '../../src/data/index.ts'
 import {
   canDepart,
   clearedStampText,
   clearingCountText,
+  clearStampPoint,
   DEPART_AWAY_MS,
   DEPART_BACK_MS,
   DEPART_MS,
   DEPART_OUT_MS,
   handOffVehicleId,
   CityHubView,
+  LIFT_FADE_FROM,
   LIFT_FROM,
   lockedStampText,
   lostStampText,
+  RING_H,
   RING_LAST,
   RING_LIFT,
   ringFrame,
   stampSum,
+  STAMP_OVER_RING,
   vesselAlpha,
   vesselOffset,
   vesselPhase,
@@ -52,16 +66,16 @@ import {
 } from '../sim/helpers.ts'
 
 const data = dataFixture()
+const map = data.map
 const docksHub = data.map.hubs.find((h) => h.district === 'docks') as MapHubDef
 const docksDef = data.districts.find((d) => d.id === 'docks')
 const CLEAR_TICKS =
   (docksDef?.kind === 'overseas' ? docksDef.clearanceS : 45) * TICKS_PER_S
-/** A made-up M9-style plane row: taxis east and climbs 64 px. */
-const plane: MapHubDef = {
-  district: 'airport',
-  office: 'ap_terminal',
-  vessel: { frame: 'ap_plane', tile: [45, 10], exit: [4, 0], liftPx: 64 },
-}
+/** M9: the shipped Airport row (design-m8-m9 §1.2): taxis east, climbs 64 px. */
+const plane = data.map.hubs.find((h) => h.district === 'airport') as MapHubDef
+const airportDef = data.districts.find((d) => d.id === 'airport')
+const AIRPORT_TICKS =
+  (airportDef?.kind === 'overseas' ? airportDef.clearanceS : 20) * TICKS_PER_S
 
 describe('departure timeline (B2 §4.1: sails out over 4 s, back after 10 s)', () => {
   it('home with no trip; out 4 s → away 10 s → back 4 s → home', () => {
@@ -115,6 +129,10 @@ describe('vessel offsets (map.hubs `exit`, tile space, integer screen px)', () =
     const [w, h] = data.map.size
     const off = x + ex < 0 || y + ey < 0 || x + ex >= w || y + ey >= h
     expect(off, 'tile + exit lies past the map edge').toBe(true)
+    // M9: the re-rolled dk_ship points its bow up-left (−x, prompts.ts
+    // DOCK_PROP_HEADING), so it sails out along −x bow first.
+    expect(ex).toBeLessThan(0)
+    expect(ey).toBe(0)
   })
 
   it('integer endpoints: 0 at home and at the start, `exit` out there, 0 again back', () => {
@@ -163,6 +181,11 @@ describe('vessel offsets (map.hubs `exit`, tile space, integer screen px)', () =
   })
 
   it('M9 plane (liftPx > 0): climbs over the last 60 % of the taxi, fades back in at its stand', () => {
+    expect(plane).toEqual({
+      district: 'airport',
+      office: 'ap_terminal',
+      vessel: { frame: 'ap_plane', tile: [45, 10], exit: [4, 0], liftPx: 64 },
+    })
     expect(vesselOffset(plane, 'out', LIFT_FROM).liftPx).toBe(0)
     expect(vesselOffset(plane, 'out', 1).liftPx).toBe(64)
     expect(vesselOffset(plane, 'away', 0).liftPx).toBe(64)
@@ -334,11 +357,12 @@ function hubView(
     topY: number
     locked: boolean
   } | null = OFFICE,
+  hub: MapHubDef = docksHub,
 ) {
   const f = fakeScene()
-  const ship = fakeObj('image', HOME.x, HOME.y, 'dk_ship')
+  const ship = fakeObj('image', HOME.x, HOME.y, hub.vessel.frame)
   const vessel = { img: ship as never, x: HOME.x, y: HOME.y }
-  const hv = new CityHubView(f.scene, f.layer, vs, docksHub, {
+  const hv = new CityHubView(f.scene, f.layer, vs, hub, {
     vessel,
     office,
     depth: 8000,
@@ -561,6 +585,267 @@ describe('the Docks unlock (B2 §4.1, §6.4 modern port): colour + _locked frame
     ]
     expect(stems.length).toBeGreaterThanOrEqual(6)
     for (const stem of new Set(stems)) {
+      expect(inAtlas(stem, 'world'), stem).toBe(true)
+      expect(inAtlas(`${stem}_locked`, 'world'), `${stem}_locked`).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------- M9 the Airport (B2 §4.3)
+
+/** A quiet sim forced to L5 (Docks + Airport live), funded, no spawns. */
+function l5(seed = 1): { sim: Sim; vs: ViewSim } {
+  const sim = quietSim(seed)
+  const res = sim.dispatch({ kind: 'debugForceLevel', level: 5 })
+  if (!res.ok) throw new Error(`forceLevel 5: ${res.reason}`)
+  for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+  fund(sim)
+  return { sim, vs: createViewSim(() => sim, { debug: true }) }
+}
+
+describe('M9 the Airport hub: the shipped map.hubs row (B2 §4.3; design-m8-m9 §1.2)', () => {
+  it('ap_terminal carries the ring; the vessel is the ap_plane prop on the runway, leaving east off the map edge with a climb', () => {
+    expect(airportDef?.kind).toBe('overseas')
+    expect(AIRPORT_TICKS).toBe(200)
+    const office = data.buildings.find((b) => b.id === plane.office)
+    expect(office?.district).toBe('airport')
+    const prop = map.props.find(
+      (p) =>
+        p.frame === plane.vessel.frame &&
+        p.tile[0] === plane.vessel.tile[0] &&
+        p.tile[1] === plane.vessel.tile[1],
+    )
+    expect(prop?.region).toBe('airport')
+    // East = +x in tile space (the diamond's lower-right edge), nose first
+    // (art: ap_plane's nose points to the lower right, prompts.ts).
+    const [ex, ey] = plane.vessel.exit
+    expect(ex).toBeGreaterThan(0)
+    expect(ey).toBe(0)
+    expect(plane.vessel.tile[0] + ex).toBeGreaterThanOrEqual(map.size[0])
+    expect(plane.vessel.liftPx).toBeGreaterThan(0)
+    // The stand is on the runway strip east of the Airport blocks.
+    const [sx, sy] = plane.vessel.tile
+    expect(mapBlockAt(map, sx, sy)).toBeNull()
+    expect(groundAt(map, sx, sy)).toMatch(/^(runway|tarmac|taxiway)/)
+  })
+
+  it('the taxi crosses only runway tiles: no road, block, building footprint or other prop on its way', () => {
+    const [x0, y] = plane.vessel.tile
+    const last = Math.min(map.size[0] - 1, x0 + plane.vessel.exit[0])
+    expect(last).toBeGreaterThan(x0)
+    for (let x = x0; x <= last; x++) {
+      expect(isRoadTile(map, x, y), `road at ${x},${y}`).toBe(false)
+      expect(mapBlockAt(map, x, y), `block at ${x},${y}`).toBeNull()
+      expect(groundAt(map, x, y)).toMatch(/^(runway|tarmac|taxiway)/)
+      const b = data.buildings.find((d) => inRect(footprintRect(d), x, y))
+      expect(b?.id, `building at ${x},${y}`).toBeUndefined()
+      if (x === x0) continue
+      const p = map.props.find((q) => q.tile[0] === x && q.tile[1] === y)
+      expect(p?.frame, `prop at ${x},${y}`).toBeUndefined()
+    }
+  })
+
+  it('taxis level for the first 40 %, then climbs `liftPx` in whole px every frame, leaving level with its stand', () => {
+    const lift = plane.vessel.liftPx
+    const [ex, ey] = plane.vessel.exit
+    let prevDx = -Infinity
+    let prevLift = -Infinity
+    for (let ms = 0; ms <= DEPART_OUT_MS; ms += 1000 / 60) {
+      const t = ms / DEPART_OUT_MS
+      const off = vesselOffset(plane, 'out', t)
+      if (t <= LIFT_FROM) expect(off.liftPx).toBe(0)
+      expect(off.liftPx).toBeGreaterThanOrEqual(prevLift)
+      const s = vesselScreenOffset(off)
+      expect(Number.isInteger(s.dx) && Number.isInteger(s.dy)).toBe(true)
+      // +x is right and down on screen: the plane only ever moves right.
+      expect(s.dx).toBeGreaterThanOrEqual(prevDx)
+      prevDx = s.dx
+      prevLift = off.liftPx
+    }
+    expect(vesselScreenOffset(vesselOffset(plane, 'out', 1))).toEqual({
+      dx: (ex - ey) * 32,
+      dy: (ex + ey) * 16 - lift,
+    })
+    expect(vesselOffset(plane, 'away', 0.5).liftPx).toBe(lift)
+    // No reverse taxi: `back` happens at the stand.
+    for (const t of [0, 0.5, 1])
+      expect(vesselOffset(plane, 'back', t)).toEqual({
+        dTx: 0,
+        dTy: 0,
+        liftPx: 0,
+      })
+  })
+
+  it('alpha: opaque taxiing and climbing, fading out over the last 20 %, hidden away, fading in at the stand; the ship never fades', () => {
+    expect(LIFT_FADE_FROM).toBe(0.8)
+    expect(LIFT_FADE_FROM).toBeGreaterThan(LIFT_FROM)
+    for (const t of [0, 0.4, 0.6, LIFT_FADE_FROM])
+      expect(vesselAlpha(plane, 'out', t), `out ${t}`).toBe(1)
+    expect(vesselAlpha(plane, 'out', 0.9)).toBeCloseTo(0.5, 9)
+    expect(vesselAlpha(plane, 'out', 1)).toBe(0)
+    let prev = 1
+    for (let t = LIFT_FADE_FROM; t <= 1; t += 0.01) {
+      const a = vesselAlpha(plane, 'out', t)
+      expect(a).toBeLessThanOrEqual(prev + 1e-12)
+      prev = a
+    }
+    expect(vesselAlpha(plane, 'away', 0.5)).toBe(0)
+    expect(vesselAlpha(plane, 'back', 0)).toBe(0)
+    expect(vesselAlpha(plane, 'back', 0.5)).toBe(0.5)
+    expect(vesselAlpha(plane, 'back', 1)).toBe(1)
+    expect(vesselAlpha(plane, 'home', 0)).toBe(1)
+    for (const t of [0, 0.5, 0.9, 1]) {
+      expect(vesselAlpha(docksHub, 'out', t)).toBe(1)
+      expect(vesselAlpha(docksHub, 'back', t)).toBe(1)
+    }
+  })
+})
+
+describe('M9 CityHubView: the Airport over a forced-L5 sim (fake scene, scene clock)', () => {
+  it('no ring and no clearance while the Airport is fogged (forced L4)', () => {
+    const sim = quietSim(1)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+    const vs = createViewSim(() => sim, { debug: true })
+    expect(vs.hub('airport')?.live).toBe(false)
+    expect(vs.debug!.forceOverseasMalware('airport').ok).toBe(false)
+    const { hv } = hubView(vs, OFFICE, plane)
+    hv.syncAll()
+    hv.update(0, vs.tick)
+    expect(hv.ringShown).toBeNull()
+  })
+
+  it('the ring drains on ap_terminal over the 20-s clearance, nine equal steps', () => {
+    const { sim, vs } = l5()
+    expect(vs.hub('airport')?.live).toBe(true)
+    expect(vs.hub('airport')?.office).toBe('ap_terminal')
+    expect(vs.debug!.forceOverseasMalware('airport').ok).toBe(true)
+    const c = vs.hub('airport')?.clearing[0]
+    expect(c?.buildingId).toMatch(/^ap_/)
+    if (!c) return
+    expect(c.clearTick - c.handOffTick).toBe(AIRPORT_TICKS)
+    const { hv, ring } = hubView(vs, OFFICE, plane)
+    hv.syncAll()
+    hv.update(0, vs.tick)
+    expect(hv.ringShown).toBe(0)
+    expect(ring()?.x).toBe(OFFICE.anchor.x)
+    runTicks(sim, AIRPORT_TICKS / 2)
+    hv.update(0, vs.tick)
+    expect(hv.ringShown).toBe(4)
+    runTicks(sim, c.clearTick - 1 - sim.state.tick)
+    hv.update(0, vs.tick + 0.5)
+    expect(hv.ringShown).toBe(8)
+    runTicks(sim, 1)
+    hv.update(0, vs.tick)
+    expect(hv.ringShown).toBeNull()
+  })
+
+  it('hub:departure {airport} sends the plane east and up, fading out; it fades back in at its stand; the Docks ship stays put', () => {
+    const { sim, vs } = l5()
+    const air = hubView(vs, OFFICE, plane)
+    const dock = hubView(vs, OFFICE, docksHub)
+    air.hv.syncAll()
+    dock.hv.syncAll()
+    const cleared: { hub: string; malware: boolean }[] = []
+    let start: number | null = null
+    sim.events.on('parcel:cleared', (p) => {
+      cleared.push({ hub: p.hub, malware: p.malware })
+    })
+    sim.events.on('hub:departure', (p) => {
+      start = sim.state.tick * 100
+      if (p.hub === 'airport') air.hv.depart(start)
+      else dock.hv.depart(start)
+    })
+    vs.debug!.forceOverseasMalware('airport')
+    runTicks(sim, AIRPORT_TICKS)
+    expect(cleared).toEqual([{ hub: 'airport', malware: true }])
+    expect(start).not.toBeNull()
+    const t0 = start as unknown as number
+    const p = air.ship
+    // Mid-taxi: right of and below the stand on screen, opaque.
+    air.hv.update(t0 + DEPART_OUT_MS * 0.3, vs.tick)
+    expect(air.hv.phase).toBe('out')
+    expect(p.x).toBeGreaterThan(HOME.x)
+    expect(p.y).toBeGreaterThan(HOME.y)
+    expect(p.alpha).toBe(1)
+    // Climbing and fading: higher than the level taxi would put it.
+    air.hv.update(t0 + DEPART_OUT_MS * 0.9, vs.tick)
+    const level = vesselScreenOffset({
+      ...vesselOffset(plane, 'out', 0.9),
+      liftPx: 0,
+    })
+    expect(p.y).toBeLessThan(HOME.y + level.dy)
+    expect(p.alpha).toBeGreaterThan(0)
+    expect(p.alpha).toBeLessThan(1)
+    expect(p.visible).toBe(true)
+    // Away 10 s: hidden; a second departure is ignored.
+    air.hv.update(t0 + DEPART_OUT_MS + 5000, vs.tick)
+    expect(air.hv.phase).toBe('away')
+    expect(p.visible).toBe(false)
+    expect(air.hv.depart(t0 + DEPART_OUT_MS + 5000)).toBe(false)
+    // Back: at the stand, fading in.
+    air.hv.update(t0 + DEPART_OUT_MS + DEPART_AWAY_MS + 1000, vs.tick)
+    expect(air.hv.phase).toBe('back')
+    expect({ x: p.x, y: p.y, visible: p.visible }).toEqual({
+      ...HOME,
+      visible: true,
+    })
+    expect(p.alpha).toBeCloseTo(1000 / DEPART_BACK_MS, 9)
+    air.hv.update(t0 + DEPART_MS, vs.tick)
+    expect(air.hv.phase).toBe('home')
+    expect({ x: p.x, y: p.y, alpha: p.alpha }).toEqual({ ...HOME, alpha: 1 })
+    // The other hub's vessel never moved.
+    dock.hv.update(t0 + DEPART_OUT_MS * 0.5, vs.tick)
+    expect(dock.hv.phase).toBe('home')
+    expect({ x: dock.ship.x, y: dock.ship.y }).toEqual(HOME)
+  })
+
+  it('syncAll mid-climb (wake / sim swap) lands the plane at its stand, opaque', () => {
+    const { vs } = l5()
+    const { hv, ship } = hubView(vs, OFFICE, plane)
+    hv.depart(0)
+    hv.update(DEPART_OUT_MS * 0.95, vs.tick)
+    expect(ship.alpha).toBeLessThan(1)
+    hv.syncAll()
+    expect(hv.phase).toBe('home')
+    expect({ x: ship.x, y: ship.y, alpha: ship.alpha }).toEqual({
+      ...HOME,
+      alpha: 1,
+    })
+  })
+})
+
+describe('M9 clearance stamps rise out of the ring (clearStampPoint)', () => {
+  it('centred on the office, the stamp pill clear above the ring', () => {
+    const at = clearStampPoint(OFFICE)
+    expect(at.x).toBe(OFFICE.anchor.x)
+    const ringTop = OFFICE.topY - RING_LIFT - RING_H
+    expect(at.y).toBe(ringTop - STAMP_OVER_RING)
+    // The 18-px pill is centred on the point: its bottom stays over the ring.
+    expect(at.y + 9).toBeLessThan(ringTop)
+    const odd = clearStampPoint({ anchor: { x: 10.5 }, topY: 100.4 })
+    expect(Number.isInteger(odd.x) && Number.isInteger(odd.y)).toBe(true)
+  })
+
+  it('ap_terminal is both the Airport office and a hand-off building (its LOCKED stamps stay on its door)', () => {
+    const t = data.buildings.find((b) => b.id === plane.office)
+    expect(t?.recv).toBeGreaterThan(0)
+    const port = data.buildings.find((b) => b.id === docksHub.office)
+    expect(port?.recv).toBe(0)
+  })
+})
+
+describe('M9 the Airport unlock (B2 §4.3, §6.5): colour + _locked frames for the crossfade', () => {
+  it('ap_terminal / ap_cargo_hangar draw their own sprites; every Airport building and prop has colour + `_locked` in the world atlas', () => {
+    const ids = data.buildings
+      .filter((b) => b.district === 'airport')
+      .map((b) => b.id)
+    expect(ids.toSorted()).toEqual(['ap_cargo_hangar', 'ap_terminal'])
+    for (const id of ids) expect(buildingSprite(id)).toBe(id)
+    const props = map.props
+      .filter((p) => p.region === 'airport')
+      .map((p) => p.frame)
+    expect(props.toSorted()).toEqual(['ap_plane', 'ap_tower'])
+    for (const stem of [...ids, ...props]) {
       expect(inAtlas(stem, 'world'), stem).toBe(true)
       expect(inAtlas(`${stem}_locked`, 'world'), `${stem}_locked`).toBe(true)
     }

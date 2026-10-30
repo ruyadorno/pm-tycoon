@@ -53,15 +53,18 @@
       {"name":"sandbar","rect":[28,43,43,43],"frame":"sand"},
       {"name":"west sea","rect":[0,28,2,47],"frame":"water"},
       {"name":"south sea","rect":[0,44,47,47],"frame":"water"},
-      {"name":"runway apron","rect":[44,3,44,19],"frame":"tarmac"},
-      {"name":"runway west","rect":[45,3,45,19],"frame":"runway"},
-      {"name":"runway centre line","rect":[46,3,46,19],"frame":"runway_stripe"},
-      {"name":"runway east","rect":[47,3,47,19],"frame":"runway"},
+      {"name":"runway north threshold","rect":[45,3,47,3],"frame":"runway_threshold","region":"airport"},
+      {"name":"runway south threshold","rect":[45,19,47,19],"frame":"runway_threshold","region":"airport"},
+      {"name":"plane taxiway","rect":[44,10,44,10],"frame":"taxiway","region":"airport"},
+      {"name":"runway apron","rect":[44,3,44,19],"frame":"tarmac","region":"airport"},
+      {"name":"runway west","rect":[45,3,45,19],"frame":"runway","region":"airport"},
+      {"name":"runway centre line","rect":[46,3,46,19],"frame":"runway_stripe","region":"airport"},
+      {"name":"runway east","rect":[47,3,47,19],"frame":"runway","region":"airport"},
       {"name":"north tree line","rect":[0,0,47,1],"frame":"tree_line"},
       {"name":"west tree line","rect":[0,0,1,27],"frame":"tree_line"},
       {"name":"east tree line","rect":[46,0,47,43],"frame":"tree_line"},
-      {"name":"north fields","rect":[2,2,18,2],"frame":"field_rows"},
-      {"name":"west fields","rect":[2,2,2,18],"frame":"field_rows"}
+      {"name":"north fields","rect":[2,2,18,2],"frame":"field_rows","region":"rural"},
+      {"name":"west fields","rect":[2,2,2,18],"frame":"field_rows","region":"rural"}
     ]
   },
   "lot": {
@@ -80,7 +83,7 @@
     {"id":"docks","colour":"water0","chipLabel":"Docks","labelTile":[7,34]},
     {"id":"lowres","colour":"purple1","chipLabel":"Semver St","labelTile":[26,7]},
     {"id":"rural","colour":"brown2","chipLabel":"Rural","labelTile":[10,8]},
-    {"id":"airport","colour":"pink0","chipLabel":"Airport","labelTile":[39,10]},
+    {"id":"airport","colour":"pink0","chipLabel":"Airport","labelTile":[41,10]},
     {"id":"civic","colour":"leaf2","chipLabel":"Commons","labelTile":[15,36]}
   ],
   "props": [
@@ -132,16 +135,20 @@
     {"frame":"bench","tile":[15,39],"region":"civic"},
     {"frame":"tree_round","tile":[23,40],"region":"civic"},
     {"frame":"tree_round","tile":[25,41],"region":"civic"},
+    {"frame":"fountain","tile":[22,41],"region":"civic"},
     {"frame":"bench","tile":[22,39],"region":"civic"},
     {"frame":"bush","tile":[24,39],"region":"civic"},
     {"frame":"dk_crane","tile":[7,29],"region":"docks"},
     {"frame":"dk_ship","tile":[1,29],"region":"docks"},
     {"frame":"dk_containers","tile":[5,32],"region":"docks"},
     {"frame":"dk_containers","tile":[6,32],"region":"docks"},
-    {"frame":"dk_containers","tile":[8,33],"region":"docks"}
+    {"frame":"dk_containers","tile":[8,33],"region":"docks"},
+    {"frame":"ap_plane","tile":[45,10],"region":"airport"},
+    {"frame":"ap_tower","tile":[44,16],"region":"airport"}
   ],
   "hubs": [
-    {"district":"docks","office":"dk_customs","vessel":{"frame":"dk_ship","tile":[1,29],"exit":[-5,0],"liftPx":0}}
+    {"district":"docks","office":"dk_customs","vessel":{"frame":"dk_ship","tile":[1,29],"exit":[-5,0],"liftPx":0}},
+    {"district":"airport","office":"ap_terminal","vessel":{"frame":"ap_plane","tile":[45,10],"exit":[4,0],"liftPx":64}}
   ],
   "buildings": {
     "dt_registry_tower": {"doorOffset":[0,1]},

@@ -205,6 +205,11 @@ export class Fx {
   private lastShake = -Infinity
   private banner: Phaser.GameObjects.Container | null = null
   private live = new Set<Phaser.GameObjects.GameObject>()
+  /**
+   * Room y at the top of the visible viewport (the scene's scroll, M9): the
+   * CLOSE CALL! banner drops in there, so a scrolled room still shows it.
+   */
+  viewTop = 0
 
   constructor(scene: Phaser.Scene, layer: Phaser.GameObjects.Container) {
     this.scene = scene
@@ -330,7 +335,7 @@ export class Fx {
     return c
   }
 
-  /** CLOSE CALL! banner: ui_banner 320 × 32 at (16, 40), slides in, 1.2 s. */
+  /** CLOSE CALL! banner: ui_banner 320 × 32 at (16, 40 + viewTop), slides in, 1.2 s. */
   closeCall(text = 'CLOSE CALL!'): void {
     this.banner?.destroy()
     const img = this.scene.add
@@ -346,7 +351,12 @@ export class Fx {
     // room's east edge: from x = BANNER.x + BANNER.w it overhung the room by
     // ~300 px onto the screen margin for the first frames (UX M2 review).
     const fromX = Math.max(BANNER.x, ROOM_W - BANNER.w)
-    const c = this.scene.add.container(fromX, BANNER.y, [img, t]).setAlpha(0)
+    const c = this.scene.add
+      .container(fromX, BANNER.y + Math.max(0, Math.round(this.viewTop)), [
+        img,
+        t,
+      ])
+      .setAlpha(0)
     this.banner = c
     this.track(c)
     this.layer.add(c)
@@ -372,14 +382,18 @@ export class Fx {
     })
   }
 
-  /** §1.14: a white outline of `r` at alpha 0.6 → 0 over 80 ms. */
-  flash(r: Rect): void {
+  /**
+   * §1.14: a white outline of `r` at alpha 0.6 → 0 over 80 ms, in the fx
+   * layer — or in `layer` (the fixed readout strip's container, whose rect
+   * `r` is in that container's px: M9's cover hides the room's fx there).
+   */
+  flash(r: Rect, layer: Phaser.GameObjects.Container = this.layer): void {
     const g = this.scene.add.graphics()
     g.lineStyle(2, PALETTE.grey5, 1)
     g.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2)
     g.setAlpha(FLASH_ALPHA)
     this.track(g)
-    this.layer.add(g)
+    layer.add(g)
     this.scene.tweens.add({
       targets: g,
       alpha: 0,

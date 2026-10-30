@@ -83,14 +83,25 @@ describe('city-view §4.1: the level bar against nextThreshold', () => {
     expect(kit.nextUnlockLine(capped, 2)).toBe('Lv 3 coming soon')
   })
 
-  it('M8 at the cap 3: "$7,200 / $9,000 · Lv 4 coming soon"', () => {
-    expect(data.economy.playtestMaxLevel).toBe(3)
+  it('M8 at the cap 3 (the M8 config): "$7,200 / $9,000 · Lv 4 coming soon"', () => {
+    const cap3 = dataFixture({ economy: { playtestMaxLevel: 3 } })
     // Thresholds are §7.6 tuning levers: the bar reads them from levels.json.
-    const t3 = data.levels.find((l) => l.level === 3)!.threshold
-    const p = kit.levelProgress(data, 3, 7200, 9000)
+    const t3 = cap3.levels.find((l) => l.level === 3)!.threshold
+    const p = kit.levelProgress(cap3, 3, 7200, 9000)
     expect(p.text).toBe('$7,200 / $9,000 · Lv 4 coming soon')
     expect(p.frac).toBeCloseTo((7200 - t3) / (9000 - t3))
-    expect(kit.nextUnlockLine(data, 3)).toBe('Lv 4 coming soon')
+    expect(kit.nextUnlockLine(cap3, 3)).toBe('Lv 4 coming soon')
+  })
+
+  it('M9 ships the cap at L5: Lv 3 and Lv 4 count plainly, L5 reads "· Tycoon"', () => {
+    expect(data.economy.playtestMaxLevel).toBe(5)
+    expect(kit.levelProgress(data, 3, 7200, 9000).text).toBe('$7,200 / $9,000')
+    expect(kit.levelProgress(data, 4, 12000, 16000).text).toBe(
+      '$12,000 / $16,000',
+    )
+    expect(kit.levelProgress(data, 5, 18400, null).text).toBe(
+      '$18,400 · Tycoon',
+    )
   })
 
   it('§9.6 step 4: the bar starts again from 0 right at the threshold', () => {

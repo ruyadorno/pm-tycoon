@@ -6,7 +6,9 @@
 // idle, the wanted list; and the Sorter Arm in the same station (L4, reached
 // through debug.forceLevel(4) at M6): every held parcel tossed 3 s after
 // arrival, the player first, a touch restarts it, decoys pay the fee, never a
-// magic parcel, never both, removal refunds half.
+// magic parcel, never both, removal refunds half. M9 (design-m8-m9 §4.6, §7
+// M9 3): the same rule at the real L4 — the shipped cap 5, the threshold
+// earned, no debug command — in a live seeded game.
 
 import { describe, expect, it, vi } from 'vitest'
 import { auditState, type Sim } from '../../src/sim/sim.ts'
@@ -491,4 +493,87 @@ describe('the Sorter Arm in the same station (design §4.3; L4 via debug.forceLe
     }
     expect(auditState(sim.state, sim.data)).toEqual([])
   })
+})
+
+describe('the Sorter Arm at the real L4 (M9: the shipped cap 5; design-m8-m9 §4.6, §7 M9 3)', () => {
+  it('locked at a funded L3 reached by lifetime earned; at L4 (earned, no debug command) it goes into the Hold Bay station and, in a live seeded game, auto-Tosses each flagged parcel 3 s after it arrives unless the player taps first', () => {
+    const sim = makeSim(4)
+    openingA(sim)
+    fund(sim)
+    const L3 = data.levels.find((l) => l.level === 3)!
+    const L4 = data.levels.find((l) => l.level === 4)!
+    expect(eco.playtestMaxLevel).toBe(5)
+    sim.state.economy.lifetimeEarned = L3.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(3)
+    expect(
+      sim.dispatch({ kind: 'buyMachine', defId: 'sorter_arm', nodeId: 'hold' }),
+    ).toEqual({ ok: false, reason: 'locked' })
+    sim.state.economy.lifetimeEarned = L4.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(4)
+    expect(sim.commandLog.some((e) => e.cmd.kind === 'debugForceLevel')).toBe(
+      false,
+    )
+    expect(
+      sim.dispatch({ kind: 'buyMachine', defId: 'sorter_arm', nodeId: 'hold' }),
+    ).toEqual({ ok: true })
+    expect(createViewSim(sim).holdStation.kind).toBe('sorter_arm')
+    // A second inspector-free checker so the lane flags more than metal.
+    expect(
+      sim.dispatch({ kind: 'buyMachine', defId: 'xray', nodeId: 'slot5' }),
+    ).toEqual({ ok: true })
+    const delay =
+      data.machines.upgrades.find((u) => u.id === 'sorter_arm')!
+        .autoTossDelayS * 10
+    expect(delay).toBe(30)
+    const heldAt = new Map<number, number>()
+    const tossedAt: { id: number; tick: number; source: string }[] = []
+    sim.addTap((name, p, tick) => {
+      if (name === 'parcel:held') heldAt.set((p as { id: number }).id, tick)
+      if (name === 'parcel:tossed') {
+        const t = p as { id: number; source: string }
+        tossedAt.push({ id: t.id, tick, source: t.source })
+      }
+    })
+    // The player taps the first held parcel 1 s in (its 3 s restart) and
+    // Tosses the second one at once; nobody touches the rest.
+    let touched: number | null = null
+    let tossedByPlayer: number | null = null
+    const touchTick = new Map<number, number>()
+    for (let t = 0; t < 20 * 600 && tossedAt.length < 8; t++) {
+      sim.tick()
+      for (const [id, at] of heldAt) {
+        const p = sim.state.parcels[String(id)]
+        if (!p || p.state !== 'held' || p.magic) continue
+        if (touched === null && sim.state.tick === at + 10) {
+          expect(sim.dispatch({ kind: 'touchHeld', parcelId: id }).ok).toBe(
+            true,
+          )
+          touched = id
+          touchTick.set(id, sim.state.tick)
+        } else if (
+          touched !== null &&
+          touched !== id &&
+          tossedByPlayer === null
+        ) {
+          expect(sim.dispatch({ kind: 'toss', parcelId: id }).ok).toBe(true)
+          tossedByPlayer = id
+        }
+      }
+    }
+    expect(touched).not.toBeNull()
+    expect(tossedByPlayer).not.toBeNull()
+    expect(tossedAt.length).toBeGreaterThanOrEqual(8)
+    for (const x of tossedAt) {
+      if (x.id === tossedByPlayer) {
+        expect(x.source).toBe('player')
+        continue
+      }
+      expect(x.source, `parcel ${x.id}`).toBe('arm')
+      const from = touchTick.get(x.id) ?? heldAt.get(x.id)!
+      expect(x.tick - from, `parcel ${x.id}`).toBe(delay)
+    }
+    expect(auditState(sim.state, sim.data)).toEqual([])
+  }, 30_000)
 })

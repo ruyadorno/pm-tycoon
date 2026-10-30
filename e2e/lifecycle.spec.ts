@@ -20,7 +20,8 @@
 //     ground texture, every listener back to its baseline;
 //   - Continue after a reload in the middle of the level-up moment (over the
 //     attract city: the City is not re-created, it syncs to tier 2 at once);
-//   - __pm.load of every tests/fixtures/*.json in both views;
+//   - __pm.load of every tests/fixtures/*.json in both views (M9: the
+//     tier-4/5 rooms too — a sim swap to another row count re-lays out);
 //   - landscape ↔ portrait (rotate card) and tab hide/show (Paused card);
 //   - gestures with real CDP multi-touch: a HUD tap during a city pan keeps
 //     panning, pinch while dragging zooms, long-press then drag opens the
@@ -47,6 +48,14 @@ const FIXTURE_NAMES = [
   'level-up-3',
   'l3-docks',
   'overseas-malware',
+  // M9 (tools/fixtures/m9.ts): tiers 3 → 4 → 5 back to back (the room
+  // re-lays out at once on a sim swap to another row count, design R21),
+  // the Golden Release offered, 3 s before the victory.
+  'level-up-4',
+  'l4-room',
+  'level-up-5',
+  'l5-tycoon',
+  'victory',
 ] as const
 
 /** Count DOM listeners on window / document / the canvas, by type. */

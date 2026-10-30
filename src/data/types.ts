@@ -462,6 +462,11 @@ export interface PunsData {
     failed: string
     star: string
     victory: string
+    /**
+     * M9 (design-m8-m9 §4.7): the endless line, once, at the first day
+     * boundary after Victory (tick.ts day step; no placeholder).
+     */
+    endless: string
   }
   /** M7: the ultimate quest's display name (levels.json has no name field). */
   ultimateQuestName: string
@@ -499,6 +504,8 @@ export interface SceneryRuleDef {
   name: string
   rect: Rect
   frame: string
+  /** M9: the district whose lock state fogs these tiles (drawn _locked while it is locked); absent = never fogged. */
+  region?: DistrictId
 }
 
 export interface MapGroundDef {

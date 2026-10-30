@@ -11,20 +11,27 @@
 //   hidden when nothing clears. Tick-derived (tick + the stepper alpha), so a
 //   load or a wake shows it at once.
 // - Departure: `hub:departure` (one per hub per tick with clearances) →
-//   CityHubView.depart. The vessel prop (map.hubs `vessel`: the dk_ship prop)
-//   travels its `exit` tile delta in tile space (iso deltas, integer rounding
-//   every frame, depth unchanged) over DEPART_OUT_MS, hides DEPART_AWAY_MS,
-//   sails back over DEPART_BACK_MS (render only, B2 §4.1 "sails west off the
-//   map edge over 4 s and returns after 10 s"). A departure while the vessel
+//   CityHubView.depart. The vessel prop (map.hubs `vessel`: the dk_ship
+//   prop) travels its `exit` tile delta in tile space (iso deltas, integer
+//   rounding every frame, depth unchanged) over DEPART_OUT_MS, hides
+//   DEPART_AWAY_MS, sails back over DEPART_BACK_MS (render only, B2 §4.1
+//   "sails west off the map edge over 4 s and returns after 10 s"; since the
+//   M9 re-roll dk_ship's bow points up-left along −x = its exit, so it sails
+//   out bow first and backs into its berth). A departure while the vessel
 //   is not home is ignored (design §9 R3: a batch = the clearances during one
 //   18-s trip). Reduced motion: no travel, hidden 10 s. The plane of M9
-//   (`liftPx` > 0) climbs over the last 60 % of its taxi out and fades back
-//   in at its stand instead of sailing back (vesselOffset / vesselAlpha).
+//   (`liftPx` > 0; map.hubs airport row: ap_plane at the runway's west lane,
+//   exit [4, 0] — nose first across the runway, off the east edge, B2 §4.3)
+//   taxis, climbs over the last 60 % of its taxi out, fades out over the last
+//   20 % of it and fades back in at its stand instead of taxiing back
+//   (vesselOffset / vesselAlpha); its ring sits on ap_terminal (20 s).
 // - Stamps (CityScene draws them with Popups): grey `LOCKED $18` at the pier
 //   on `parcel:handedOff`, gold `CLEARED +$18` at the office on
 //   `parcel:cleared`, red `SHIP HAS SAILED` (Airport: `PLANE HAS LEFT`, §9
-//   R11) for a malware clearance. Same-place stamps inside the Popups merge
-//   window sum their dollars (stampSum).
+//   R11) for a malware clearance — since M9 rising from just above the
+//   office's ring (clearStampPoint), clear of the terminal's own hand-off
+//   stamps on its door. Same-place stamps inside the Popups merge window sum
+//   their dollars (stampSum).
 //
 // No Phaser value import and no DOM (types only): the scene clock (ms) and
 // the sim tick come in as arguments, so the timelines are frozen-clock
@@ -46,6 +53,12 @@ export const DEPART_BACK_MS = 4000
 export const DEPART_MS = DEPART_OUT_MS + DEPART_AWAY_MS + DEPART_BACK_MS
 /** M9 plane: the climb (liftPx) runs over the last 60 % of the taxi out. */
 export const LIFT_FROM = 0.4
+/**
+ * M9 plane: it fades out over the last 20 % of its climb (off the east
+ * edge, into the haze) instead of vanishing at full alpha; the ship keeps
+ * its M8 look (hidden at the end of its sail).
+ */
+export const LIFT_FADE_FROM = 0.8
 
 export type VesselPhase = 'home' | 'out' | 'away' | 'back'
 
@@ -138,14 +151,20 @@ export function vesselScreenOffset(
   return out
 }
 
-/** Vessel alpha: hidden while away; the plane (M9) fades in at its stand on `back`. */
+/**
+ * Vessel alpha: hidden while away; the plane (M9, liftPx > 0) fades out
+ * over the last 20 % of its climb (LIFT_FADE_FROM) and fades back in at its
+ * stand on `back` (no reverse taxi).
+ */
 export function vesselAlpha(
   hub: Pick<MapHubDef, 'vessel'>,
   phase: VesselPhase,
   t: number,
 ): number {
   if (phase === 'away') return 0
-  if (phase === 'back' && hub.vessel.liftPx > 0) return clamp01(t)
+  if (hub.vessel.liftPx <= 0) return 1
+  if (phase === 'back') return clamp01(t)
+  if (phase === 'out') return clamp01((1 - clamp01(t)) / (1 - LIFT_FADE_FROM))
   return 1
 }
 
@@ -277,7 +296,25 @@ const COUNT_DX = 10
 /** m5x7 metrics (src/assets/m5x7.xml): cap top 4, cap height 7 (BuildingView.capTop). */
 const CAP_TOP = 4
 const CAP_H = 7
-const RING_H = 16
+export const RING_H = 16
+/** A Popups stamp pill's half height (PILL_H 18 / 2) + a 2-px gap over the ring. */
+export const STAMP_OVER_RING = 11
+
+/**
+ * M9: where a clearance stamp (`CLEARED +$18`, `SHIP HAS SAILED`,
+ * `PLANE HAS LEFT`) spawns — centred just above the office's ring, so it
+ * rises out of the ring that just emptied, and never on the door where the
+ * Airport terminal's own hand-offs stamp `LOCKED $40` (ap_terminal is both
+ * the office and a hand-off building).
+ */
+export function clearStampPoint(
+  office: { readonly anchor: { readonly x: number }; readonly topY: number },
+  out: { x: number; y: number } = { x: 0, y: 0 },
+): { x: number; y: number } {
+  out.x = Math.round(office.anchor.x)
+  out.y = Math.round(office.topY - RING_LIFT - RING_H - STAMP_OVER_RING)
+  return out
+}
 
 /**
  * One overseas hub in the city: the clearance ring over its office and its

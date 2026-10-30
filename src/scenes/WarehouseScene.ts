@@ -1,7 +1,8 @@
 // WarehouseScene `Warehouse` (warehouse-view.md §1, §2.3, §3.3-§3.4, §4, §5,
-// §7; plan.md §8): the one-screen intake-lane room. No camera pan, no zoom,
-// no scroll: a 352 × 448 room container centred between the HUD bands
+// §7; plan.md §8): the one-screen intake-lane room. No camera pan, no zoom:
+// a 352-px-wide room container centred between the HUD bands
 // (roomPlacement, §1.1) with the lane readout strip glued 24 px above it.
+// Through tier 3 the room (448 px) always fits; M9 (below) scrolls it.
 //
 // Parts (src/render/warehouse): RoomLayout (FixedLaneLayout, the rect table
 // by node id), LaneRenderer (room, slots, Hold Bay, bin, shelf, parcels,
@@ -50,6 +51,46 @@
 // panel the summary. `dock:bought` opens the new door while its pad fades
 // in (DockView.onBought). The room layout is the LaneRenderer's, which
 // follows the warehouse tier (the tier-3 shelf grid).
+//
+// M9 (spec-build2 §4.4; design-m8-m9 §6.1, R10, R21, R22): room growth. The
+// room is `layout.height` tall (448 / 512 / 576 at tiers 1–3 / 4 / 5); when
+// it does not fit between the bands (`roomPlacement(…, roomH).fits` false:
+// tier 4 at 360 × 604 and 393 × 659, tier 5 everywhere below 430 × 932)
+// the readout strip stays fixed at the band's top (its own container,
+// RoomLayers.readout), the room's top sits 28 px below the band and the
+// room scrolls vertically: integer `scrollY` in [0, maxScroll], the root
+// container moved up by it, and an opaque cover (two world-atlas ui
+// nine-slices at COVER_DEPTH, FILL-tinted the camera's background colour,
+// so they batch with the readout and the HUD — a Graphics cost two draw
+// calls, M9 review) masks everything outside the viewport — the HUD's
+// ticker is translucent. Not a second camera: the
+// sheets, dialogs, popovers and tooltips this scene creates later would
+// all have to be ignored by it one by one. Gesture (R22): a press that
+// travels more than TAP_PX vertically before it lifts a fixture drags the
+// room 1:1 (no inertia; the tap is suppressed); a lifted fixture never
+// scrolls (edge auto-scroll while lifting is the first item of the cut
+// order, so it is not built); the mouse wheel scrolls 32 px a notch.
+// Pointer → room px subtracts the scrolled origin (`roomY`); presses
+// outside the viewport (under the cover) pick nothing but the readout.
+// A press whose pointer-up a HUD band caught (Phaser's topOnly: the HUD
+// scene is above) never sees onUp: update() drops a press whose pointer is
+// no longer down, and onDown replaces one from an earlier touch (the same
+// Pointer object, another downTime), so a lifted ghost snaps back and the
+// next tap is a tap (M9 review). Tooltips anchor on a picked rect's top
+// clamped into the viewport, popovers below the HUD's top band.
+// pm:goto's highlight and every card opened from the room (BuySheet,
+// SlotCard, HoldBayCard, StationCard) scroll their target toward the part
+// of the viewport above the sheet (as far as the scroll range goes: slot 6
+// stays under a BuySheet, as the lowest slots do in a room that fits). A
+// level-up that changes the room's rows while inside (3 → 4, 4 → 5; R21)
+// rebuilds the room on the next frame — new layers, LaneRenderer,
+// DockView, WorkerSprites and Fx on `new FixedLaneLayout(tier)` + syncAll
+// — while the old room fades out above it over the tier fade, moved onto
+// the new room's origin so the walls, sign and slots they share line up
+// with what a tap hits (in-flight parcel tweens snap), and the newly live
+// slot unrolls after it; a WAKE or a sim swap at another row count
+// rebuilds at once. A level-up within the same rows keeps the in-place
+// cross-fade.
 import Phaser from 'phaser'
 import {
   EV_GARAGE_OPENING,
@@ -74,13 +115,17 @@ import { Fx, reducedMotion } from '../render/warehouse/Fx.ts'
 import {
   createRoomLayers,
   LaneRenderer,
+  TIER_FADE_MS,
   visualTier,
   type RoomLayers,
 } from '../render/warehouse/LaneRenderer.ts'
 import {
   bayRect,
   BAY_COUNT,
+  clampScroll,
+  coverRects,
   DOCK_PANEL,
+  dragScrolls,
   FixedLaneLayout,
   HOLD_STATION,
   POSTER,
@@ -89,9 +134,12 @@ import {
   READOUT_H,
   ROOM_W,
   roomPlacement,
+  scrollForDrag,
+  scrollToShow,
   SIGN,
   type Point,
   type Rect,
+  type RoomPlacement,
 } from '../render/warehouse/RoomLayout.ts'
 import { WorkerSprites } from '../render/warehouse/WorkerSprites.ts'
 import type { SimEventPayloads } from '../sim/events.ts'
@@ -100,7 +148,7 @@ import type { DockSlotView, ViewSim } from '../sim/view-api.ts'
 import { Dialog } from '../ui/Dialog.ts'
 import { HireSheet } from '../ui/HireSheet.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
-import { addPanel } from '../ui/Panel.ts'
+import { addPanel, setPanelRect, SLICE } from '../ui/Panel.ts'
 import { claimKey } from '../ui/Sheet.ts'
 import { laneReadout, strainRows, TONE_TEXT } from '../ui/ShieldPopover.ts'
 import { addText, textTop } from '../ui/text.ts'
@@ -134,6 +182,16 @@ export const POPOVER_DEPTH = 4000
 export const HIGHLIGHT_MS = 3000
 const READOUT_REFRESH_MS = 250
 const SHEET_DELAY_MS = 200
+/**
+ * M9 scroll (R10): the cover masking the room outside its viewport, the
+ * fixed readout strip above it, and a room fading out after a rebuild
+ * (R21) — all below the popovers (4000) and the sheets (5000).
+ */
+export const COVER_DEPTH = 10
+export const READOUT_DEPTH = 11
+const OLD_ROOM_DEPTH = 1
+/** Mouse wheel: room px per notch. */
+export const WHEEL_STEP_PX = 32
 
 type Pick =
   | { kind: 'slot'; nodeId: string; rect: Rect }
@@ -152,12 +210,19 @@ type Pick =
 
 interface Press {
   pointer: Phaser.Input.Pointer
+  /** The pointer's downTime at this press (Phaser reuses one Pointer per touch slot). */
+  downTime: number
   pick: Pick | null
   x0: number
   y0: number
   t0: number
   moved: boolean
   lifted: boolean
+  /** M9 (R22): the press went down inside the room's viewport. */
+  inView: boolean
+  /** The scroll when it went down, and whether it drags the room now. */
+  scroll0: number
+  scrolling: boolean
 }
 
 interface Drag {
@@ -178,7 +243,11 @@ export interface WarehouseInit {
   highlight?: string
 }
 
-/** "Slots 5–6 — unlock at Lv 4 and Lv 5 · coming soon" (§6). */
+/**
+ * "Slots 5–6 — unlock at Lv 4 and Lv 5" (§6; " · coming soon" past the
+ * playtest cap); one slot left past the column (tier 4, M9): "Slot 6 —
+ * unlocks at Lv 5".
+ */
 export function extTooltip(
   data: GameData,
   locked: readonly { id: string; level: number }[],
@@ -187,9 +256,10 @@ export function extTooltip(
   const soon = lv.some((l) => l > data.economy.playtestMaxLevel)
     ? ' · coming soon'
     : ''
-  const nums = locked.map((x) => x.id.replace(/\D+/g, '')).join('–')
+  const nums = locked.map((x) => x.id.replace(/\D+/g, ''))
   const lvls = lv.map((l) => `Lv ${l}`).join(' and ')
-  return `Slots ${nums} — unlock at ${lvls}${soon}`
+  if (nums.length === 1) return `Slot ${nums[0]} — unlocks at ${lvls}${soon}`
+  return `Slots ${nums.join('–')} — unlock at ${lvls}${soon}`
 }
 
 /** "Slot 4 — unlocks at Lv 2" (+ " · coming soon" past the playtest cap). */
@@ -225,7 +295,21 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   private gd!: GameData
   private L!: Layout
   private roomX = 0
+  /** Screen y of room px 0 now (the unscrolled top minus the scroll). */
   private roomY = 0
+  /** M9: screen y of the room's top at scroll 0 (roomPlacement.roomY). */
+  private roomTop = 0
+  /** M9: integer vertical scroll in [0, place.maxScroll] (room px). */
+  private scrollY = 0
+  /** The entry drop's current offset (−16 → 0, §5.3). */
+  private entryDy = 0
+  private place!: RoomPlacement
+  /** M9: masks the room outside its viewport while it scrolls (above, below). */
+  private cover: Phaser.GameObjects.NineSlice[] = []
+  /** M9 (R21): a level-up changed the room's rows; rebuild on the next frame. */
+  private relayoutPending = false
+  /** Old rooms fading out after a rebuild (destroyed on completion / sleep). */
+  private fading: Phaser.GameObjects.Container[] = []
   private layers!: RoomLayers
   private fx!: Fx
   private lane!: LaneRenderer
@@ -273,6 +357,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.hireSheet = null
     this.hireToken = null
     this.dockDialog = null
+    this.scrollY = 0
+    this.entryDy = 0
+    this.relayoutPending = false
+    this.fading = []
   }
 
   /** The room layout of the current tier (the LaneRenderer's, M8). */
@@ -283,17 +371,16 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   create(): void {
     this.vs = getViewSim(this)
     this.gd = this.vs.data
-    const layout = new FixedLaneLayout(visualTier(this.gd, this.vs.level))
     this.cameras.main.setBackgroundColor(PALETTE.outline)
     this.L = this.computeL()
-    const place = this.placement()
-    this.roomX = place.roomX
-    this.roomY = place.roomY
-    this.layers = createRoomLayers(this, this.roomX, this.roomY)
-    this.fx = new Fx(this, this.layers.fx)
-    this.lane = new LaneRenderer(this, this.layers, layout, this.vs, this.fx)
-    this.dock = new DockView(this, this.layers, this.vs)
-    this.workers = new WorkerSprites(this, this.layers, this.layout, this.vs)
+    this.cover = [0, 1].map(() =>
+      addPanel(this, 0, 0, 1, 1, 'ui_panel_dark')
+        .setTint(PALETTE.outline)
+        .setTintMode(Phaser.TintModes.FILL)
+        .setDepth(COVER_DEPTH)
+        .setVisible(false),
+    )
+    this.buildRoom(new FixedLaneLayout(visualTier(this.gd, this.vs.level)))
     this.buildSheets()
     this.installInput()
     this.installGameEvents()
@@ -315,7 +402,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         'lane:stalled': () => this.lane.refreshReadout(),
         'lane:resumed': () => this.lane.refreshReadout(),
         'worker:walkedOut': (p) => this.workers.onWalkedOut(p.employeeId),
-        'level:up': () => this.lane.onLevelUp(),
+        'level:up': () => this.onLevelUp(),
         'dock:bought': (p) => this.dock.onBought(p.index),
         'life:lost': () => this.lane.onLifeLost(),
         'day:ended': () => this.lane.refreshSign(),
@@ -352,7 +439,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.cameras.main.resetFX()
     this.entryTween?.stop()
     this.entryTween = null
-    this.layers.root.setY(this.roomY)
+    this.entryDy = 0
+    this.dropFading()
+    this.applyRoomPosition()
   }
 
   private onShutdown(): void {
@@ -361,6 +450,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.removeGameEvents()
     this.cancelPress()
     this.closePopover()
+    this.dropFading()
     this.lane.destroy()
     this.dock.destroy()
     this.workers.destroy()
@@ -370,22 +460,29 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   private enter(): void {
     const cam = this.cameras.main
     cam.resetFX()
-    const root = this.layers.root
     this.entryTween?.stop()
+    this.entryTween = null
     if (!this.game.loop.running || reducedMotion()) {
-      root.setY(this.roomY)
+      this.entryDy = 0
+      this.applyRoomPosition()
     } else {
       cam.fadeIn(FADE_IN_MS, FADE_RGB[0], FADE_RGB[1], FADE_RGB[2])
-      root.setY(this.roomY - ENTRY_DROP_PX)
+      const prog = { dy: -ENTRY_DROP_PX }
+      this.entryDy = prog.dy
+      this.applyRoomPosition()
       this.entryTween = this.tweens.add({
-        targets: root,
-        y: this.roomY,
+        targets: prog,
+        dy: 0,
         duration: FADE_IN_MS,
         ease: 'Quad.easeOut',
-        onUpdate: () => root.setY(Math.round(root.y)),
+        onUpdate: () => {
+          this.entryDy = Math.round(prog.dy)
+          this.applyRoomPosition()
+        },
         onComplete: () => {
           this.entryTween = null
-          root.setY(this.roomY)
+          this.entryDy = 0
+          this.applyRoomPosition()
         },
       })
     }
@@ -407,12 +504,123 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     cam.fadeOut(FADE_OUT_MS, FADE_RGB[0], FADE_RGB[1], FADE_RGB[2])
   }
 
-  /** Rebuild every dynamic part from sim state (create, WAKE, sim swap). */
+  /**
+   * Rebuild every dynamic part from sim state (create, WAKE, sim swap); a
+   * room of other rows than the sim's tier is rebuilt first (M9, R21).
+   */
   private syncAll(): void {
+    if (this.lane.needsRebuild()) {
+      this.rebuildRoom(false)
+      return
+    }
+    this.syncParts()
+  }
+
+  private syncParts(): void {
     this.closeCalls.clear()
     this.lane.syncAll()
     this.dock.syncAll()
     this.workers.syncAll()
+  }
+
+  // ---------------------------------------------------------------- room build (M9)
+
+  /** The room's layers and parts on `layout`, placed for its height. */
+  private buildRoom(layout: FixedLaneLayout): void {
+    this.place = this.placementFor(layout.height)
+    this.roomX = this.place.roomX
+    this.roomTop = this.place.roomY
+    this.scrollY = clampScroll(this.scrollY, this.place.maxScroll)
+    this.layers = createRoomLayers(this, this.roomX, this.roomTop)
+    this.layers.readout.setDepth(READOUT_DEPTH)
+    this.fx = new Fx(this, this.layers.fx)
+    this.lane = new LaneRenderer(this, this.layers, layout, this.vs, this.fx)
+    this.dock = new DockView(this, this.layers, this.vs)
+    this.workers = new WorkerSprites(this, this.layers, this.layout, this.vs)
+    this.applyRoomPosition()
+    this.drawCover()
+  }
+
+  /** level:up — in place within the same rows, else a rebuild next frame (R21). */
+  private onLevelUp(): void {
+    if (this.relayoutPending) return
+    if (this.lane.needsRebuild()) {
+      this.relayoutPending = true
+      return
+    }
+    this.lane.onLevelUp()
+  }
+
+  /**
+   * R21 hard re-layout: drop a lift / Move / popover on the old room, stop
+   * its parts, build the room of the sim's tier and sync it; with `fade`
+   * the old room fades out above the new one over TIER_FADE_MS and the
+   * slots it showed locked unroll after it (§1.6), else it goes at once.
+   */
+  private rebuildRoom(fade: boolean): void {
+    this.relayoutPending = false
+    const tier = visualTier(this.gd, this.vs.level)
+    const prevLocked = this.lane.lockedSlotIds()
+    const old = this.layers
+    this.dropDrag()
+    this.endMove()
+    this.closePopover()
+    this.lane.clearTransient()
+    this.lane.destroy()
+    this.dock.destroy()
+    this.workers.destroy()
+    this.fx.clear()
+    this.buildRoom(new FixedLaneLayout(tier))
+    this.syncParts()
+    old.readout.destroy()
+    this.killTweensIn(old.root)
+    if (!fade) {
+      old.root.destroy()
+      return
+    }
+    this.lane.unrollOpened(prevLocked, TIER_FADE_MS)
+    // On the new room's origin: what they share lines up with the taps.
+    old.root.setPosition(this.layers.root.x, this.layers.root.y)
+    old.root.setDepth(OLD_ROOM_DEPTH)
+    this.fading.push(old.root)
+    this.tweens.add({
+      targets: old.root,
+      alpha: 0,
+      duration: TIER_FADE_MS,
+      onComplete: () => {
+        this.fading = this.fading.filter((c) => c !== old.root)
+        old.root.destroy()
+      },
+    })
+  }
+
+  /** Stop every tween on `c` and its descendants (a room being replaced). */
+  private killTweensIn(c: Phaser.GameObjects.Container): void {
+    this.tweens.killTweensOf(c)
+    for (const child of c.list) {
+      this.tweens.killTweensOf(child)
+      if (child instanceof Phaser.GameObjects.Container)
+        this.killTweensIn(child)
+    }
+  }
+
+  /** Destroy the rooms still fading out (sleep, shutdown). */
+  private dropFading(): void {
+    for (const c of this.fading) {
+      this.tweens.killTweensOf(c)
+      c.destroy()
+    }
+    this.fading = []
+  }
+
+  /** A lifted fixture's ghost goes without the snap-back (its room is replaced). */
+  private dropDrag(): void {
+    this.press = null
+    if (!this.drag) return
+    this.drag.ghost.destroy()
+    this.drag = null
+    this.lane.setLifted(null)
+    this.lane.showCandidates(null)
   }
 
   // ---------------------------------------------------------------- layout
@@ -429,18 +637,20 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     )
   }
 
-  private placement() {
+  /** roomPlacement for a room `roomH` px tall between this layout's bands. */
+  private placementFor(roomH: number): RoomPlacement {
     const L = this.L
-    return roomPlacement(L.W, L.ticker.y + L.ticker.h, L.bottomBar.y)
+    return roomPlacement(L.W, L.ticker.y + L.ticker.h, L.bottomBar.y, roomH)
   }
 
   private relayout(): void {
     this.L = this.computeL()
-    const p = this.placement()
-    this.roomX = p.roomX
-    this.roomY = p.roomY
-    if (!this.entryTween) this.layers.root.setPosition(this.roomX, this.roomY)
-    else this.layers.root.setX(this.roomX)
+    this.place = this.placementFor(this.layout.height)
+    this.roomX = this.place.roomX
+    this.roomTop = this.place.roomY
+    this.scrollY = clampScroll(this.scrollY, this.place.maxScroll)
+    this.applyRoomPosition()
+    this.drawCover()
     const sheetL = {
       ...this.L,
       labelFor: (id: string) => this.layout.labelFor(id),
@@ -457,6 +667,98 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   /** Room px → screen px. */
   private toScreen(x: number, y: number): Point {
     return { x: Math.round(this.roomX + x), y: Math.round(this.roomY + y) }
+  }
+
+  /**
+   * A tooltip's anchor for room rect `r`: its top centre, clamped into the
+   * viewport — a rect scrolled half out of view would put the bubble over
+   * the HUD's top band (M9 review).
+   */
+  private tipAt(r: Rect): Point {
+    const p = this.toScreen(r.x + r.w / 2, r.y)
+    const v = this.place.viewport
+    return { x: p.x, y: Math.min(v.y + v.h, Math.max(v.y, p.y)) }
+  }
+
+  // ---------------------------------------------------------------- scroll (M9)
+
+  /**
+   * Put the room at the scroll (and the entry drop): root at the scrolled
+   * origin, the readout strip at the unscrolled one (fixed, R10).
+   */
+  private applyRoomPosition(): void {
+    this.roomY = this.roomTop - this.scrollY
+    this.layers.root.setPosition(this.roomX, this.roomY + this.entryDy)
+    this.layers.readout.setPosition(this.roomX, this.roomTop + this.entryDy)
+    this.fx.viewTop = this.scrollY
+  }
+
+  /**
+   * The cover over everything outside the viewport while the room scrolls
+   * (coverRects: the corners of the nine-slices off screen).
+   */
+  private drawCover(): void {
+    const rects = coverRects(this.place, this.L.W, this.L.H, SLICE)
+    this.cover.forEach((panel, i) => {
+      const r = rects[i]
+      panel.setVisible(r !== undefined)
+      if (r) setPanelRect(panel, r)
+    })
+  }
+
+  /** Scroll to `y` (clamped, integer); the new scroll. */
+  private setScroll(y: number): number {
+    const s = clampScroll(y, this.place.maxScroll)
+    if (s !== this.scrollY) {
+      this.scrollY = s
+      this.applyRoomPosition()
+    }
+    return s
+  }
+
+  /** True when screen (x, y) shows the room (always while it fits). */
+  private inViewport(x: number, y: number): boolean {
+    const p = this.place
+    if (p.maxScroll <= 0) return true
+    const v = p.viewport
+    return y >= v.y && y < v.y + v.h && x >= 0 && x < this.L.W
+  }
+
+  /**
+   * Scroll room rect `r` into the viewport — above `sheetTop` (screen y)
+   * when a sheet covers the bottom of it. No-op while the room fits.
+   */
+  private showInView(r: Rect, sheetTop?: number): void {
+    const p = this.place
+    if (p.maxScroll <= 0) return
+    const v = p.viewport
+    const bottom = Math.min(v.y + v.h, sheetTop ?? Number.POSITIVE_INFINITY)
+    const viewH = Math.max(r.h, bottom - v.y)
+    this.setScroll(scrollToShow(r, this.scrollY, viewH, p.maxScroll))
+  }
+
+  /** The readout strip in screen px (fixed while the room scrolls). */
+  private readoutScreen(): Rect {
+    const rr = this.lane.readoutRect()
+    return {
+      x: this.roomX + rr.x,
+      y: this.roomTop + rr.y,
+      w: rr.w,
+      h: rr.h,
+    }
+  }
+
+  /** Mouse wheel over the room: WHEEL_STEP_PX a notch while it scrolls. */
+  private onWheel(
+    _p: Phaser.Input.Pointer,
+    _over: unknown,
+    _dx: number,
+    dy: number,
+  ): void {
+    if (this.place.maxScroll <= 0 || dy === 0) return
+    if (this.anySheetOpen() || this.transitioning || this.drag) return
+    this.closePopover()
+    this.setScroll(this.scrollY + Math.sign(dy) * WHEEL_STEP_PX)
   }
 
   // ---------------------------------------------------------------- sheets
@@ -661,7 +963,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   private highlight(machineId: string): void {
     const empty = this.firstEmptySlot()
     if (!empty) {
-      const r = this.lane.readoutRect()
+      const r = this.readoutScreen()
       this.tooltip('No empty slot — move or sell a machine', {
         x: r.x + r.w / 2,
         y: r.y + r.h,
@@ -670,6 +972,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     }
     this.lane.pulseSlot(empty, PALETTE.blue1, HIGHLIGHT_MS)
     if (!this.anySheetOpen()) this.buy?.open(empty, machineId)
+    const r = this.layout.rectFor(empty)
+    if (r) this.showInView(r, this.buy?.isOpen() ? this.buy.top : undefined)
   }
 
   private firstEmptySlot(): string | null {
@@ -688,6 +992,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.input.on(Phaser.Input.Events.POINTER_UP, this.onUp, this)
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onCancel, this)
     this.input.on(Phaser.Input.Events.GAME_OUT, this.onCancel, this)
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this)
   }
 
   private isPrimary(p: Phaser.Input.Pointer): boolean {
@@ -698,7 +1003,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     p: Phaser.Input.Pointer,
     over: Phaser.GameObjects.GameObject[],
   ): void {
-    if (!this.isPrimary(p) || this.press) return
+    if (!this.isPrimary(p)) return
+    // A press from an earlier touch whose up a HUD band caught (stale).
+    if (this.press && this.isStale(this.press)) this.cancelPress()
+    if (this.press) return
     if (over.length > 0 || this.anySheetOpen() || this.transitioning) return
     if (this.popover) {
       this.closePopover()
@@ -706,12 +1014,16 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     }
     this.press = {
       pointer: p,
-      pick: this.pick(p.x - this.roomX, p.y - this.roomY),
+      downTime: p.downTime,
+      pick: this.pickAt(p.x, p.y),
       x0: p.x,
       y0: p.y,
       t0: this.time.now,
       moved: false,
       lifted: false,
+      inView: this.inViewport(p.x, p.y),
+      scroll0: this.scrollY,
+      scrolling: false,
     }
   }
 
@@ -719,6 +1031,20 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     const press = this.press
     if (!press || press.pointer !== p) return
     if (Math.hypot(p.x - press.x0, p.y - press.y0) > TAP_PX) press.moved = true
+    // R22: vertical travel past the slop before a lift drags the room 1:1.
+    const dy = p.y - press.y0
+    if (
+      !press.scrolling &&
+      press.inView &&
+      dragScrolls(dy, press.lifted, this.place.maxScroll, TAP_PX)
+    ) {
+      press.scrolling = true
+      press.moved = true
+    }
+    if (press.scrolling) {
+      this.setScroll(scrollForDrag(press.scroll0, dy, this.place.maxScroll))
+      return
+    }
     if (this.drag) {
       this.drag.ghost.setPosition(
         Math.round(p.x - this.roomX - this.drag.dx),
@@ -732,7 +1058,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     if (!press || press.pointer !== p) return
     this.press = null
     if (press.lifted) {
-      this.drop(p.x - this.roomX, p.y - this.roomY)
+      if (this.inViewport(p.x, p.y))
+        this.drop(p.x - this.roomX, p.y - this.roomY)
+      else this.snapBack()
       return
     }
     if (press.moved || !press.pick) {
@@ -746,17 +1074,37 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.cancelPress()
   }
 
+  /**
+   * The press's pointer went up without onUp (a HUD band caught it — the
+   * HUD scene is on top) or went down again since: the press is over.
+   */
+  private isStale(press: Press): boolean {
+    return !press.pointer.isDown || press.pointer.downTime !== press.downTime
+  }
+
   private cancelPress(): void {
     this.press = null
     if (this.drag) this.snapBack()
   }
 
+  /**
+   * The hit target under screen point (x, y): the fixed readout strip
+   * (padded 6 px), else — inside the viewport — the room under it.
+   */
+  private pickAt(x: number, y: number): Pick | null {
+    const rr = this.readoutScreen()
+    const pad = { x: rr.x, y: rr.y - 6, w: rr.w, h: rr.h + 12 }
+    if (inside(pad, x, y)) {
+      // the strip in its own (fixed) container's px: the tap flash
+      return { kind: 'readout', rect: this.lane.readoutRect() }
+    }
+    if (!this.inViewport(x, y)) return null
+    return this.pick(x - this.roomX, y - this.roomY)
+  }
+
   /** The hit target under room point (x, y), most specific first. */
   private pick(x: number, y: number): Pick | null {
     const lay = this.layout
-    const rr = this.lane.readoutRect()
-    const readout = { x: rr.x, y: rr.y - 6, w: rr.w, h: rr.h + 12 }
-    if (inside(readout, x, y)) return { kind: 'readout', rect: rr }
     if (inside(POSTER_HIT, x, y)) return { kind: 'poster', rect: { ...POSTER } }
     // The Hold Bay station is not a lane node (layout.stationAt, M6).
     if (lay.stationAt(x, y))
@@ -792,7 +1140,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       return { kind: 'dock', dockId: id, rect: lay.hitFor(id) as Rect }
     if (/^dock\d+$/.test(id)) return null
     if (id === 'hold') return null
-    if (!lay.isBeltSlot(id)) return { kind: 'ext', rect: lay.extRect() }
+    if (!lay.isBeltSlot(id)) {
+      const er = lay.extRect()
+      return er ? { kind: 'ext', rect: er } : null
+    }
     return { kind: 'slot', nodeId: id, rect: r }
   }
 
@@ -802,7 +1153,11 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
 
   private tap(pick: Pick): void {
     this.game.events.emit(EV_UI_TAP, { id: `wh:${pick.kind}` })
-    this.fx.flash(pick.rect)
+    // The strip's flash goes in its container, above the cover (M9 review).
+    this.fx.flash(
+      pick.rect,
+      pick.kind === 'readout' ? this.layers.readout : undefined,
+    )
     if (this.moveFrom) {
       const from = this.moveFrom
       this.endMove()
@@ -811,7 +1166,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       }
       return
     }
-    const top = this.toScreen(pick.rect.x + pick.rect.w / 2, pick.rect.y)
+    const top = this.tipAt(pick.rect)
     switch (pick.kind) {
       case 'slot':
         this.tapSlot(pick.nodeId, top)
@@ -884,12 +1239,15 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       this.tooltip(text, top)
       return
     }
+    const r = this.layout.rectFor(nodeId)
     if (n.fixture) {
       this.slotCard?.open(nodeId)
       if (n.fixture.kind === 'desk') this.workers.showNames(nodeId)
+      if (r && this.slotCard?.isOpen()) this.showInView(r, this.slotCard.top)
       return
     }
     this.buy?.open(nodeId)
+    if (r && this.buy?.isOpen()) this.showInView(r, this.buy.top)
   }
 
   /**
@@ -939,6 +1297,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       return
     }
     this.stationCard?.open()
+    if (this.stationCard?.isOpen())
+      this.showInView({ ...HOLD_STATION }, this.stationCard.top)
   }
 
   /** desk:placed — point at the new desk: it checks nothing until staffed. */
@@ -947,16 +1307,15 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     if (n?.fixture?.kind !== 'desk' || n.fixture.inspectorIds.length > 0) return
     const r = this.layout.rectFor(p.nodeId)
     if (!r) return
-    this.tooltip(
-      'Desk placed — tap it to hire inspectors',
-      this.toScreen(r.x + r.w / 2, r.y),
-    )
+    this.tooltip('Desk placed — tap it to hire inspectors', this.tipAt(r))
   }
 
   private tapBay(bay: number, top: Point): void {
     const id = this.lane.heldAt(bay)
     if (id !== null) {
       this.holdCard?.open(id)
+      if (this.holdCard?.isOpen())
+        this.showInView(bayRect(bay), this.holdCard.top)
       return
     }
     const cap = this.vs.holdBay.cap
@@ -1003,12 +1362,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.moveFrom = nodeId
     this.lane.showCandidates(nodeId)
     const r = this.layout.rectFor(nodeId)
-    if (r) {
-      this.tooltip(
-        'Tap a slot to move it there',
-        this.toScreen(r.x + r.w / 2, r.y),
-      )
-    }
+    if (r) this.tooltip('Tap a slot to move it there', this.tipAt(r))
   }
 
   private endMove(): void {
@@ -1023,10 +1377,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     const res = this.vs.lane.moveFixture(from, to)
     if (res.ok) return true
     this.game.events.emit(EV_UI_SFX, { name: 'deny' })
-    this.tooltip(
-      warehouseFailText(res.reason),
-      this.toScreen(rect.x + rect.w / 2, rect.y),
-    )
+    this.tooltip(warehouseFailText(res.reason), this.tipAt(rect))
     return false
   }
 
@@ -1152,7 +1503,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     const panel = addPanel(this, 0, 0, w, h, 'ui_panel')
     parts.push(panel, ...lines)
     const x = Math.round(Math.min(this.L.W - w - 4, Math.max(4, anchor.x)))
-    const top = Math.round(Math.min(this.L.H - h - 4, Math.max(4, anchor.y)))
+    // Below the HUD's top band (the ticker is translucent): the wanted
+    // poster scrolled near the viewport's top would put it under (M9 review).
+    const band = this.L.ticker.y + this.L.ticker.h + 4
+    const top = Math.round(Math.min(this.L.H - h - 4, Math.max(band, anchor.y)))
     this.popover = this.add.container(x, top, parts).setDepth(POPOVER_DEPTH)
     this.popoverTimer = this.time.delayedCall(POPOVER_MS, () =>
       this.closePopover(),
@@ -1174,9 +1528,12 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         text: 'No strain announced yet',
         tint: PALETTE.grey1,
       })
-    const rr = this.lane.readoutRect()
+    const rr = this.readoutScreen()
     const w = 240
-    const at = this.toScreen(rr.x + (ROOM_W - w) / 2, rr.y + rr.h + 2)
+    const at = {
+      x: Math.round(rr.x + (ROOM_W - w) / 2),
+      y: Math.round(rr.y + rr.h + 2),
+    }
     // The city shield popover's header (`Lane 15/min · Detection 97%`): the
     // bare `… · Detection` read as a cut-off title (UX M3 review).
     this.showPopover(laneReadout(stats), out, at, w)
@@ -1204,14 +1561,11 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   // ---------------------------------------------------------------- frame
 
   update(time: number, delta: number): void {
+    if (this.relayoutPending)
+      this.rebuildRoom(this.game.loop.running && !reducedMotion())
+    if (this.press && this.isStale(this.press)) this.cancelPress()
     const press = this.press
-    if (
-      press &&
-      !press.lifted &&
-      !press.moved &&
-      press.pointer.isDown &&
-      time - press.t0 >= HOLD_MS
-    ) {
+    if (press && !press.lifted && !press.moved && time - press.t0 >= HOLD_MS) {
       this.lift(press)
     }
     this.lane.update(time, delta)
@@ -1237,24 +1591,46 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     return null
   }
 
-  /** Debug / e2e: what the room shows right now. */
+  /**
+   * Debug / e2e: what the room shows right now. `roomY` is the screen y of
+   * room px 0 at the current scroll (a tap at room (x, y) lands at (roomX
+   * + x, roomY + y)); `readout` is the fixed strip; M9 adds the tier, the
+   * room's height, the scroll, its maximum and the viewport.
+   */
   stats(): {
     roomX: number
     roomY: number
     readout: Rect
     sheetOpen: boolean
+    tier: number
+    roomH: number
+    fits: boolean
+    scrollY: number
+    maxScroll: number
+    viewport: Rect
   } {
     return {
       roomX: this.roomX,
       roomY: this.roomY,
       readout: {
         x: this.roomX,
-        y: this.roomY - READOUT_GAP,
+        y: this.roomTop - READOUT_GAP,
         w: ROOM_W,
         h: READOUT_H,
       },
       sheetOpen: this.anySheetOpen(),
+      tier: this.layout.tier,
+      roomH: this.layout.height,
+      fits: this.place.maxScroll <= 0,
+      scrollY: this.scrollY,
+      maxScroll: this.place.maxScroll,
+      viewport: { ...this.place.viewport },
     }
+  }
+
+  /** Debug / e2e (shots): scroll the room to `y` (clamped); the scroll now. */
+  scrollTo(y: number): number {
+    return this.setScroll(y)
   }
 }
 

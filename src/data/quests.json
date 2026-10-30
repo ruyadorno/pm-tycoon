@@ -2,13 +2,13 @@
   "offer": {"firstOfferDay":3,"intervalDays":2,"declineCooldownDays":1,"offerExpiresDays":1,"maxActive":1},
   "templates": [
     {"id":"rush_district","name":"Rush hour","unlockLevel":1,"target":"district:mostWaiting","goal":{"kind":"deliveriesFrom","count":[6,10,14,18,22]},"limitDays":3,"reward":{"cash":[120,200,300,400,500]},"weight":3},
-    {"id":"cheer_up","name":"Cheer up","unlockLevel":1,"target":"district:satisfactionBelow","targetArg":50,"goal":{"kind":"satisfactionAtLeast","value":60},"limitDays":5,"reward":{"cash":150,"satisfaction":5},"weight":2},
+    {"id":"cheer_up","name":"Cheer up","unlockLevel":1,"target":"district:satisfactionBelow","targetArg":50,"goal":{"kind":"satisfactionAtLeast","value":52},"limitDays":5,"reward":{"cash":150,"satisfaction":5},"weight":2},
     {"id":"magic_parcel","name":"Special delivery","unlockLevel":1,"condition":"livesBelowCap","requires":"firstToss","goal":{"kind":"magicParcel","maxRoadTiles":20},"weight":2},
     {"id":"clean_sweep","name":"Clean sweep","unlockLevel":2,"goal":{"kind":"tossStreak","count":3},"limitDays":5,"reward":{"starApplicant":{"role":"inspector","name":"Vera","pips":{"eye":5,"pace":3,"charisma":1}}},"weight":1},
     {"id":"on_time_day","name":"Like clockwork","unlockLevel":1,"goal":{"kind":"onTimeRateDay","rate":0.85,"minDeliveries":6},"limitDays":3,"reward":{"starApplicant":{"role":"driver","name":"Rae","pips":{"speed":5,"energy":4,"charisma":1},"affinity":"van"}},"weight":1},
     {"id":"big_haul","name":"Big haul","unlockLevel":2,"goal":{"kind":"deliveriesOfSize","size":"XL","count":3},"limitDays":4,"reward":{"cash":300},"weight":2},
     {"id":"night_shift","name":"Night shift","unlockLevel":2,"goal":{"kind":"holdDecisions","count":6,"noStall":true},"limitDays":4,"reward":{"cash":250},"weight":1},
-    {"id":"customs_run","name":"Customs run","unlockLevel":3,"condition":"hubLive:docks","goal":{"kind":"overseasCleared","hub":"docks","count":6},"limitDays":4,"reward":{"cash":400},"weight":2},
+    {"id":"customs_run","name":"Customs run","unlockLevel":3,"condition":"hubLive:docks","goal":{"kind":"overseasCleared","hub":"docks","count":3},"limitDays":5,"reward":{"cash":400},"weight":2},
     {"id":"inspector_general","name":"Inspector general","unlockLevel":3,"goal":{"kind":"detectionAllStrains","rate":0.95,"holdDays":1},"limitDays":4,"reward":{"cash":500},"weight":1},
     {"id":"express_lane","name":"Express lane","unlockLevel":5,"condition":"hubLive:airport","goal":{"kind":"overseasCleared","hub":"airport","count":4},"limitDays":5,"reward":{"cash":600},"weight":2}
   ]

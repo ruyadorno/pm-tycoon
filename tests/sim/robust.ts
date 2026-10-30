@@ -36,6 +36,7 @@ import type { SimSnapshot } from '../../src/sim/sim.ts'
 import { unitsOf } from '../../src/sim/map.ts'
 import { outboundEligible } from '../../src/sim/systems/dispatch.ts'
 import { salaryOf } from '../../src/sim/systems/people.ts'
+import { stuckKey } from '../../tools/sim/cli.ts'
 import type {
   Applicant,
   LaneNode,
@@ -80,10 +81,13 @@ export interface MonitorOptions {
   /** Stop recording after this many problems (default 20). */
   maxProblems?: number
   /**
-   * 'state' (default, the CLI rule): no vehicle in one state > 120 s.
-   * 'progress': no vehicle without progress (same state, position, cargo,
-   * stop and timer) for 120 s — for the chaos player, whose rush storms keep
-   * a truck on one long, moving collect leg.
+   * 'state' (default): no vehicle in one state > 120 s.
+   * 'progress' (the CLI rule since M9, tools/sim/cli.ts stuckKey): no
+   * vehicle without progress (same state, cargo, stop, wait timer and
+   * reservations — position is not progress, so a routing loop is caught)
+   * for 120 s — for the chaos player, whose rush storms keep a truck in one
+   * state on a long collect leg, and for the L4-L5 map, where a truck's
+   * 12-stop delivering leg runs longer than 120 s in one state.
    */
   stuck?: 'state' | 'progress'
   /**
@@ -468,9 +472,7 @@ export class Monitor {
         (lane.stallReason === 'shelfFull' && !fleetCanCarryShelf(sim)))
     const progress = this.#opts.stuck === 'progress'
     for (const v of s.vehicles) {
-      const key = progress
-        ? `${v.state}|${v.pos.tx},${v.pos.ty}|${v.cargo.length}|${v.stopIndex}|${v.waitUntilTick}|${v.reserved.length}`
-        : v.state
+      const key = progress ? stuckKey(v) : v.state
       const prev = this.#since.get(v.id)
       if (!prev || prev.key !== key) {
         this.#since.set(v.id, { key, tick: s.tick })

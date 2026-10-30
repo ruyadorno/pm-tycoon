@@ -29,7 +29,8 @@
 //     fee + purchaseBuffer, before any new purchase (dormant unless two
 //     paydays in a row ran short);
 //   Toss every flag on the tick it is held: the step before the next tick
-//     tosses every parcel in the Hold Bay, so a Hold Bay stall never builds;
+//     tosses every parcel in the Hold Bay, so a Hold Bay stall never builds
+//     (M9: the Sorter Arm takes this over once bought, see below);
 //   home zones stay `any`.
 //
 // Build 2, M6 (spec-build2 §7.2 L1-L2 rows; design-m6 §5.1): every hire
@@ -65,6 +66,15 @@
 // seats the best inspector there in the same step. Both kinds share it (the
 // delegating sorter holds the station, so the L4 Sorter Arm is skipped).
 //
+// Build 2, M9 (spec-build2 §7.2 L4-L5 rows; design-m8-m9 §5.1-§5.2): with
+// SIM_FEATURES.levels45 the plan runs L4 (X-ray → dock 3 → the Sorter Arm
+// into the empty station → a 2nd van; the X-ray ahead of any L3 step still
+// pending — levelPlan.ts NEW STRAIN FIRST) and L5 (the 3rd truck; the Golden
+// Release is questPolicyStep's accept-every-offer). Once the Arm holds the
+// station the policy leaves the Hold Bay to it (levelPlan.ts armHoldsBay:
+// the Arm Tosses each held parcel 3 s after it arrives) and hand-Tosses only
+// while every bay is taken (policy extension, docs/decisions.md).
+//
 // Prices come from src/data; the buffer, the counts and dockBlockedHireS are
 // the policy's own parameters (spec §7 wording), not balance numbers.
 
@@ -76,6 +86,7 @@ import {
   delegatingHoldBay,
 } from './policies/delegating.ts'
 import {
+  armHoldsBay,
   levelPlanDone,
   levelPlanStep,
   placeNextDesk,
@@ -214,7 +225,8 @@ class CompetentPolicy implements Policy {
     this.#counters()
     if (SIM_FEATURES.payroll) this.#inspectors()
     if (SIM_FEATURES.lane && !(this.#delegating && delegatingHoldBay(sim))) {
-      this.#tossEverything()
+      // M9: the Sorter Arm Tosses for the policy while a bay is free.
+      if (!armHoldsBay(sim)) this.#tossEverything()
     }
   }
 
@@ -424,7 +436,7 @@ class CompetentPolicy implements Policy {
     })
   }
 
-  /** Toss every held parcel (spec §7, M2). */
+  /** Toss every held parcel (spec §7, M2; M9: only while the Arm does not hold the bay). */
   #tossEverything(): void {
     const sim = this.#sim
     const hold = laneNode(sim.state.lane, sim.state.lane.holdBayNodeId)

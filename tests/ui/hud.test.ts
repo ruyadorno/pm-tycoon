@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   chipEntries,
+  ENDLESS_TAIL,
   detectionColour,
   floatsGold,
   garageAlert,
@@ -19,6 +20,7 @@ import {
   newlyAffordableTypes,
   nextUnlockLine,
   speedSegment,
+  topLevelName,
   trendGlyph,
   cargoCounts,
   FOLLOW_PIPS_W,
@@ -36,11 +38,11 @@ import {
   TICKER_QUEUE_MAX,
   TickerQueue,
 } from '../../src/ui/Ticker.ts'
-import { formatMoney } from '../../src/ui/text.ts'
+import { CHECK, formatMoney } from '../../src/ui/text.ts'
 import { THEME } from '../../src/ui/theme.ts'
 import type { VehicleSnapshot } from '../../src/sim/view-api.ts'
 import type { VehicleType } from '../../src/sim/types.ts'
-import { capConfig, dataFixture } from '../sim/helpers.ts'
+import { dataFixture } from '../sim/helpers.ts'
 
 const data = dataFixture()
 /** A stand-in for BitmapText width: 5 px per character. */
@@ -143,54 +145,136 @@ describe('spec §8 / city-view §4.1: the level bar', () => {
     expect(nextUnlockLine(capped, 2)).toBe('Lv 3 coming soon')
   })
 
-  it('M8 (design R1): the shipped cap is 3 — Lv 2 counts toward L3 plainly, Lv 3 reads "Lv 4 coming soon"', () => {
-    expect(data.economy.playtestMaxLevel).toBe(3)
-    const l3 = data.levels.find((l) => l.level === 3)!
-    const l4 = data.levels.find((l) => l.level === 4)!
+  it('M8 (design R1) at a cap of 3 (the M8 config): Lv 2 counts toward L3 plainly, Lv 3 reads "Lv 4 coming soon"', () => {
+    const cap3 = dataFixture({ economy: { playtestMaxLevel: 3 } })
+    const l3 = cap3.levels.find((l) => l.level === 3)!
+    const l4 = cap3.levels.find((l) => l.level === 4)!
     // Lv 2 is below the cap: no suffix, the L3 unlocks on tap.
-    const two = levelProgress(data, 2, 3410, l3.threshold)
+    const two = levelProgress(cap3, 2, 3410, l3.threshold)
     expect(two.atCap).toBe(false)
     expect(two.text).toBe(`$3,410 / ${formatMoney(l3.threshold)}`)
-    expect(nextUnlockLine(data, 2)).toBe(
+    expect(nextUnlockLine(cap3, 2)).toBe(
       'Lv 3: Shrinkwrap Shore + Battery checker',
     )
     // Lv 3 at the cap keeps counting toward the L4 threshold.
-    const three = levelProgress(data, 3, 7200, l4.threshold)
+    const three = levelProgress(cap3, 3, 4500, l4.threshold)
     expect(three.atCap).toBe(true)
     expect(three.text).toBe(
-      `$7,200 / ${formatMoney(l4.threshold)} · Lv 4 coming soon`,
+      `$4,500 / ${formatMoney(l4.threshold)} · Lv 4 coming soon`,
     )
     expect(three.frac).toBeCloseTo(
-      (7200 - l3.threshold) / (l4.threshold - l3.threshold),
+      (4500 - l3.threshold) / (l4.threshold - l3.threshold),
       6,
     )
-    const over = levelProgress(data, 3, 9400, l4.threshold)
+    const over = levelProgress(cap3, 3, 9400, l4.threshold)
     expect(over.frac).toBe(1)
     expect(over.text).toMatch(/· Lv 4 coming soon$/)
     expect(three.text).not.toMatch(/build/i)
     // M7's compact bar (quest chip showing) drops the suffix.
     expect(
-      levelProgress(data, 3, 7200, l4.threshold, { compact: true }).text,
-    ).toBe(`$7,200 / ${formatMoney(l4.threshold)}`)
-    expect(nextUnlockLine(data, 3)).toBe('Lv 4 coming soon')
+      levelProgress(cap3, 3, 4500, l4.threshold, { compact: true }).text,
+    ).toBe(`$4,500 / ${formatMoney(l4.threshold)}`)
+    expect(nextUnlockLine(cap3, 3)).toBe('Lv 4 coming soon')
   })
 
-  it('plan-build2 §8.2 task 11: "coming soon" vanishes by data once the cap rises', () => {
+  it('plan-build2 §8.2 task 11: "coming soon" vanishes by data once the cap rises (M9 ships it at the last level)', () => {
     const top = Math.max(...data.levels.map((l) => l.level))
-    const open = dataFixture(capConfig(top))
-    const l3 = open.levels.find((l) => l.level === 3)!
-    const p = levelProgress(open, 2, 3410, l3.threshold)
+    expect(data.economy.playtestMaxLevel).toBe(top)
+    const l3 = data.levels.find((l) => l.level === 3)!
+    const p = levelProgress(data, 2, 3410, l3.threshold)
     expect(p.atCap).toBe(false)
     expect(p.text).toBe(`$3,410 / ${formatMoney(l3.threshold)}`)
-    expect(nextUnlockLine(open, 2)).toMatch(/^Lv 3: /)
-    expect(nextUnlockLine(open, 2)).not.toMatch(/coming soon/)
+    expect(nextUnlockLine(data, 2)).toMatch(/^Lv 3: /)
+    expect(nextUnlockLine(data, 2)).not.toMatch(/coming soon/)
+    // No level of the shipped tables reads "coming soon" (bar or toast).
+    for (const row of data.levels) {
+      const next = data.levels.find((l) => l.level === row.level + 1)
+      const bar = levelProgress(
+        data,
+        row.level,
+        row.threshold + 100,
+        next?.threshold ?? null,
+      )
+      expect(bar.atCap, `L${row.level}`).toBe(false)
+      expect(bar.text, `L${row.level}`).not.toMatch(/coming soon/)
+      expect(nextUnlockLine(data, row.level)).not.toMatch(/coming soon/)
+    }
     // The top level has nothing coming: no "Lv 6 coming soon".
-    expect(levelProgress(open, top, 20000, null)).toEqual({
+    expect(levelProgress(data, top, 20000, null)).toEqual({
       frac: 1,
-      text: '$20,000',
+      text: '$20,000 · Tycoon',
       atCap: false,
     })
-    expect(nextUnlockLine(open, top)).toMatch(/top level$/)
+    expect(nextUnlockLine(data, top)).toMatch(/top level$/)
+  })
+})
+
+describe('M9 (design-m8-m9 §6.3, §7 M9 10): the level bar at the top level', () => {
+  const top = Math.max(...data.levels.map((l) => l.level))
+
+  it('L5 Tycoon: "$18,400 · Tycoon", "· Tycoon ✓" after the Victory; the compact bar "$18,400" / "$18,400 ✓"', () => {
+    expect(top).toBe(5)
+    expect(data.levels.find((l) => l.level === 5)?.title).toBe('Tycoon')
+    expect(CHECK).toBe('\u2713')
+    expect(levelProgress(data, 5, 18400, null)).toEqual({
+      frac: 1,
+      text: '$18,400 · Tycoon',
+      atCap: false,
+    })
+    expect(levelProgress(data, 5, 18400, null, { victory: true })).toEqual({
+      frac: 1,
+      text: '$18,400 · Tycoon ✓',
+      atCap: false,
+    })
+    // Beside the quest chip (M7 compact bar, 98 px at 360 — endless mode
+    // keeps offering quests): the money, and the mark once won.
+    expect(levelProgress(data, 5, 18400, null, { compact: true }).text).toBe(
+      '$18,400',
+    )
+    expect(
+      levelProgress(data, 5, 18400, null, { compact: true, victory: true })
+        .text,
+    ).toBe('$18,400 ✓')
+    expect(topLevelName(data, 5, false)).toBe('Tycoon')
+    expect(topLevelName(data, 5, true)).toBe('Tycoon ✓')
+    // The level label left of the bar is unchanged.
+    expect(levelLabel(data, 5)).toBe('Lv5 Tycoon')
+  })
+
+  it('nextUnlockLine: L3 → the L4 row, L4 → the L5 row, L5 → "Tycoon — top level" / "Tycoon ✓ — endless mode"', () => {
+    expect(nextUnlockLine(data, 3)).toBe(
+      'Lv 4: Semver Street + Pasture Peer Fields + X-ray + Sorter Arm',
+    )
+    expect(nextUnlockLine(data, 4)).toBe(
+      'Lv 5: Prefetch International + Monorepo Commons',
+    )
+    expect(nextUnlockLine(data, 5)).toBe('Tycoon — top level')
+    expect(nextUnlockLine(data, 5, true)).toBe(`Tycoon ✓ — ${ENDLESS_TAIL}`)
+    expect(nextUnlockLine(data, 5, true)).toBe('Tycoon ✓ — endless mode')
+    // The victory flag only matters at the top level.
+    expect(nextUnlockLine(data, 4, true)).toBe(nextUnlockLine(data, 4))
+  })
+
+  it("L4 / L5 chips: the next level's regions locked with their level, none left at L5", () => {
+    const lockedAt = (level: number) => {
+      const live = new Set(
+        data.districts.filter((d) => d.unlockLevel <= level).map((d) => d.id),
+      )
+      return chipEntries(data, level, (id) =>
+        live.has(id) ? 'live' : 'locked',
+      )
+    }
+    expect(lockedAt(3).filter((c) => c.lockLevel !== null)).toEqual([
+      { id: 'lowres', label: 'Semver St', lockLevel: 4 },
+      { id: 'rural', label: 'Rural', lockLevel: 4 },
+    ])
+    expect(lockedAt(4).filter((c) => c.lockLevel !== null)).toEqual([
+      { id: 'airport', label: 'Airport', lockLevel: 5 },
+      { id: 'civic', label: 'Commons', lockLevel: 5 },
+    ])
+    const five = lockedAt(5)
+    expect(five.every((c) => c.lockLevel === null)).toBe(true)
+    expect(five.map((c) => c.id)).toEqual(data.map.regions.map((r) => r.id))
   })
 })
 

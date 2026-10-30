@@ -5,7 +5,8 @@
 // overseas clearance lands ≤ firstOverseasClearedAfterLevel3MaxMin after L3
 // by median; at L3 every seed buys the Battery checker on the L3 tick
 // (REPLACEing COUNTERS' 2nd Metal detector) and then dock 2, in plan order;
-// nothing past the M8 cap (no level:up {4}); the CLI invariants hold. Tagged
+// the levels come in order (M9: the cap is 5, so L4 may land inside the 25
+// minutes — the L3 plan still comes first); the CLI invariants hold. Tagged
 // [long]: excluded from `vlr check:quick` (tools/check.mjs), run by the full
 // `vlr check`.
 
@@ -50,7 +51,7 @@ describe('the L3 window under the competent policy (seeds 1-10 × 25 min) [long]
     ).toBeLessThanOrEqual(targets.firstOverseasClearedAfterLevel3MaxMin)
   }, 120_000)
 
-  it('the plan at L3: the Battery checker on the L3 tick (REPLACE of the duplicate Metal detector), then dock 2; never a level past the cap', () => {
+  it('the plan at L3: the Battery checker on the L3 tick (REPLACE of the duplicate Metal detector), then dock 2 before any L4 purchase; the levels in order', () => {
     for (const r of runs()) {
       const l3 = r.events.find((e) => e.name === 'level:up' && e.level === 3)!
       const placed = r.events.find(
@@ -67,10 +68,19 @@ describe('the L3 window under the competent policy (seeds 1-10 × 25 min) [long]
       const dock = r.events.find((e) => e.name === 'dock:bought')
       expect(dock, `seed ${r.seed}`).toMatchObject({ index: 2 })
       expect(dock!.tick).toBeGreaterThan(l3.tick)
-      expect(
-        r.events.filter((e) => e.name === 'level:up').map((e) => e.level),
-        `seed ${r.seed}`,
-      ).toEqual([2, 3])
+      // M9: the L4 X-ray waits for the whole L3 plan (dock 2 included).
+      const xray = r.events.find(
+        (e) =>
+          e.name === 'lane:fixturePlaced' &&
+          (e.fixture as { checker?: { defId?: string } }).checker?.defId ===
+            'xray',
+      )
+      if (xray) expect(xray.tick, `seed ${r.seed}`).toBeGreaterThan(dock!.tick)
+      const ups = r.events
+        .filter((e) => e.name === 'level:up')
+        .map((e) => e.level as number)
+      expect(ups.slice(0, 2), `seed ${r.seed}`).toEqual([2, 3])
+      expect(ups, `seed ${r.seed}`).toEqual(ups.map((_, i) => i + 2))
     }
   }, 120_000)
 

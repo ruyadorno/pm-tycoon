@@ -169,6 +169,11 @@ export class Toast {
     this.root.setVisible(false).setAlpha(1)
   }
 
+  /** The lane's top (screen y) the toasts slide into now. */
+  get laneY(): number {
+    return this.lane.y
+  }
+
   /** Re-fit to a new layout (pass L: uses L.toast and L.W). */
   relayout(L: { W: number; toast: ToastOptions['lane'] }): void {
     this.lane = { ...L.toast }

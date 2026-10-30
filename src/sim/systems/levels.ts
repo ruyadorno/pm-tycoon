@@ -3,9 +3,12 @@
 // next levels.json threshold the company levels up — unless that row is past
 // economy.playtestMaxLevel: then nothing fires and LevelState.nextThreshold
 // keeps pointing at that row's threshold, so the HUD bar keeps counting
-// ("$6,410 / $9,000 · Lv 4 coming soon" at M8's cap 3, design-m8-m9 R1;
-// spec preamble). Several thresholds
-// crossed in one tick level up one row at a time, in order.
+// ("$6,410 / $9,000 · Lv 4 coming soon" under a cap-3 config, design-m8-m9
+// R1; spec preamble). Since M9 the shipped cap is the last row (B2 §9:
+// playtestMaxLevel 5): the L5 level-up sets nextThreshold null and nothing
+// is "coming" (the quests step offers the Golden Release on that tick).
+// Several thresholds crossed in one tick level up one row at a time, in
+// order.
 //
 // A level-up applies the row first, then emits (handlers see the new state):
 //   - LevelState: level, nextThreshold, slots, holdBayCap, shelfCap,
@@ -151,13 +154,17 @@ export function levelUp(sim: Sim, row: LevelDef): void {
  * The tick an announced strain enters the spawn pool (announced +
  * newStrainDelayS, spawn.ts availableStrains): `ticker:news {kind: 'strain'}`.
  * Derived from the state (no flag), so a loaded game announces exactly once.
+ * Only the starting strain (the first levels.json row's, announced at tick 0
+ * by the new game) has no line; a level forced at tick 0 (debugForceLevel —
+ * the ?level=N boot) still gets one for each strain it announces (M9 review).
  */
 function announceStrains(sim: Sim): void {
   const s = sim.state
   const delay = ticksFromS(sim.data.parcels.malware.newStrainDelayS)
+  const start = sim.data.levels[0]?.strain ?? null
   for (const st of sim.data.parcels.malware.strains) {
     const at = s.level.announced[st.id]
-    if (at === undefined || at <= 0) continue
+    if (at === undefined || (at <= 0 && st.id === start)) continue
     if (s.tick === at + delay) {
       sim.emit('ticker:news', {
         text: strainSpottedText(st.id),

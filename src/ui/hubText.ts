@@ -160,8 +160,8 @@ export type HubData = { map: Pick<GameData['map'], 'hubs'> }
 
 /**
  * True when the hub's vessel is a plane: its map.hubs vessel frame names a
- * plane (`ap_plane`); before a hub has its map.hubs row (the Airport until
- * M9) its id decides.
+ * plane (`ap_plane`, the Airport's row since M9); a hub without a map.hubs
+ * row (a data override) falls back on its id.
  */
 export function isPlaneHub(data: HubData, hub: DistrictId | null): boolean {
   const row = (data.map.hubs ?? []).find((h) => h.district === hub)

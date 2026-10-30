@@ -11,7 +11,7 @@ import type { MoneyReason } from '../sim/events.ts'
 import type { Role, Size, VehicleType } from '../sim/types.ts'
 import type { Trend, VehicleSnapshot } from '../sim/view-api.ts'
 import type { Rect } from './layout.ts'
-import { ellipsize, formatMoney } from './text.ts'
+import { CHECK, ellipsize, formatMoney } from './text.ts'
 import { THEME } from './theme.ts'
 
 /** spec §9.4: the HUD face is happy at ≥ 70, neutral at 40–69, angry below. */
@@ -52,7 +52,11 @@ export function levelLabel(data: GameData, level: number): string {
 export interface LevelProgress {
   /** Bar fill 0..1. */
   frac: number
-  /** `$1,240 / $2,000` (+ ` · Lv 4 coming soon` at the playtest cap, 3 since M8). */
+  /**
+   * `$1,240 / $2,000` (+ ` · Lv 4 coming soon` below the last level at the
+   * playtest cap); at the top level `$18,400 · Tycoon`, `· Tycoon ✓` after
+   * the Victory (M9, design-m8-m9 §6.3).
+   */
   text: string
   /**
    * The counter is held below an existing levels.json row by
@@ -74,23 +78,51 @@ export function cappedBelowNext(data: GameData, level: number): boolean {
 }
 
 /**
+ * The top level's name with the Victory mark: `Tycoon` / `Tycoon ✓`
+ * (levels.json title of `level`; B2 §3.4, design-m8-m9 §6.3).
+ */
+export function topLevelName(
+  data: GameData,
+  level: number,
+  victory: boolean,
+): string {
+  const title = data.levels.find((l) => l.level === level)?.title ?? ''
+  const name = title || `Lv ${level}`
+  return victory ? `${name} ${CHECK}` : name
+}
+
+/**
  * The level bar (city-view §4.1, spec §8): lifetime earned between this
  * level's threshold and `nextThreshold`. At `playtestMaxLevel` the bar keeps
  * counting toward the next row's threshold and says "Lv N coming soon" —
  * unless `compact` (M7, design-m7 §6.4: the quest chip shortens the bar, so
- * the suffix goes and the HUD ellipsizes the rest to the bar).
+ * the suffix goes and the HUD ellipsizes the rest to the bar). At the top
+ * level (`nextThreshold` null: no row after it, nothing "coming") the full
+ * bar reads `$18,400 · Tycoon`, `$18,400 · Tycoon ✓` once the Golden Release
+ * is done (`victory`, endless mode — M9, design-m8-m9 §6.3); the compact bar
+ * (98 px at 360 beside the chip) shortens it to `$18,400` / `$18,400 ✓`.
  */
 export function levelProgress(
   data: GameData,
   level: number,
   lifetime: number,
   nextThreshold: number | null,
-  opts: { compact?: boolean } = {},
+  opts: { compact?: boolean; victory?: boolean } = {},
 ): LevelProgress {
   const atCap = cappedBelowNext(data, level)
   const base = data.levels.find((l) => l.level === level)?.threshold ?? 0
   if (nextThreshold === null) {
-    return { frac: 1, text: formatMoney(lifetime), atCap }
+    const money = formatMoney(lifetime)
+    const victory = opts.victory === true
+    // Compact (98 px at 360 beside the chip — endless mode keeps offering
+    // quests): the label left of the bar already says `Lv5 Tycoon`, so the
+    // bar keeps only the money and the mark (`$18,400 ✓`).
+    const text = opts.compact
+      ? victory
+        ? `${money} ${CHECK}`
+        : money
+      : `${money} · ${topLevelName(data, level, victory)}`
+    return { frac: 1, text, atCap }
   }
   const span = nextThreshold - base
   const raw = span > 0 ? (lifetime - base) / span : 1
@@ -100,14 +132,26 @@ export function levelProgress(
   return { frac, text, atCap }
 }
 
+/** The tap toast's endless-mode tail after the Victory (B2 §3.4, M9). */
+export const ENDLESS_TAIL = 'endless mode'
+
 /**
  * The level cell's tap toast: `Lv 2: Hoist Hill + trucks + Shaky shaker`
  * from the next levels.json row (region flavour names, vehicle names,
- * machine names); `Lv 4 coming soon` at the playtest cap (3 since M8).
+ * machine names); `Lv 4 coming soon` at a playtest cap below the last row.
+ * At the top level (M9, design-m8-m9 §6.3): `Tycoon — top level`, and
+ * `Tycoon ✓ — endless mode` after the Victory.
  */
-export function nextUnlockLine(data: GameData, level: number): string {
+export function nextUnlockLine(
+  data: GameData,
+  level: number,
+  victory = false,
+): string {
   const row = data.levels.find((l) => l.level === level + 1)
-  if (!row) return `${levelLabel(data, level)} — top level`
+  if (!row) {
+    const name = topLevelName(data, level, victory)
+    return victory ? `${name} — ${ENDLESS_TAIL}` : `${name} — top level`
+  }
   if (cappedBelowNext(data, level)) return `Lv ${level + 1} coming soon`
   const parts: string[] = []
   for (const id of row.unlockRegions) {

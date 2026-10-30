@@ -132,13 +132,18 @@ export const SUBJECT_OVERRIDES: Record<string, string> = {
     'with a glowing light strip and a big green battery shape lying on top, ' +
     'the passage between the pillars is completely empty, nothing inside ' +
     'the gate',
+  // build 2 M9 re-roll (docs/art-todo.md M6 note: the M6 pick reads as an
+  // arch): a long roof seen from above, a big screen with the x-ray picture
+  // and a radiation sticker carry the "scanner" read; the passage below the
+  // header stays empty (candidates.ts OPENINGS)
   xray:
-    'chunky airport x-ray baggage scanner tunnel, a wide boxy light grey ' +
-    'housing with thick side walls and a deep roof over the passage, a ' +
-    'glowing light strip along the front of the roof, a small dark blue ' +
-    'monitor screen on the right wall, purple trim, the tunnel passage ' +
-    'through the middle is completely empty and open at the bottom, ' +
-    'nothing inside the tunnel',
+    'chunky airport x-ray baggage scanner gate, two slim light grey pillars ' +
+    'carrying a thick deep boxy roof block, on the front face of the roof ' +
+    'block a wide dark blue screen showing a bright light blue x-ray ' +
+    'outline of a parcel, a glowing light strip under the screen, a small ' +
+    'yellow and black radiation warning sticker on the left pillar, purple ' +
+    'trim, the space between the pillars under the roof block is completely ' +
+    'empty and open down to the floor, nothing between the pillars',
   sorter_arm:
     'chunky industrial robot arm on a round grey pedestal base, an orange ' +
     'column, two thick yellow arm segments with grey joints raised up and ' +
@@ -186,12 +191,21 @@ export const VEHICLE_OK = new Set([
 ])
 
 /**
- * dock-prop headings (the template says "bow pointing to the lower left",
- * the moored ship): the plane taxis east along +x, off the east edge
- * (B2 §4.3, design-m8-m9 §1.2 `exit [4, 0]`) — nose to the lower right.
+ * dock-prop headings (the template's default is "bow pointing to the lower
+ * left"): the plane taxis east along +x, off the east edge (B2 §4.3,
+ * design-m8-m9 §1.2 `exit [4, 0]`) — nose to the lower right; the ship
+ * sails west along -x (`exit [-5, 0]`) — bow to the upper left.
  */
 export const DOCK_PROP_HEADING: Record<string, string> = {
   ap_plane: 'nose pointing to the lower right',
+  // build 2 M9 re-roll: the ship leaves west along -x (map.hubs exit
+  // [-5, 0]), i.e. toward the upper left of the screen, so the bow points
+  // there and the departure tween sails it bow first (the M5 pick's bow
+  // points to the lower left, so it slid sideways)
+  dk_ship:
+    'bow pointing to the upper left, the stern with the white bridge tower ' +
+    'at the lower right nearest the viewer, the long hull running from the ' +
+    'lower right to the upper left',
 }
 
 /** the build-2 modern port rows (B2 §6.4) */

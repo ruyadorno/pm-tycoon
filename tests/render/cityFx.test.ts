@@ -5,8 +5,13 @@
 // countdown ring (magicRingStep: the rush ring's steps) and the gold hop.
 // M8 (design-m8-m9 §6.2, docks 2–3): the bay lights and docked poses by
 // dock NUMBER, and the dock run that maps the hidden dock column onto the
-// SW face's bays (continuous, never moving the queue head).
-import { describe, expect, it } from 'vitest'
+// SW face's bays (continuous, never moving the queue head). M9 (B2
+// §4.2–§4.3, design-m8-m9 §6.2): the L4 / L5 regions open in pairs (one
+// crossfade), with unique sprites and `_locked` twins for every building and
+// prop; tiers 4–5 swap in with three lamps and three docked poses (dock 3
+// before dock 2 at L4); the ground fog follows scenery rows that name a
+// region (cityFx.groundRegionAt: the runway with the Airport).
+import { describe, expect, it, vi } from 'vitest'
 import {
   BAY_LIGHTS,
   bayLightShown,
@@ -25,6 +30,7 @@ import {
   dockRunRadius,
   dustFrame,
   fadeK,
+  groundRegionAt,
   grumbleDue,
   GRUMBLE_EVERY_MS,
   honkShown,
@@ -57,15 +63,23 @@ import {
   WH_CANVAS,
 } from '../../src/render/cityFx.ts'
 import { WH_ANCHORS } from '../../src/render/frames.generated.ts'
-import { blockRect, buildGameData } from '../../src/data/index.ts'
+import {
+  blockRect,
+  buildGameData,
+  groundAt,
+  isRoadTile,
+  mapBlockAt,
+} from '../../src/data/index.ts'
 import {
   footprintAnchor,
   originX,
   screenToTileF,
   tileToScreen,
+  tileTopLeft,
 } from '../../src/render/iso.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
 import { FRAMES } from '../../src/render/frames.generated.ts'
+import { buildingSprite, inAtlas } from '../../src/render/frames.ts'
 import { ticksFromS } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
@@ -78,6 +92,14 @@ import {
   runUntil,
   startQuest,
 } from '../sim/helpers.ts'
+
+// ground.ts imports Phaser for its bake (the M9 fog test bakes a fake scene).
+vi.mock('phaser', () => ({
+  default: {
+    Renderer: { Events: { RESTORE_WEBGL: 'restorewebgl' } },
+    Scenes: { Events: { SHUTDOWN: 'shutdown' } },
+  },
+}))
 
 const data = buildGameData(loadRawData())
 const sat = data.economy.satisfaction
@@ -747,3 +769,271 @@ describe('M7 magic parcel in the city (B2 §3.3, design-m7 §6.8)', () => {
     expect(p && hopIcon(p)).toBe('ic_magic')
   })
 })
+
+// ---------------------------------------------------------------- M9 L4 / L5 (B2 §4.2–§4.3)
+
+/** The regions each level opens (levels.json unlockRegions). */
+const M9_REGIONS: Record<number, string[]> = {
+  4: ['lowres', 'rural'],
+  5: ['airport', 'civic'],
+}
+const M9_IDS = Object.values(M9_REGIONS).flat()
+
+describe('M9 the L4 / L5 regions unlock through the crossfade (design-m8-m9 §6.2)', () => {
+  it('levels.json: L4 opens Low-density + Rural, L5 the Airport + Park & civic', () => {
+    for (const [lv, ids] of Object.entries(M9_REGIONS)) {
+      const row = data.levels.find((l) => l.level === Number(lv))
+      expect(row?.unlockRegions.toSorted()).toEqual(ids.toSorted())
+    }
+  })
+
+  it('both regions of a level are live before its first region:unlocked: one crossfade and one ground re-bake carry the pair', () => {
+    const sim = quietSim(1)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
+    const vs = createViewSim(() => sim)
+    for (const id of M9_IDS) expect(vs.regionState(id)).toBe('locked')
+    const seen: { district: string; live: string[] }[] = []
+    let order: string[] = []
+    sim.events.on('level:up', () => order.push('level:up'))
+    sim.events.on('region:unlocked', (p) => {
+      order.push('region:unlocked')
+      seen.push({
+        district: p.district,
+        live: M9_IDS.filter((id) => vs.regionState(id) === 'live'),
+      })
+    })
+    for (const lv of [4, 5]) {
+      seen.length = 0
+      order = []
+      expect(sim.dispatch({ kind: 'debugForceLevel', level: lv }).ok).toBe(true)
+      const ids = M9_REGIONS[lv] ?? []
+      expect(seen.map((s) => s.district).toSorted()).toEqual(ids.toSorted())
+      // CityScene.applyLockState on the first event sees every change.
+      for (const id of ids) expect(seen[0]?.live).toContain(id)
+      // The exterior swap (level:up) starts before the fog lifts.
+      expect(order[0]).toBe('level:up')
+    }
+  })
+
+  it('every building of the four regions draws its own unique sprite, in colour and `_locked`, in the world atlas', () => {
+    const all = data.buildings.map((b) => buildingSprite(b.id))
+    const rows = data.buildings.filter((b) => M9_IDS.includes(b.district))
+    // 10 Low-density + 10 Rural + 2 Airport + 10 Park & civic (PB2 §6).
+    expect(rows).toHaveLength(32)
+    for (const b of rows) {
+      const stem = buildingSprite(b.id)
+      expect(
+        all.filter((s) => s === stem),
+        `${b.id} shares ${stem}`,
+      ).toEqual([stem])
+      expect(inAtlas(stem, 'world'), stem).toBe(true)
+      expect(inAtlas(`${stem}_locked`, 'world'), `${stem}_locked`).toBe(true)
+    }
+  })
+
+  it('their props (fence, hay_bale, the plane, the tower, trees, benches) and the fountain have colour + `_locked` frames', () => {
+    const props = data.map.props.filter((p) => M9_IDS.includes(p.region))
+    const stems = new Set([...props.map((p) => p.frame), 'fountain'])
+    for (const want of ['fence', 'hay_bale', 'ap_plane', 'ap_tower'])
+      expect(stems.has(want), want).toBe(true)
+    for (const stem of stems) {
+      expect(inAtlas(stem, 'world'), stem).toBe(true)
+      expect(inAtlas(`${stem}_locked`, 'world'), `${stem}_locked`).toBe(true)
+    }
+    // Every region opens with some scenery of its own.
+    for (const id of M9_IDS)
+      expect(
+        props.some((p) => p.region === id),
+        `${id} has props`,
+      ).toBe(true)
+  })
+})
+
+describe('M9 tiers 4–5: the exterior swap on level-up (B2 §6.6; design-m8-m9 §6.2)', () => {
+  it('L4 / L5 swap to wh_ext_t4 / _t5 (world atlas) under LEVEL 4 — NATIONAL / LEVEL 5 — TYCOON', () => {
+    const want: Record<number, [string, string]> = {
+      4: ['wh_ext_t4', 'LEVEL 4 — NATIONAL'],
+      5: ['wh_ext_t5', 'LEVEL 5 — TYCOON'],
+    }
+    for (const [lv, [frame, stamp]] of Object.entries(want)) {
+      const row = data.levels.find((l) => l.level === Number(lv))
+      expect(row && `wh_ext_t${row.warehouseTier}`).toBe(frame)
+      expect(inAtlas(frame, 'world'), frame).toBe(true)
+      expect(levelStampText(Number(lv), row?.title ?? '')).toBe(stamp)
+    }
+  })
+
+  it('both carry three measured lamps and three docked poses: all three docks light and park at their own bay', () => {
+    for (const frame of ['wh_ext_t4', 'wh_ext_t5'] as const) {
+      const a = WH_ANCHORS[frame]
+      expect(a?.bayLights, frame).toHaveLength(3)
+      expect(a?.dockPoses, frame).toHaveLength(3)
+      expect(a?.dockPoses?.[0]).toEqual(a?.dockPose)
+      expect(warehouseAnchors(frame)).toEqual(a)
+      for (const [x, y] of a?.bayLights ?? []) {
+        expect(x).toBeGreaterThanOrEqual(0)
+        expect(x).toBeLessThan(WH_CANVAS / 2)
+        expect(y).toBeLessThan(WH_CANVAS)
+      }
+      for (let n = 1; n <= 3; n++)
+        expect(dockPoseCanvas(warehouseAnchors(frame), n)).toEqual(
+          a?.dockPoses?.[n - 1],
+        )
+      expect(
+        lit(['dock1', 'dock2', 'dock3'], a?.bayLights.length ?? 0),
+      ).toEqual([0, 1, 2])
+    }
+  })
+
+  it('through the facade at L4: dock 3 bought before dock 2 lights lamps 1 and 3 on t4, dock 2 then lamp 2', () => {
+    const sim = quietSim(1)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+    sim.state.economy.balance = 1_000_000
+    const vs = createViewSim(() => sim)
+    const tier = data.levels.find((l) => l.level === vs.level)?.warehouseTier
+    expect(tier).toBe(4)
+    const lamps = warehouseAnchors(`wh_ext_t${tier}`).bayLights.length
+    expect(vs.lane.buyDock(3).ok).toBe(true)
+    let owned = vs.docks.map((d) => d.id)
+    expect(owned).toEqual(['dock1', 'dock3'])
+    expect(maxDockNumber(owned)).toBe(3)
+    expect([0, 1, 2].filter((k) => bayLightShown(k, owned, lamps))).toEqual([
+      0, 2,
+    ])
+    expect(vs.lane.buyDock(2).ok).toBe(true)
+    owned = vs.docks.map((d) => d.id)
+    expect([0, 1, 2].filter((k) => bayLightShown(k, owned, lamps))).toEqual([
+      0, 1, 2,
+    ])
+  })
+})
+
+describe('M9 ground fog by region (cityFx.groundRegionAt; style-guide §2.2: the runway is the Airport’s locked scenery)', () => {
+  const map = data.map
+  /** The shipped map with scenery rows tagged as the M9 data row does it. */
+  const tagged = (rows: unknown[]) =>
+    ({
+      ...map,
+      ground: { ...map.ground, scenery: [...rows, ...map.ground.scenery] },
+    }) as unknown as typeof map
+
+  it('a region block → its district; the lot, roads and scenery blocks → never fogged', () => {
+    // Rural block (0, 0): tiles 4–10 × 4–10.
+    expect(groundRegionAt(map, 5, 5)).toBe('rural')
+    expect(groundRegionAt(map, 37, 8)).toBe('airport')
+    expect(groundRegionAt(map, 22, 41)).toBe('civic')
+    const [lx, ly] = lot.warehouse.tile
+    expect(groundRegionAt(map, lx, ly)).toBeNull()
+    expect(groundRegionAt(map, 11, 5)).toBeNull() // an avenue
+    expect(groundRegionAt(map, 38, 38)).toBeNull() // the lake block
+    for (let y = 0; y < map.size[1]; y++)
+      for (let x = 0; x < map.size[0]; x++) {
+        const b = mapBlockAt(map, x, y)
+        if (b?.kind === 'region' && !isRoadTile(map, x, y))
+          expect(groundRegionAt(map, x, y)).toBe(b.region)
+      }
+  })
+
+  it('a scenery row naming a region fogs with it (first matching row wins); rows naming none never fog', () => {
+    const m = tagged([
+      {
+        name: 't',
+        rect: [45, 3, 47, 3],
+        frame: 'runway_threshold',
+        region: 'airport',
+      },
+      { name: 'u', rect: [44, 3, 47, 19], frame: 'runway' },
+    ])
+    expect(groundRegionAt(m, 46, 3)).toBe('airport')
+    expect(groundRegionAt(m, 46, 10)).toBeNull() // the untagged row wins below
+    // Off-block scenery the rows do not cover (the west sea): never fogged.
+    expect(groundRegionAt(m, 0, 40)).toBeNull()
+    // Blocks and roads ignore scenery rows.
+    expect(groundRegionAt(m, 5, 5)).toBe('rural')
+  })
+
+  it('the bake stamps a tagged runway `_locked` while the Airport is locked, in colour once it opens', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { bakeGround, GROUND_Y } = await import('../../src/render/ground.ts')
+    const m = tagged([
+      {
+        name: 'apron',
+        rect: [44, 3, 44, 19],
+        frame: 'tarmac',
+        region: 'airport',
+      },
+      {
+        name: 'west',
+        rect: [45, 3, 45, 19],
+        frame: 'runway',
+        region: 'airport',
+      },
+    ])
+    const ox = originX(m.size[1])
+    const frameAt = (
+      calls: { frame: string; x: number; y: number }[],
+      x: number,
+      y: number,
+    ) => {
+      const tl = tileTopLeft(x, y, ox)
+      return calls.find((c) => c.x === tl.x && c.y === tl.y - GROUND_Y)?.frame
+    }
+    for (const locked of [true, false]) {
+      const { scene, calls } = fakeGroundScene()
+      bakeGround(scene as never, m, {
+        isLocked: (id) => locked && id === 'airport',
+      })
+      const s = locked ? '_locked' : ''
+      expect(frameAt(calls, 44, 10)).toBe(`tarmac${s}`)
+      expect(frameAt(calls, 45, 10)).toBe(`runway${s}`)
+      // The shipped centre-line row (behind these) is tagged too since M9.
+      expect(frameAt(calls, 46, 10)).toBe(`runway_stripe${s}`)
+      // A block tile of the locked Airport fogs as before.
+      expect(frameAt(calls, 37, 8)).toBe(`${groundAt(m, 37, 8)}${s}`)
+    }
+    vi.restoreAllMocks()
+  })
+
+  const shippedTagged = data.map.ground.scenery.some(
+    (r) => (r as { region?: unknown }).region !== undefined,
+  )
+  it.skipIf(!shippedTagged)(
+    'shipped map: every runway / taxiway / apron tile fogs with the Airport',
+    () => {
+      for (let y = 0; y < map.size[1]; y++)
+        for (let x = 0; x < map.size[0]; x++) {
+          const f = groundAt(map, x, y)
+          if (/^(runway|taxiway|tarmac)/.test(f) && !mapBlockAt(map, x, y))
+            expect(groundRegionAt(map, x, y), `${x},${y} ${f}`).toBe('airport')
+        }
+    },
+  )
+})
+
+/** A scene just rich enough for bakeGround (ground-slab.test.ts's fake). */
+function fakeGroundScene() {
+  const calls: { frame: string; x: number; y: number }[] = []
+  const chain: Record<string, unknown> = new Proxy(
+    {},
+    { get: () => () => chain },
+  )
+  const dt = {
+    key: 'ground',
+    clear() {},
+    render() {},
+    stamp(_atlas: string, frame: string, x: number, y: number) {
+      calls.push({ frame, x, y })
+    },
+  }
+  const scene = {
+    textures: {
+      exists: () => false,
+      addDynamicTexture: () => dt,
+      get: () => ({ has: () => true }),
+    },
+    add: { image: () => chain },
+    game: { renderer: { on() {}, off() {} } },
+    events: { once() {}, off() {} },
+  }
+  return { scene, calls }
+}

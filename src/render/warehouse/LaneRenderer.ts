@@ -61,6 +61,21 @@
 // (RoomLayout propsFor). From tier 3 the shelf draws the 20 × 5 @ 11 grid:
 // a tier change swaps `layout` for `new FixedLaneLayout(tier)` and moves
 // the minis (the room keeps its rows through tier 3, so nothing else moves).
+//
+// M9 (spec-build2 §4.2-§4.4, design-m8-m9 §6.1, R2, R10, R21): the room
+// grows. Everything static is built from the layout of the renderer's tier
+// (`lay.rows` floor/wall rows, the belt column with slots 5–6, the chute
+// down to `chuteBottom()`, the shelf / bin / badge / plates Δ lower, the ext
+// strip only while a slot lies past the column, captioned `5–6` or `6`). A
+// tier whose rows differ (3 → 4, 4 → 5) cannot be applied in place
+// (`needsRebuild`): the scene builds a new renderer on `new
+// FixedLaneLayout(tier)` and hands it the slots that were locked
+// (`unrollOpened`) so the newly live slot still unrolls after the fade.
+// The readout strip is its own top-level container (`RoomLayers.readout`),
+// so the scene keeps it fixed while the room scrolls (R10). Tier 5 swaps
+// the strip lights for `neon_strip_f0` (a short `_f1` flicker now and then).
+// The Sorter Arm (`sorter_arm_f0/_f1/_f2`, packed into both atlases) stands
+// in the station at L4+ and swings on every `parcel:tossed {source: 'arm'}`.
 import Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type { LaneNode, Parcel, Size, Strain } from '../../sim/types.ts'
@@ -79,7 +94,6 @@ import { FONT_KEY, ROOM_FONT_KEY } from '../atlases.ts'
 import { atlasOf, frameOrNull, roomAtlas } from '../frames.ts'
 import {
   BELT_CX,
-  BIN_COUNTER,
   BULB,
   bayRect,
   DOOR_POINT,
@@ -98,14 +112,11 @@ import {
   READOUT_GAP,
   READOUT_H,
   ROOM_COLS,
-  ROOM_H,
-  ROOM_ROWS,
   ROOM_W,
-  SHELF_BADGE,
+  rowsForTier,
   SHELF_MAX_CELLS,
   SIGN,
   SIGN_TEXT,
-  SIGNAGE,
   SORTER_ARM_AT,
   SORTER_STAND,
   STRIP_LIGHTS,
@@ -138,6 +149,12 @@ type Box = Phaser.GameObjects.Container
 export interface RoomLayers {
   /** The room container (screen px); every layer is a child, room px. */
   root: Box
+  /**
+   * The readout strip's container (M9, R10): a sibling of `root` at the
+   * room's unscrolled origin (its children sit at room y −24), so the scene
+   * can keep it fixed while the room scrolls under it.
+   */
+  readout: Box
   floor: Box
   walls: Box
   belts: Box
@@ -178,8 +195,10 @@ export function createRoomLayers(
     badges,
     fx,
   ])
+  const readout = scene.add.container(x, y)
   return {
     root,
+    readout,
     floor,
     walls,
     belts,
@@ -209,6 +228,9 @@ const LAMP_BLINK_MS = 500
 const RING_REFRESH_MS = 500
 const BULB_FLICKER_EVERY_MS = 7000
 const BULB_FLICKER_MS = 120
+/** Tier 5's neon strips: one dims (`neon_strip_f1`) this long, this often. */
+const NEON_FLICKER_EVERY_MS = 5000
+const NEON_FLICKER_MS = 160
 const CRACK_FPS = 6
 const SIGN_FADE_MS = 200
 export const TIER_FADE_MS = 400
@@ -312,13 +334,15 @@ export function floorFrameFor(
   return `floor_t1_${v === 0 ? 1 : v === 3 ? 2 : 0}`
 }
 
-/** The tier-only parts a room of tier `tier` shows (§5; M8 tiers 3–5). */
+/** The tier-only parts a room of tier `tier` shows (§5; M8 tiers 3–5; M9 the tier-5 neon). */
 export function tierParts(tier: number): {
   bulb: boolean
   strips: boolean
   plates: boolean
   props: 1 | 2 | 3
   signDark: boolean
+  /** Tier 5: the strip-light spots carry `neon_strip` (B2 §6.6 "strip lights → neon"). */
+  neon: boolean
 } {
   return {
     bulb: tier <= 1,
@@ -326,7 +350,24 @@ export function tierParts(tier: number): {
     plates: tier >= 2,
     props: propGroup(tier),
     signDark: tier >= 2,
+    neon: tier >= 5,
   }
+}
+
+/**
+ * The frame on a strip-light spot (64 × 8, RoomLayout STRIP_LIGHTS): the
+ * neon tube at tier 5 (`neon_strip_f0`, `_f1` while it flickers) when the
+ * art is packed, else the plain `strip_light`.
+ */
+export function stripFrame(
+  tier: number,
+  flicker = false,
+  has: (name: string) => boolean = (n) => frameOrNull(n) !== null,
+): string {
+  if (!tierParts(tier).neon) return 'strip_light'
+  const f = flicker ? 'neon_strip_f1' : 'neon_strip_f0'
+  if (has(f)) return f
+  return has('neon_strip_f0') ? 'neon_strip_f0' : 'strip_light'
 }
 
 /** `Lane: 15/min · Detection ` + `97%` (§1.9), or the stalled caption (§4). */
@@ -557,6 +598,7 @@ export class LaneRenderer {
   private props = new Map<1 | 2 | 3, Img[]>()
   private poster!: Img
   private plates: Box[] = []
+  private neonAcc = 0
   private shelfImg!: Img
   private beltImgs: { img: Img; tile: BeltTile; frame: number }[] = []
   private slots = new Map<string, SlotView>()
@@ -574,9 +616,9 @@ export class LaneRenderer {
   private stationKey = ''
   private bin!: Img
   private binText!: Txt
-  private ext!: Img
-  private extLock!: Img
-  private extText!: Txt
+  private ext: Img | null = null
+  private extLock: Img | null = null
+  private extText: Txt | null = null
   private minis: Img[] = []
   private miniChecks = new Map<number, Img>()
   private badge!: Img
@@ -698,8 +740,9 @@ export class LaneRenderer {
   private buildRoom(): void {
     const t = this.tier
     const lay = this.layout
-    // Floor x 32–319, y 32–447 (9 × 13 tiles).
-    for (let r = 1; r < ROOM_ROWS; r++) {
+    const rows = lay.rows
+    // Floor x 32–319, y 32 to the room's bottom (9 × (rows − 1) tiles).
+    for (let r = 1; r < rows; r++) {
       for (let c = 1; c < ROOM_COLS - 1; c++) {
         const img = this.img(
           this.L.floor,
@@ -711,7 +754,7 @@ export class LaneRenderer {
       }
     }
     // Walls: west c0 / east c10 below the north face r0.
-    for (let r = 1; r < ROOM_ROWS; r++) {
+    for (let r = 1; r < rows; r++) {
       this.wallImgs.push(
         this.img(this.L.walls, 0, r * TILE, this.tierName('wall', t)),
       )
@@ -729,7 +772,7 @@ export class LaneRenderer {
         this.img(this.L.walls, c * TILE, 0, this.tierName('wallface', t)),
       )
     const base = this.scene.add
-      .rectangle(0, ROOM_H - 2, ROOM_W, 2, PALETTE.outline, 1)
+      .rectangle(0, lay.baseboardY(), ROOM_W, 2, PALETTE.outline, 1)
       .setOrigin(0, 0)
     this.L.walls.add(base)
     // North-wall sign, crack overlay, lights.
@@ -744,7 +787,7 @@ export class LaneRenderer {
     this.crack.setVisible(false)
     this.bulb = this.img(this.L.walls, BULB.x, BULB.y, 'bulb_0')
     for (const p of STRIP_LIGHTS)
-      this.strips.push(this.img(this.L.walls, p.x, p.y, 'strip_light'))
+      this.strips.push(this.img(this.L.walls, p.x, p.y, stripFrame(t)))
 
     // Belts (per edge, §8) and the chute (each slot's divert edge).
     for (const tile of lay.beltTiles()) {
@@ -759,19 +802,22 @@ export class LaneRenderer {
       if (node.kind !== 'slot' || !lay.isBeltSlot(node.id)) continue
       this.slots.set(node.id, this.buildSlot(node.id))
     }
-    // Extension strip (slots past the column, §6).
+    // Extension strip (slots past the column, §6): `5–6` at tiers 1–3,
+    // `6` at tier 4, none at tier 5 (M9).
     const er = lay.extRect()
-    this.ext = this.img(this.L.badges, er.x, er.y, 'ext_outline')
-    this.ext.setAlpha(LOCKED_ALPHA)
-    this.extLock = this.img(this.L.badges, er.x + 6, er.y + 4, 'ic_lock')
-    this.extText = this.text(
-      this.L.badges,
-      er.x + 26,
-      textTop(er.y, er.h),
-      '5–6',
-      PALETTE.grey5,
-    )
-    this.extText.setDropShadow(1, 1, THEME.shadow, 1)
+    if (er) {
+      this.ext = this.img(this.L.badges, er.x, er.y, 'ext_outline')
+      this.ext.setAlpha(LOCKED_ALPHA)
+      this.extLock = this.img(this.L.badges, er.x + 6, er.y + 4, 'ic_lock')
+      this.extText = this.text(
+        this.L.badges,
+        er.x + 26,
+        textTop(er.y, er.h),
+        lay.extCaption(),
+        PALETTE.grey5,
+      )
+      this.extText.setDropShadow(1, 1, THEME.shadow, 1)
+    }
 
     // Hold Bay rack, bays, lamp.
     this.img(this.L.fixtures, RACK.x, RACK.y, 'holdbay_rack')
@@ -819,12 +865,8 @@ export class LaneRenderer {
       this.minis.push(m)
     }
     this.placeMinis()
-    this.badge = this.img(
-      this.L.badges,
-      SHELF_BADGE.x,
-      SHELF_BADGE.y,
-      'ui_badge',
-    )
+    const sb = lay.shelfBadge()
+    this.badge = this.img(this.L.badges, sb.x, sb.y, 'ui_badge')
     this.badgeText = this.text(this.L.badges, 0, 0, '', THEME.textDark)
 
     // Tier props (one set per group; tiers 4–5 reuse group 3 with their
@@ -845,8 +887,8 @@ export class LaneRenderer {
       POSTER.y,
       this.tierName('wanted_poster', t),
     )
-    // Tier-2 signage plates.
-    for (const s of SIGNAGE) {
+    // Tier-2 signage plates (SHELF / QUARANTINE Δ lower with the shelf, M9).
+    for (const s of lay.plates()) {
       const txt = addText(this.scene, PLATE_PAD / 2, 0, s.text, {
         tint: THEME.textDark,
       })
@@ -1024,15 +1066,19 @@ export class LaneRenderer {
       READOUT_H,
       'ui_panel_dark',
     )
-    this.L.root.add(this.readoutPanel)
+    // Its own container (M9, R10): fixed while the room scrolls.
+    this.L.readout.add(this.readoutPanel)
     this.readoutLead = addText(this.scene, 0, 0, '', { tint: THEME.textLight })
     this.readoutMid = addText(this.scene, 0, 0, '', { tint: THEME.textLight })
     this.readoutPct = addText(this.scene, 0, 0, '', { tint: THEME.ok })
-    this.L.root.add([this.readoutLead, this.readoutMid, this.readoutPct])
+    this.L.readout.add([this.readoutLead, this.readoutMid, this.readoutPct])
     this.refreshReadout(true)
   }
 
-  /** The strip's rect in room px (tap target padded by the scene). */
+  /**
+   * The strip's rect relative to the readout container (the room's
+   * unscrolled origin; the scene pads the tap target and maps it to screen).
+   */
   readoutRect(): Rect {
     return { x: 0, y: -READOUT_GAP, w: ROOM_W, h: READOUT_H }
   }
@@ -1078,7 +1124,9 @@ export class LaneRenderer {
     const prev = this.tier
     this.tier = tier
     const cross = fade && prev !== tier
-    if (this.lay.tier !== tier) {
+    // Same rows only (tiers 1–3): a taller room is a new renderer (M9,
+    // needsRebuild); until the scene swaps it this one keeps its geometry.
+    if (this.lay.tier !== tier && !this.needsRebuild(tier)) {
       this.lay = new FixedLaneLayout(tier)
       this.placeMinis()
     }
@@ -1097,6 +1145,7 @@ export class LaneRenderer {
     const parts = tierParts(tier)
     for (const p of this.props.get(3) ?? [])
       swap(p, tierFrame('props', Math.max(3, tier)))
+    for (const s of this.strips) swap(s, stripFrame(tier))
     const tint = parts.signDark ? THEME.textDark : THEME.textLight
     if (cross && this.signText.tintTopLeft !== tint)
       this.ghostText(this.signText)
@@ -1190,6 +1239,31 @@ export class LaneRenderer {
     this.syncBays()
   }
 
+  /**
+   * True when tier `tier` has other rows than this renderer's room (3 → 4,
+   * 4 → 5, M9 R21): the scene rebuilds the room on `new
+   * FixedLaneLayout(tier)` instead of applyTier.
+   */
+  needsRebuild(tier = visualTier(this.gd, this.vs.level)): boolean {
+    return rowsForTier(tier) !== this.lay.rows
+  }
+
+  /** Slot ids this renderer shows locked now (handed to its replacement). */
+  lockedSlotIds(): ReadonlySet<string> {
+    return new Set(this.lockedSlots)
+  }
+
+  /**
+   * After a rebuild on a level-up (M9, R21): every slot of `prevLocked`
+   * that is live now unrolls (§1.6) `delay` ms from now, as onLevelUp
+   * would have done in place.
+   */
+  unrollOpened(prevLocked: ReadonlySet<string>, delay: number): void {
+    for (const id of prevLocked)
+      if (this.slots.has(id)) this.lockedSlots.add(id)
+    this.syncSlots(true, delay)
+  }
+
   // ================================================================ sign
 
   refreshSign(): void {
@@ -1251,9 +1325,9 @@ export class LaneRenderer {
       .some(
         (n) => n.kind === 'slot' && !this.layout.isBeltSlot(n.id) && n.locked,
       )
-    this.ext.setVisible(extLocked)
-    this.extLock.setVisible(extLocked)
-    this.extText.setVisible(extLocked)
+    this.ext?.setVisible(extLocked)
+    this.extLock?.setVisible(extLocked)
+    this.extText?.setVisible(extLocked)
   }
 
   private syncSlotLook(v: SlotView, node: LaneNode): void {
@@ -1495,10 +1569,11 @@ export class LaneRenderer {
 
   private refreshBin(): void {
     const n = this.vs.quarantine.count
+    const at = this.lay.binCounter()
     this.binText.setText(`×${n}`)
     this.binText.setPosition(
-      Math.round(BIN_COUNTER.x - this.binText.width / 2),
-      textTop(BIN_COUNTER.y - 8, 16),
+      Math.round(at.x - this.binText.width / 2),
+      textTop(at.y - 8, 16),
     )
   }
 
@@ -1592,9 +1667,10 @@ export class LaneRenderer {
       full && ids.length === cap ? 'FULL' : `${ids.length}/${cap}`,
     )
     this.badgeText.setTint(full ? PALETTE.grey5 : THEME.textDark)
+    const sb = this.lay.shelfBadge()
     this.badgeText.setPosition(
-      Math.round(SHELF_BADGE.x + (SHELF_BADGE.w - this.badgeText.width) / 2),
-      textTop(SHELF_BADGE.y, SHELF_BADGE.h),
+      Math.round(sb.x + (sb.w - this.badgeText.width) / 2),
+      textTop(sb.y, sb.h),
     )
   }
 
@@ -2224,6 +2300,7 @@ export class LaneRenderer {
     this.updateLamp(delta)
     this.updateRings(delta)
     this.updateBulb(delta)
+    this.updateNeon(delta)
     const now = this.scene.time.now
     this.pulses = this.pulses.filter((p) => {
       if (now >= p.until) {
@@ -2317,6 +2394,19 @@ export class LaneRenderer {
       rec.ringFrame = frame
       this.syncDeco(rec)
     }
+  }
+
+  /** Tier 5: one neon strip dims for NEON_FLICKER_MS every NEON_FLICKER_EVERY_MS. */
+  private updateNeon(delta: number): void {
+    if (!tierParts(this.tier).neon || this.strips.length === 0) return
+    this.neonAcc += delta
+    const k = Math.floor(this.neonAcc / NEON_FLICKER_EVERY_MS)
+    const t = this.neonAcc % NEON_FLICKER_EVERY_MS
+    const dim = k % this.strips.length
+    this.strips.forEach((s, i) => {
+      const f = stripFrame(this.tier, i === dim && t < NEON_FLICKER_MS)
+      if (s.frame.name !== f && frameOrNull(f)) s.setFrame(f)
+    })
   }
 
   private updateBulb(delta: number): void {

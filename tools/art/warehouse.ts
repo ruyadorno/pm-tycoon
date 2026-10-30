@@ -581,6 +581,25 @@ function stripLight(): Grid {
   return g
 }
 
+/**
+ * Tier 5 (M9): a pink neon tube in a white channel, the strip_light canvas
+ * (64x8, RoomLayout STRIP_LIGHTS). f0 lit (a white-hot core line and a pink
+ * glow on the channel), f1 the dimmer flicker frame.
+ */
+function neonStrip(lit: boolean): Grid {
+  const g = new Grid(64, 8)
+  oRect(g, 0, 0, 64, 8, 'grey4')
+  g.hline(1, 62, 1, 'grey5')
+  g.hline(1, 62, 6, 'grey3')
+  g.rect(1, 2, 3, 4, 'grey2')
+  g.rect(60, 2, 3, 4, 'grey2')
+  g.hline(4, 59, 2, lit ? 'pink1' : 'grey4')
+  g.hline(4, 59, 3, lit ? 'grey5' : 'pink1')
+  g.hline(4, 59, 4, lit ? 'pink1' : 'pink0')
+  g.hline(4, 59, 5, lit ? 'pink0' : 'grey3')
+  return g
+}
+
 const CARD_DARK: BoxScheme = {
   top: 'brown1',
   topHi: 'brown2',
@@ -1374,6 +1393,454 @@ function posterT3(): Grid {
 }
 
 // ---------------------------------------------------------------------------
+// Tiers 4 "National" and 5 "Tycoon" (build 2 M9, B2 §4.2-§4.4 / §6.6,
+// design-m8-m9 §6.4). Tier 4 = wh_ext_t4 from inside: charcoal anti-slip
+// epoxy, grey ribbed steel cladding with a blue band, yellow / blue
+// high-bay racking, a forklift, a steel notice board. Tier 5 = the glass HQ
+// of wh_ext_t5: white terrazzo, blue glass in white mullions, pink neon
+// (neon_strip replaces the strip lights), white gloss racking, a palm and a
+// delivery robot, a MOST WANTED wall screen. Interior classes have no
+// `water` / `gold` ramps (palette.ts RAMP_RULES), so glass is the blue ramp
+// and the trim the yellow one.
+
+function floorT4(d: DrawCtx, lane: boolean): Grid {
+  const g = new Grid(T, T)
+  const r = rngOf(d, 'epoxy4')
+  g.rect(0, 0, T, T, 'grey1')
+  // 32-px slab joints with a lit bevel
+  g.hline(0, T - 1, 0, 'grey0')
+  g.vline(0, 0, T - 1, 'grey0')
+  g.hline(1, T - 1, 1, 'grey2')
+  // anti-slip grit
+  specks(g, r, 6, 'grey2', 3, 3, 26, 26)
+  specks(g, r, 3, 'grey0', 3, 3, 26, 26)
+  if (lane) {
+    g.rect(0, 0, 2, T, 'yellow2')
+    g.rect(30, 0, 2, T, 'yellow2')
+    g.vline(1, 0, T - 1, 'yellow1')
+    g.vline(31, 0, T - 1, 'yellow1')
+  }
+  return g
+}
+
+function floorT5(d: DrawCtx, lane: boolean): Grid {
+  const g = new Grid(T, T)
+  const r = rngOf(d, 'terrazzo')
+  g.rect(0, 0, T, T, 'grey5')
+  g.hline(0, T - 1, 0, 'grey4')
+  g.vline(0, 0, T - 1, 'grey4')
+  // terrazzo chips in the HQ's colours, and a pale sheen streak
+  specks(g, r, 4, 'grey3', 3, 3, 26, 26)
+  specks(g, r, 2, 'pink1', 3, 3, 26, 26)
+  specks(g, r, 2, 'blue2', 3, 3, 26, 26)
+  specks(g, r, 1, 'yellow3', 3, 3, 26, 26)
+  const sx = r.int(4, 18)
+  const sy = r.int(5, 24)
+  for (let i = 0; i < 5; i++) g.set(sx + i, sy - (i >> 1), 'grey4')
+  if (lane) {
+    g.rect(0, 0, 2, T, 'pink1')
+    g.rect(30, 0, 2, T, 'pink1')
+    g.vline(1, 0, T - 1, 'pink0')
+    g.vline(31, 0, T - 1, 'pink0')
+  }
+  return g
+}
+
+/** side walls (west c0, east c10): ribbed steel cladding with a blue band */
+function wallT4(): Grid {
+  const g = new Grid(T, T)
+  for (let y = 0; y < T; y++) {
+    const k = y % 4
+    g.hline(2, T - 3, y, k === 0 ? 'grey4' : k === 3 ? 'grey2' : 'grey3')
+  }
+  g.rect(13, 0, 6, T, 'blue1')
+  g.vline(13, 0, T - 1, 'blue2')
+  g.vline(18, 0, T - 1, 'blue0')
+  g.vline(1, 0, T - 1, 'grey4')
+  g.vline(T - 2, 0, T - 1, 'grey1')
+  g.vline(0, 0, T - 1, 'outline')
+  g.vline(T - 1, 0, T - 1, 'outline')
+  return g
+}
+
+/** side walls of the HQ: blue glass in white mullions, seen from above */
+function wallT5(): Grid {
+  const g = new Grid(T, T)
+  g.rect(4, 0, 24, T, 'blue2')
+  g.rect(4, 0, 3, T, 'blue1')
+  g.vline(27, 0, T - 1, 'blue1')
+  // a transom every 16 px and a glint per pane
+  for (const y of [0, 16]) {
+    g.hline(4, 27, y, 'grey5')
+    g.hline(4, 27, y + 1, 'grey4')
+    for (let i = 0; i < 4; i++) g.set(10 + i, y + 9 - i, 'grey5')
+    g.set(16, y + 9, 'grey5')
+  }
+  // the white mullions along both edges
+  for (const x of [1, 28]) {
+    g.rect(x, 0, 3, T, 'grey4')
+    g.vline(x, 0, T - 1, 'grey5')
+    g.vline(x + 2, 0, T - 1, 'grey3')
+  }
+  g.vline(0, 0, T - 1, 'outline')
+  g.vline(T - 1, 0, T - 1, 'outline')
+  return g
+}
+
+/** north wall face: ribbed steel cladding, a blue band, a yellow kick rail */
+function wallfaceT4(): Grid {
+  const g = new Grid(T, T)
+  g.hline(0, T - 1, 0, 'outline')
+  g.hline(0, T - 1, 1, 'grey4')
+  g.hline(0, T - 1, 2, 'grey2')
+  for (let x = 0; x < T; x++) {
+    const k = x % 4
+    const c = k === 0 ? 'grey4' : k === 3 ? 'grey2' : 'grey3'
+    g.vline(x, 3, 17, c)
+    g.vline(x, 23, 25, c)
+  }
+  g.rect(0, 18, T, 5, 'blue1')
+  g.hline(0, T - 1, 18, 'blue2')
+  g.hline(0, T - 1, 22, 'blue0')
+  g.hline(0, T - 1, 26, 'outline')
+  g.rect(0, 27, T, 3, 'yellow2')
+  g.hline(0, T - 1, 27, 'yellow3')
+  g.hline(0, T - 1, 29, 'yellow1')
+  g.hline(0, T - 1, 30, 'grey0')
+  g.hline(0, T - 1, 31, 'outline')
+  return g
+}
+
+/** north wall face: glass panes in white mullions, a white dado with a pink neon line */
+function wallfaceT5(): Grid {
+  const g = new Grid(T, T)
+  g.hline(0, T - 1, 0, 'outline')
+  g.hline(0, T - 1, 1, 'grey5')
+  g.hline(0, T - 1, 2, 'grey4')
+  g.rect(0, 3, T, 18, 'blue2')
+  g.rect(0, 3, T, 2, 'blue1')
+  for (const x of [0, 16]) {
+    g.vline(x, 3, 20, 'grey5')
+    g.vline(x + 1, 3, 20, 'grey4')
+    for (let i = 0; i < 5; i++) g.set(x + 5 + i, 15 - i, 'grey5')
+    g.set(x + 11, 14, 'grey5')
+    g.set(x + 12, 13, 'grey5')
+  }
+  g.hline(0, T - 1, 21, 'outline')
+  g.rect(0, 22, T, 8, 'grey5')
+  g.hline(0, T - 1, 24, 'pink0')
+  g.hline(0, T - 1, 25, 'pink1')
+  g.hline(0, T - 1, 26, 'pink0')
+  g.hline(0, T - 1, 29, 'grey4')
+  g.hline(0, T - 1, 30, 'grey3')
+  g.hline(0, T - 1, 31, 'outline')
+  return g
+}
+
+interface RackScheme {
+  /** deck fill, the mesh line along each row, the cell dividers */
+  deck: string
+  mesh: string
+  divider: string
+  /** back beam [lit top, body] */
+  back: [string, string]
+  /** uprights [lit, body, shade] */
+  upright: [string, string, string]
+  /** front beam rows y 59 / 60 / 61 */
+  front: [string, string, string]
+  clip: string
+}
+
+/**
+ * The tier >= 3 racking geometry of shelfT3 (20 x 5 cells @ 11 px from
+ * canvas (3, 4); row tops grey5 at y 4 + 11r, seams grey2 at y 14 + 11r,
+ * dividers at x 13 + 11c) in another colour scheme.
+ */
+function rackShelf(s: RackScheme): Grid {
+  const g = new Grid(224, 64)
+  oRect(g, 0, 0, 224, 63, s.deck)
+  g.rect(1, 1, 222, 2, s.back[1])
+  g.hline(1, 222, 1, s.back[0])
+  g.hline(1, 222, 3, 'outline')
+  for (let r = 0; r < 5; r++) {
+    const y = 4 + 11 * r
+    g.hline(1, 222, y, 'grey5')
+    g.hline(1, 222, y + 10, 'grey2')
+    g.hline(3, 220, y + 5, s.mesh)
+    for (let c = 0; c <= 19; c++) {
+      const x = 13 + 11 * c
+      if (x > 221) break
+      g.vline(x, y + 1, y + 9, s.divider)
+      g.set(x, y, s.deck)
+    }
+  }
+  g.rect(1, 4, 2, 55, s.upright[1])
+  g.vline(1, 4, 58, s.upright[0])
+  g.rect(222, 4, 1, 55, s.upright[2])
+  g.hline(1, 222, 59, s.front[0])
+  g.hline(1, 222, 60, s.front[1])
+  g.hline(1, 222, 61, s.front[2])
+  for (const x of [2, 110, 219]) g.rect(x, 59, 3, 3, s.clip)
+  g.hline(0, 223, 62, 'outline')
+  g.hline(1, 223, 63, 'outline')
+  return g
+}
+
+/** tier 4 high-bay racking: steel decks, yellow uprights, a blue front beam */
+function shelfT4(): Grid {
+  return rackShelf({
+    deck: 'grey3',
+    mesh: 'grey2',
+    divider: 'grey2',
+    back: ['blue2', 'blue1'],
+    upright: ['yellow3', 'yellow2', 'yellow1'],
+    front: ['blue2', 'blue1', 'blue0'],
+    clip: 'yellow2',
+  })
+}
+
+/** tier 5 white gloss racking: chrome uprights, a pink neon front beam */
+function shelfT5(): Grid {
+  return rackShelf({
+    deck: 'grey4',
+    mesh: 'grey5',
+    divider: 'grey3',
+    back: ['pink1', 'pink0'],
+    upright: ['grey5', 'grey4', 'grey2'],
+    front: ['pink1', 'grey5', 'pink0'],
+    clip: 'grey2',
+  })
+}
+
+const TOTE: BoxScheme = {
+  top: 'blue2',
+  topHi: 'grey5',
+  front: 'blue1',
+  frontLo: 'blue0',
+}
+
+/**
+ * A yellow forklift seen from behind (facing north, into the room) with a
+ * pallet of blue totes raised on its forks: load, mast, overhead guard over
+ * the seat, the counterweight with its hazard stripe nearest the viewer.
+ */
+function propsT4(): Grid {
+  const g = new Grid(48, 64)
+  const f = new Grid(48, 64)
+  // wheels first (the body overlaps their inner halves)
+  for (const [x, y] of [
+    [4, 34],
+    [39, 34],
+    [4, 50],
+    [39, 50],
+  ] as const) {
+    f.rect(x, y, 5, 8, 'grey0')
+    f.vline(x + 1, y + 1, y + 6, 'grey1')
+  }
+  // counterweight
+  f.rect(8, 46, 32, 14, 'yellow2')
+  f.hline(8, 39, 46, 'yellow3')
+  f.rect(8, 53, 32, 7, 'yellow1')
+  hazard(f, 10, 55, 28, 3)
+  f.set(9, 54, 'red1')
+  f.set(38, 54, 'red1')
+  // the seat under the overhead guard
+  f.rect(10, 34, 28, 13, 'grey1')
+  f.rect(17, 37, 14, 8, 'grey0')
+  f.hline(17, 30, 37, 'grey1')
+  // guard: two posts each side and roof bars (seat shows between)
+  for (const x of [10, 36]) {
+    f.rect(x, 33, 2, 14, 'yellow2')
+    f.vline(x, 33, 46, 'yellow3')
+  }
+  f.hline(10, 37, 33, 'yellow3')
+  f.hline(10, 37, 34, 'yellow1')
+  for (const y of [38, 42]) f.hline(12, 35, y, 'grey2')
+  // mast: the two channels and the crossbar behind the load
+  f.rect(9, 27, 30, 6, 'grey2')
+  f.hline(9, 38, 27, 'grey3')
+  f.hline(9, 38, 32, 'grey1')
+  f.rect(12, 27, 3, 6, 'grey1')
+  f.rect(33, 27, 3, 6, 'grey1')
+  f.outline()
+  g.blit(f, 0, 0)
+  // the pallet and four blue totes on the forks
+  pallet(g, 6, 20, 36)
+  crate(g, 8, 1, 16, 11, TOTE)
+  crate(g, 24, 1, 16, 11, TOTE)
+  crate(g, 7, 9, 17, 12, TOTE)
+  crate(g, 24, 9, 17, 12, TOTE)
+  // tote handles (dark slots on the front faces)
+  for (const x of [12, 29]) g.hline(x, x + 6, 17, 'blue0')
+  g.hline(4, 44, 61, 'outline')
+  return g
+}
+
+/**
+ * A tall potted palm in a white planter (left) and a small white delivery
+ * robot carrying a parcel (right): the HQ's lobby touch.
+ */
+function propsT5(): Grid {
+  const g = new Grid(48, 64)
+  const p = new Grid(48, 64)
+  // fronds radiating from the crown at (12, 30)
+  const tips: readonly [number, number][] = [
+    [2, 10],
+    [7, 3],
+    [15, 1],
+    [22, 7],
+    [24, 18],
+    [1, 22],
+    [22, 27],
+  ]
+  for (const [tx, ty] of tips) {
+    p.line(12, 30, tx, ty, 'leaf1')
+    p.line(12, 29, tx, ty + 1, 'leaf2')
+    // leaflets: short ticks along the frond
+    for (let k = 1; k <= 3; k++) {
+      const x = Math.round(12 + ((tx - 12) * k) / 4)
+      const y = Math.round(30 + ((ty - 30) * k) / 4)
+      p.set(x + 1, y + 1, 'grass2')
+      p.set(x - 1, y + 1, 'leaf0')
+    }
+  }
+  // trunk
+  for (let y = 30; y <= 43; y++) {
+    p.hline(11, 13, y, y % 3 === 0 ? 'brown0' : 'brown1')
+  }
+  p.set(11, 33, 'brown2')
+  p.set(12, 39, 'brown2')
+  // white planter with a lit rim and a soil top
+  p.rect(3, 43, 19, 18, 'grey5')
+  p.rect(3, 50, 19, 11, 'grey4')
+  p.hline(3, 21, 43, 'grey5')
+  p.hline(4, 20, 44, 'brown0')
+  p.hline(5, 19, 45, 'brown1')
+  p.vline(21, 46, 60, 'grey3')
+  p.hline(3, 21, 51, 'pink1')
+  p.outline()
+  g.blit(p, 0, 0)
+  // the robot: a white box on dark wheels, a sensor band with a pink eye
+  const b = new Grid(48, 64)
+  b.rect(26, 42, 19, 16, 'grey5')
+  b.rect(26, 48, 19, 10, 'grey4')
+  b.hline(26, 44, 48, 'grey3')
+  b.rect(28, 50, 15, 3, 'blue0')
+  b.hline(28, 42, 50, 'blue1')
+  b.set(35, 51, 'pink1')
+  b.set(36, 51, 'pink1')
+  b.rect(27, 58, 4, 3, 'grey0')
+  b.rect(40, 58, 4, 3, 'grey0')
+  b.outline()
+  g.blit(b, 0, 0)
+  // the parcel riding on top
+  crate(g, 29, 33, 13, 10, CARDBOARD)
+  g.hline(2, 46, 62, 'outline')
+  return g
+}
+
+/** steel notice board: the L4 dense-strain WANTED sheet and a blue magnet */
+function posterT4(): Grid {
+  const g = new Grid(32, 32)
+  oRect(g, 1, 1, 30, 30, 'grey3')
+  g.rect(2, 2, 28, 28, 'grey4')
+  g.hline(2, 29, 2, 'grey5')
+  g.vline(2, 2, 29, 'grey5')
+  g.hline(2, 29, 29, 'grey2')
+  g.vline(29, 2, 29, 'grey2')
+  // the WANTED sheet with a blue header
+  oRect(g, 5, 4, 19, 23, 'grey5')
+  g.rect(6, 5, 17, 4, 'blue1')
+  g.hline(6, 22, 5, 'blue2')
+  for (const [x0, x1] of [
+    [8, 11],
+    [13, 16],
+    [18, 21],
+  ] as const) {
+    g.hline(x0, x1, 7, 'grey5')
+  }
+  // mugshot: the dense parcel, a heavy grey weight with its handle
+  oRect(g, 8, 10, 13, 11, 'grey3')
+  g.rect(9, 11, 11, 3, 'grey4')
+  g.hline(12, 16, 12, 'outline')
+  g.set(12, 13, 'outline')
+  g.set(16, 13, 'outline')
+  for (let y = 14; y <= 19; y++) {
+    const w = 2 + (y - 14)
+    g.hline(14 - Math.floor(w / 2) - 1, 14 + Math.ceil(w / 2), y, 'grey1')
+  }
+  g.hline(12, 15, 15, 'grey2')
+  // the typosquat label: a yellow tag with a misprinted line
+  g.rect(18, 22, 5, 3, 'yellow2')
+  g.hline(19, 21, 23, 'outline')
+  g.set(20, 23, 'red1')
+  g.hline(8, 16, 22, 'grey3')
+  g.hline(8, 14, 24, 'grey3')
+  // the magnet and a second, older sheet's corner
+  g.disc(14, 4, 1.5, 'blue1')
+  g.set(13, 3, 'blue2')
+  g.rect(25, 18, 4, 9, 'grey5')
+  g.vline(28, 18, 26, 'grey3')
+  g.hline(1, 30, 31, 'outline')
+  return g
+}
+
+/** wall screen: MOST WANTED, the four strains' mugshots in a 2x2 grid */
+function posterT5(): Grid {
+  const g = new Grid(32, 32)
+  oRect(g, 1, 2, 30, 26, 'grey5')
+  g.hline(2, 29, 26, 'grey4')
+  // the display
+  g.rect(3, 4, 26, 21, 'blue0')
+  g.rect(3, 4, 26, 3, 'pink0')
+  for (const [x0, x1] of [
+    [5, 9],
+    [11, 17],
+    [19, 26],
+  ] as const) {
+    g.hline(x0, x1, 5, 'grey5')
+  }
+  // four mugshot cells: metal (ring), rattle (pink), battery (orange),
+  // dense (grey weight)
+  const cells: readonly [number, number][] = [
+    [5, 8],
+    [17, 8],
+    [5, 16],
+    [17, 16],
+  ]
+  for (const [x, y] of cells) {
+    g.rect(x, y, 10, 7, 'blue1')
+    g.hline(x, x + 9, y, 'blue2')
+  }
+  // metal: a grey washer
+  g.rect(8, 10, 4, 3, 'grey3')
+  g.set(9, 11, 'outline')
+  g.set(10, 11, 'outline')
+  // rattle: a pink ball on a stick
+  g.rect(20, 9, 3, 3, 'pink1')
+  g.set(23, 12, 'yellow2')
+  g.set(24, 13, 'yellow2')
+  // battery: an orange cell with its bolt
+  g.rect(9, 17, 3, 5, 'orange2')
+  g.set(10, 16, 'grey3')
+  g.set(10, 19, 'yellow3')
+  // dense: a grey weight
+  g.hline(21, 23, 17, 'grey2')
+  g.rect(20, 18, 5, 4, 'grey1')
+  g.hline(21, 23, 18, 'grey2')
+  // the stand and a pink status LED
+  g.rect(14, 28, 4, 2, 'grey3')
+  g.hline(12, 19, 30, 'grey2')
+  g.set(27, 26, 'pink1')
+  g.hline(11, 20, 31, 'outline')
+  g.vline(13, 28, 29, 'outline')
+  g.vline(18, 28, 29, 'outline')
+  g.set(11, 30, 'outline')
+  g.set(20, 30, 'outline')
+  return g
+}
+
+// ---------------------------------------------------------------------------
 // Signs 200x24
 
 /** tier 3: cream enamel face (dark text, as t2), green band with rivets */
@@ -1396,6 +1863,70 @@ function signT3(): Grid {
     g.set(x, 1, 'grey4')
     g.set(x, 22, 'grey3')
   }
+  return g
+}
+
+/**
+ * tier 4: a pale face (dark text, as t2 / t3) in a blue band, yellow
+ * chevron caps inside the face's ends (x 4..7 / 192..195, outside the text
+ * area x 8..191), bolts in the band
+ */
+function signT4(): Grid {
+  const g = new Grid(200, 24)
+  oRect(g, 0, 0, 200, 24, 'blue1')
+  g.hline(1, 198, 1, 'blue2')
+  g.vline(1, 1, 22, 'blue2')
+  g.hline(1, 198, 22, 'blue0')
+  g.vline(198, 1, 22, 'blue0')
+  oRect(g, 3, 3, 194, 18, 'grey5')
+  g.hline(4, 195, 19, 'grey4')
+  // chevrons pointing inward on yellow
+  for (const [x0, dir] of [
+    [4, 1],
+    [192, -1],
+  ] as const) {
+    g.rect(x0, 4, 4, 15, 'yellow2')
+    g.vline(dir === 1 ? x0 + 4 : x0 - 1, 4, 18, 'outline')
+    for (let y = 4; y <= 18; y++) {
+      const k = (y - 4) % 6
+      const off = k < 3 ? k : 5 - k
+      g.set(dir === 1 ? x0 + off : x0 + 3 - off, y, 'outline')
+    }
+  }
+  for (const x of [8, 66, 133, 191]) {
+    g.set(x, 1, 'grey4')
+    g.set(x, 22, 'grey2')
+  }
+  return g
+}
+
+/**
+ * tier 5: a white lightbox face (dark text) in a dark board ringed by a
+ * pink neon tube with white-hot corners
+ */
+function signT5(): Grid {
+  const g = new Grid(200, 24)
+  oRect(g, 0, 0, 200, 24, 'grey0')
+  // the neon tube one pixel inside the outline
+  g.hline(1, 198, 1, 'pink1')
+  g.hline(1, 198, 22, 'pink1')
+  g.vline(1, 1, 22, 'pink1')
+  g.vline(198, 1, 22, 'pink1')
+  for (const [x, y] of [
+    [1, 1],
+    [198, 1],
+    [1, 22],
+    [198, 22],
+  ] as const) {
+    g.set(x, y, 'grey5')
+  }
+  // its glow on the board
+  g.hline(2, 197, 2, 'pink0')
+  g.hline(2, 197, 21, 'pink0')
+  g.vline(2, 2, 21, 'pink0')
+  g.vline(197, 2, 21, 'pink0')
+  oRect(g, 3, 3, 194, 18, 'grey5')
+  g.hline(4, 195, 19, 'grey4')
   return g
 }
 
@@ -2009,6 +2540,24 @@ reg('sign_t3', () => signT3())
 reg('props_t3', () => propsT3())
 reg('wanted_poster_t3', () => posterT3())
 reg('dock_pad', () => dockPad())
+// build 2 M9: tiers 4-5 (design-m8-m9 §6.4)
+reg('floor_t4', (_s, _i, d) => floorT4(d, false))
+reg('floor_t4_lane', (_s, _i, d) => floorT4(d, true))
+reg('floor_t5', (_s, _i, d) => floorT5(d, false))
+reg('floor_t5_lane', (_s, _i, d) => floorT5(d, true))
+reg('wall_t4', () => wallT4())
+reg('wall_t5', () => wallT5())
+reg('wallface_t4', () => wallfaceT4())
+reg('wallface_t5', () => wallfaceT5())
+reg('shelf_t4', () => shelfT4())
+reg('shelf_t5', () => shelfT5())
+reg('sign_t4', () => signT4())
+reg('sign_t5', () => signT5())
+reg('props_t4', () => propsT4())
+reg('props_t5', () => propsT5())
+reg('wanted_poster_t4', () => posterT4())
+reg('wanted_poster_t5', () => posterT5())
+reg('neon_strip', (s) => neonStrip(s === '_f0'))
 reg('belt_h', (_s, i) => beltH(i))
 reg('belt_v', (_s, i) => beltV(i))
 reg('belt_corner', (_s, i) => beltCorner(i))

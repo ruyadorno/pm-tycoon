@@ -239,8 +239,9 @@ describe('malware at spawn (spec §5.4)', () => {
   })
 
   it('share per level: baseShare at L1, + perLevel at L2, + postVictoryPerDay per day after the playtest cap, capped, × overseasMult', () => {
-    // The playtest-1 cap (2) keeps testing the cap rule; the shipped cap
-    // (3 since M8) escalates from the L3 tick instead (below).
+    // The playtest-1 cap (2) keeps testing the cap rule; a cap of 3 (M8's)
+    // escalates from the L3 tick instead, and the shipped cap (5 since M9,
+    // the last levels.json row) only from Victory (below).
     const sim = makeSim(1, { economy: { playtestMaxLevel: 2 } })
     const cap2 = sim.data
     const s = sim.state
@@ -264,19 +265,29 @@ describe('malware at spawn (spec §5.4)', () => {
     s.day = 40
     expect(malwareShare(s, cap2)).toBe(cap2.parcels.malware.cap)
     expect(malwareShare(s, cap2, true)).toBe(cap2.parcels.malware.cap)
-    // M8: at the shipped cap (L3) reaching L2 alone does not escalate.
-    const shipped = dataFixture()
-    expect(shipped.economy.playtestMaxLevel).toBe(3)
-    expect(malwareShare(s, shipped)).toBeCloseTo(m.baseShare + m.perLevel, 10)
+    // M8's cap (L3): reaching L2 alone does not escalate.
+    const cap3 = dataFixture({ economy: { playtestMaxLevel: 3 } })
+    expect(malwareShare(s, cap3)).toBeCloseTo(m.baseShare + m.perLevel, 10)
     s.level.level = 3
     s.stats.levelTick['3'] = 600 * 30 + 5 // day 30; now day 40: 10 boundaries
     const l3 = m.baseShare + 2 * m.perLevel
-    expect(malwareShare(s, shipped)).toBeCloseTo(
-      l3 + 10 * m.postVictoryPerDay,
+    expect(malwareShare(s, cap3)).toBeCloseTo(l3 + 10 * m.postVictoryPerDay, 10)
+    expect(malwareShare(s, cap3, true)).toBeCloseTo(
+      Math.min(m.cap, (l3 + 10 * m.postVictoryPerDay) * m.overseasMult),
       10,
     )
+    // M9: the shipped cap is the last row (B2 §9) — reaching it never
+    // escalates; only Victory does (tests/sim/endless.test.ts).
+    const shipped = dataFixture()
+    expect(shipped.economy.playtestMaxLevel).toBe(
+      Math.max(...shipped.levels.map((l) => l.level)),
+    )
+    s.level.level = 5
+    s.stats.levelTick['5'] = 600 * 30 + 5
+    const l5 = m.baseShare + 4 * m.perLevel
+    expect(malwareShare(s, shipped)).toBeCloseTo(l5, 10)
     expect(malwareShare(s, shipped, true)).toBeCloseTo(
-      Math.min(m.cap, (l3 + 10 * m.postVictoryPerDay) * m.overseasMult),
+      Math.min(m.cap, l5 * m.overseasMult),
       10,
     )
   })
@@ -397,17 +408,21 @@ describe('malware at spawn (spec §5.4)', () => {
     }
   })
 
-  it('malware share climbs by postVictoryPerDay per day after the cap and stops at malware.cap (a real level-up; the MinuteRow malShare column)', () => {
-    const m = data.parcels.malware
-    const sim = quiet(makeSim(1))
-    const capLevel = data.economy.playtestMaxLevel
-    const row = data.levels.find((l) => l.level === capLevel)!
+  it('malware share climbs by postVictoryPerDay per day after the cap and stops at malware.cap (a real level-up at a cap-3 config; the MinuteRow malShare column)', () => {
+    // The shipped cap is the last level since M9 (only Victory escalates
+    // there, tests/sim/endless.test.ts); M8's cap 3 pins the cap rule.
+    const sim = quiet(makeSim(1, { economy: { playtestMaxLevel: 3 } }))
+    const capData = sim.data
+    const m = capData.parcels.malware
+    const capLevel = capData.economy.playtestMaxLevel
+    expect(capLevel).toBe(3)
+    const row = capData.levels.find((l) => l.level === capLevel)!
     runTicks(sim, 100)
     sim.state.economy.lifetimeEarned = row.threshold
     runTicks(sim, 1)
     expect(sim.state.level.level).toBe(capLevel)
     const atCap = m.baseShare + m.perLevel * (capLevel - 1)
-    expect(malwareShare(sim.state, data)).toBeCloseTo(atCap, 10)
+    expect(malwareShare(sim.state, capData)).toBeCloseTo(atCap, 10)
     const days = Math.ceil((m.cap - atCap) / m.postVictoryPerDay) + 5
     runTicks(sim, 600 * days - 101)
     const shares = sim.state.stats.minutes.map((r) => r.malShare)

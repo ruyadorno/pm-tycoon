@@ -24,8 +24,11 @@
 //              [Re-hire $28] (salary × rehireFeeDays, §7.4) [Fire]
 //   arm        `Sorter Arm · tosses every held parcel after 3 s`, `Clear a
 //              parcel first to keep it`, [Remove +$300] → Dialog confirm →
-//              lane.removeFixture(hold) (removalRefund × price); text only —
-//              the `sorter_arm_f*` sprite lives in the room (M9 art)
+//              lane.removeFixture(hold) (removalRefund × price); M9
+//              (design-m8-m9 §6.1, §6.4): the header shows the Arm itself —
+//              `sorter_arm_f0` (64 × 64, manifest `"atlas": "both"`, so this
+//              world-bound card can draw it) at the card's top right
+//              (armArt), in place of the sorter's dimmed idle frame
 //
 // Every number comes from the ViewSim (holdStation, people(), data tables).
 // It re-renders on worker / payroll / level / applicant events, and on
@@ -94,6 +97,11 @@ export const BTN_H = 44
 export const BTN_GAP = 8
 /** Header art: the sorter's idle frame (24 × 32), world atlas. */
 export const HEADER_FRAME = 'worker_sorter_s_idle_0'
+/** M9: the Arm state's picture (the room's idle frame, 64 × 64). */
+export const ARM_ART_FRAME = 'sorter_arm_f0'
+export const ARM_ART_SIZE = 64
+/** Its top inside the card (above BODY_Y, clear of the centred drag handle). */
+export const ARM_ART_Y = 4
 /** Name column of the person row (≤ 60 px incl. the ★). */
 export const NAME_W = 60
 /** `! unpaid` after the two pip groups (96 + 74 + 8). */
@@ -252,6 +260,19 @@ export function stationModel(
   }
 }
 
+/**
+ * Where the Arm state draws `sorter_arm_f0` on a card `W` wide: top right
+ * (x W − 8 − 64, y 4: right of the centred drag handle, above the body
+ * lines at BODY_Y), or null while the atlas lacks the frame.
+ */
+export function armArt(
+  W: number,
+  has: (frame: string) => boolean = (f) => frameOrNull(f) !== null,
+): { frame: string; x: number; y: number } | null {
+  if (!has(ARM_ART_FRAME)) return null
+  return { frame: ARM_ART_FRAME, x: W - PAD - ARM_ART_SIZE, y: ARM_ART_Y }
+}
+
 /** Card height per state (all ≤ STATION_CARD_MAX_H). */
 export function stationCardHeight(state: StationState): number {
   switch (state) {
@@ -350,9 +371,16 @@ export class StationCard extends WarehouseSheet {
     const hs = this.vs.holdStation
     const state = stationState(hs)
     const m = stationModel(this.vs.data, hs)
-    const art = frameOrNull(HEADER_FRAME) ?? frameOrNull('worker_s_idle_0')
+    // The Arm state shows the Arm (M9), every other state the sorter.
+    const arm = state === 'arm' ? armArt(this.L.W) : null
+    const art =
+      state === 'arm'
+        ? null
+        : (frameOrNull(HEADER_FRAME) ?? frameOrNull('worker_s_idle_0'))
     const head = art ? this.image(PAD + 4, 10, art) : null
     if (state !== 'onDuty') head?.setAlpha(DIM_ALPHA)
+    const armFrame = arm ? frameOrNull(arm.frame) : null
+    if (arm && armFrame) this.image(arm.x, arm.y, armFrame)
     this.text(40, textTop(16, 20), m.title)
     this.text(40, textTop(36, 20), m.status, MUTED)
     if (state === 'empty') this.buildEmpty()

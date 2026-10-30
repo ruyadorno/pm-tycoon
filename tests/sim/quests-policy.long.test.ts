@@ -27,7 +27,6 @@ import {
   tallyText,
 } from '../../tools/sim/report.ts'
 import {
-  capConfig,
   dataFixture,
   makeSim,
   noOffers,
@@ -40,7 +39,6 @@ import {
 const data = dataFixture()
 const targets = data.economy.pacingTargets
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-const PM5 = capConfig(5)
 
 let gateRuns: RunResult[] | null = null
 /** The 10-seed × 30-min competent-policy runs (computed once for this file). */
@@ -134,7 +132,7 @@ describe('questPolicyStep (B2 §7.2 quests row; design §5.1)', () => {
   })
 
   it('the Golden Release waits while a regular quest is active (no Accept attempt), and is accepted on the step the slot frees; never declined or abandoned', () => {
-    const sim = noOffers(quietSim(1, PM5))
+    const sim = noOffers(quietSim(1)) // M9: the shipped cap is L5
     startQuest(sim, 'rush_district')
     sim.state.economy.lifetimeEarned = 16_000
     runTicks(sim, 1)
@@ -178,7 +176,7 @@ describe('questPolicyStep (B2 §7.2 quests row; design §5.1)', () => {
 })
 
 describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-build2 §8.4 acceptance)', () => {
-  it('every offer is accepted on the tick it was offered; nothing expires, is declined or abandoned; every accept succeeds', () => {
+  it('every regular offer is accepted on the tick it was offered; nothing expires, is declined or abandoned; every accept succeeds', () => {
     for (const r of runs()) {
       const offered = r.events.filter((e) => e.name === 'quest:offered')
       expect(offered.length, `seed ${r.seed}`).toBeGreaterThan(0)
@@ -188,6 +186,17 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
         )
         // The last offer of the run may land on the final tick.
         if (o.tick === 30 * TICKS_PER_DAY) continue
+        // The Golden Release (offered on level:up {5}, before 30 min since
+        // M9's retune) waits for the active regular quest to end — accepted
+        // as soon as no quest is active (questPolicyStep), never declined.
+        if (o.ultimate === true) {
+          if (a !== undefined) {
+            expect(a.tick, `seed ${r.seed} ultimate`).toBeGreaterThanOrEqual(
+              Number(o.tick),
+            )
+          }
+          continue
+        }
         expect(a?.tick, `seed ${r.seed} ${String(o.questId)}`).toBe(o.tick)
       }
       const declined = r.events.filter((e) => e.name === 'quest:declined')
@@ -248,7 +257,7 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
     expect(n).toBeGreaterThanOrEqual(0)
   }, 120_000)
 
-  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows, L4-L5 informational until M9) passes by median on these runs; no seed breaks an invariant', () => {
+  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows; M9: + the L4-L5 rows) passes by median on these runs; no seed breaks an invariant', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -261,10 +270,7 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
     )
     expect(
       g.checks.filter((c) => c.note !== null).map((c) => [c.key, c.note]),
-    ).toEqual([
-      ['level4Min', 'informational (M9)'],
-      ['level5Min', 'informational (M9)'],
-    ])
+    ).toEqual([])
     expect(
       g.checks
         .filter((c) => c.note === null && !c.pass)

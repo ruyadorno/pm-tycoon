@@ -9,8 +9,9 @@
 // §6.3, §7 M8 9): an overseas route ends `Handed off at Prefetch Pier 2
 // 14:02` · `Cleared 14:47 — the ship has sailed` (Airport: `— the plane has
 // left`), a 12-line 6-slot overseas path fits 360×604, elision keeps both
-// overseas lines, and a real clearance's life:lost reads the same. Phaser is
-// stubbed (the module imports the kit).
+// overseas lines, and a real clearance's life:lost reads the same; M9: a
+// real Airport clearance at L5 through six live slots ends `— the plane has
+// left` and fits 360×604. Phaser is stubbed (the module imports the kit).
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -821,5 +822,56 @@ describe('M8 end to end: a real clearance life:lost through the card model', () 
       `Cleared ${card.simClock(handOffTick + docks.clearanceS * 10)} — the ship has sailed`,
     ])
     expect(m.lives).toBe(2)
+  })
+})
+
+describe('M9 end to end (design R11): an Airport clearance at the real L5, six live slots', () => {
+  it('debug overseas malware at the Airport: six slot lines, the terminal hand-off and "the plane has left" 20 s later, fitting 360×604', async () => {
+    const L5 = data.levels.find((l) => l.level === 5)!
+    const sim = helpers.quietSim(6)
+    sim.state.economy.lifetimeEarned = L5.threshold
+    helpers.runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(5)
+    for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+    helpers.fund(sim)
+    // Six live slots: the lane path of a 6-slot room (B2 §4.3, tier 5).
+    expect(
+      sim.state.lane.nodes.filter((n) => /^slot\d$/.test(n.id)).length,
+    ).toBe(6)
+    const lost = helpers.collect(sim, 'life:lost')
+    expect(
+      sim.dispatch({ kind: 'debugOverseasMalware', hub: 'airport' }).ok,
+    ).toBe(true)
+    const handOffTick = sim.state.tick
+    const airport = data.districts.find((d) => d.id === 'airport')!
+    if (airport.kind !== 'overseas') throw new Error('airport is not a hub')
+    helpers.runTicks(sim, airport.clearanceS * 10 - 1)
+    expect(lost).toHaveLength(0)
+    helpers.runTicks(sim, 1)
+    expect(lost).toHaveLength(1)
+    const l = lost[0]!
+    expect(l.report.viaClearance).toBe(true)
+    const m = model(sim, l)
+    const lines = card.routeText(m.route, m.strain)
+    const handedAt = l.path.find((e) => e.what === 'handedOff')?.ref
+    const terminal = data.buildings.find((b) => b.id === handedAt)!
+    expect(terminal.district).toBe('airport')
+    expect(terminal.recv).toBeGreaterThan(0)
+    expect(lines.slice(-2)).toEqual([
+      `Handed off at ${terminal.name} ${card.simClock(handOffTick)}`,
+      `Cleared ${card.simClock(handOffTick + airport.clearanceS * 10)} — the plane has left`,
+    ])
+    for (let k = 1; k <= 6; k++)
+      expect(
+        lines.some((x) => x.startsWith(`Slot ${k}`)),
+        `slot ${k}`,
+      ).toBe(true)
+    // It fits the card at the minimum profile and every line fits unwrapped.
+    const tail = card.tailTextsHeight({ counter: m.counter })
+    const fit = card.fitRoute(m.route, m.strain, card.routeBudget(604, tail))
+    expect(fit.lines.slice(-1)).toEqual([lines.at(-1)])
+    const width = await m5x7Width()
+    for (const x of lines) expect(width(x), x).toBeLessThanOrEqual(360 - 48)
+    expect(card.LOST_LIFE_TITLE).toBe('MALWARE DELIVERED')
   })
 })

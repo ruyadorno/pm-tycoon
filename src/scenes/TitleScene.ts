@@ -19,7 +19,9 @@
 // safeTop + 48 (B2 §5, Q-B2-1); the old text title is only a fallback when
 // the texture is missing. Then the kit buttons laid out with layout.ts:
 //   Continue  only for a compatible autosave (save.ts version + same
-//             dataHash), with the save header `Day 7 · $1,240 · Lv 2`;
+//             dataHash), with the save header `Day 7 · $1,240 · Lv 2`
+//             (+ ` · Tycoon ✓` once the run's Golden Release shipped —
+//             endless mode, B2 §3.4 / plan-build2 §8.6 task 3);
 //   New game  (with a save: Dialog `Overwrite your save?`);
 //   Reset     (Dialog `Clear save, settings and tutorial progress?`: clears
 //             the save, settings and playtest keys);
@@ -52,6 +54,7 @@ import {
   newGame,
   readSave,
   REG_ONBOARDING,
+  saveHeader,
   STALE_SAVE_TEXT,
   type LoadedGame,
   type SaveCheck,
@@ -74,7 +77,7 @@ import { ATTRACT_KEY, LOGO_KEY, WORLD_ATLAS } from '../render/atlases.ts'
 import { attractRecycleDue, type AttractBase } from '../render/AttractCamera.ts'
 import { visibleRect } from '../render/BuildingView.ts'
 import { Sim, type PolicyFactory } from '../sim/sim.ts'
-import { Button } from '../ui/Button.ts'
+import { Button, CONTENT_PAD } from '../ui/Button.ts'
 import { Dialog } from '../ui/Dialog.ts'
 import { buttonColumn, computeLayout, type Target } from '../ui/layout.ts'
 import { addPanel } from '../ui/Panel.ts'
@@ -332,8 +335,9 @@ export class TitleScene extends Phaser.Scene {
   }
 
   /**
-   * A long-idle Title (B2 §5): past the level cap the malware share keeps
-   * climbing (parcels.json postVictoryPerDay), so after an hour or so the
+   * A long-idle Title (B2 §5): once the demo's policy ships the Golden
+   * Release (M9: the cap is the last level, so only a Victory escalates) the
+   * malware share keeps climbing (parcels.json postVictoryPerDay), and the
    * demo city starts losing lives and, hours later, would freeze on game
    * over. Every ATTRACT_RECYCLE_S of attract sim time, or on its first lost
    * life / game over, the City re-installs the snapshot under its fade.
@@ -450,11 +454,18 @@ export class TitleScene extends Phaser.Scene {
     })
     btn.setData('label', label)
     if (isContinue && this.save.kind === 'ok' && hasFont(this)) {
-      // Two lines: `Continue` over the save header.
+      // Two lines: `Continue` over the save header (M9: ` · Tycoon ✓` for
+      // an endless-mode save, its `Lv 5` dropped when the line is too wide).
       const tint = primary ? THEME.textLight : THEME.textDark
       const top = textTop(0, t.rect.h, 2)
       const a = addText(this, 0, top, 'Continue', { tint })
-      const b = addText(this, 0, top + LINE_H, this.save.header, { tint })
+      const b = addText(this, 0, top + LINE_H, '', { tint })
+      b.setText(
+        saveHeader(this.save.payload, {
+          maxW: t.rect.w - 2 * CONTENT_PAD,
+          measure: (x) => b.setText(x).width,
+        }),
+      )
       for (const s of [a, b]) s.setX(Math.round((t.rect.w - s.width) / 2))
       btn.add([a, b])
     }

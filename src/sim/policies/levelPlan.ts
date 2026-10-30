@@ -3,7 +3,8 @@
 // class (src/sim/policy.ts — both kinds) after the L2 rule and before
 // COUNTERS. Each step walks levels 3..current (capped by the build:
 // SIM_FEATURES.levels3plus runs L3 at M8, levels45 adds L4-L5 at M9) and
-// the level's steps in order:
+// the level's steps in order, each level's strain counter first (NEW STRAIN
+// FIRST below):
 //
 //   done        → the next step;
 //   impossible  → the next step, re-checked every step: a machine with no
@@ -14,6 +15,21 @@
 //                 applicant): later steps wait, like the L2 truck → shaker
 //                 chain;
 //   ready       → act once (one purchase per policy step) and stop.
+//
+// NEW STRAIN FIRST (policy extension, M9 — docs/decisions.md; B2 §7.2's
+// order holds within a level): a level that announces a strain
+// (levels.json `strain`) puts its counter — the plan's machine step for a
+// checker that level unlocks (levels.json `machines`: the Battery checker
+// at L3, the X-ray at L4) — ahead of every step still pending, newest level
+// first. When L4 arrives with an L3 step unbought (the van, the 2nd truck),
+// the X-ray is bought before it, as a competent player covers a new strain
+// before growing the fleet: `dense` spawns newStrainDelayS after the
+// announcement against a lane that catches ~91 % of it without the X-ray
+// (balance lane, seeds 1-10 × 48 min: lives lost 15 → 7). At L3 the
+// Battery checker is already first, so the L3 order is unchanged. The cost
+// is on Victory: the van and 2nd truck come ~4 min later, so fewer Golden
+// Release wins by 45 min (docs/decisions.md M9 — kept: lives is gated,
+// victory informational).
 //
 // A vehicle's driver fee comes out of the buffer (M6 §5.1: the trigger is
 // price + purchaseBuffer, never price + fee + buffer); the picked driver is
@@ -35,6 +51,21 @@
 // COUNTERS, a desk never takes the slot a plan machine needs (M8 review:
 // desk 2 in the REPLACE slot left the Battery checker — B2 §7.2's first L3
 // purchase — impossible for the rest of the run).
+//
+// The Sorter Arm (B2 §7.2 L4 row "Sorter Arm (into the empty station)";
+// design-m8-m9 §7 M9 item 3; policy extension, docs/decisions.md): once
+// the Arm holds the Hold Bay station the competent policy leaves the bay to
+// it — the Arm Tosses every held parcel autoTossDelayS after it arrives
+// (sorter.ts armStep, `source: 'arm'`), the same Toss-everything outcome 3 s
+// later — and hand-Tosses only while every bay is taken, so a full bay never
+// stalls the lane (armHoldsBay). Before the Arm (L1-L3, or with a sorter in
+// the station) the policy Tosses every flag on the tick it is held, as in
+// playtest 1.
+//
+// L5 (B2 §7.2 "accept the Golden Release; 3rd truck; counters"): the accept
+// is questPolicyStep's accept-every-offer rule (policy.ts, M7 — the
+// ultimate as soon as no quest is active); the plan holds the 3rd truck;
+// COUNTERS fills slot 6 once it is bought.
 //
 // Pure sim code (tools/check-sim-purity.mjs): reads sim.state, acts only
 // through sim.dispatch. No import of policy.ts (no import cycle).
@@ -85,14 +116,40 @@ export function planMaxLevel(
   return features.levels45 ? 5 : PLAN_FIRST_LEVEL
 }
 
-/** The plan steps of levels 3..min(current level, planMaxLevel()), in order. */
+/**
+ * The step of `level`'s plan that counters the strain the level announces
+ * (NEW STRAIN FIRST, see the header): a machine step for a checker listed in
+ * the level's levels.json `machines`, when the row has a `strain`; else null.
+ */
+export function strainCounterStep(sim: Sim, level: number): PlanStep | null {
+  const row = sim.data.levels.find((r) => r.level === level)
+  if (!row || row.strain === null) return null
+  const checkers = new Set(sim.data.machines.checkers.map((c) => c.id))
+  return (
+    (LEVEL_PLAN[level] ?? []).find(
+      (st) =>
+        st.kind === 'machine' &&
+        checkers.has(st.defId) &&
+        row.machines.includes(st.defId),
+    ) ?? null
+  )
+}
+
+/**
+ * The plan steps of levels 3..min(current level, planMaxLevel()): each
+ * level's strain counter first, newest level first (NEW STRAIN FIRST), then
+ * every other step in level order (B2 §7.2's order within a level).
+ */
 export function planSteps(sim: Sim): PlanStep[] {
   const top = Math.min(sim.state.level.level, planMaxLevel())
-  const out: PlanStep[] = []
+  const counters: PlanStep[] = []
+  const rest: PlanStep[] = []
   for (let l = PLAN_FIRST_LEVEL; l <= top; l++) {
-    out.push(...(LEVEL_PLAN[l] ?? []))
+    const counter = strainCounterStep(sim, l)
+    if (counter) counters.unshift(counter)
+    rest.push(...(LEVEL_PLAN[l] ?? []).filter((st) => st !== counter))
   }
-  return out
+  return [...counters, ...rest]
 }
 
 /** A slot a purchase can go into: an empty live slot, or the REPLACE slot and its refund. */
@@ -260,6 +317,19 @@ export function levelPlanDone(sim: Sim): boolean {
     const st = stepStatus(sim, step, 0)
     return st === 'done' || st === 'impossible'
   })
+}
+
+/**
+ * The Sorter Arm holds the Hold Bay station and a bay is still free: the
+ * policy leaves the held parcels to the Arm this step (see the header).
+ * False without the Arm (a sorter, or nobody, in the station) and while
+ * every bay is taken — then the caller Tosses by hand.
+ */
+export function armHoldsBay(sim: Sim): boolean {
+  const lane = sim.state.lane
+  if (lane.holdStation.fixture !== SORTER_ARM_ID) return false
+  const hold = laneNode(lane, lane.holdBayNodeId)
+  return hold !== null && (hold.cap === null || hold.queue.length < hold.cap)
 }
 
 /** A plan machine step of levels ≤ current not yet done and still possible: it needs a slot. */

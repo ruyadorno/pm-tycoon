@@ -36,8 +36,10 @@
 // SIM_FEATURES.quests, informational below 30 minutes), a quests line (the
 // per-template offered / completed / failed counts), the conservation
 // identity and the tick time percentiles. Asserts every tick:
-// finite balance ≥ 0, finite vehicle positions, no vehicle in one state
-// > 120 s (idle_lot / inactive exempt); every 600 ticks: auditState (no NaN /
+// finite balance ≥ 0, finite vehicle positions, no vehicle without progress
+// (stuckKey: state, cargo, stop, wait timer, reservations — never position)
+// for > 120 s (M9: was "in one state"; idle_lot / inactive exempt); every
+// 600 ticks: auditState (no NaN /
 // non-JSON, ids resolve, each parcel in one place, the conservation identity
 // spawned = waiting + in vehicles + in lane + held + shelf + delivered +
 // tossed). An assertion failure ends that seed and exits 1. Gate windows
@@ -60,7 +62,7 @@ import {
   Sim,
 } from '../../src/sim/sim.ts'
 import type { Conservation } from '../../src/sim/sim.ts'
-import type { MinuteRow, VehicleState } from '../../src/sim/types.ts'
+import type { MinuteRow, Vehicle, VehicleState } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
 import { loadGameData } from './load.node.ts'
 import type { GateSummary, RecordedEvent, SeedResult } from './report.ts'
@@ -80,9 +82,24 @@ import {
   summarise,
 } from './report.ts'
 
-/** CLI sanity rule (plan.md §6.9.2): no vehicle stays in one state longer. */
+/**
+ * CLI sanity rule (plan.md §6.9.2, "no vehicle stuck > 120 s"): no vehicle
+ * goes this long without progress — the same stuckKey (state, cargo, stop,
+ * wait timer and reservations; tests/sim/robust.ts `stuck: 'progress'`).
+ * M9: a truck's delivering leg over the L4-L5 map (a dozen stops across five
+ * regions) runs past 120 s while it moves, so "one state" is no longer a
+ * deadlock sign (docs/decisions.md). Position is not progress: a vehicle
+ * driving a routing loop moves every tick but never reaches its next stop.
+ * The longest stretch without a key change in the policy runs is ~33 s
+ * (M9 review, 6 runs × 60 min, both policies).
+ */
 const STUCK_S = 120
 const STUCK_EXEMPT: readonly VehicleState[] = ['idle_lot', 'inactive']
+
+/** A vehicle's progress key: any change of it (never its position) is progress. */
+export function stuckKey(v: Vehicle): string {
+  return `${v.state}|${v.cargo.length}|${v.stopIndex}|${v.waitUntilTick}|${v.reserved.length}`
+}
 const POLICY_URL = new URL('../../src/sim/policy.ts', import.meta.url)
 const GATE_DIR = new URL('../../docs/gate/', import.meta.url)
 const QUICK = { seeds: [1, 2, 3], minutes: 20 }
@@ -285,7 +302,7 @@ export function runSeed(
   const total = minutes * TICKS_PER_DAY
   const times = new Float64Array(total)
   const asserts: string[] = []
-  const since = new Map<number, { state: VehicleState; tick: number }>()
+  const since = new Map<number, { key: string; tick: number }>()
   let rowsSeen = 0
   let ran = 0
   for (let i = 0; i < total && asserts.length === 0; i++) {
@@ -303,14 +320,17 @@ export function runSeed(
       if (!Number.isFinite(v.pos.tx) || !Number.isFinite(v.pos.ty)) {
         asserts.push(`${s.tick}: ${v.name} position NaN`)
       }
+      const key = stuckKey(v)
       const prev = since.get(v.id)
-      if (!prev || prev.state !== v.state) {
-        since.set(v.id, { state: v.state, tick: s.tick })
+      if (!prev || prev.key !== key) {
+        since.set(v.id, { key, tick: s.tick })
       } else if (
         !STUCK_EXEMPT.includes(v.state) &&
         s.tick - prev.tick > STUCK_S * TICKS_PER_S
       ) {
-        asserts.push(`${s.tick}: ${v.name} stuck in ${v.state} > ${STUCK_S} s`)
+        asserts.push(
+          `${s.tick}: ${v.name} stuck in ${v.state} > ${STUCK_S} s without progress`,
+        )
       }
     }
     while (rowsSeen < s.stats.minutes.length) {

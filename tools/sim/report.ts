@@ -36,14 +36,29 @@
 // never fails on L3. Printed: overseasCleared, overseasLivesLost (life:lost
 // with report.viaClearance), dock2Min / dock3Min (dock:bought); the gate
 // table gains L3_min, ovs+min, L4_min, L5_min.
+//
+// Build 2, M9 (spec-build2 §7.3; plan-build2 §8.6 task 4; design-m8-m9
+// §5.2-§5.3): SIM_FEATURES.levels45 is on, so level4Min (20-25 min) and
+// level5Min (25-30 min) gate like level3Min; goldenReleaseOfferedMaxMin
+// (≤ 32 min, read from `vlr sim:gate -- --minutes 35` → latest-35min.*) and
+// victoryMaxMin (≤ 45 min, tests/sim/victory.long.test.ts on seeds 1-3) are
+// printed as plain "informational". Printed too: armTosses (parcel:tossed
+// with source 'arm' — the L4 plan's Sorter Arm at work, design §7 M9 item 3);
+// the gate table gains GR_min (the Golden Release offer); the narrative
+// names the Sorter Arm purchase, its first Toss and an Airport loss as "the
+// plane has left" (design R11).
 
 import type { PacingTargets } from '../../src/data/types.ts'
 import type { SimEventName } from '../../src/sim/events.ts'
 import type { SimFeature } from '../../src/sim/features.ts'
 import { FEATURE_MILESTONE, SIM_FEATURES } from '../../src/sim/features.ts'
 import type { Sim } from '../../src/sim/sim.ts'
+import { SORTER_ARM_ID } from '../../src/sim/systems/sorter.ts'
 import type { MinuteRow, RunStats } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
+
+/** The hub whose malware clearance reads "the plane has left" (design R11). */
+const AIRPORT_HUB = 'airport'
 
 // Recording -------------------------------------------------------------------------
 
@@ -184,6 +199,9 @@ export class Highlights {
         if (this.#scripted.includes(e.id as number)) {
           return `${at} scripted malware #${e.id} tossed (+$${e.bounty})`
         }
+        if (e.source === 'arm' && this.#first('armToss')) {
+          return `${at} first Sorter Arm toss #${e.id}${e.wasMalware ? ` (+$${e.bounty})` : ' (clean parcel)'}`
+        }
         const key = e.wasMalware ? 'tossMalware' : 'tossClean'
         if (!this.#first(key)) return null
         return e.wasMalware
@@ -256,9 +274,24 @@ export class Highlights {
         return this.#first('handedOff')
           ? `${at} first hand-off #${e.id} at ${e.buildingId} (locked $${e.lockedValue})`
           : null
+      case 'money:changed': {
+        // The Sorter Arm has no event of its own: buyMachine seats it in the
+        // station, then debits its price (commands.ts), so the first
+        // purchase of that price that finds it seated is the Arm.
+        const arm = sim.data.machines.upgrades.find(
+          (u) => u.id === SORTER_ARM_ID,
+        )
+        return e.reason === 'purchase' &&
+          arm !== undefined &&
+          e.delta === -arm.price &&
+          s.lane.holdStation.fixture === SORTER_ARM_ID &&
+          this.#first('armBought')
+          ? `${at} bought the Sorter Arm into the Hold Bay station ($${arm.price})`
+          : null
+      }
       case 'parcel:cleared':
         if (e.malware === true) {
-          return `${at} malware cleared at ${e.hub} #${e.id} (the ship has sailed)`
+          return `${at} malware cleared at ${e.hub} #${e.id} (${e.hub === AIRPORT_HUB ? 'the plane has left' : 'the ship has sailed'})`
         }
         return this.#first('clearedOverseas')
           ? `${at} first overseas clearance #${e.id} at ${e.hub}: $${e.paid}`
@@ -350,6 +383,8 @@ export interface RunMetrics {
   /** M8: minute of dock:bought {index: 2} / {index: 3}, or null. */
   dock2Min: number | null
   dock3Min: number | null
+  /** M9: parcel:tossed with source 'arm' (the L4 plan's Sorter Arm). */
+  armTosses: number
   /** M6: stats.payrollPaid ÷ stats.income (gross), 3 dp; null with no income yet. */
   payrollShareOfGross: number | null
   /** M6: sorter:decided calls. */
@@ -614,6 +649,9 @@ export function computeMetrics(
     ).length,
     dock2Min: toMin(dockTick(2)),
     dock3Min: toMin(dockTick(3)),
+    armTosses: events.filter(
+      (e) => e.name === 'parcel:tossed' && e.source === 'arm',
+    ).length,
     payrollShareOfGross:
       stats.income > 0 ? round(stats.payrollPaid / stats.income, 3) : null,
     sorterDecisions: calls.length,
@@ -923,6 +961,7 @@ export interface MedianMetrics extends GateInputs {
   overseasLivesLost: number | null
   dock2Min: number | null
   dock3Min: number | null
+  armTosses: number | null
   payrollShareOfGross: number | null
   sorterDecisions: number | null
   sorterWrongToss: number | null
@@ -961,6 +1000,7 @@ export function medianMetrics(runs: readonly RunMetrics[]): MedianMetrics {
     overseasLivesLost: pick('overseasLivesLost'),
     dock2Min: pick('dock2Min'),
     dock3Min: pick('dock3Min'),
+    armTosses: pick('armTosses'),
     payrollShareOfGross: pick('payrollShareOfGross'),
     sorterDecisions: pick('sorterDecisions'),
     sorterWrongToss: pick('sorterWrongToss'),
@@ -1071,6 +1111,8 @@ export function summarise(
     windowNote('payrollShareOfGrossMax', features) ?? 'informational'
   const quests = features.quests ? 'informational' : build2
   const l3 = features.levels3plus ? 'informational' : build2
+  const l45 = features.levels45 ? 'informational' : 'informational (M9)'
+  const ultimate = !features.quests ? build2 : l45
   const metrics = runs.map((r) => r.metrics)
   const plateau = metrics.filter((m) => m.questActive7to13 === 1).length
   const magicOffered = metrics.reduce((n, m) => n + (m.magicSpawned ?? 0), 0)
@@ -1162,19 +1204,25 @@ export function summarise(
       key: 'dock3Min',
       target: 'minute loading dock 3 is bought',
       median: medians.dock3Min,
-      note: features.levels45 ? 'informational' : 'informational (M9)',
+      note: l45,
+    },
+    {
+      key: 'armTosses',
+      target: 'Hold Bay parcels the Sorter Arm tossed (L4 plan)',
+      median: medians.armTosses,
+      note: l45,
     },
     {
       key: 'goldenReleaseOfferedMaxMin',
       target: `≤ ${t.goldenReleaseOfferedMaxMin} min (seeds 1-10 × 35 min, --minutes 35)`,
       median: medians.goldenReleaseOfferedMin,
-      note: features.quests ? 'informational (M9)' : build2,
+      note: ultimate,
     },
     {
       key: 'victoryMaxMin',
       target: `≤ ${t.victoryMaxMin} min (seeds 1-3 × 45 min, the long test)`,
       median: medians.victoryMin,
-      note: features.quests ? 'informational (M9)' : build2,
+      note: ultimate,
     },
     ...(features.quests
       ? [
@@ -1368,6 +1416,7 @@ const GATE_COLS: readonly {
   },
   { head: 'L4_min', w: 7, cell: (m) => num(m.level4Min, 2) },
   { head: 'L5_min', w: 7, cell: (m) => num(m.level5Min, 2) },
+  { head: 'GR_min', w: 7, cell: (m) => num(m.goldenReleaseOfferedMin, 2) },
 ]
 
 /** An integer count (a median of counts may end in .5). */

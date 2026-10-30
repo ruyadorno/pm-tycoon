@@ -41,52 +41,6 @@ export function dataFixture(overrides?: unknown): GameData {
   return buildGameData(applyConfig(loadRawData(), overrides, 'test overrides'))
 }
 
-/**
- * The map.hubs rows (+ vessel props) M9 ships for overseas districts the
- * current map has no row for yet (design-m8-m9 §1.2).
- */
-const PENDING_HUBS: Record<string, { hub: unknown; prop: unknown }> = {
-  airport: {
-    hub: {
-      district: 'airport',
-      office: 'ap_terminal',
-      vessel: { frame: 'ap_plane', tile: [45, 10], exit: [4, 0], liftPx: 64 },
-    },
-    prop: { frame: 'ap_plane', tile: [45, 10], region: 'airport' },
-  },
-}
-
-/**
- * A config patch raising economy.playtestMaxLevel to `level`. The schema
- * wants a map.hubs row for every overseas district live at a level ≤ the
- * cap; one the shipped map has no row for yet (the Airport before M9) gets
- * its PENDING_HUBS row, its vessel prop appended to map.props (arrays merge
- * by index, so the patch arrays are sparse).
- */
-export function capConfig(level: number): Record<string, unknown> {
-  const raw = loadRawData() as unknown as {
-    districts: { id: string; kind: string; unlockLevel: number }[]
-    map: { hubs: { district: string }[]; props: unknown[] }
-  }
-  const hubs: unknown[] = []
-  const props: unknown[] = []
-  let nHubs = raw.map.hubs.length
-  let nProps = raw.map.props.length
-  for (const d of raw.districts) {
-    if (d.kind !== 'overseas' || d.unlockLevel > level) continue
-    if (raw.map.hubs.some((h) => h.district === d.id)) continue
-    const row = PENDING_HUBS[d.id]
-    if (!row) throw new Error(`capConfig: no pending hub row for ${d.id}`)
-    hubs[nHubs++] = row.hub
-    props[nProps++] = row.prop
-  }
-  const patch: Record<string, unknown> = {
-    economy: { playtestMaxLevel: level },
-  }
-  if (hubs.length > 0) patch.map = { hubs, props }
-  return patch
-}
-
 /** A new game on the shipped (or patched) data. */
 export function makeSim(seed = 1, overrides?: unknown): Sim {
   return new Sim(dataFixture(overrides), seed)

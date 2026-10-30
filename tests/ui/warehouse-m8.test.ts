@@ -69,12 +69,18 @@ describe('design-m8-m9 §6.1: dock texts', () => {
     expect(dv.lockedDockText(data, 2)).toBe(
       'Loading dock 2 — unlocks at Lv 3 ($800)',
     )
+    // M9: the shipped cap is the top level (5), so no dock is "coming soon".
+    expect(data.economy.playtestMaxLevel).toBe(5)
     expect(dv.lockedDockText(data, 3)).toBe(
-      'Loading dock 3 — unlocks at Lv 4 ($2,000) · coming soon',
+      'Loading dock 3 — unlocks at Lv 4 ($1,000)',
     )
     const capped = dataFixture({ economy: { playtestMaxLevel: 2 } })
     expect(dv.lockedDockText(capped, 2)).toBe(
       'Loading dock 2 — unlocks at Lv 3 ($800) · coming soon',
+    )
+    const cap3 = dataFixture({ economy: { playtestMaxLevel: 3 } })
+    expect(dv.lockedDockText(cap3, 3)).toBe(
+      'Loading dock 3 — unlocks at Lv 4 ($1,000) · coming soon',
     )
     expect(dv.lockedDockText(data, 1)).toBeNull()
     expect(dv.lockedDockText(data, 4)).toBeNull()
@@ -139,6 +145,23 @@ describe('design-m8-m9 §6.1: the bay look per dock slot', () => {
       Math.round(door3.x + (door3.w - textW('$800')) / 2),
     )
     expect(dv.badgeTextX({ x: 0, w: 32 }, 33)).toBe(0)
+  })
+
+  it('M9: a buyable door\'s price sits on a ui_badge tag (dark on light — the tier-4/5 walls are light), inside the room, below the "+", every shipped price fitting it', () => {
+    expect(FRAME_ATLAS['ui_badge']).toBeDefined()
+    for (const k of [2, 3]) {
+      const door = rl.dockGeom(k)!.door
+      const r = dv.priceTagRect(door)
+      expect(r.x).toBeGreaterThanOrEqual(0)
+      expect([r.w, r.h]).toEqual([dv.PRICE_TAG.w, dv.PRICE_TAG.h])
+      // Below the "+" (centred at door.y + 20, 16 px), inside the door's height.
+      expect(r.y).toBeGreaterThanOrEqual(door.y + 28)
+      expect(r.y + r.h).toBeLessThanOrEqual(door.y + door.h)
+    }
+    for (const d of data.economy.docks.filter((x) => x.price > 0)) {
+      const w = textW(`$${d.price.toLocaleString('en-US')}`)
+      expect(w, `dock ${d.index}`).toBeLessThanOrEqual(dv.PRICE_TAG.w - 4)
+    }
   })
 
   it('owned: closed (open while a vehicle stands in it), its pad and lamp; dock 1 has no pad', () => {
@@ -348,11 +371,13 @@ describe('design-m8-m9 §6.1: tier 3 and the frame fallback', () => {
     expect(
       lr.tierFrame('floor', 3, (n) => n === 'floor_t2_lane', '_lane'),
     ).toBe('floor_t2_lane')
-    // The real atlas: tiers 4–5 draw the tier-3 room until M9's art lands.
+    // The real atlas (M9 art packed): every tier draws its own room; a
+    // tier past the art (6) falls back to the top one.
     for (const stem of ['wall', 'wallface', 'sign', 'shelf', 'wanted_poster'])
       for (const t of [3, 4, 5])
-        expect(lr.tierFrame(stem, t), `${stem} t${t}`).toBe(`${stem}_t3`)
-    expect(lr.tierFrame('props', 5)).toBe('props_t3')
+        expect(lr.tierFrame(stem, t), `${stem} t${t}`).toBe(`${stem}_t${t}`)
+    expect(lr.tierFrame('props', 5)).toBe('props_t5')
+    expect(lr.tierFrame('props', 6)).toBe('props_t5')
   })
 
   it('floors: tier-1 crack variants, `floor_t<t>` and its `_lane` in the belt column above', () => {
@@ -361,7 +386,10 @@ describe('design-m8-m9 §6.1: tier 3 and the frame fallback', () => {
     expect(lr.floorFrameFor(2, 3, 3)).toBe('floor_t2')
     expect(lr.floorFrameFor(3, 4, 3)).toBe('floor_t3_lane')
     expect(lr.floorFrameFor(3, 5, 7)).toBe('floor_t3')
-    expect(lr.floorFrameFor(5, 5, 7)).toBe('floor_t3')
+    expect(lr.floorFrameFor(5, 5, 7)).toBe('floor_t5')
+    expect(lr.floorFrameFor(4, 4, 7)).toBe('floor_t4_lane')
+    // Tier 5 art missing: the nearest lower tier's floor.
+    expect(lr.floorFrameFor(5, 5, 7, (n) => n === 'floor_t3')).toBe('floor_t3')
     // No art at all above tier 1: the crack variants, never a missing frame.
     expect(lr.floorFrameFor(3, 4, 3, () => false)).toMatch(/^floor_t1_/)
   })
@@ -373,6 +401,7 @@ describe('design-m8-m9 §6.1: tier 3 and the frame fallback', () => {
       plates: false,
       props: 1,
       signDark: false,
+      neon: false,
     })
     expect(lr.tierParts(2)).toMatchObject({
       bulb: false,
@@ -386,6 +415,8 @@ describe('design-m8-m9 §6.1: tier 3 and the frame fallback', () => {
         plates: true,
         props: 3,
         signDark: true,
+        // M9: the tier-5 strip-light spots carry the neon tubes.
+        neon: t === 5,
       })
   })
 

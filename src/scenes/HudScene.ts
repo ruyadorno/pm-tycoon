@@ -5,7 +5,8 @@
 //
 //   top bar      money (300 ms count tween, red flash on a negative delta,
 //                floats), 5 life slots, mood face; level label + bar
-//                (`$1,240 / $2,000`, `· Lv N coming soon` at the cap), shield
+//                (`$1,240 / $2,000`, `· Lv N coming soon` at a cap below
+//                the last level, `$18,400 · Tycoon ✓` at the top), shield
 //                (2 Hz poll of laneStats, ShieldPopover on tap)
 //   ticker       Ticker (Day cell + scrolling news, PAUSED blink)
 //   toast lane   kit Toast (also pm:toast) + pm:tooltip bubbles
@@ -89,6 +90,21 @@
 // 3 the level bar reads `· Lv 4 coming soon` (data-driven,
 // hudKit.cappedBelowNext).
 //
+// M9 L4 + L5 (design-m8-m9 §6.3; B2 §3.4, §4.2-§4.3): the cap is the last
+// levels.json row, so nothing reads "coming soon" any more; at the top level
+// (nextThreshold null) the level-up sweep leaves the bar full and the bar
+// reads `$18,400 · Tycoon`, `$18,400 · Tycoon ✓` from game:victory on
+// (vs.victory: re-read at once and on every sync, so a loaded endless save
+// shows it), the compact bar beside the quest chip drops the suffix, and the
+// level tap toasts `Tycoon — top level` / `Tycoon ✓ — endless mode`. The
+// Golden Release is offered on the level:up {5} tick (M7's QuestCard, gold
+// frame, opening once the level paper is gone), the VictoryCard's Continue
+// releases the 'victory' hold into endless play, and the endless line
+// (`Endless mode — the malware keeps evolving`) is the sim's ticker:news
+// 'level' at the first day boundary after the Victory — the HUD adds
+// nothing. An Airport clearance's lost life ends `— the plane has left`
+// (hubText.sailedText from its map.hubs vessel, design R11).
+//
 // M4 (plan.md §12.7 tasks 1-2, §12.9): the PlaytestRecorder
 // (src/metrics/playtest.ts) follows the sim from create (resumed from
 // pm.playtest.v1 when this is the same run as the save, a fresh profile
@@ -145,7 +161,11 @@ import { UI_ATLAS } from '../render/atlases.ts'
 import { STAMP_MS, STAMP_RISE_MS, stampPose } from '../render/cityFx.ts'
 import { buildingSprite } from '../render/frames.ts'
 import { footprintAnchor, originX } from '../render/iso.ts'
-import { roomPlacement } from '../render/warehouse/RoomLayout.ts'
+import { visualTier } from '../render/warehouse/LaneRenderer.ts'
+import {
+  roomHeightForTier,
+  roomPlacement,
+} from '../render/warehouse/RoomLayout.ts'
 import type {
   LifeLostPayload,
   SimEventPayloads,
@@ -1638,6 +1658,8 @@ export class HudScene extends Phaser.Scene {
   private onVictory(): void {
     this.hold('victory')
     this.questDirty = true
+    // M9: the level bar turns `$18,400 · Tycoon ✓` (economy.victory is set).
+    this.refreshLevel()
     // Persist the victory right after this tick.
     if (this.saveSoon !== 'final') this.saveSoon = 'save'
     if (this.victoryTimer || this.victoryCard.isOpen) return
@@ -1931,12 +1953,15 @@ export class HudScene extends Phaser.Scene {
 
   /** level:up (city-view §9.6, HUD side). */
   private onLevelUp(p: SimEventPayloads['level:up']): void {
-    // Step 4: the bar shows full, then refills from 0 toward the next threshold.
-    this.levelAnim = reducedMotion() ? null : 0
+    // Step 4: the bar shows full, then refills from 0 toward the next
+    // threshold — at the top level (M9: no next threshold) it just stays full.
+    this.levelAnim =
+      reducedMotion() || this.vs.nextThreshold === null ? null : 0
     this.refreshLevel()
     this.refreshShield()
     this.refreshChips()
     this.refreshGarageBadge()
+    this.syncToastLane()
     const row = this.gd.levels.find((l) => l.level === p.level)
     if (!row) return
     this.queueLine(row.ticker, 'level')
@@ -2233,7 +2258,10 @@ export class HudScene extends Phaser.Scene {
       level: addTapZone(
         this,
         L.level.hit,
-        () => this.toast.show(nextUnlockLine(this.gd, this.vs.level)),
+        () =>
+          this.toast.show(
+            nextUnlockLine(this.gd, this.vs.level, this.vs.victory),
+          ),
         'level',
       ),
       shield: addTapZone(
@@ -2416,7 +2444,7 @@ export class HudScene extends Phaser.Scene {
       vs.level,
       vs.lifetimeEarned,
       vs.nextThreshold,
-      { compact },
+      { compact, victory: vs.victory },
     )
     this.levelText.setText(levelLabel(this.gd, vs.level))
     const bar = this.levelBarRect()
@@ -2966,6 +2994,20 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
+   * The toast lane follows the room when its height changes inside the
+   * warehouse — a level-up 3 → 4 / 4 → 5 or a sim swap at another tier
+   * (M9 review: the lane stayed at the old room's wall, over the dock
+   * panel); a no-op while it already sits there (a toast mid-slide keeps
+   * its tween).
+   */
+  private syncToastLane(): void {
+    if (!this.toast) return
+    const lane = this.toastLane()
+    if (lane.y === this.toast.laneY) return
+    this.toast.relayout({ W: this.L.W, toast: lane })
+  }
+
+  /**
    * The toast lane for the current view: L.toast in the city; in the
    * warehouse it moves onto the room's north wall (over the decorative
    * incident sign), because L.toast covers the lane readout strip — exactly
@@ -2974,7 +3016,16 @@ export class HudScene extends Phaser.Scene {
   private toastLane(): Layout['toast'] {
     const L = this.L
     if (this.view !== 'warehouse') return L.toast
-    const room = roomPlacement(L.W, L.ticker.y + L.ticker.h, L.bottomBar.y)
+    // M9: the tier's room height (16 / 18 rows at tiers 4-5), as the
+    // WarehouseScene places it — a room taller than the bands starts 28 px
+    // under the ticker instead of being centred.
+    const roomH = roomHeightForTier(visualTier(this.gd, this.vs.level))
+    const room = roomPlacement(
+      L.W,
+      L.ticker.y + L.ticker.h,
+      L.bottomBar.y,
+      roomH,
+    )
     return { ...L.toast, y: room.roomY + 4 }
   }
 
@@ -3527,6 +3578,7 @@ export class HudScene extends Phaser.Scene {
     this.strainsTold = new Set(this.liveStrains())
     this.moodDay.clear()
     this.levelAnim = null
+    this.syncToastLane()
     this.refreshWarehouseBtn()
     this.refreshGarageBadge()
     if (

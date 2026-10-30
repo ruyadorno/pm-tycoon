@@ -18,7 +18,7 @@
     "sim": "node tools/sim/cli.ts",
     "sim:gate": "node tools/sim/cli.ts --gate --seeds 1-10 --minutes 30",
     "sim:delegating": "node tools/sim/cli.ts --gate --seeds 1-10 --minutes 30 --policy delegating",
-    "fixtures": "node tools/fixtures/late-waiting.ts && node tools/fixtures/warehouse.ts && node tools/fixtures/m3.ts && node tools/fixtures/people.ts && node tools/fixtures/m8.ts && node tools/fixtures/attract.ts",
+    "fixtures": "node tools/fixtures/late-waiting.ts && node tools/fixtures/warehouse.ts && node tools/fixtures/m3.ts && node tools/fixtures/people.ts && node tools/fixtures/m8.ts && node tools/fixtures/m9.ts && node tools/fixtures/attract.ts",
     "fixtures:attract": "node tools/fixtures/attract.ts",
     "e2e:install": "node tools/e2e-install.mjs",
     "e2e": "node tools/e2e-available.mjs && vite build && playwright test",

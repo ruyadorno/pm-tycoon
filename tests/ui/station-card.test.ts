@@ -72,7 +72,11 @@ describe('the station states (B2 §2.6)', () => {
     })
     const arm = st.armDef(data)!
     expect(st.armCaption(arm, 2, 1_000_000)).toBe('Lv 4')
-    expect(st.armBlockReason(data, arm, 2, 1_000_000)).toBe(
+    // M9 ships the cap at the last level (B2 §9): L4 is reachable, so no
+    // "coming soon"; a cap below L4 (the M8 config) still adds it.
+    expect(st.armBlockReason(data, arm, 2, 1_000_000)).toBe('Unlocks at Lv 4')
+    const cap3 = dataFixture({ economy: { playtestMaxLevel: 3 } })
+    expect(st.armBlockReason(cap3, st.armDef(cap3)!, 2, 1_000_000)).toBe(
       'Unlocks at Lv 4 · coming soon',
     )
     // the card's buyArm refuses below the level (locked) — the button is disabled

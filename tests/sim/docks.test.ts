@@ -45,7 +45,7 @@ const nodeIds = (sim: Sim): string[] => sim.state.lane.nodes.map((n) => n.id)
 describe('buyDock (design-m8-m9 §3.1, §4.2)', () => {
   it('failures change nothing: index 1 / 4 invalid, below the unlock level locked, short of $800 insufficient-funds, twice invalid', () => {
     expect(dock2).toEqual({ index: 2, unlockLevel: 3, price: 800 })
-    expect(dock3).toEqual({ index: 3, unlockLevel: 4, price: 2000 })
+    expect(dock3).toEqual({ index: 3, unlockLevel: 4, price: 1000 })
     const sim = quietSim(1)
     fund(sim)
     const try1 = (index: number) => {
@@ -169,7 +169,7 @@ describe('buyDock (design-m8-m9 §3.1, §4.2)', () => {
     ).not.toThrow()
   })
 
-  it('ViewSim lane.dockSlots(): dock 1 owned, dock 2 available at L3 ($800), dock 3 not before L4 ($2,000); lane.buyDock dispatches', () => {
+  it('ViewSim lane.dockSlots(): dock 1 owned, dock 2 available at L3 ($800), dock 3 not before L4 ($1,000); lane.buyDock dispatches', () => {
     const sim = atLevel(3)
     const vs = createViewSim(sim)
     expect(vs.lane.dockSlots()).toEqual([
@@ -194,7 +194,7 @@ describe('buyDock (design-m8-m9 §3.1, §4.2)', () => {
         dockId: 'dock3',
         owned: false,
         unlockLevel: 4,
-        price: 2000,
+        price: 1000,
         available: false,
       },
     ])

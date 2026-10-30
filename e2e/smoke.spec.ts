@@ -66,7 +66,21 @@
 //      the policy, sim-only to L3 with $800 (tools/fixtures/m8.ts), dock 2's
 //      door → Buy by real taps: `dock:bought {2}` (the log's buyDock, −$800),
 //      lane.docks [dock1, dock2], the HUD toast `Loading dock 2 open — two
-//      vehicles unload at once`, the replay still matches.
+//      vehicles unload at once`, the replay still matches. M9: the cap is
+//      L5, so dock 3's tooltip reads `… unlocks at Lv 4 ($1,000)` (no
+//      `coming soon`; the text is built from economy.docks).
+//   M9 (plan-build2 §8.6 task 2; design-m8-m9 §6.1 R10/R22) — room growth:
+//      a fresh ?level=5 game in the room at 393×659: the 18-row room does
+//      not fit (maxScroll 73), the readout stays fixed under the top band; a
+//      real touch drag (CDP touch events) 40 px up scrolls the room 40 px
+//      1:1 and opens nothing; scrolled, a tap on slot 6 still hits slot 6
+//      (its BuySheet), and the room scrolls toward it (to maxScroll).
+//      M9 review: a scroll drag ending on the bottom bar and a lift released
+//      on the top band (a HUD zone takes the pointer-up) leave no stale
+//      press — the ghost snaps back, slot 1 keeps its desk, the next taps
+//      open BuySheets; and a real-time ?level=3 → debugForceLevel 4 in the
+//      room fades the old room out on the new room's origin (gone after the
+//      tier fade) with the HUD toast lane on the new room's north wall.
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, gameUp, test, titleUp, type PmHelpers } from './fixtures.ts'
@@ -74,10 +88,13 @@ import {
   bayRect,
   dockHit,
   expectRoomFits,
+  expectRoomScrolls,
   hireSheet,
+  layoutFor,
   openSheet,
   policyOff,
   roomFit,
+  roomScrollTo,
   sceneTarget,
   settleUntil,
   SORTER_STAND,
@@ -1604,14 +1621,25 @@ test.describe('M8 docks smoke', () => {
     await recordTooltips(page)
     expect(await dockSlots(page)).toEqual(['1:owned', '2:buy', '3:locked'])
 
-    // Dock 3 (L4): the unlock tooltip, no dialog.
+    // Dock 3 (L4): the unlock tooltip, no dialog. M9: L4 is reachable (cap
+    // 5), so no `coming soon`; level and price come from economy.docks.
     await tapRoomRect(page, pm, dockHit(3))
     await pm.settle(16)
     expect(
       await sceneTarget(page, 'Warehouse', 'wh:dockDialog:confirm'),
     ).toBeNull()
+    const dock3 = await page.evaluate(() => {
+      const d = window.__pm!.data.economy
+      const row = d.docks.find((r) => r.index === 3)!
+      return {
+        level: row.unlockLevel,
+        price: row.price,
+        soon: row.unlockLevel > d.playtestMaxLevel,
+      }
+    })
+    expect(dock3.soon, 'L4 is reachable at M9').toBe(false)
     expect(await tooltips(page)).toEqual([
-      'Loading dock 3 — unlocks at Lv 4 ($2,000) · coming soon',
+      `Loading dock 3 — unlocks at Lv ${dock3.level} ($${dock3.price.toLocaleString('en-US')})`,
     ])
 
     // Dock 2 (L3, $800) at the start balance: the dialog, Buy refused.
@@ -1688,6 +1716,301 @@ test.describe('M8 docks smoke', () => {
       'Loading dock 2 open — two vehicles unload at once',
     )
     expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+/**
+ * A real one-finger drag (CDP touch events, as a phone sends them) from
+ * logical game px `from` to `to` in `steps` moves, one 16-ms frame after
+ * each event (well inside the 450-ms lift).
+ */
+async function touchDrag(
+  page: Page,
+  pm: PmHelpers,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  steps = 8,
+): Promise<void> {
+  const css = await page.evaluate(() => {
+    const game = window.__pm!.game
+    const r = game.canvas.getBoundingClientRect()
+    return { left: r.left, top: r.top, zoom: game.scale.zoom }
+  })
+  const at = (x: number, y: number): { x: number; y: number } => ({
+    x: css.left + (x + 0.5) * css.zoom,
+    y: css.top + (y + 0.5) * css.zoom,
+  })
+  const cdp = await page.context().newCDPSession(page)
+  try {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [at(from.x, from.y)],
+    })
+    await pm.settle(1)
+    for (let i = 1; i <= steps; i++) {
+      const k = i / steps
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [
+          at(
+            Math.round(from.x + (to.x - from.x) * k),
+            Math.round(from.y + (to.y - from.y) * k),
+          ),
+        ],
+      })
+      await pm.settle(1)
+    }
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+    await pm.settle(1)
+  } finally {
+    await cdp.detach()
+  }
+}
+
+test.describe('M9 room scroll smoke', () => {
+  test('a fresh ?level=5 game in the room: 18 rows that scroll (readout fixed), a touch drag scrolls 1:1 and opens nothing, a tap on slot 6 still lands on slot 6', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(`${NEW_URL}&view=warehouse&level=5`)
+    await pm.freeze()
+    await pm.settle(30)
+    const f0 = await roomFit(page)
+    expect(f0.tier).toBe(5)
+    expect(f0.roomH, '18 rows').toBe(18 * 32)
+    expectRoomScrolls(f0, 'L5 at 393×659')
+    expect(f0.maxScroll, 'design §6.1: 73 at 393×659').toBe(73)
+    expect(f0.scrollY).toBe(0)
+
+    // A drag 40 px up from the viewport's middle (over the belt and rack).
+    const x = f0.roomX + 160
+    const y = f0.viewport.y + Math.floor(f0.viewport.h / 2)
+    await touchDrag(page, pm, { x, y }, { x, y: y - 40 })
+    await pm.settle(8)
+    const f1 = await roomFit(page)
+    console.log(`smoke: drag-scroll ${JSON.stringify({ f0, f1 })}`)
+    expectRoomScrolls(f1, 'after the drag')
+    expect(f1.scrollY, '1:1, no inertia').toBe(40)
+    expect(f1.readout, 'the readout does not move').toEqual(f0.readout)
+    expect(await openSheet(page), 'a drag is never a tap').toBeNull()
+
+    // Scrolled, slot 6 (an empty live slot at a fresh L5) opens its BuySheet.
+    const slot6 = layoutFor(5).rectFor('slot6')!
+    expect(slot6.y + slot6.h - f1.scrollY).toBeLessThanOrEqual(f1.viewport.h)
+    await tapRoomRect(page, pm, slot6)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'buy',
+      ),
+      'slot 6 opens the BuySheet',
+    ).toBe(true)
+    const f2 = await roomFit(page)
+    const sheetTop = await page.evaluate(() => {
+      const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+        buy: { top: number } | null
+      }
+      return wh.buy?.top ?? null
+    })
+    console.log(`smoke: slot 6 sheet ${JSON.stringify({ f2, sheetTop })}`)
+    expectRoomScrolls(f2, 'with the sheet')
+    expect(sheetTop, 'the BuySheet top').not.toBeNull()
+    // Scroll-into-view (design §6.1): the room scrolls toward slot 6 as far
+    // as it goes — at 393×659 the BuySheet (top ≈ 219) still covers slot 6
+    // at maxScroll, so only the clamp is pinned here.
+    expect(f2.scrollY, 'scrolled toward slot 6, clamped').toBe(f2.maxScroll)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('a drag or a lift released over a HUD band (its zone takes the pointer-up) leaves no stale press: the ghost snaps back, the next tap is a tap', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(`${NEW_URL}&view=warehouse&level=5`)
+    await pm.freeze()
+    await pm.settle(30)
+    const f0 = await roomFit(page)
+    expectRoomScrolls(f0, 'L5 at 393×659')
+    const press = (): Promise<{
+      press: boolean
+      drag: boolean
+      slot1: string | null
+    }> =>
+      page.evaluate(() => {
+        const api = window.__pm!
+        const wh = api.game.scene.getScene('Warehouse') as unknown as {
+          press: object | null
+          drag: object | null
+        }
+        const n = api.core.state.lane.nodes.find((x) => x.id === 'slot1')
+        return {
+          press: wh.press !== null,
+          drag: wh.drag !== null,
+          slot1: n?.fixture?.kind ?? null,
+        }
+      })
+    const x = f0.roomX + 160
+    const mid = f0.viewport.y + Math.floor(f0.viewport.h / 2)
+
+    // 1. A scroll drag that ends on the bottom bar.
+    await touchDrag(page, pm, { x, y: mid }, { x, y: f0.bandBottom + 24 }, 10)
+    await pm.settle(2)
+    expect(await press(), 'no press left after the drag').toMatchObject({
+      press: false,
+      drag: false,
+    })
+    // The next tap on slot 2 (empty at a fresh L5) opens its BuySheet.
+    await tapRoomRect(page, pm, layoutFor(5).rectFor('slot2')!)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'buy',
+      ),
+      'the tap after the drag opens slot 2',
+    ).toBe(true)
+    await page.keyboard.press('Escape')
+    await pm.settle(20)
+    expect(await openSheet(page)).toBeNull()
+
+    // 2. A lift (hold ≥ 450 ms on slot 1's desk) released on the top band.
+    await roomScrollTo(page, 0)
+    const f1 = await roomFit(page)
+    const s1 = layoutFor(5).rectFor('slot1')!
+    const from = {
+      x: f1.roomX + s1.x + Math.floor(s1.w / 2),
+      y: f1.roomY + s1.y + Math.floor(s1.h / 2),
+    }
+    expect((await press()).slot1, 'slot 1 holds the start desk').toBe('desk')
+    const css = await page.evaluate(() => {
+      const game = window.__pm!.game
+      const r = game.canvas.getBoundingClientRect()
+      return { left: r.left, top: r.top, zoom: game.scale.zoom }
+    })
+    const at = (px: number, py: number): { x: number; y: number } => ({
+      x: css.left + (px + 0.5) * css.zoom,
+      y: css.top + (py + 0.5) * css.zoom,
+    })
+    const cdp = await page.context().newCDPSession(page)
+    try {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [at(from.x, from.y)],
+      })
+      await pm.settle(32) // > HOLD_MS on the frozen 16-ms frames
+      expect((await press()).drag, 'lifted').toBe(true)
+      for (const y of [from.y - 40, 60, 40, 30]) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [at(from.x, y)],
+        })
+        await pm.settle(1)
+      }
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: [],
+      })
+    } finally {
+      await cdp.detach()
+    }
+    await pm.settle(20) // the 150-ms snap back
+    expect(await press(), 'the ghost snapped back').toEqual({
+      press: false,
+      drag: false,
+      slot1: 'desk',
+    })
+    // The next tap on empty slot 6 is a tap (its BuySheet), not a drop.
+    const slot6 = layoutFor(5).rectFor('slot6')!
+    await roomScrollTo(page, f1.maxScroll)
+    await tapRoomRect(page, pm, slot6)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'buy',
+      ),
+      'slot 6 opens its BuySheet',
+    ).toBe(true)
+    expect((await press()).slot1, 'the desk stayed in slot 1').toBe('desk')
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('a level-up 3 → 4 inside the room in real time (R21 fade): the old room fades out on the new room’s origin, is gone after the tier fade, and the HUD toast lane follows the taller room', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(`${NEW_URL}&view=warehouse&level=3`)
+    await pm.thaw()
+    await page.waitForTimeout(600)
+    const f0 = await roomFit(page)
+    expect(f0.tier).toBe(3)
+    expect(f0.fits).toBe(true)
+    const ok = await page.evaluate(
+      () => window.__pm!.dispatch({ kind: 'debugForceLevel', level: 4 }).ok,
+    )
+    expect(ok).toBe(true)
+    const mid = await (
+      await page.waitForFunction(
+        () => {
+          const wh = window.__pm!.game.scene.getScene(
+            'Warehouse',
+          ) as unknown as {
+            fading: { x: number; y: number; alpha: number }[]
+            layers: { root: { x: number; y: number } }
+          }
+          const old = wh.fading[0]
+          if (!old) return null
+          return {
+            old: { x: old.x, y: old.y, alpha: old.alpha },
+            root: { x: wh.layers.root.x, y: wh.layers.root.y },
+          }
+        },
+        null,
+        { timeout: 3000 },
+      )
+    ).jsonValue()
+    console.log(`smoke: R21 fade ${JSON.stringify(mid)}`)
+    expect(mid, 'a fading old room').not.toBeNull()
+    expect(mid!.old.alpha).toBeGreaterThan(0)
+    expect(
+      { x: mid!.old.x, y: mid!.old.y },
+      'the old room fades on the new room’s origin',
+    ).toEqual(mid!.root)
+    await page.waitForFunction(
+      () =>
+        (
+          window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+            fading: unknown[]
+          }
+        ).fading.length === 0,
+      null,
+      { timeout: 3000 },
+    )
+    await pm.freeze()
+    const f1 = await roomFit(page)
+    expect(f1.tier).toBe(4)
+    expectRoomScrolls(f1, 'L4 at 393×659')
+    const lane = await page.evaluate(() => {
+      const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+        roomTop: number
+      }
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        toast: { laneY: number }
+      }
+      return { toast: hud.toast.laneY, roomTop: wh.roomTop }
+    })
+    console.log(`smoke: toast lane after 3 → 4 ${JSON.stringify(lane)}`)
+    expect(lane.toast, 'the toast lane on the new room’s north wall').toBe(
+      lane.roomTop + 4,
+    )
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

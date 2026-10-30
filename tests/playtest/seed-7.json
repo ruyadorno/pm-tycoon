@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "buildStamp": "11b6517 2026-10-30",
+  "buildStamp": "99ce939 2026-10-30",
   "seed": 7,
-  "startedAt": "2026-10-30T11:08:48Z",
+  "startedAt": "2026-10-30T14:30:11Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -11,7 +11,7 @@
     "zoom": 1,
     "maxTexture": 8192
   },
-  "elapsedS": 185.1,
+  "elapsedS": 184.9,
   "simS": 721.2,
   "pausedS": 0.9,
   "firstDeliveryS": 31.5,
@@ -86,12 +86,12 @@
   "tapsPerMin": 1.6,
   "rushTaps": 1,
   "viewSwitches": 2,
-  "warehouseS": 59.4,
+  "warehouseS": 59.3,
   "fps": {
     "p50": 61,
     "p5": 60,
-    "min": 56,
-    "samples": 185
+    "min": 54,
+    "samples": 184
   },
   "holdBayEvents": 8,
   "holdBayEventsPer10Min": 6.7,

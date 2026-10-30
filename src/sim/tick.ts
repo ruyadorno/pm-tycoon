@@ -20,6 +20,7 @@ import { spawnStep } from './systems/spawn.ts'
 import { vehiclesStep } from './systems/vehicles.ts'
 import type { MinuteRow } from './types.ts'
 import {
+  endlessFirstDay,
   laneNode,
   malwareShare,
   meanSatisfaction,
@@ -115,7 +116,7 @@ export function quests(sim: Sim, ctx: TickContext): void {
 
 /**
  * 12. On the day boundary: payroll and walkouts, the applicant pools (M6,
- * applicant stream only), drift, escalation,
+ * applicant stream only), drift, escalation (+ the endless ticker line, M9),
  * dock:occupancy, daysSinceIncident, day:ended, the MinuteRow, then the
  * per-day counters reset.
  */
@@ -131,6 +132,15 @@ export function day(sim: Sim, ctx: TickContext): void {
   // day count and stats.victoryTick / stats.levelTick (§5.4, spec-build2
   // §3.4): + postVictoryPerDay at every day boundary after Victory (or after
   // the counter capped below the last level), up to malware.cap.
+  // Endless mode (M9, design-m8-m9 §4.7): the first boundary after Victory
+  // gets the sim-owned ticker line once — derived from the state like the
+  // strain lines, so a loaded game emits it exactly once too.
+  if (s.day === endlessFirstDay(s)) {
+    sim.emit('ticker:news', {
+      text: sim.data.puns.tickerQuest.endless,
+      kind: 'level',
+    })
+  }
   for (const d of s.lane.docks) {
     sim.emit('dock:occupancy', {
       dockId: d.id,

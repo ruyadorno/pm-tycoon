@@ -12,7 +12,12 @@
 // — 5 seeds × 60 min under the same Monitor, with saves while the sorter's
 // clock runs and while a tagged parcel waits, continuing identically.
 // Build 2, M8: both sweeps end at the playtest cap (L3 — the plan's Battery
-// checker REPLACE, dock 2, a van and a 2nd truck in the run).
+// checker REPLACE, dock 2, a van and a 2nd truck in the run). M9: the cap is
+// the top level (5) — the competent sweep runs L4-L5 (X-ray, dock 3, the
+// Sorter Arm, the Golden Release, endless mode); the delegating sweep ends
+// at L4 or L5 by 60 min (asserted ≥ L4). Both use the CLI's stuck rule
+// (stuck 'progress'): on the L4-L5 map a truck's 12-stop delivering leg
+// keeps it in one state for more than 120 s while it still drives.
 
 import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
@@ -46,12 +51,12 @@ describe('[long] the §7 policy, 20 seeds × 90 min: every invariant holds; save
           { why: 'mid-catch', test: midCatch },
           { why: 'mid-process + held', test: midProcessAndHeld },
         ],
-        monitor: { every: 10 },
+        monitor: { every: 10, stuck: 'progress' },
       })
       expect(run.monitor.problems).toEqual([])
       const s = sim.state
       expect(s.tick).toBe(90 * TICKS_PER_DAY)
-      expect(s.level.level).toBe(data.economy.playtestMaxLevel) // M8: L3
+      expect(s.level.level).toBe(data.economy.playtestMaxLevel) // M9: L5
       expect(s.stats.minutes).toHaveLength(90)
       // The 60-minute checkpoint.
       const at60 = s.stats.minutes[59]!
@@ -97,13 +102,13 @@ describe('[long] the delegating policy, 5 seeds × 60 min: every invariant holds
             },
             { why: 'tagged parcel held', test: taggedHeld },
           ],
-          monitor: { every: 10 },
+          monitor: { every: 10, stuck: 'progress' },
         },
       )
       expect(run.monitor.problems).toEqual([])
       const s = sim.state
       expect(s.tick).toBe(60 * TICKS_PER_DAY)
-      expect(s.level.level).toBe(data.economy.playtestMaxLevel) // M8: L3
+      expect(s.level.level).toBeGreaterThanOrEqual(4) // M9: L4-L5 by 60 min
       // The policy hired one sorter at L2 and never fires, so it holds the station.
       const sorters = s.employees.filter((e) => e.role === 'sorter')
       expect(sorters).toHaveLength(1)

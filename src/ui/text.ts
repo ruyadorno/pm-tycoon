@@ -17,6 +17,13 @@ export const CAP_H = 7
 /** U+2212, the minus the font draws for negative amounts (`−$28`). */
 export const MINUS = '−'
 
+/**
+ * U+2713, the Victory mark (B2 §3.4 `Tycoon ✓`: the level bar, its tap toast
+ * and the Title's Continue line). m5x7 has no ✓: tools/art/font.ts draws it
+ * (DRAWN, M9) like ★ and ✕.
+ */
+export const CHECK = '✓'
+
 /** `1,234` (rounded, thousands separators; negative numbers use `−`). */
 export function formatInt(n: number): string {
   const v = Math.round(Number.isFinite(n) ? n : 0)

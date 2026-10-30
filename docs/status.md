@@ -16,7 +16,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 - [x] M6 people: applicants, pips, charisma, salaries, desk 2, the Hold Bay sorter, drivers, hire sheets, faces, policies (commit `M6: …`)
 - [x] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
 - [x] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
-- [ ] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
+- [x] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
 - [ ] M10 playtest-2 build: metrics v2, summary card v2, shots, report, Pages deploy, hand-off (commit `M10: …`)
 
 ## Milestone checklist (playtest 1)
@@ -29,7 +29,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 ## Gate results
 
-Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M8 commit (data 9be64b60; the table below is playtest 1's, the build-2 medians are in the newest entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
+Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M9 commit (data: docs/gate/latest.md; the table below is playtest 1's, the build-2 medians are in the newest entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
 
 | Gate                                                          | Window           | Median    | Min / max     | Pass                        |
 | ------------------------------------------------------------- | ---------------- | --------- | ------------- | --------------------------- |
@@ -47,7 +47,41 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M8 — L3 Regional — 2026-10-30 11:15 UTC — DONE at (this commit; sha recorded in the M9 entry)
+## M9 — L4 + L5 Tycoon — 2026-10-30 14:39 UTC — DONE at (this commit; sha recorded in the M10 entry)
+
+Built: the level cap at 5 (B2 §9); L4 "National" (Low-density + Rural live with their unique art, X-ray, the Sorter Arm
+into the Hold Bay station, the `dense` strain with typosquat labels, slot 5, shelf 80, dock 3, tier 4) and L5 "Tycoon"
+(Airport live — ×2, S/M only, 20-s clearance, the plane departure — Park & civic live, slot 6, shelf 100, tier 5 with neon,
+the Golden Release offered on `level:up {5}`, Victory → endless with the escalation from Victory and a ticker line,
+`Tycoon ✓` on the Title); room growth 14/14/14/16/18 rows with a vertical drag only when the room does not fit (readout
+fixed above it); the policy's L4/L5 plan + NEW STRAIN FIRST + the Arm taking over the Hold Bay; the balance pass; the
+`dk_ship` and `xray` re-rolls; G5/G6 contact sheets; the ✓ glyph in m5x7.
+Gate (30 min, data hash in docs/gate/latest.md): PASS, playtest-1 rows within ±5 % of M8 — first delivery 43.3 s,
+scripted catch 178.3 s, L2 11.72, truck +1.54, lives 0 (2/10 seeds lose one), shelf stall 0 s, Hold Bay 6.78/10 min,
+quests 7 / 3.5, L3 17.98, first clearance +2.18, **L4 22.35** (20–25), **L5 27.70** (25–30; seed 5 at 31.50 in the 35-min
+run). 35-min gate PASS: Golden Release offered at 27.70 (≤ 32), dock 3 at 32.86. Delegating (informational): L5 28.02,
+lives 1.5. Victory long test (informational): seed 2 wins at 45.70, seeds 1 and 3 have no victory by 48 min — below the
+≤ 45-min target (waived pending the author, see Open). Retunes (decisions.md M9): L4 $9,000 → $5,200, L5 $16,000 →
+$7,400, `customs_run` 3 / 5 days, `cheer_up` 52, dock 3 $1,000, `postVictoryPerDay` back to 0.01.
+Tests: 2,099+ passing (vitest, 102 files incl. the long sweeps, + 1 todo); e2e: full `vlr e2e` 131 passed / 0 failed;
+`vlr check` ~157 s. Draw calls: city 3, warehouse 6 (tier 5 scrolled 6). Atlases: world 80.3 %, interior 37.1 %. Dist
+6.34 MB transfer (~4.32 MB gzip) of 8 MB.
+Shots: `lowres-live`, `rural-live`, `civic-live` — each region in colour with NEW chips; `airport-live` — terminal, tower,
+hangar, the plane on the runway (it faces across the runway: one heading); `level-up-5` — "LEVEL 5 — TYCOON", no "coming
+soon"; `warehouse-tier4` (+360) — charcoal floor, steel walls, five slots, 0/80, dock 3 "$1,000" on a tag; `warehouse-tier5`
+(+360, + scrolled) — terrazzo, neon, six slots, the shelf and bin reachable by scrolling with the readout fixed;
+`golden-release-offer` (+360); `victory` (+360) — the TYCOON card, "Tycoon ✓" in the bar; `plane-departure`; `title` (L5
+attract city); `title-tycoon` (+360) — "Day 46 · $3,580 · Lv 5 · Tycoon ✓". All in the STYLE.md look.
+Deviations from spec-core.md / B2: rows 18 at tier 5 (B2 says 16; six slots at the 64-px pitch need 18), the thresholds
+and prices above, NEW STRAIN FIRST, the scroll without a second camera (decisions.md M9).
+Open for the author: **victory by 45 min** — the Golden Release's ≥ 90 % on-time rule fails against the L5 fleet
+(industrial/rural parcels wait for trucks); options measured: the policy order "Arm before dock 3, dock 3 after the 3rd
+truck" (seeds 2 and 3 by 45 min, never seed 1) or a softer on-time rate in `levels.json ultimateQuest` (spec says
+unchanged) — the build keeps the spec; the lives row is fragile (15/40 seeds lose a life by 30 min; untried lever
+`newStrainDelayS` 60 → 90); no scroll affordance in the tall rooms; G5 + G6 sheets (`art/contact/*@4x.png`).
+Next: M10 playtest-2 build
+
+## M8 — L3 Regional — 2026-10-30 11:15 UTC — DONE at 99ce939
 
 Built: the level counter to 3 (`playtestMaxLevel` 3 — R1, 5 at M9) with the L3 row's unlocks from data (Docks live,
 `battery` strain + Battery checker, Hold Bay 5, shelf 60, tier 3, dock 2 for $800); `systems/hubs.ts` — overseas
@@ -258,7 +292,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Cost spent
 
-- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); M8 220 (Airport + Park & civic at 2 candidates); run total 829; $0 credits
+- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); M8 220 (Airport + Park & civic at 2 candidates); M9 48 (dk_ship, xray re-rolls); run total 877 of 1,500; $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)
 - Retro Diffusion: $0 (expected; only with RD_API_KEY and after the author read its ToS)

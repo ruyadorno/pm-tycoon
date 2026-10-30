@@ -29,8 +29,7 @@ vi.mock('phaser', () => {
 
 const bs = await import('../../src/ui/warehouse/BuySheet.ts')
 const { computeLayout, HUD_TOP_H } = await import('../../src/ui/layout.ts')
-const { capConfig, dataFixture, fund, makeSim } =
-  await import('../sim/helpers.ts')
+const { dataFixture, fund, makeSim } = await import('../sim/helpers.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { frameOrNull } = await import('../../src/render/frames.ts')
 const { textTop } = await import('../../src/ui/text.ts')
@@ -141,9 +140,10 @@ describe('§2.1 BuySheet rows: unlocked first, desk rows, locked last', () => {
     expect(bs.unlockText(capped, 2)).toBe('Unlocks at Lv 2')
   })
 
-  it('M8 (design-m8-m9 R1): at the shipped cap 3 the L3 rows lose the suffix, L4 keeps it; the Battery checker opens at L3', () => {
-    expect(data.economy.playtestMaxLevel).toBe(3)
-    const l1 = bs.buyRows(data, 1, [])
+  it('M8 (design-m8-m9 R1): at a cap of 3 the L3 rows lose the suffix, L4 keeps it; the Battery checker opens at L3', () => {
+    // The M8 cap, pinned with an override (M9 ships the top level, 5).
+    const cap3 = dataFixture({ economy: { playtestMaxLevel: 3 } })
+    const l1 = bs.buyRows(cap3, 1, [])
     const line = (id: string) => l1.find((r) => r.id === id)?.lines[1]
     expect(line('battery_checker')).toBe('60/min · Unlocks at Lv 3')
     expect(line('desk2')).toBe('Unlocks at Lv 3')
@@ -173,9 +173,10 @@ describe('§2.1 BuySheet rows: unlocked first, desk rows, locked last', () => {
     expect(bs.machineFrame('battery_checker')).toBe('battery_checker_f0')
   })
 
-  it('plan-build2 §8.2 task 11: the suffix vanishes by data once the cap rises', () => {
+  it('plan-build2 §8.2 task 11: the suffix vanishes by data once the cap rises (M9 ships the top level)', () => {
     const top = Math.max(...data.levels.map((l) => l.level))
-    const open = dataFixture(capConfig(top))
+    expect(data.economy.playtestMaxLevel).toBe(top)
+    const open = dataFixture()
     expect(bs.unlockText(open, 3)).toBe('Unlocks at Lv 3')
     expect(bs.unlockText(open, top)).toBe(`Unlocks at Lv ${top}`)
   })

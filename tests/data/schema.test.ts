@@ -409,6 +409,10 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
     )
     expect(p).toContainEqual('puns.tickerQuest.offered: must contain {name}')
     expect(p).toContainEqual('puns.tickerQuest.victory: must contain {company}')
+    // M9: the endless line has no placeholder (design-m8-m9 §4.7) but is required.
+    expect(p.some((x) => x.startsWith('puns.tickerQuest.endless'))).toBe(false)
+    delete raw.puns.tickerQuest.endless
+    expect(problemsOf(raw)).toContainEqual('puns.tickerQuest.endless: missing')
   })
 
   it('empty pun list for a strain', () => {
@@ -452,7 +456,7 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
     )
   })
 
-  it('map.hubs (M8, design-m8-m9 §1.4): an overseas district, once; its office a building of that district; its vessel one of its props; an exit that moves', () => {
+  it('map.hubs (M8 + M9, design-m8-m9 §1.2, §1.4): an overseas district, once; its office a building of that district; its vessel one of its props; an exit that moves', () => {
     const shipped = fresh()
     expect(shipped.map.hubs).toEqual([
       {
@@ -460,57 +464,83 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
         office: 'dk_customs',
         vessel: { frame: 'dk_ship', tile: [1, 29], exit: [-5, 0], liftPx: 0 },
       },
+      {
+        district: 'airport',
+        office: 'ap_terminal',
+        vessel: { frame: 'ap_plane', tile: [45, 10], exit: [4, 0], liftPx: 64 },
+      },
     ])
+    // M9: the plane's stand and the tower are airport props (the vessel's
+    // prop row is what the schema matches).
+    expect(shipped.map.props).toContainEqual({
+      frame: 'ap_plane',
+      tile: [45, 10],
+      region: 'airport',
+    })
+    expect(shipped.map.props).toContainEqual({
+      frame: 'ap_tower',
+      tile: [44, 16],
+      region: 'airport',
+    })
+    expect(problemsOf(shipped)).toEqual([])
     const raw = fresh()
     const docks = raw.map.hubs[0]
-    raw.map.hubs.push(
-      structuredClone(docks),
-      { ...structuredClone(docks), district: 'highres' },
-      { ...structuredClone(docks), district: 'airport' },
-    )
+    raw.map.hubs.push(structuredClone(docks), {
+      ...structuredClone(docks),
+      district: 'highres',
+    })
+    // [0] docks, [1] airport, [2] docks again, [3] highres
     raw.map.hubs[0].office = 'ap_terminal'
-    raw.map.hubs[1].vessel.tile = [2, 29]
-    raw.map.hubs[1].vessel.exit = [0, 0]
-    raw.map.hubs[3].vessel.liftPx = 999
+    raw.map.hubs[2].vessel.tile = [2, 29]
+    raw.map.hubs[2].vessel.exit = [0, 0]
+    raw.map.hubs[1].vessel.liftPx = 999
     const p = problemsOf(raw)
-    expect(p).toContainEqual('map.hubs[3].vessel.liftPx: 999 is outside 0..256')
-    raw.map.hubs[3].vessel.liftPx = 64
+    expect(p).toContainEqual('map.hubs[1].vessel.liftPx: 999 is outside 0..256')
+    raw.map.hubs[1].vessel.liftPx = 64
+    raw.map.hubs[1].vessel.frame = 'dk_ship'
     const q = problemsOf(raw)
     expect(q).toContainEqual(
       'map.hubs[0].office: "ap_terminal" is not a building of "docks"',
     )
-    expect(q).toContainEqual('map.hubs[1].district: duplicate hub "docks"')
+    expect(q).toContainEqual('map.hubs[2].district: duplicate hub "docks"')
     expect(q).toContainEqual(
-      'map.hubs[1].vessel: no map.props row {frame "dk_ship", tile [2,29], region "docks"}',
+      'map.hubs[2].vessel: no map.props row {frame "dk_ship", tile [2,29], region "docks"}',
     )
     expect(q).toContainEqual(
-      'map.hubs[1].vessel.exit: is [0,0] (the vessel never leaves)',
+      'map.hubs[2].vessel.exit: is [0,0] (the vessel never leaves)',
     )
     expect(q).toContainEqual(
-      'map.hubs[2].district: "highres" is not an overseas district',
+      'map.hubs[3].district: "highres" is not an overseas district',
     )
-    // The Airport row (M9) is not a dk_ship prop of the airport region.
+    // The Airport row's vessel must be one of the airport's props.
     expect(q).toContainEqual(
-      'map.hubs[3].vessel: no map.props row {frame "dk_ship", tile [1,29], region "airport"}',
+      'map.hubs[1].vessel: no map.props row {frame "dk_ship", tile [45,10], region "airport"}',
     )
     const missing = fresh()
     delete missing.map.hubs
     expect(problemsOf(missing)).toContainEqual('map.hubs: missing')
   })
 
-  it('M8 review: every overseas district live at ≤ playtestMaxLevel has a map.hubs row; dock indices are unique; an overseas clearanceS / valueMult is positive', () => {
+  it('every overseas district live at ≤ playtestMaxLevel has a map.hubs row (M9: the shipped cap 5 needs the Docks and the Airport); dock indices are unique; an overseas clearanceS / valueMult is positive', () => {
     const none = fresh()
     none.map.hubs = []
-    expect(problemsOf(none)).toContainEqual(
-      'map.hubs: no row for "docks" (overseas, live at level 3 ≤ playtestMaxLevel 3)',
-    )
-    // Below the Docks' level no row is needed; the Airport (L5) needs one
-    // once the cap reaches it.
+    expect(none.economy.playtestMaxLevel).toBe(5)
+    expect(problemsOf(none)).toEqual([
+      'map.hubs: no row for "docks" (overseas, live at level 3 ≤ playtestMaxLevel 5)',
+      'map.hubs: no row for "airport" (overseas, live at level 5 ≤ playtestMaxLevel 5)',
+    ])
+    // Below the Docks' level no row is needed.
     none.economy.playtestMaxLevel = 2
     expect(problemsOf(none)).toEqual([])
-    const pm5 = fresh()
-    pm5.economy.playtestMaxLevel = 5
-    expect(problemsOf(pm5)).toEqual([
+    // The Docks alone are enough below the Airport's level (L5).
+    const docksOnly = fresh()
+    docksOnly.map.hubs = docksOnly.map.hubs.filter(
+      (h: { district: string }) => h.district === 'docks',
+    )
+    docksOnly.economy.playtestMaxLevel = 4
+    expect(problemsOf(docksOnly)).toEqual([])
+    docksOnly.economy.playtestMaxLevel = 5
+    expect(problemsOf(docksOnly)).toEqual([
       'map.hubs: no row for "airport" (overseas, live at level 5 ≤ playtestMaxLevel 5)',
     ])
     const dup = fresh()

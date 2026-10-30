@@ -29,7 +29,8 @@
 // e.g. after the game-over save), and a disabled autosave still writes the
 // profile on hide. readPlaytest() hands the stored profile to the recorder,
 // which resumes it only for the same run. The Title reads the
-// save header (`Day 7 · $1,240 · Lv 2`) and offers Continue only for a
+// save header (`Day 7 · $1,240 · Lv 2`; M9: ` · Tycoon ✓` once the run's
+// Golden Release shipped, LoadedGame.victory) and offers Continue only for a
 // current-version (SAVE_VERSION) payload whose dataHash matches the running
 // tables; anything else is discarded with the toast "Save from an older
 // build was reset" (R9: no migrations). The sim never sees the onboarding
@@ -62,7 +63,7 @@ import {
   type SavePayload,
 } from '../sim/save.ts'
 import { Sim } from '../sim/sim.ts'
-import { formatMoney } from '../ui/text.ts'
+import { CHECK, formatMoney } from '../ui/text.ts'
 import { freshOnboarding, normaliseOnboarding } from '../ui/Onboarding.ts'
 
 export { LEGACY_SAVE_KEY, SAVE_KEY }
@@ -314,10 +315,38 @@ export function writeSettings(
 
 // ---- the save ---------------------------------------------------------------------
 
-/** Title Continue subtitle: `Day 7 · $1,240 · Lv 2` (Day = completed days + 1). */
-export function saveHeader(payload: Pick<SavePayload, 'state'>): string {
+/** The Continue line's mark of a run that won (B2 §3.4, plan-build2 §8.6 task 3). */
+export const TYCOON_MARK = `Tycoon ${CHECK}`
+
+/** What saveHeader needs to fit the Continue button (Title). */
+export interface HeaderFit {
+  /** The button's inner width (logical px). */
+  maxW: number
+  /** BitmapText width of a string (m5x7). */
+  measure: (s: string) => number
+}
+
+/**
+ * Title Continue subtitle: `Day 7 · $1,240 · Lv 2` (Day = completed days + 1);
+ * a run whose Golden Release shipped (state.economy.victory — endless mode)
+ * appends ` · Tycoon ✓` (M9). With `fit`, a winning header wider than the
+ * button drops its `Lv N` (Tycoon ✓ is the top level): `Day 120 · $1,234,567
+ * · Tycoon ✓`.
+ */
+export function saveHeader(
+  payload: Pick<SavePayload, 'state'>,
+  fit?: HeaderFit,
+): string {
   const s = payload.state
-  return `Day ${s.day + 1} · ${formatMoney(s.economy.balance)} · Lv ${s.level.level}`
+  const parts = [
+    `Day ${s.day + 1}`,
+    formatMoney(s.economy.balance),
+    `Lv ${s.level.level}`,
+  ]
+  if (s.economy.victory !== true) return parts.join(' · ')
+  parts.push(TYCOON_MARK)
+  if (fit && fit.measure(parts.join(' · ')) > fit.maxW) parts.splice(2, 1)
+  return parts.join(' · ')
 }
 
 export type SaveCheck =
@@ -362,6 +391,11 @@ export function readSave(data: GameData, store = browserStorage()): SaveCheck {
 export interface LoadedGame {
   sim: Sim
   onboarding: OnboardingSave
+  /**
+   * M9 (design-m8-m9 §6.3): the run's Golden Release shipped
+   * (payload.state.economy.victory) — an endless-mode save (`Tycoon ✓`).
+   */
+  victory: boolean
 }
 
 /** Resume a checked payload (Sim.load; throws SimLoadError on a bad state). */
@@ -369,12 +403,17 @@ export function loadGame(data: GameData, payload: SavePayload): LoadedGame {
   return {
     sim: restore(data, payload),
     onboarding: normaliseOnboarding(payload.onboarding),
+    victory: payload.state.economy.victory === true,
   }
 }
 
 /** A fresh game: the §7.1 start state and an untouched tour. */
 export function newGame(data: GameData, seed: number): LoadedGame {
-  return { sim: new Sim(data, seed), onboarding: freshOnboarding() }
+  return {
+    sim: new Sim(data, seed),
+    onboarding: freshOnboarding(),
+    victory: false,
+  }
 }
 
 export interface StartupChoice {

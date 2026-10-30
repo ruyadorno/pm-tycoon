@@ -7,6 +7,15 @@
 // (HOLD_STATION_HIT, the sorter's SORTER_STAND, the rack lamp's S badge),
 // the StationCard and the HireSheet (Warehouse id `wh:hire`, Garage id
 // `garage:hire`; its cards are `<id>:card:<i>`) join openSheet / hireSheet.
+// M9 (design-m8-m9 §6.1, R10/R21/R22): the room grows to 16 / 18 rows at
+// tiers 4 / 5 and scrolls vertically when it does not fit — `roomFit` reads
+// the scene's tier, height, scroll and viewport (`stats()`, whose `roomY` is
+// the scrolled origin, so `tapRoom` taps the right pixel at any scroll),
+// `layoutFor(tier)` is the room the specs tap at that tier (the shelf, the
+// bin and slots 5-6 sit 64 / 128 px lower), `expectRoomScrolls` checks a
+// room that does not fit (readout fixed under the top band, viewport between
+// the bands, maxScroll = roomH − viewport.h) and `roomScrollTo` drives the
+// scene's scroll (WarehouseScene.scrollTo, the shots' debug hook).
 import type { Page } from '@playwright/test'
 import {
   bayRect,
@@ -22,6 +31,11 @@ import { expect, type PmHelpers } from './fixtures.ts'
 
 /** The tier-1 room (tiers 1-3 share every rect the specs tap, M8). */
 export const roomLayout = new FixedLaneLayout()
+
+/** M9: the room of `tier` (16 rows at tier 4, 18 at tier 5). */
+export function layoutFor(tier: number): FixedLaneLayout {
+  return tier === 1 ? roomLayout : new FixedLaneLayout(tier)
+}
 export { bayRect, dockGeom, HOLD_STATION_HIT, ROOM_H, ROOM_W, SORTER_STAND }
 
 /**
@@ -46,6 +60,15 @@ export interface RoomFit {
   /** Top of the HUD's bottom bar. */
   bandBottom: number
   sheetOpen: boolean
+  /** M9: the room's visual tier and height (rows × 32). */
+  tier: number
+  roomH: number
+  /** M9: false when the room scrolls (R10). */
+  fits: boolean
+  scrollY: number
+  maxScroll: number
+  /** M9: the screen rect the room shows in (logical px). */
+  viewport: Rect
 }
 
 export function roomFit(page: Page): Promise<RoomFit> {
@@ -57,6 +80,12 @@ export function roomFit(page: Page): Promise<RoomFit> {
         roomY: number
         readout: Rect
         sheetOpen: boolean
+        tier: number
+        roomH: number
+        fits: boolean
+        scrollY: number
+        maxScroll: number
+        viewport: Rect
       }
     }
     const hud = game.scene.getScene('HUD') as unknown as {
@@ -78,13 +107,20 @@ export function roomFit(page: Page): Promise<RoomFit> {
       bandTop: L.ticker.y + L.ticker.h,
       bandBottom: L.bottomBar.y,
       sheetOpen: s.sheetOpen,
+      tier: s.tier,
+      roomH: s.roomH,
+      fits: s.fits,
+      scrollY: s.scrollY,
+      maxScroll: s.maxScroll,
+      viewport: s.viewport,
     }
   })
 }
 
 /**
- * warehouse-view.md §1.1: the readout strip and the 352×448 room sit inside
- * the screen and between the HUD bands, with no scrolling.
+ * warehouse-view.md §1.1: the readout strip and the 352×448 room (M9: its
+ * tier's height) sit inside the screen and between the HUD bands, with no
+ * scrolling.
  */
 export function expectRoomFits(f: RoomFit, label: string): void {
   console.log(`warehouse fit ${label}: ${JSON.stringify(f)}`)
@@ -101,9 +137,53 @@ export function expectRoomFits(f: RoomFit, label: string): void {
     `${label}: readout above the room`,
   ).toBeLessThanOrEqual(f.roomY)
   expect(
-    f.roomY + ROOM_H,
+    f.roomY + (f.roomH ?? ROOM_H),
     `${label}: room above the bottom bar`,
   ).toBeLessThanOrEqual(f.bandBottom)
+  expect(f.fits ?? true, `${label}: fits`).toBe(true)
+  expect(f.scrollY ?? 0, `${label}: no scroll`).toBe(0)
+}
+
+/**
+ * M9 (design-m8-m9 §6.1, R10): a room taller than the space between the
+ * bands scrolls — the readout stays fixed just under the top band, the
+ * viewport runs from under the readout to the bottom bar across the screen
+ * width, `maxScroll = roomH − viewport.h`, and the scroll is an integer in
+ * [0, maxScroll] (the room's screen origin is `viewport.y − scrollY`).
+ */
+export function expectRoomScrolls(f: RoomFit, label: string): void {
+  console.log(`warehouse scroll ${label}: ${JSON.stringify(f)}`)
+  expect(f.fits, `${label}: the room does not fit`).toBe(false)
+  expect(f.roomX, `${label}: room left edge on screen`).toBeGreaterThanOrEqual(
+    0,
+  )
+  expect(f.roomX + ROOM_W, `${label}: room right edge`).toBeLessThanOrEqual(f.W)
+  expect(
+    f.readout.y,
+    `${label}: readout fixed under the top band`,
+  ).toBeGreaterThanOrEqual(f.bandTop)
+  expect(
+    f.readout.y + f.readout.h,
+    `${label}: readout above the viewport`,
+  ).toBeLessThanOrEqual(f.viewport.y)
+  expect(f.viewport.y + f.viewport.h, `${label}: viewport bottom`).toBe(
+    f.bandBottom,
+  )
+  expect(f.maxScroll, `${label}: maxScroll`).toBe(f.roomH - f.viewport.h)
+  expect(Number.isInteger(f.scrollY), `${label}: integer scroll`).toBe(true)
+  expect(f.scrollY).toBeGreaterThanOrEqual(0)
+  expect(f.scrollY).toBeLessThanOrEqual(f.maxScroll)
+  expect(f.roomY, `${label}: scrolled origin`).toBe(f.viewport.y - f.scrollY)
+}
+
+/** M9: scroll the room to `y` (WarehouseScene.scrollTo, clamped); the scroll now. */
+export function roomScrollTo(page: Page, y: number): Promise<number> {
+  return page.evaluate((yy) => {
+    const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+      scrollTo(y: number): number
+    }
+    return wh.scrollTo(yy)
+  }, y)
 }
 
 /** A real tap at room px (x, y). */

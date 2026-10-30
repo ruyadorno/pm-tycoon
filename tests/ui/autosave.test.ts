@@ -8,6 +8,10 @@
 // from an older build was reset", a build-1 pm.save.v1 included), Reset
 // clears every pm.save / pm.playtest key and the settings, settings {muted,
 // speed} merge, and a failed write reports once and retries next cycle.
+// M9: an endless-mode save (economy.victory) reads `… · Tycoon ✓` on the
+// Continue line (its `Lv 5` dropped when too wide) and loads with
+// LoadedGame.victory.
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   AUTOSAVE_MS,
@@ -35,13 +39,24 @@ import {
   STALE_SAVE_TEXT,
   startupGame,
   STORAGE_KEYS,
+  TYCOON_MARK,
   writeSettings,
   type KeyValueStore,
 } from '../../src/boot/autosave.ts'
 import { SAVE_VERSION, serialise } from '../../src/sim/save.ts'
 import { Sim, stateHash } from '../../src/sim/sim.ts'
 import { freshOnboarding } from '../../src/ui/Onboarding.ts'
-import { dataFixture, makeSim, runSeconds } from '../sim/helpers.ts'
+import {
+  acceptOffer,
+  dataFixture,
+  injectParcel,
+  makeSim,
+  noOffers,
+  quiet,
+  quietSim,
+  runSeconds,
+  runTicks,
+} from '../sim/helpers.ts'
 
 /** A Storage fake; enumerable (length / key) like localStorage. */
 class MemoryStore implements KeyValueStore {
@@ -97,6 +112,33 @@ function saverFor(
 }
 
 afterEach(() => setSaveConfig(undefined))
+
+/**
+ * A run whose Golden Release shipped (M9): L5 earned the levels.json way,
+ * the offer accepted and its deliveries scripted (as tests/sim/endless.test.ts
+ * does) — a valid endless-mode state.
+ */
+function wonSim(seed: number): Sim {
+  const sim = noOffers(quietSim(seed))
+  const L5 = data.levels.find((l) => l.level === 5)!
+  sim.state.economy.lifetimeEarned = L5.threshold
+  runTicks(sim, 1)
+  quiet(sim)
+  acceptOffer(sim)
+  const u = L5.ultimateQuest!
+  for (let i = 0; i < u.deliveries; i++) {
+    const p = injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    sim.emit('parcel:delivered', {
+      id: p.id,
+      paid: 20,
+      onTime: true,
+      malware: false,
+    })
+  }
+  runTicks(sim, 1)
+  if (!sim.state.economy.victory) throw new Error('no victory')
+  return sim
+}
 
 describe('plan.md §5 / spec-build2 §8: the pm.* keys', () => {
   it('the build-2 keys; no ?config= under Node means the plain keys', () => {
@@ -379,6 +421,74 @@ describe('city-view §9.5 / plan.md §6.4: Title Continue', () => {
     expect(game.sim.state.tick).toBe(0)
     expect(game.sim.state.economy.balance).toBe(data.economy.startMoney)
     expect(game.onboarding).toEqual(freshOnboarding())
+    expect(game.victory).toBe(false)
+  })
+
+  it('M9 (B2 §3.4, design-m8-m9 §6.3): an endless-mode save reads "… · Lv 5 · Tycoon ✓" and loads with LoadedGame.victory', () => {
+    const store = new MemoryStore()
+    const sim = wonSim(8)
+    const { saver } = saverFor(store, sim)
+    expect(saver.save('manual')).toBe(true)
+    const check = readSave(data, store)
+    expect(check).toMatchObject({ kind: 'ok' })
+    if (check.kind !== 'ok') return
+    expect(TYCOON_MARK).toBe('Tycoon ✓')
+    const s = sim.state
+    expect(check.header).toBe(
+      `Day ${s.day + 1} · $${s.economy.balance.toLocaleString('en-US')} · Lv 5 · Tycoon ✓`,
+    )
+    const game = loadGame(data, check.payload)
+    expect(game.victory).toBe(true)
+    expect(game.sim.state.economy.victory).toBe(true)
+    // A run that has not won keeps the plain header and victory false.
+    const plain = readSave(
+      data,
+      (() => {
+        const st = new MemoryStore()
+        saverFor(st, makeSim(8)).saver.save('manual')
+        return st
+      })(),
+    )
+    if (plain.kind !== 'ok') throw new Error('plain save')
+    expect(plain.header).not.toMatch(/Tycoon/)
+    expect(loadGame(data, plain.payload).victory).toBe(false)
+  })
+
+  it('M9: the Continue line fits the 200-px Title button in m5x7 — a winning header too wide drops its "Lv 5"', () => {
+    const xml = readFileSync(
+      new URL('../../src/assets/m5x7.xml', import.meta.url),
+      'utf8',
+    )
+    const adv = new Map<number, number>()
+    for (const m of xml.matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+      adv.set(Number(m[1]), Number(m[2]))
+    // ✓ is drawn by tools/art/font.ts (M9); a missing glyph counts 8 px.
+    const measure = (t: string): number =>
+      [...t].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 8), 0)
+    // layout.buttonColumn's 200-px button less Button CONTENT_PAD (5) a side.
+    const fit = { maxW: 200 - 2 * 5, measure }
+    const sim = makeSim(9)
+    const p = JSON.parse(
+      serialise(sim, { savedAt: 0, build: 'b', onboarding: null }),
+    ) as Parameters<typeof saveHeader>[0]
+    p.state.level.level = 5
+    p.state.economy.victory = true
+    p.state.day = 11
+    p.state.economy.balance = 18400
+    const typical = saveHeader(p, fit)
+    expect(typical).toBe('Day 12 · $18,400 · Lv 5 · Tycoon ✓')
+    expect(measure(typical)).toBeLessThanOrEqual(fit.maxW)
+    // A long endless run: the level goes, the mark stays.
+    p.state.day = 119
+    p.state.economy.balance = 1_234_567
+    const long = saveHeader(p, fit)
+    expect(long).toBe('Day 120 · $1,234,567 · Tycoon ✓')
+    expect(measure(long)).toBeLessThanOrEqual(fit.maxW)
+    // Without `fit` (the Overwrite dialog, which wraps) the full header.
+    expect(saveHeader(p)).toBe('Day 120 · $1,234,567 · Lv 5 · Tycoon ✓')
+    // A run that has not won is never shortened.
+    p.state.economy.victory = false
+    expect(saveHeader(p, fit)).toBe('Day 120 · $1,234,567 · Lv 5')
   })
 })
 

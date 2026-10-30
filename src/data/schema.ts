@@ -604,6 +604,7 @@ const puns = obj({
     failed: str,
     star: str,
     victory: str,
+    endless: str,
   }),
   ultimateQuestName: str,
 })
@@ -642,7 +643,10 @@ const mapShape = obj({
     accentEvery: int(1),
     lot: obj({ parking: frame, queue: frame }),
     scenery: arr(
-      obj({ name: str, rect: tuple(int(0), int(0), int(0), int(0)), frame }),
+      obj(
+        { name: str, rect: tuple(int(0), int(0), int(0), int(0)), frame },
+        { region: snakeId },
+      ),
     ),
   }),
   lot: obj({
@@ -1211,6 +1215,8 @@ function checkQuests(
     if (d.puns.quests[id] === undefined)
       bad('puns.quests', `missing the line for "${id}"`)
   for (const [k, line] of Object.entries(d.puns.tickerQuest)) {
+    // M9: the endless line has no placeholder (design-m8-m9 §4.7).
+    if (k === 'endless') continue
     const need = k === 'victory' ? '{company}' : '{name}'
     if (!line.includes(need))
       bad(`puns.tickerQuest.${k}`, `must contain ${need}`)
@@ -1567,8 +1573,7 @@ function checkMap(
   // hubs (M8, design-m8-m9 §1.4): one row per overseas district, its office
   // a building of that district, its vessel one of the district's props;
   // every overseas district live at a level ≤ playtestMaxLevel has a row
-  // (M8: the Docks; test configs that raise the cap past the Airport's level
-  // before M9 ships its row add it — tests/sim/helpers.ts capConfig).
+  // (M9's cap 5: the Docks and the Airport; a cap-2 config needs none).
   const hubIds = new Set<string>()
   m.hubs.forEach((h, i) => {
     const p = `map.hubs[${i}]`
@@ -1611,6 +1616,9 @@ function checkMap(
     const [x0, y0, x1, y1] = s.rect
     if (x0 > x1 || y0 > y1 || x1 >= W || y1 >= H)
       bad(`map.ground.scenery[${i}].rect`, 'empty or outside the map')
+    // M9 (style-guide §2.2): a row may fog with a district's lock state.
+    if (s.region !== undefined && !districtIds.has(s.region))
+      bad(`map.ground.scenery[${i}].region`, `unknown district "${s.region}"`)
   })
 }
 

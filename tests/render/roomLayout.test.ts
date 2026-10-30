@@ -11,6 +11,22 @@ import { describe, expect, it } from 'vitest'
 import {
   AISLE_X,
   BAY_COUNT,
+  BELT_SLOTS_BY_TIER,
+  beltSlotsForTier,
+  CHUTE_BOTTOM,
+  clampScroll,
+  clampTier,
+  coverRects,
+  dragScrolls,
+  ROOM_BLOCK_H,
+  ROOM_SLACK,
+  roomBlockH,
+  roomHeightForTier,
+  rowsForTier,
+  scrollForDrag,
+  scrollToShow,
+  shiftForTier,
+  SLOT_COUNT,
   DESK_HIT_X,
   DOCK_COUNT,
   DOCK_PAD,
@@ -278,7 +294,11 @@ describe('warehouse-view §1.1: the room fits between the HUD bands', () => {
     expect(p.roomX).toBe(4)
     expect(p.roomY).toBe(92)
     expect(p.roomY + ROOM_H).toBe(MIN_VIEW_H - HUD_BOTTOM_H)
-    expect(fit(MIN_VIEW_W, MIN_VIEW_H - 1).fits).toBe(false)
+    // M9: up to ROOM_SLACK px shorter still fits, the strip in its margin.
+    const tight = fit(MIN_VIEW_W, MIN_VIEW_H - ROOM_SLACK)
+    expect(tight).toMatchObject({ fits: true, maxScroll: 0 })
+    expect(tight.readout.y).toBe(HUD_TOP_H)
+    expect(fit(MIN_VIEW_W, MIN_VIEW_H - ROOM_SLACK - 1).fits).toBe(false)
   })
 
   it('centres the room on the iPhone 16 (393 × 659) and at 430', () => {
@@ -338,7 +358,7 @@ describe('warehouse-view §5.2: tier-2 props and signage plates', () => {
 
   it('the plates clear the slots-5–6 strip, the shelf badge, the rack and the bin counter', () => {
     const avoid: [string, Rect][] = [
-      ['ext', layout.extRect()],
+      ['ext', layout.extRect() as Rect],
       ['shelf badge', SHELF_BADGE],
       ['rack', RACK],
       [
@@ -593,7 +613,7 @@ describe('spec-build2 §4.4 (M6): the Hold Bay station, the poster and the props
     const above: [string, Rect][] = [
       ['dock panel', DOCK_PANEL],
       ['shelf badge', SHELF_BADGE],
-      ['ext strip', layout.extRect()],
+      ['ext strip', layout.extRect() as Rect],
       ...signagePlates(),
     ]
     const room: Rect = { x: 0, y: 0, w: ROOM_W, h: ROOM_H }
@@ -933,5 +953,560 @@ describe('design-m8-m9 §6.1 / R13 (M8): tier-3 shelf grid and props', () => {
         expect(overlaps(r, o), n).toBe(false)
       expect(within(r, ROOM_FLOOR)).toBe(true)
     }
+  })
+})
+
+// ---- M9: room growth (design-m8-m9 §6.1, §7 M9 item 9; R2, R10, R22) ------
+
+const TIERS = [1, 2, 3, 4, 5] as const
+
+/** The lane of a game at level `tier` (debug.forceLevel), docks 2–3 bought. */
+function laneOfTier(tier: number): readonly LaneNode[] {
+  const sim = makeSim(1)
+  if (tier > 1)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: tier })).toEqual({
+      ok: true,
+    })
+  addDock(sim, 2)
+  addDock(sim, 3)
+  return sim.state.lane.nodes
+}
+
+/** Every tap rect of a room of tier `tier` (the scene's pick set). */
+function tapRectsOf(lay: FixedLaneLayout): [string, Rect][] {
+  const out: [string, Rect][] = [
+    ['poster hit', POSTER_HIT],
+    ['station hit', HOLD_STATION_HIT],
+    ['sign', SIGN],
+    ['dock panel', DOCK_PANEL],
+  ]
+  for (let i = 0; i < BAY_COUNT; i++) out.push([`bay ${i}`, bayRect(i)])
+  for (let k = 2; k <= DOCK_COUNT; k++)
+    out.push([`dock ${k} hit`, (dockGeom(k) as { hit: Rect }).hit])
+  out.push(['dock1 hit', lay.hitFor('dock1') as Rect])
+  for (let k = 1; k <= lay.beltSlots; k++) {
+    out.push([`slot${k} hit`, lay.hitFor(`slot${k}`) as Rect])
+    out.push([`desk hit slot${k}`, lay.deskHit(`slot${k}`) as Rect])
+  }
+  const ext = lay.extSlotIds()[0]
+  if (ext) out.push([`ext (${ext}) hit`, lay.hitFor(ext) as Rect])
+  out.push(['bin hit', lay.hitFor('bin') as Rect])
+  out.push(['shelf hit', lay.hitFor('shelf') as Rect])
+  return out
+}
+
+const platesOf = (lay: FixedLaneLayout): [string, Rect][] =>
+  lay
+    .plates()
+    .map((p) => [
+      `plate ${p.text}`,
+      { x: p.x, y: p.y, w: textW(p.text) + PLATE_PAD, h: PLATE_H },
+    ])
+
+const floorOf = (lay: FixedLaneLayout): Rect => ({
+  x: TILE,
+  y: TILE,
+  w: ROOM_W - 2 * TILE,
+  h: lay.height - TILE,
+})
+
+describe('design-m8-m9 §6.1 / R2 (M9): rows, belt slots and Δ per tier', () => {
+  it('rowsForTier 14/14/14/16/18, belt slots 4/4/4/5/6, Δ 0/0/0/64/128; tiers clamp to 1..5', () => {
+    expect(BELT_SLOTS_BY_TIER).toEqual([4, 4, 4, 5, 6])
+    expect(TIERS.map(rowsForTier)).toEqual([14, 14, 14, 16, 18])
+    expect(TIERS.map(beltSlotsForTier)).toEqual([4, 4, 4, 5, 6])
+    expect(TIERS.map(shiftForTier)).toEqual([0, 0, 0, 64, 128])
+    expect(TIERS.map(roomHeightForTier)).toEqual([448, 448, 448, 512, 576])
+    expect(TIERS.map(roomBlockH)).toEqual([476, 476, 476, 540, 604])
+    expect(roomBlockH(1)).toBe(ROOM_BLOCK_H)
+    expect([clampTier(0), clampTier(9), clampTier(4.7)]).toEqual([1, 5, 4])
+    for (const t of TIERS) {
+      const lay = new FixedLaneLayout(t)
+      expect(lay.rows).toBe(rowsForTier(t))
+      expect(lay.height).toBe(lay.rows * TILE)
+      expect(lay.beltSlots).toBe(beltSlotsForTier(t))
+      expect(lay.shift).toBe(shiftForTier(t))
+    }
+    // The shipped levels: L4 is tier 4 with slot 5, L5 tier 5 with slot 6
+    // — the belt column holds exactly the live slots.
+    for (const l of dataFixture().levels.filter((x) => x.level >= 4))
+      expect(beltSlotsForTier(l.warehouseTier), `L${l.level}`).toBe(l.slots)
+  })
+
+  it('slots 5–6 unroll in the belt column at the 64-px pitch (rects, machines, desks, stand points, outlets)', () => {
+    const lay = new FixedLaneLayout(5)
+    for (let k = 1; k <= SLOT_COUNT; k++) {
+      const id = `slot${k}`
+      const y = 96 + 64 * (k - 1)
+      expect(lay.isBeltSlot(id), id).toBe(true)
+      expect(lay.rectFor(id)).toEqual({ x: 96, y, w: 64, h: 64 })
+      expect(lay.machineAt(id)).toEqual({ x: 120, y: y + 16 })
+      expect(lay.deskAt(id)).toEqual({ x: 80, y: y + 20 })
+      expect(lay.standPoints(id)).toHaveLength(3)
+      expect(lay.outletAt(id)).toEqual({ x: 160, y: y + 34 })
+      expect(lay.plusAt(id)).not.toBeNull()
+    }
+    // Slot 6 ends at y 480; the gap belt tile, then the shelf to the bottom.
+    expect(lay.gapTileY()).toBe(480)
+    expect(lay.rectFor('shelf')).toEqual({ x: 32, y: 512, w: 224, h: 64 })
+    expect(lay.rectFor('bin')).toEqual({ x: 256, y: 512, w: 64, h: 64 })
+    expect(lay.height).toBe(576)
+    const t4 = new FixedLaneLayout(4)
+    expect(t4.isBeltSlot('slot5')).toBe(true)
+    expect(t4.isBeltSlot('slot6')).toBe(false)
+    expect(t4.machineAt('slot6')).toBeNull()
+    expect(new FixedLaneLayout(3).isBeltSlot('slot5')).toBe(false)
+  })
+
+  it('everything at y ≥ 352 of the tier-1 table moves down by Δ; the rack, station, poster, props and docks stay', () => {
+    const t1 = new FixedLaneLayout(1)
+    for (const t of [4, 5] as const) {
+      const lay = new FixedLaneLayout(t)
+      const d = shiftForTier(t)
+      for (const id of ['shelf', 'bin']) {
+        const a = t1.rectFor(id) as Rect
+        expect(lay.rectFor(id), `${id} t${t}`).toEqual({ ...a, y: a.y + d })
+        expect(lay.anchorsFor(id).entry.y).toBe(t1.anchorsFor(id).entry.y + d)
+      }
+      expect(lay.shelfBadge()).toEqual({ ...SHELF_BADGE, y: SHELF_BADGE.y + d })
+      expect(lay.binCounter()).toEqual({
+        x: BIN_COUNTER.x,
+        y: BIN_COUNTER.y + d,
+      })
+      expect(lay.chuteBottom()).toBe(CHUTE_BOTTOM + d)
+      expect(lay.gapTileY()).toBe(352 + d)
+      expect(lay.baseboardY()).toBe(lay.height - 2)
+      const plates = new Map(lay.plates().map((p) => [p.text, p]))
+      for (const p of SIGNAGE) {
+        const moved = p.text === 'SHELF' || p.text === 'QUARANTINE'
+        expect(plates.get(p.text), p.text).toEqual({
+          ...p,
+          y: p.y + (moved ? d : 0),
+        })
+      }
+      // Fixed parts: rack / bays, the docks, the props (tier-1 rects equal).
+      for (const id of [
+        'hold',
+        'dock1',
+        'conv1',
+        'dock2',
+        'conv2',
+        'dock3',
+        'conv3',
+      ])
+        expect(lay.rectFor(id), `${id} t${t}`).toEqual(t1.rectFor(id))
+      for (let k = 1; k <= 4; k++)
+        expect(lay.rectFor(`slot${k}`)).toEqual(t1.rectFor(`slot${k}`))
+      expect(lay.props()).toEqual(PROPS_T3)
+      expect(lay.propsFor(1)).toEqual(PROPS_T1)
+    }
+    // Tiers 1–3 keep the tier-1 table except the shelf grid (M8).
+    for (const t of [2, 3] as const) {
+      const lay = new FixedLaneLayout(t)
+      expect(lay.shift).toBe(0)
+      expect(lay.plates()).toEqual(SIGNAGE)
+      expect(lay.shelfBadge()).toEqual({ ...SHELF_BADGE })
+    }
+  })
+
+  it('the ext strip: `5–6` at tiers 1–3, `Slot 6` Δ lower at tier 4, none at tier 5', () => {
+    for (const t of [1, 2, 3] as const) {
+      const lay = new FixedLaneLayout(t)
+      expect(lay.extSlotIds()).toEqual(['slot5', 'slot6'])
+      expect(lay.extCaption()).toBe('5–6')
+      expect(lay.extRect()).toEqual({ x: 72, y: 356, w: 56, h: 24 })
+    }
+    const t4 = new FixedLaneLayout(4)
+    expect(t4.extSlotIds()).toEqual(['slot6'])
+    expect(t4.extCaption()).toBe('6')
+    expect(t4.extRect()).toEqual({ x: 72, y: 420, w: 56, h: 24 })
+    expect(t4.hitFor('slot6')).toEqual({ x: 72, y: 416, w: 56, h: 32 })
+    expect(t4.labelFor('slot6')).toBe('Slot 6')
+    const t5 = new FixedLaneLayout(5)
+    expect(t5.extSlotIds()).toEqual([])
+    expect(t5.extCaption()).toBe('')
+    expect(t5.extRect()).toBeNull()
+  })
+
+  it('belt tiles: two per belt slot, the gap tile under the last one (nodeId shelf); the chute runs to chuteBottom', () => {
+    for (const t of TIERS) {
+      const lay = new FixedLaneLayout(t)
+      const tiles = lay.beltTiles()
+      for (let k = 1; k <= lay.beltSlots; k++) {
+        const mine = tiles.filter((b) => b.nodeId === `slot${k}`)
+        expect(
+          mine.map((b) => b.y),
+          `t${t} slot${k}`,
+        ).toEqual([96 + 64 * (k - 1), 128 + 64 * (k - 1)])
+      }
+      const gap = tiles.filter((b) => b.nodeId === 'shelf')
+      expect(gap).toEqual([
+        { x: 128, y: lay.gapTileY(), stem: 'belt_v', nodeId: 'shelf' },
+      ])
+      for (const b of tiles)
+        expect(b.y + TILE, `t${t} tile ${b.y}`).toBeLessThanOrEqual(
+          (lay.rectFor('shelf') as Rect).y,
+        )
+      const chute = lay.chuteSegments()
+      expect(chute[0]?.y).toBe(96)
+      expect((chute[chute.length - 1]?.y ?? 0) + TILE).toBe(lay.chuteBottom())
+    }
+  })
+})
+
+describe('design-m8-m9 §7 M9 item 9: every tier — rects, hits, paths', () => {
+  for (const t of TIERS) {
+    it(`tier ${t}: every lane node of its level has a rect inside the ${rowsForTier(t)}-row room; no overlaps but the documented pairs`, () => {
+      const lay = new FixedLaneLayout(t)
+      const nodes = laneOfTier(t)
+      const room: Rect = { x: 0, y: 0, w: ROOM_W, h: lay.height }
+      for (const n of nodes) {
+        const r = lay.rectFor(n.id)
+        expect(r, n.id).not.toBeNull()
+        if (r) expect(within(r, room), `${n.id} t${t}`).toBe(true)
+      }
+      // Live slots of the level are belt slots (the room shows them all).
+      for (const n of nodes)
+        if (n.kind === 'slot' && !n.locked)
+          expect(lay.isBeltSlot(n.id), `${n.id} live at t${t}`).toBe(true)
+      const documented = new Set(['conv1|dock1', 'conv2|dock2', 'conv3|dock3'])
+      if (lay.extSlotIds().length > 1) documented.add('slot5|slot6')
+      const ids = nodes.map((n) => n.id)
+      for (let i = 0; i < ids.length; i++)
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = ids[i] as string
+          const b = ids[j] as string
+          const ra = lay.rectFor(a)
+          const rb = lay.rectFor(b)
+          if (!ra || !rb || !overlaps(ra, rb)) continue
+          const key = [a, b].toSorted().join('|')
+          expect(documented.has(key), `${key} overlap at t${t}`).toBe(true)
+        }
+    })
+
+    it(`tier ${t}: tap rects are ≥ 44 px (the ext strip ≥ 32), inside the room and pairwise disjoint`, () => {
+      const lay = new FixedLaneLayout(t)
+      const taps = tapRectsOf(lay)
+      const room: Rect = { x: 0, y: 0, w: ROOM_W, h: lay.height }
+      for (const [n, r] of taps) {
+        expect(within(r, room), `${n} t${t}`).toBe(true)
+        // The north-wall sign (24 px, the wall's height) is a decorative
+        // tooltip, as in playtest 1; the ext strip is 32 (§1.3).
+        if (n === 'sign') continue
+        // A desk's 40-px west strip continues its slot's hit (one 120-px tap).
+        if (n.startsWith('desk hit ')) {
+          const slot = lay.hitFor(n.slice('desk hit '.length)) as Rect
+          expect(r.x + r.w, `${n} t${t}`).toBe(slot.x)
+          expect(r.w + slot.w).toBeGreaterThanOrEqual(44)
+          continue
+        }
+        const min = n.startsWith('ext') ? 32 : 44
+        expect(Math.min(r.w, r.h), `${n} t${t}`).toBeGreaterThanOrEqual(min)
+      }
+      for (let i = 0; i < taps.length; i++)
+        for (let j = i + 1; j < taps.length; j++) {
+          const [a, ra] = taps[i] as [string, Rect]
+          const [b, rb] = taps[j] as [string, Rect]
+          expect(overlaps(ra, rb), `${a} vs ${b} at t${t}`).toBe(false)
+        }
+    })
+
+    it(`tier ${t}: pathBetween is defined for every next and divert edge; nodeAt resolves every tappable node`, () => {
+      const lay = new FixedLaneLayout(t)
+      const nodes = laneOfTier(t)
+      let edges = 0
+      for (const n of nodes) {
+        for (const to of [...n.next, ...(n.divert ? [n.divert] : [])]) {
+          const dest = lay.anchorsFor(to).buffer[0] ?? lay.anchorsFor(to).entry
+          const path = lay.pathBetween(n.id, to, dest)
+          expect(path.length, `${n.id}→${to}`).toBeGreaterThan(0)
+          for (const p of path) expect(finite(p), `${n.id}→${to}`).toBe(true)
+          expect(path[path.length - 1], `${n.id}→${to}`).toEqual(dest)
+          edges += 1
+        }
+      }
+      expect(edges).toBeGreaterThanOrEqual(nodes.length)
+      const tappable = ['hold', 'bin', 'shelf']
+      for (let k = 1; k <= lay.beltSlots; k++) tappable.push(`slot${k}`)
+      for (const id of tappable) {
+        const r = lay.hitFor(id) as Rect
+        expect(lay.nodeAt(r.x + r.w / 2, r.y + r.h / 2), `${id} t${t}`).toBe(id)
+      }
+      const ext = lay.extSlotIds()[0]
+      if (ext) {
+        const r = lay.hitFor(ext) as Rect
+        expect(lay.nodeAt(r.x + r.w / 2, r.y + r.h / 2)).toBe(ext)
+      }
+      // Slot anchors sit on the belt inside the slot rect (every belt slot).
+      for (let k = 1; k <= lay.beltSlots; k++) {
+        const id = `slot${k}`
+        const r = lay.rectFor(id) as Rect
+        const a = lay.anchorsFor(id)
+        for (const p of [...a.buffer, ...a.stations])
+          expect(inside(p, r), `${id} t${t}`).toBe(true)
+      }
+    })
+
+    it(`tier ${t}: the station and the poster stay clear of the bays, the bin, the plates and the props; plates on the floor`, () => {
+      const lay = new FixedLaneLayout(t)
+      const floor = floorOf(lay)
+      const avoid: [string, Rect][] = [
+        ['bin', lay.binRect()],
+        ['shelf', lay.rectFor('shelf') as Rect],
+        ['shelf badge', lay.shelfBadge()],
+        ...platesOf(lay),
+        ...lay
+          .props()
+          .map(
+            (p, i) =>
+              [`prop ${i}`, { ...p, ...PROP_T3_SIZE }] as [string, Rect],
+          ),
+      ]
+      for (let i = 0; i < BAY_COUNT; i++) avoid.push([`bay ${i}`, bayRect(i)])
+      for (const [n, r] of [
+        ['station', HOLD_STATION],
+        ['station hit', HOLD_STATION_HIT],
+        ['poster', POSTER],
+        ['poster hit', POSTER_HIT],
+      ] as [string, Rect][]) {
+        expect(within(r, floor), `${n} t${t}`).toBe(true)
+        for (const [m, o] of avoid)
+          expect(overlaps(r, o), `${n} vs ${m} at t${t}`).toBe(false)
+      }
+      for (const [n, r] of platesOf(lay)) {
+        expect(within(r, floor), `${n} t${t}`).toBe(true)
+        const ext = lay.extRect()
+        if (ext) expect(overlaps(r, ext), `${n} vs ext t${t}`).toBe(false)
+        expect(overlaps(r, lay.shelfBadge()), `${n} vs badge t${t}`).toBe(false)
+      }
+      // The Arm's 64 × 64 canvas stays off the bin and the plates.
+      const arm: Rect = { ...SORTER_ARM_AT, ...SORTER_ARM_SIZE }
+      expect(overlaps(arm, lay.binRect())).toBe(false)
+      for (const [n, r] of platesOf(lay))
+        expect(overlaps(arm, r), `arm vs ${n} t${t}`).toBe(false)
+    })
+
+    it(`tier ${t}: the shelf grid holds the level's cap inside the shelf rect, clear of the badge`, () => {
+      const lay = new FixedLaneLayout(t)
+      const cap =
+        dataFixture().levels.find((l) => l.warehouseTier === t)?.shelfCap ?? 0
+      expect(lay.shelfCapacity()).toBeGreaterThanOrEqual(cap)
+      const shelf = lay.rectFor('shelf') as Rect
+      const badge = lay.shelfBadge()
+      for (let i = 0; i < lay.shelfCapacity(); i++) {
+        const c = lay.shelfCell(i)
+        const mini = { x: c.x, y: c.y, w: 10, h: 10 }
+        expect(within(mini, shelf), `cell ${i} t${t}`).toBe(true)
+        expect(overlaps(mini, badge), `cell ${i} vs badge t${t}`).toBe(false)
+      }
+      expect(lay.shelfGrid().origin.y).toBe(shelfGrid(t).origin.y + lay.shift)
+      expect(lay.anchorsFor('shelf').buffer).toHaveLength(lay.shelfCapacity())
+    })
+
+    it(`tier ${t}: every walk keeps its sprite in the room, off the badge-layer rects; feet off the rack, bin and shelf`, () => {
+      const lay = new FixedLaneLayout(t)
+      const room: Rect = { x: 0, y: 0, w: ROOM_W, h: lay.height }
+      const ext = lay.extRect()
+      const above: [string, Rect][] = [
+        ['dock panel', DOCK_PANEL],
+        ['shelf badge', lay.shelfBadge()],
+        ...(ext ? [['ext strip', ext] as [string, Rect]] : []),
+        ...platesOf(lay).filter(([n]) => n !== 'plate INTAKE'),
+      ]
+      const feetOff: [string, Rect][] = [
+        ['rack', RACK],
+        ['bin', lay.binRect()],
+        ['shelf', lay.rectFor('shelf') as Rect],
+      ]
+      const walks: Point[][] = [lay.stationWalkPath()]
+      for (let k = 1; k <= lay.beltSlots; k++)
+        for (const st of lay.standPoints(`slot${k}`))
+          walks.push(lay.walkPath(`slot${k}`, st))
+      for (const path of walks)
+        for (const pt of samples(path[0] as Point, path.slice(1))) {
+          const box = spriteBox({ x: Math.round(pt.x), y: Math.round(pt.y) })
+          expect(within(box, room), `${pt.x},${pt.y} t${t}`).toBe(true)
+          for (const [n, r] of above)
+            expect(overlaps(box, r), `${n} at ${pt.x},${pt.y} t${t}`).toBe(
+              false,
+            )
+          for (const [n, r] of feetOff)
+            expect(inside(pt, r), `feet on ${n} at ${pt.x},${pt.y} t${t}`).toBe(
+              false,
+            )
+        }
+    })
+  }
+
+  it('the Clear path at tier 5 runs bay → chute → the gap row (y 496) → the shelf cell; slot 6 drops to the shelf', () => {
+    const lay = new FixedLaneLayout(5)
+    const bay = lay.anchorsFor('hold').buffer[1] as Point
+    const cell = lay.anchorsFor('shelf').buffer[42] as Point
+    expect(lay.pathBetween('hold', 'shelf', cell, bay)).toEqual([
+      { x: 180, y: bay.y },
+      { x: 180, y: 496 },
+      { x: 144, y: 496 },
+      { x: 144, y: 516 },
+      cell,
+    ])
+    const gap = { x: 128, y: lay.gapTileY(), w: 32, h: 32 }
+    expect(inside({ x: 144, y: 496 }, gap)).toBe(true)
+    expect(lay.pathBetween('slot6', 'shelf', cell)).toEqual([
+      { x: 144, y: 516 },
+      cell,
+    ])
+    // Slot 6's divert edge climbs the chute to its bay like slot 4's.
+    const b0 = lay.anchorsFor('hold').buffer[0] as Point
+    expect(lay.pathBetween('slot6', 'hold', b0)).toEqual([
+      { x: 180, y: 456 },
+      { x: 180, y: b0.y },
+      b0,
+    ])
+  })
+})
+
+/** roomPlacement of a tier-`t` room on a W × H canvas without insets. */
+const placeOf = (W: number, H: number, t: number) =>
+  roomPlacement(W, HUD_TOP_H, H - HUD_BOTTOM_H, roomHeightForTier(t))
+
+describe('B2 §4.4 / R10 (M9): the room fits or scrolls at 360 × 604 and 393 × 659', () => {
+  it('tiers 1–3 fit 360 × 604 exactly (no scroll) and centre at 393 × 659, as playtest 1', () => {
+    for (const t of [1, 2, 3] as const) {
+      const p = placeOf(360, 604, t)
+      expect(p).toMatchObject({ roomX: 4, roomY: 92, fits: true, maxScroll: 0 })
+      expect(p.roomY + 448).toBe(604 - HUD_BOTTOM_H)
+      expect(p.viewport).toEqual({ x: 4, y: 92, w: ROOM_W, h: 448 })
+      expect(placeOf(393, 659, t)).toMatchObject({ roomY: 119, fits: true })
+      // The default height is tier 1's (callers that pass none).
+      expect(roomPlacement(360, HUD_TOP_H, 540)).toEqual(p)
+    }
+  })
+
+  it('tier 4 scrolls 64 px at 360 × 604 and 9 at 393 × 659; tier 5 128 / 73; everything fits 430 × 932', () => {
+    expect(placeOf(360, 604, 4).maxScroll).toBe(64)
+    expect(placeOf(393, 659, 4).maxScroll).toBe(9)
+    expect(placeOf(360, 604, 5).maxScroll).toBe(128)
+    expect(placeOf(393, 659, 5).maxScroll).toBe(73)
+    for (const t of TIERS) {
+      const p = placeOf(430, 932, t)
+      expect(p.fits, `t${t}`).toBe(true)
+      expect(p.maxScroll).toBe(0)
+      expect(p.roomY + roomHeightForTier(t)).toBeLessThanOrEqual(
+        932 - HUD_BOTTOM_H,
+      )
+    }
+  })
+
+  it('a block at most ROOM_SLACK (4) px too tall fits: the strip moves up into its top margin, the room ends on the bottom band (375 × 667 tier 4: 1 px over, no scroll)', () => {
+    expect(ROOM_SLACK).toBe(4)
+    const p = placeOf(375, 667, 4)
+    expect(p).toMatchObject({ fits: true, maxScroll: 0 })
+    expect(p.readout.y).toBe(HUD_TOP_H + 3)
+    expect(p.roomY + 512).toBe(667 - HUD_BOTTOM_H)
+    expect(coverRects(p, 375, 667, 4)).toEqual([])
+    // 4 px over still fits (strip on the band); 5 px over scrolls.
+    const bandH = 512 + 28 - 4
+    const edge = roomPlacement(375, 0, bandH, 512)
+    expect(edge).toMatchObject({ fits: true, maxScroll: 0, roomY: 24 })
+    expect(edge.readout.y).toBe(0)
+    expect(roomPlacement(375, 0, bandH - 1, 512)).toMatchObject({
+      fits: false,
+      maxScroll: 5,
+    })
+  })
+
+  it('coverRects: none while the room fits; scrolling, the bands above and below the viewport, bled past the canvas so the nine-slice corners stay off screen', () => {
+    expect(coverRects(placeOf(393, 659, 3), 393, 659, 4)).toEqual([])
+    const p = placeOf(393, 659, 5)
+    const v = p.viewport
+    expect(coverRects(p, 393, 659, 4)).toEqual([
+      { x: -4, y: -4, w: 401, h: v.y + 4 },
+      { x: -4, y: v.y + v.h, w: 401, h: 659 - v.y - v.h + 4 },
+    ])
+  })
+
+  for (const [W, H] of [
+    [360, 604],
+    [393, 659],
+  ] as const) {
+    it(`at ${W}×${H} every tier fits or scrolls: the strip stays at the band's top, the viewport fills the band, the scroll range shows the whole room`, () => {
+      const bandTop = HUD_TOP_H
+      const bandBottom = H - HUD_BOTTOM_H
+      for (const t of TIERS) {
+        const roomH = roomHeightForTier(t)
+        const p = placeOf(W, H, t)
+        expect(p.readout.y, `t${t}`).toBeGreaterThanOrEqual(bandTop)
+        expect(p.readout.y + p.readout.h).toBeLessThanOrEqual(p.roomY)
+        expect(p.roomX).toBeGreaterThanOrEqual(0)
+        expect(p.roomX + ROOM_W).toBeLessThanOrEqual(W)
+        if (p.fits) {
+          expect(p.maxScroll).toBe(0)
+          expect(p.roomY + roomH, `t${t}`).toBeLessThanOrEqual(bandBottom)
+          continue
+        }
+        // Scrolls (R10): readout at bandTop + 4, the room's top 28 below
+        // the band, the viewport down to the bottom band.
+        expect(t).toBeGreaterThanOrEqual(4)
+        expect(p.readout.y).toBe(bandTop + 4)
+        expect(p.roomY).toBe(bandTop + 28)
+        expect(p.viewport).toEqual({
+          x: 0,
+          y: bandTop + 28,
+          w: W,
+          h: bandBottom - bandTop - 28,
+        })
+        expect(p.maxScroll).toBe(roomH - p.viewport.h)
+        // Scroll 0 shows the room's top; maxScroll puts its bottom on the band.
+        expect(p.roomY - 0).toBe(p.viewport.y)
+        expect(p.roomY - p.maxScroll + roomH).toBe(bandBottom)
+        // Every tap rect is reachable: inside the viewport at some scroll.
+        for (const [n, r] of tapRectsOf(new FixedLaneLayout(t))) {
+          const s = scrollToShow(r, 0, p.viewport.h, p.maxScroll, 0)
+          const top = p.roomY - s + r.y
+          expect(top, `${n} t${t}`).toBeGreaterThanOrEqual(p.viewport.y)
+          expect(top + r.h, `${n} t${t}`).toBeLessThanOrEqual(
+            p.viewport.y + p.viewport.h,
+          )
+        }
+      }
+    })
+  }
+})
+
+describe('R22 (M9): the scroll gesture and clamping', () => {
+  it('clampScroll: integer in [0, max]', () => {
+    expect(clampScroll(-5, 64)).toBe(0)
+    expect(clampScroll(70, 64)).toBe(64)
+    expect(clampScroll(12.6, 64)).toBe(13)
+    expect(clampScroll(30, 0)).toBe(0)
+    expect(clampScroll(Number.NaN, 64)).toBe(0)
+  })
+
+  it('a press scrolls once its vertical travel passes the slop — never a lifted fixture, never a room that fits', () => {
+    expect(dragScrolls(9, false, 64, 8)).toBe(true)
+    expect(dragScrolls(-9, false, 64, 8)).toBe(true)
+    expect(dragScrolls(8, false, 64, 8)).toBe(false)
+    expect(dragScrolls(40, true, 64, 8)).toBe(false)
+    expect(dragScrolls(40, false, 0, 8)).toBe(false)
+  })
+
+  it('the drag is 1:1 from the press (finger up = room up), clamped; no inertia', () => {
+    expect(scrollForDrag(0, -20, 64)).toBe(20)
+    expect(scrollForDrag(30, 10, 64)).toBe(20)
+    expect(scrollForDrag(30, -100, 64)).toBe(64)
+    expect(scrollForDrag(30, 100, 64)).toBe(0)
+  })
+
+  it('scrollToShow: the smallest move that shows a rect (above an open sheet), its top when taller than the window', () => {
+    const slot6 = new FixedLaneLayout(5).rectFor('slot6') as Rect
+    // 360 × 604 tier 5: viewport 448, max 128.
+    expect(scrollToShow(slot6, 0, 448, 128)).toBe(416 + 64 + 4 - 448)
+    expect(scrollToShow(slot6, 100, 448, 128)).toBe(100)
+    expect(scrollToShow({ x: 0, y: 40, w: 10, h: 10 }, 100, 448, 128)).toBe(36)
+    // A sheet leaves 120 px of room above it: slot 6 scrolls to the top.
+    expect(scrollToShow(slot6, 0, 120, 128)).toBe(128)
+    expect(scrollToShow({ x: 0, y: 200, w: 10, h: 300 }, 0, 120, 128)).toBe(128)
+    expect(scrollToShow({ x: 0, y: 100, w: 10, h: 300 }, 0, 120, 400)).toBe(96)
+    expect(scrollToShow(slot6, 0, 448, 0)).toBe(0)
   })
 })

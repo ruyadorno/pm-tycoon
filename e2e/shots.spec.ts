@@ -171,6 +171,54 @@
 //                          pier, sim-only to life:lost: the card's route
 //                          ends `Handed off at Prefetch Pier 1 …` / `Cleared
 //                          … — the ship has sailed` (+ `-360x604`)
+//
+// M9 (plan-build2 §8.6 task 7 + acceptance; design-m8-m9 §6.1-§6.3, §8 lane
+// G), fixtures from `node tools/fixtures/m9.ts` (l3-docks.json is at a real
+// L4 since M9: warehouse-two-docks shows tier 4 with dock 3 for sale):
+//   title                  re-taken over the L5 attract city (the first
+//                          whole minute in 24-30 with a van and two trucks)
+//   lowres-live            level-up-4.json + policy, the chip's pan to
+//   rural-live             Low-density / Rural, after the 1-s fog
+//                          cross-fade of both L4 regions: in colour
+//   level-up-5             level-up-5.json + policy, camera on the
+//                          warehouse, frozen on dust frame 2 of level:up {5}
+//                          (no `coming soon` anywhere in the HUD)
+//   airport-live           level-up-5.json + policy, the pan to the Airport
+//   civic-live             / Park & civic after the cross-fade: in colour
+//                          (the Airport label sits at (41, 10) since the M9
+//                          integration, so the pan frames the plane at its
+//                          stand, the terminal, the tower and the hangar's
+//                          door; the civic fountain at (22, 41))
+//   warehouse-tier4        l4-room.json + policy in the room, scrolled 0:
+//                          tier 4, 16 rows, slots 1-5, the slot-6 strip
+//                          (iPhone 16 393×659: maxScroll 9; `-360x604`:
+//                          maxScroll 64 — the plan's warehouse-tier4-360)
+//   warehouse-tier5        level-up-5.json + policy in the room: level:up
+//                          {5} while inside → the hard re-layout (R21) under
+//                          the fade, settled at scroll 0: tier 5, 18 rows,
+//                          slot 6 (+ `-360x604`: maxScroll 128); then
+//                          warehouse-tier5-scrolled at maxScroll (the shelf
+//                          and bin, the readout still fixed, R10)
+//   golden-release-offer   l5-tycoon.json WITHOUT the policy: the regular
+//                          quest it holds abandoned, the gold chip tapped →
+//                          the Golden Release card, Accept · Later
+//                          (+ `-360x604`: inside the canvas)
+//   plane-departure        l5-tycoon.json + policy, sim-only to the first
+//                          hub:departure {airport}, then 160 frames (2.56 s,
+//                          t ≈ 0.64 of the 4-s leg): the plane climbing at
+//                          full opacity east of its stand
+//   victory                victory.json + policy, real frames to its
+//                          game:victory, the VictoryCard after the stamp —
+//                          the real Golden Release of seed 7's run
+//                          (+ `-360x604`)
+//   title-tycoon           victory.json + policy to game:victory (the HUD
+//                          saves at once), then the Title: Continue
+//                          `Day … · $… · Tycoon ✓` (+ `-360x604`: the line
+//                          inside the button, `Lv 5` dropped if too wide)
+// Every M9 shot but title-tycoon marks the page's one-time hints done after
+// the load (quietHints: the tour skipped, the first-flag funnel, the
+// first-Toss hint and the 20-minute summary offer seen), so no toast covers
+// the M9 art.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
@@ -186,10 +234,13 @@ import {
 import {
   bayRect,
   dockHit,
+  expectRoomScrolls,
   hireSheet,
   openSheet,
   policyOff,
+  roomFit,
   roomLayout,
+  roomScrollTo,
   sceneTarget,
   sceneTexts,
   settleUntil,
@@ -1021,13 +1072,23 @@ async function levelUpAt(
   page: Page,
   pm: PmHelpers,
   url: string,
-  focus: 'warehouse' | 'industrial' | 'docks' | null,
-  name: 'level-up' | 'level-up-3' = 'level-up',
+  focus:
+    | 'warehouse'
+    | 'industrial'
+    | 'docks'
+    | 'lowres'
+    | 'rural'
+    | 'airport'
+    | 'civic'
+    | null,
+  name: 'level-up' | 'level-up-3' | 'level-up-4' | 'level-up-5' = 'level-up',
   level = 2,
+  quiet = false,
 ): Promise<void> {
   await pm.open(url)
   const { fixture } = await loadFixture(page, pm, name)
   await pm.settle(5)
+  if (quiet) await quietHints(page)
   if (focus === 'warehouse') await focusCity(page, await warehouseCentre(page))
   else if (focus !== null) {
     // The chip's own pan (pm:panTo), one frame per 16 ms until it lands.
@@ -1059,6 +1120,36 @@ async function levelUpAt(
   }, capFrames)
   console.log(`shots: ${name} level:up after ${w.frames} frames`)
   expect(w.level, `the fixture levels up to ${level}`).toBe(level)
+}
+
+/**
+ * M9 shots: the one-time hints a fresh page would raise over a loaded
+ * mid-game fixture are marked done, as a player of that run has seen them —
+ * the tour skipped (its Skip tour), the first-flag funnel and the first-Toss
+ * hint seen (the policy Tosses as the player) and the 20-minute summary offer
+ * made (fixtures past 20:00) — and any toast up is cleared, so nothing
+ * covers the M9 art. Every
+ * other HUD reaction (level stamp, paper, chips, quest UI) is untouched.
+ */
+async function quietHints(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const api = window.__pm!
+    type Seen = { sawFirstFlag: boolean; sawTossHint: boolean }
+    const hud = api.game.scene.getScene('HUD') as unknown as {
+      onboarding: { skipTour(): void; state: Seen }
+      recorder: { offered: boolean; markOffered(): void }
+      toast: { clear(): void }
+    }
+    hud.onboarding.skipTour()
+    const ob = api.game.registry.get('onboarding') as Seen | null
+    for (const s of [hud.onboarding.state, ob])
+      if (s) {
+        s.sawFirstFlag = true
+        s.sawTossHint = true
+      }
+    if (!hud.recorder.offered) hud.recorder.markOffered()
+    hud.toast.clear()
+  })
 }
 
 /** The HUD newspaper: the paper on screen (kind) and whether it shows. */
@@ -2770,7 +2861,16 @@ test.describe('M8 shots', () => {
     })
     console.log(`shots: warehouse-two-docks ${JSON.stringify(st)}`)
     expect(st.warehouse).toBe(true)
-    expect(st.slots).toEqual(['1:owned', '2:owned', '3:locked'])
+    // M9: l3-docks.json is at a real L4 (dock 3 for sale from L4).
+    const dock3 = await page.evaluate(
+      () =>
+        window.__pm!.data.economy.docks.find((d) => d.index === 3)!.unlockLevel,
+    )
+    expect(st.slots).toEqual([
+      '1:owned',
+      '2:owned',
+      (fixture.level as number) >= dock3 ? '3:buy' : '3:locked',
+    ])
     expect(st.docks.map((d) => d.id)).toEqual(fixture.docks)
     for (const d of st.docks)
       expect(d.state ?? '', `${d.id} docked`).toMatch(/^docked/)
@@ -2923,6 +3023,509 @@ test.describe('M8 shots', () => {
     expect(await page.evaluate(() => window.__pm!.sim.lives)).toBe(
       (fixture.lives as number) - 1,
     )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M9 ------------------------------------------------------------------
+
+/** The region's buildings and their frames in the City (`id:frame`). */
+function regionFrames(page: Page, region: string): Promise<string[]> {
+  return page.evaluate((r) => {
+    const city = window.__pm!.game.scene.getScene('City') as unknown as {
+      byDistrict: Map<
+        string,
+        { id: string; image: { frame: { name: string } } | null }[]
+      >
+    }
+    return (city.byDistrict.get(r) ?? []).map(
+      (v) => `${v.id}:${v.image?.frame.name ?? '-'}`,
+    )
+  }, region)
+}
+
+/** The HUD's region chips as `id:lockLevel` (M3). */
+function chipEntries(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    (
+      window.__pm!.game.scene.getScene('HUD') as unknown as {
+        chips: { entry: { id: string; lockLevel: number | null } }[]
+      }
+    ).chips.map((c) => `${c.entry.id}:${c.entry.lockLevel ?? ''}`),
+  )
+}
+
+/**
+ * The room's tier-only parts as the frozen frame shows them (warehouse-tier3's
+ * probe, M9 tiers): any still mid-fade, which prop groups show, the floor's
+ * tier, the strip lights' frames.
+ */
+function roomTierProbe(page: Page): Promise<{
+  warehouse: boolean
+  level: number
+  tier: number
+  fading: string[]
+  bulb: boolean
+  strips: boolean
+  stripFrames: string[]
+  propsShown: number[]
+  floorTier: string[]
+  slots: string[]
+  shelfCap: number | null | undefined
+}> {
+  return page.evaluate(() => {
+    const api = window.__pm!
+    type Obj = { visible: boolean; alpha: number }
+    type Img = Obj & { frame: { name: string } }
+    const wh = api.game.scene.getScene('Warehouse') as unknown as {
+      tweens: { isTweening(o: unknown): boolean }
+      lane: {
+        tier: number
+        bulb: Obj
+        strips: Img[]
+        plates: Obj[]
+        props: Map<number, Obj[]>
+        signText: Obj
+        floorImgs: { img: { frame: { name: string } } }[]
+      }
+    }
+    const L = wh.lane
+    const parts: [string, Obj][] = [
+      ['bulb', L.bulb],
+      ['sign', L.signText],
+      ...L.strips.map((o, i): [string, Obj] => [`strip${i}`, o]),
+      ...L.plates.map((o, i): [string, Obj] => [`plate${i}`, o]),
+      ...[...L.props].flatMap(([g, imgs]) =>
+        imgs.map((o, i): [string, Obj] => [`props${g}.${i}`, o]),
+      ),
+    ]
+    return {
+      warehouse: api.game.scene.isActive('Warehouse'),
+      level: api.sim.level,
+      tier: L.tier,
+      fading: parts
+        .filter(
+          ([, o]) => wh.tweens.isTweening(o) || (o.visible && o.alpha < 1),
+        )
+        .map(([n]) => n),
+      bulb: L.bulb.visible,
+      strips: L.strips.length > 0 && L.strips.every((o) => o.visible),
+      stripFrames: [...new Set(L.strips.map((o) => o.frame.name))],
+      propsShown: [...L.props]
+        .filter(([, imgs]) => imgs.length > 0 && imgs.every((o) => o.visible))
+        .map(([g]) => g),
+      floorTier: [
+        ...new Set(
+          L.floorImgs.map((f) =>
+            f.img.frame.name.replace(/^floor_(t\d).*$/, '$1'),
+          ),
+        ),
+      ],
+      slots: api.sim.lane
+        .nodes()
+        .filter((n) => n.kind === 'slot' && !n.locked)
+        .map((n) => n.id),
+      shelfCap: api.core.state.lane.nodes.find((n) => n.id === 'shelf')?.cap,
+    }
+  })
+}
+
+/** WarehouseScene's maxScroll for a tier at this viewport (design §6.1). */
+function expectedMaxScroll(tier: number): number {
+  const minFit = isMinFit()
+  if (tier === 4) return minFit ? 64 : 9
+  if (tier === 5) return minFit ? 128 : 73
+  return 0
+}
+
+/** The HUD's open VictoryCard / its hold, through questUi. */
+async function victoryCardUp(page: Page, pm: PmHelpers): Promise<boolean> {
+  return settleUntil(page, pm, async () => (await questUi(page)).victoryCard)
+}
+
+test.describe('M9 shots', () => {
+  for (const region of ['lowres', 'rural'] as const) {
+    test(`${region}-live`, async ({ page, pm, consoleErrors }) => {
+      phoneOnly()
+      await levelUpAt(page, pm, POLICY, region, 'level-up-4', 4, true)
+      // 100 frames = 1.6 s: the 1-s fog cross-fade and the sign pop are done.
+      await pm.shot(`${region}-live`, 100)
+      const st = {
+        region: await page.evaluate(
+          (r) => window.__pm!.sim.regionState(r),
+          region,
+        ),
+        both: await page.evaluate(() => [
+          window.__pm!.sim.regionState('lowres'),
+          window.__pm!.sim.regionState('rural'),
+        ]),
+        chips: await chipEntries(page),
+        frames: await regionFrames(page, region),
+      }
+      console.log(`shots: ${region}-live ${JSON.stringify(st)}`)
+      expect(st.region).toBe('live')
+      expect(st.both, 'both L4 regions went live together').toEqual([
+        'live',
+        'live',
+      ])
+      expect(st.chips).toContain(`${region}:`)
+      expect(st.frames.length).toBeGreaterThan(0)
+      for (const f of st.frames) expect(f, 'in colour').not.toMatch(/_locked$/)
+      expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+    })
+  }
+
+  test('level-up-5', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, 'warehouse', 'level-up-5', 5, true)
+    // 38 frames = 608 ms: dust frame 2 (500-749 ms), the stamp rising.
+    await pm.shot('level-up-5', 38)
+    const st = await page.evaluate(() => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        construction: { start: number } | null
+        time: { now: number }
+      }
+      const c = city.construction
+      return {
+        ms: c ? city.time.now - c.start : null,
+        offer: window.__pm!.quests().offer?.templateId ?? null,
+      }
+    })
+    const hud = await sceneTexts(page, 'HUD')
+    console.log(
+      `shots: level-up-5 ${JSON.stringify({ ...st, level: hud.filter((t) => /Tycoon|Lv|\$/.test(t)).slice(0, 6) })}`,
+    )
+    expect(st.ms, 'the construction overlay is up').not.toBeNull()
+    expect(st.ms!).toBeGreaterThanOrEqual(500)
+    expect(st.ms!).toBeLessThan(750)
+    expect(st.offer, 'the Golden Release offered on level:up {5}').toBe(
+      'golden_release',
+    )
+    expect(
+      hud.filter((t) => /coming soon/.test(t)),
+      'no "coming soon" at the top level',
+    ).toEqual([])
+    expect((await paperState(page)).visible, 'no paper over the moment').toBe(
+      false,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  for (const region of ['airport', 'civic'] as const) {
+    test(`${region}-live`, async ({ page, pm, consoleErrors }) => {
+      phoneOnly()
+      await levelUpAt(page, pm, POLICY, region, 'level-up-5', 5, true)
+      await pm.shot(`${region}-live`, 100)
+      const st = {
+        region: await page.evaluate(
+          (r) => window.__pm!.sim.regionState(r),
+          region,
+        ),
+        chips: await chipEntries(page),
+        frames: await regionFrames(page, region),
+      }
+      console.log(`shots: ${region}-live ${JSON.stringify(st)}`)
+      expect(st.region).toBe('live')
+      expect(st.chips).toContain(`${region}:`)
+      // L5 is the top level: no chip is locked any more.
+      for (const c of st.chips) expect(c, 'no lock left at L5').toMatch(/:$/)
+      expect(st.frames.length).toBeGreaterThan(0)
+      for (const f of st.frames) expect(f, 'in colour').not.toMatch(/_locked$/)
+      expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+    })
+  }
+
+  test('warehouse-tier4', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(WH_POLICY)
+    const { fixture } = await loadFixture(page, pm, 'l4-room')
+    await pm.settle(5)
+    await quietHints(page)
+    await pm.settle(59)
+    expect(await roomScrollTo(page, 0)).toBe(0)
+    await pm.shot(shotName('warehouse-tier4'), 20)
+    const st = await roomTierProbe(page)
+    const fit = await roomFit(page)
+    console.log(`shots: warehouse-tier4 ${JSON.stringify({ st, fit })}`)
+    expect(st).toMatchObject({ warehouse: true, level: 4, tier: 4 })
+    expect(st.fading, 'no tier part mid-fade').toEqual([])
+    expect(st.floorTier).toEqual(['t4'])
+    expect(st.slots).toEqual(fixture.slots)
+    expect(st.shelfCap).toBe(80)
+    expect(fit.tier).toBe(4)
+    expect(fit.roomH, '16 rows').toBe(16 * 32)
+    expectRoomScrolls(fit, 'warehouse-tier4')
+    expect(fit.maxScroll).toBe(expectedMaxScroll(4))
+    expect(fit.scrollY, 'scrolled 0').toBe(0)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-tier5', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await levelUpAt(page, pm, WH_POLICY, null, 'level-up-5', 5, true)
+    // R21: the rebuild lands on the next frame, the old room fades out over
+    // it for 400 ms, then slot 6 unrolls — 96 frames ≈ 1.5 s.
+    await pm.settle(96)
+    expect(await roomScrollTo(page, 0)).toBe(0)
+    await pm.shot(shotName('warehouse-tier5'), 20)
+    const st = await roomTierProbe(page)
+    const fit = await roomFit(page)
+    console.log(`shots: warehouse-tier5 ${JSON.stringify({ st, fit })}`)
+    expect(st).toMatchObject({ warehouse: true, level: 5, tier: 5 })
+    expect(st.fading, 'the re-layout fade has finished').toEqual([])
+    expect(st.floorTier).toEqual(['t5'])
+    expect(st.bulb).toBe(false)
+    expect(st.strips).toBe(true)
+    for (const f of st.stripFrames) expect(f).toMatch(/^neon_strip_f[01]$/)
+    expect(st.slots).toEqual([
+      'slot1',
+      'slot2',
+      'slot3',
+      'slot4',
+      'slot5',
+      'slot6',
+    ])
+    expect(st.shelfCap).toBe(100)
+    expect(fit.roomH, '18 rows').toBe(18 * 32)
+    expectRoomScrolls(fit, 'warehouse-tier5')
+    expect(fit.maxScroll).toBe(expectedMaxScroll(5))
+    expect(fit.scrollY, 'scrolled 0').toBe(0)
+    expect((await paperState(page)).visible, 'no paper over the room').toBe(
+      false,
+    )
+    // R10: scrolled to the bottom the readout stays where it was.
+    expect(await roomScrollTo(page, fit.maxScroll)).toBe(fit.maxScroll)
+    await pm.shot(shotName('warehouse-tier5-scrolled'), 8)
+    const down = await roomFit(page)
+    expectRoomScrolls(down, 'warehouse-tier5-scrolled')
+    expect(down.scrollY).toBe(fit.maxScroll)
+    expect(down.readout).toEqual(fit.readout)
+    expect(down.roomY).toBe(fit.roomY - fit.maxScroll)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('golden-release-offer', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    // No policy: it would accept the offer as soon as its quest ends.
+    await pm.open(CITY)
+    const { fixture } = await loadFixture(page, pm, 'l5-tycoon')
+    await pm.settle(5)
+    await quietHints(page)
+    await pm.settle(11)
+    if (fixture.activeQuestId !== null) await abandonActive(page)
+    await pm.settle(8)
+    const chip = (await questUi(page)).chip
+    expect(chip.visible, 'the quest chip shows the offer').toBe(true)
+    await tapTarget(page, pm, 'HUD', 'questChip')
+    expect(
+      await settleUntil(page, pm, async () => {
+        const ui = await questUi(page)
+        return ui.card.open && ui.card.mode === 'offer'
+      }),
+      'the chip opens the Golden Release card',
+    ).toBe(true)
+    await pm.settle(30)
+    const ui = await questUi(page)
+    const fit = await questCardFit(page)
+    console.log(
+      `shots: golden-release-offer ${JSON.stringify({ offer: ui.offer, card: ui.card, chip: ui.chip, fit })}`,
+    )
+    expect(ui.offer?.templateId).toBe('golden_release')
+    expect(ui.offer?.id).toBe(fixture.questId)
+    expect(ui.active).toBeNull()
+    expect(ui.card).toMatchObject({
+      questId: fixture.questId,
+      gold: true,
+      buttons: ['accept', 'later'],
+    })
+    expect(fit.card.x).toBeGreaterThanOrEqual(0)
+    expect(fit.card.x + fit.card.w).toBeLessThanOrEqual(fit.W)
+    expect(fit.card.y).toBeGreaterThanOrEqual(fit.bandTop)
+    expect(fit.card.y + fit.card.h).toBeLessThanOrEqual(fit.bandBottom)
+    await expectInside(page, 'HUD', ['quest:accept', 'quest:later'])
+    await pm.shot(shotName('golden-release-offer'), 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('plane-departure', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(150_000)
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'l5-tycoon')
+    await pm.settle(5)
+    await quietHints(page)
+    const v0 = await vesselAt(page, 'airport')
+    expect(v0, 'the Airport vessel prop (ap_plane)').not.toBeNull()
+    expect(v0!.visible).toBe(true)
+    // exit [4, 0]: east along +x (iso: right and down); frame the stand and
+    // the first half of the taxi.
+    await focusCity(page, { x: v0!.home.x + 24, y: v0!.home.y - 8 })
+    await pm.settle(10)
+    const capMs = ((fixture.airportDepartureInS as number) + 10) * 1000
+    const w = await page.evaluate((cap) => {
+      const api = window.__pm!
+      const ev = api.core.events as unknown as {
+        on(n: string, f: (p: { hub: string; count: number }) => void): unknown
+        off(n: string, f: (p: { hub: string; count: number }) => void): unknown
+      }
+      const got: { count: number | null; tick: number | null } = {
+        count: null,
+        tick: null,
+      }
+      const fn = (p: { hub: string; count: number }): void => {
+        if (p.hub !== 'airport' || got.count !== null) return
+        got.count = p.count
+        got.tick = api.core.state.tick
+      }
+      ev.on('hub:departure', fn)
+      let ms = 0
+      while (got.count === null && ms < cap) {
+        api.advance(100)
+        ms += 100
+      }
+      ev.off('hub:departure', fn)
+      return { ok: got.count !== null, ms, count: got.count, tick: got.tick }
+    }, capMs)
+    console.log(`shots: plane-departure hub:departure ${JSON.stringify(w)}`)
+    expect(w.ok, 'the first Airport clearance flies the plane').toBe(true)
+    // The settle frames above ran the sim too: time it from the fixture tick.
+    expect(((w.tick ?? 0) - (fixture.tick as number)) / 10).toBe(
+      fixture.airportDepartureInS,
+    )
+    // 160 frames = 2.56 s of the 4-s out leg (t ≈ 0.64): past the climb's
+    // start (t 0.4), before the fade (t 0.8).
+    await pm.overlay(false)
+    await pm.stamp('test')
+    await pm.settle(160)
+    const st = await hubState(page, 'airport')
+    const v = await vesselAt(page, 'airport')
+    const alpha = await page.evaluate(() => {
+      const api = window.__pm!
+      const row = api.data.map.hubs.find((x) => x.district === 'airport')!
+      const city = api.game.scene.getScene('City') as unknown as {
+        props: {
+          region: string
+          tile: readonly [number, number]
+          img: { alpha: number } | null
+        }[]
+      }
+      const p = city.props.find(
+        (pv) =>
+          pv.region === 'airport' &&
+          pv.tile[0] === row.vessel.tile[0] &&
+          pv.tile[1] === row.vessel.tile[1],
+      )
+      return p?.img?.alpha ?? null
+    })
+    console.log(`shots: plane-departure ${JSON.stringify({ st, v, alpha })}`)
+    expect(st?.phase).toBe('out')
+    expect(st!.t).toBeGreaterThan(0.5)
+    expect(st!.t).toBeLessThan(0.8)
+    expect(v?.visible).toBe(true)
+    expect(alpha, 'full opacity before the fade').toBe(1)
+    expect(v!.img!.x, 'the plane taxied east').toBeGreaterThan(v!.home.x)
+    await pm.shot('plane-departure', 0)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('victory', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'victory')
+    await pm.settle(5)
+    await quietHints(page)
+    await pm.settle(11)
+    // Real frames at 1× to the Golden Release's last delivery (3 s).
+    const w = await framesUntil(
+      page,
+      'api.sim.victory === true',
+      Math.ceil((((fixture.victoryInS as number) + 10) * 1000) / 16),
+      1,
+    )
+    console.log(`shots: victory game:victory ${JSON.stringify(w)}`)
+    expect(w.ok, 'game:victory').toBe(true)
+    expect(await victoryCardUp(page, pm), 'the VictoryCard opens').toBe(true)
+    await pm.settle(30)
+    const ui = await questUi(page)
+    const texts = await sceneTexts(page, 'HUD')
+    console.log(
+      `shots: victory ${JSON.stringify({ holds: ui.holds, victory: ui.victory, last: ui.last, texts: texts.filter((t) => /TYCOON|Tycoon|Day|Lv/.test(t)) })}`,
+    )
+    expect(ui.victory).toBe(true)
+    expect(ui.holds).toContain('victory')
+    expect(ui.last).toMatchObject({
+      id: fixture.questId,
+      templateId: 'golden_release',
+      outcome: 'completed',
+    })
+    expect(texts).toContain('TYCOON')
+    await expectInside(page, 'HUD', [
+      'victory:continue',
+      'victory:newGame',
+      'victory:summary',
+    ])
+    await pm.shot(shotName('victory'), 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('title-tycoon', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(POLICY)
+    await page.evaluate(() => localStorage.clear())
+    const { fixture } = await loadFixture(page, pm, 'victory')
+    await pm.settle(5)
+    const capMs = ((fixture.victoryInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('game:victory', cap),
+      capMs,
+    )
+    expect(w.ok, 'game:victory').toBe(true)
+    // The HUD saves right after the victory tick (onVictory → saveSoon).
+    await pm.settle(8)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem('pm.save.v2')
+          if (!raw) return null
+          const s = JSON.parse(raw) as {
+            state: { economy: { victory: boolean }; level: { level: number } }
+          }
+          return `${s.state.level.level}:${String(s.state.economy.victory)}`
+        }),
+      )
+      .toBe('5:true')
+    // The Title (default flow) over the attract city, the save's Continue.
+    await page.goto(BASE)
+    await titleUp(page)
+    await pm.freeze()
+    await pm.settle(30)
+    const texts = await sceneTexts(page, 'Title')
+    const header = texts.find((t) => /^Day \d+ · /.test(t)) ?? null
+    const cont = await sceneTarget(page, 'Title', 'title:continue')
+    const width = await page.evaluate((h) => {
+      type Obj = { text?: unknown; width?: number; list?: Obj[] }
+      const t = window.__pm!.game.scene.getScene('Title') as unknown as {
+        children: { list: Obj[] }
+      }
+      const find = (list: readonly Obj[]): number | null => {
+        for (const o of list) {
+          if (o.text === h) return o.width ?? null
+          const inner = Array.isArray(o.list) ? find(o.list) : null
+          if (inner !== null) return inner
+        }
+        return null
+      }
+      return find(t.children.list)
+    }, header)
+    console.log(
+      `shots: title-tycoon ${JSON.stringify({ header, width, cont, texts })}`,
+    )
+    expect(header, 'the Continue line').not.toBeNull()
+    expect(header!).toMatch(/^Day \d+ · \$[\d,]+ · (Lv 5 · )?Tycoon ✓$/)
+    expect(cont, 'Continue is offered').not.toBeNull()
+    expect(width, 'the line fits the button').not.toBeNull()
+    expect(width!).toBeLessThanOrEqual(cont!.w)
+    await pm.shot(shotName('title-tycoon'), 10)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

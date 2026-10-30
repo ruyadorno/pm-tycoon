@@ -25,8 +25,9 @@
 // candidate waits. A player Toss / Clear / touch restarts a running clock
 // (people.ts restartSorterClock), so the player's tap always wins.
 //
-// Sorter Arm (design §4.3, the single source of the Arm rule; reachable at
-// M6 only through debug.forceLevel(4)): no rng, no salary — every held
+// Sorter Arm (design §4.3, the single source of the Arm rule; reached at
+// M6 only through debug.forceLevel(4), since M9 at the real L4 — the
+// shipped cap 5, design-m8-m9 §4.6): no rng, no salary — every held
 // non-magic parcel whose arrival (or last player touch) is autoTossDelayS
 // old is tossed this tick, oldest first (`source: 'arm'`; decoys pay the
 // wrong-Toss fee).

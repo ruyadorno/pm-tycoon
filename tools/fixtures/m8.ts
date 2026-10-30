@@ -30,6 +30,12 @@
 //                     parcel clears `clearInS` later (`parcel:cleared`, then
 //                     `hub:departure {docks}`) — the `clearance-ring`,
 //                     `ship-departure` and `warehouse-two-docks` shots.
+//                     M9: seed 7's first Docks hand-off after dock 2 (≈ 21.0
+//                     min) comes after its L4 (≈ 22.7 min; the next
+//                     clearance starts ≈ 24.3 min), so the fixture is at a
+//                     real L4 (tier 4, dock 3 for sale) since M9 — level ≥
+//                     3, as the attract rule; `fixture.level` /
+//                     `fixture.tier` hold what it is.
 //   overseas-malware  The run OVS_SETTLE_S past its real L3, then
 //                     `debugOverseasMalware {hub: 'docks'}` (a malware parcel
 //                     handed off at the first pier, design §4.1) and
@@ -192,10 +198,11 @@ function l3Docks(): void {
   const p = soonest(sim)
   if (dockTick === null || p === null || p.clearTick === null)
     throw new Error(`l3-docks: no dock 2 and Docks clearance by ${CAP_S} s`)
-  if (st.level.level !== LEVEL || st.economy.gameOver)
-    throw new Error(`l3-docks: level ${st.level.level}, want a live L${LEVEL}`)
+  if (st.level.level < LEVEL || st.economy.gameOver)
+    throw new Error(`l3-docks: level ${st.level.level}, want a live L${LEVEL}+`)
   write('l3-docks', sim, {
-    level: LEVEL,
+    level: st.level.level,
+    tier: st.level.warehouseTier,
     docks: st.lane.docks.map((d) => d.id),
     dockBoughtTick: dockTick,
     clearingParcelId: p.id,

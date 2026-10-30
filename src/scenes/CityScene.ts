@@ -78,6 +78,19 @@
 // bay from the exterior frame); dock:bought extends the run and pops the
 // new lamp.
 //
+// M9 (spec-build2 §4.2–§4.3, design-m8-m9 §6.2): L4 opens Low-density +
+// Rural and L5 the Airport + Park & civic through the same crossfade (both
+// regions of a level are live before the first region:unlocked, so one fade
+// and one ground re-bake carry the pair); every one of their buildings has
+// its own sprite + `_locked` twin, the fence / hay_bale / fountain / plane /
+// tower props too, and the runway scenery fogs with the Airport
+// (cityFx.groundRegionAt). The Airport's CityHubView is the map.hubs row's:
+// the 20-s ring on ap_terminal and ap_plane taxiing east off the map edge,
+// climbing and fading out on hub:departure, fading back in at its stand.
+// Clearance stamps rise from above the office's ring (cityHub
+// clearStampPoint). level:up 4 / 5 swaps the exterior to wh_ext_t4 / _t5
+// (three bays: three lamps and three docked poses, dock 3 lit by number).
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -151,6 +164,7 @@ import {
 } from '../render/cityFx.ts'
 import {
   clearedStampText,
+  clearStampPoint,
   handOffVehicleId,
   CityHubView,
   lockedStampText,
@@ -1885,13 +1899,15 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
    * parcel:cleared (B2 §4.1, §5.6) at the hub's office: gold `CLEARED +$18`,
    * or red `SHIP HAS SAILED` (Airport `PLANE HAS LEFT`) for malware — the
    * lost life itself (boom, scorch on the pier, the HUD card) is life:lost's.
+   * M9: the stamp rises from just above the office's ring (cityHub
+   * clearStampPoint), off the Airport terminal's door, where its own
+   * hand-offs stamp `LOCKED $40`.
    */
   private onCleared(p: SimEventPayloads['parcel:cleared']): void {
     const officeId = this.hubViews.get(p.hub)?.office ?? p.buildingId
     const b = this.buildings.get(officeId)
     if (!b) return
-    const x = b.door.x
-    const y = b.door.y - POPUP_LIFT
+    const { x, y } = clearStampPoint(b)
     if (p.malware) {
       this.popups.stamp(
         this.viewRect,

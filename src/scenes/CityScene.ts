@@ -222,6 +222,7 @@ import {
 } from '../ui/BuildingTooltip.ts'
 import { hubTip } from '../ui/hubText.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
+import { keysBlocked } from '../ui/Sheet.ts'
 import {
   MERGE_MS,
   Popups,
@@ -2321,6 +2322,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
       }) as Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
       const onKey = (e: KeyboardEvent): void => {
+        if (keysBlocked()) return // the rotate card holds the keyboard
         if (e.key === 'f' || e.key === 'F') this.followNearestToCursor()
       }
       kb.on('keydown', onKey)
@@ -2335,7 +2337,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
 
   private keyPan(): void {
     const c = this.cursors
-    if (!c || this.transitioning || this.attract) return
+    if (!c || this.transitioning || this.attract || keysBlocked()) return
     let dx = 0
     let dy = 0
     if (c.left.isDown) dx += KEY_PAN_PX

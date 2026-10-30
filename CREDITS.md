@@ -8,24 +8,40 @@ music lines below.
 
 - **m5x7** by Daniel Linssen — CC0 (public domain dedication). Vendored as `art/fonts/m5x7.ttf` (itch.io upload
   170386, sha256 `47c3f0b0…8cbf`) and rendered into the `m5x7` glyph sheet of the `world` atlas by
-  `tools/art/font.ts`.
+  `tools/art/font.ts`, which also pixel-draws the few UI symbols the TTF lacks (– — − … → ▲ ▼ ▬ ▸ ▾ ✕ ★ ✓) in its
+  metrics; those additions are MIT, same as the code.
+
+## Logo
+
+- The **Package Management Tycoon logo** is the author's own artwork (Ruy Adorno, `art/logo.png`, 512×256, committed
+  in 84334f7). It is used as-is (plan-build2 Q-B2-1): `tools/art/logo.ts` (`vlr art:logo`) Lanczos-downscales it to
+  352×176 into `src/assets/logo.png`, drawn 1:1 on the Title; it is brand art outside the palette contract and outside
+  both atlases (manifest row `logo`, `source: "author"`).
 
 ## Art
 
-Every sprite in the two atlases (`src/assets/world.png`, `src/assets/interior.png`) comes from one of two sources, recorded per id in `art/manifest.json`
-(`source`), and is post-processed into the project's original 48-colour palette (`art/palette.json`; no third-party
-palette, no ready-made art pack):
+Every sprite in the two atlases (`src/assets/world.png`, `src/assets/interior.png`) comes from one of two sources,
+recorded per id in `art/manifest.json` (`source`), and is post-processed into the project's original 48-colour palette
+(`art/palette.json`; no third-party palette, no ready-made art pack):
 
-- **Procedural** (168 ids — ground and road tiles, the lot, parcels, icons, UI nine-slices, effects, the warehouse
-  floor and belts, signs — plus the inspection desk and the two shelves, whose PixelLab candidates were rejected) —
+- **Procedural** (227 ids — ground, road and runway tiles, the lot and its slab, parcels, icons, UI nine-slices,
+  effects, the warehouse interiors of all five tiers with their floors, walls, signs, shelves, props and wanted
+  posters, the Hold Bay station, the twelve applicant faces, pips and ★, the orange-vest sorter, the quest and
+  Victory cards — plus the inspection desk and the two tier-1/2 shelves, whose PixelLab candidates were rejected) —
   drawn by this repository's seeded generators in `tools/art/*.ts`; MIT, same as the code.
-- **Generated with PixelLab** (63 ids: the city buildings and locked scenery, the bike, van and truck, the warehouse
-  exterior, the inspector, the Metal detector and the Shaky shaker) — https://www.pixellab.ai, under the author's
-  Tier 2 subscription and PixelLab's Terms of Service (https://pixellab.ai/termsofservice), which assign the outputs
-  to the subscriber. Provenance per id in `art/manifest.json` `gen[]` (tool, endpoint, prompt, seed, candidate) and
-  `batches[]` (1,700 generations in playtest 1); review state in `approved` / `approvedBy`; the provenance and
-  disclosure note is `art/STYLE.md` §10. Generated candidates were keyed, quantized to the palette, outlined and
-  fitted to the sprite contract by `tools/art/*.ts`; no sprite was hand-retouched.
+- **PixelLab** (AI image generation; 91 ids: the city buildings of all eight districts — incl. the ten Low-density, ten
+  Rural and ten Park & civic uniques of build 2 — the modern port, the ship, crane and containers,
+  the Airport terminal, cargo hangar, tower and plane, the fountain, trees and bush, the bike, van and truck, the five
+  warehouse exteriors, the inspector, and the Metal detector, Shaky shaker, Battery checker, X-ray and Sorter Arm) —
+  https://www.pixellab.ai, under the author's Tier 2 subscription and PixelLab's Terms of Service
+  (https://pixellab.ai/termsofservice), which assign the outputs to the subscriber. Provenance per id in
+  `art/manifest.json` `gen[]` (tool, endpoint, prompt, seed, candidate) and `batches[]` (2,577 generations in 41
+  batches: 1,700 in playtest 1, 877 in build 2; $0 in credits); superseded and rejected ids keep their provenance in
+  `retired[]` (15 ids); review state in `approved` / `approvedBy` (`docs/art-todo.md` lists what awaits the author);
+  the provenance and disclosure note is `art/STYLE.md` §10. Generated candidates were keyed, quantized to the palette,
+  outlined and fitted to the sprite contract by `tools/art/*.ts`; no sprite was hand-retouched. A few frames are
+  scripted edits of generated ones: the inspector's scan poses, the Sorter Arm's reach and toss frames, the sorter's
+  orange vest (a palette swap of the inspector), and the `_locked` fogged twins of every building.
 
 ## Audio
 

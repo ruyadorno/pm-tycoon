@@ -70,7 +70,7 @@ overrules any line by number.
 
 - `map.json lot.parking` re-ordered: the first parking tiles are the ones the warehouse sprite does not hide (+2.5 s on
   the first delivery, still < 60 s median).
-- Top bar + ticker alpha 0.94 (city-view says 0.85: world labels read through it); Warehouse/Garage buttons up to 92 px
+- Top bar + ticker opaque (city-view says 0.85: world labels read through it; 0.94 still did — final review); Warehouse/Garage buttons up to 92 px
   wide where W ≥ 393 (76 px left 1 px around the label).
 - Onboarding step 3 waits until a building with waiting parcels is on screen; onboarding cards hide while a sheet,
   popover or dialog is up.
@@ -614,3 +614,125 @@ M7 review fixes (rules the M7 contract did not state, or stated against the spec
 - **Fixtures/shots**: `l3-docks.json` is taken at a real L4 (seed 7 has no Docks hand-off between dock 2 and L4); M9 shots
   skip the tour hints so region and room art are not covered; `golden-release-offer` abandons the policy's active quest
   first.
+
+## Run decisions and deviations (M10 — playtest-2 build)
+
+### Metrics: `playtest.json` v2 and the summary card (plan-build2 §8.7 tasks 1–2, §9)
+
+- **The profile key is `pm.playtest.v2`** (`src/boot/autosave.ts PLAYTEST_KEY`; `pm.playtest.v2:cfg:<name>` in a config
+  session). `PLAYTEST_VERSION` is 2 and the recorder's `sameRun` refuses any other version, so a stored v1 profile is
+  never resumed. The old key is `LEGACY_PLAYTEST_KEY` (`pm.playtest.v1`): never read, cleared by Reset with its `:cfg:`
+  copies (it is in `STORAGE_KEYS` and the per-config prefixes).
+- **`hires[]` carries a `cheapest` flag** beyond B2's {role, pips, salary, star, atS}; fun bar 2 item 1 needs it. At
+  `worker:hired` the hired applicant has left the pool and the pool is not refilled yet, so the flag compares it with
+  the applicants left in that pool; drivers are compared within the same vehicle class; a lone applicant counts as the
+  cheapest; re-hires are not recorded. The policy always picks the best pips, so every policy hire is "not the
+  cheapest".
+- **Quest counts**: `declined` includes offers left to expire; `failed` includes abandoned quests; a withdrawn offer
+  counts only toward `offered`; `firstCompletedS` is an extra field (also read from the history). The sim keeps the last
+  50 quests, so a very long endless run undercounts.
+- **`livesLost[]` entries gain `sorter`** (the sorter whose "looks clean" call the parcel carried) **and `hub`** (null
+  for a local delivery). "Explained" (fun bar item 5) = a counter machine, a sorter or a player Clear; overseas losses
+  read "the ship has sailed" / "the plane has left". With the shipped data every strain has a counter, so the data part
+  of item 5 cannot fail and the item reads "you judge" whenever a life was lost: the author's read of the lost-life
+  card is the check (plan-build2 §9 names 5 as judged). Kept as the plan wrote it rather than "counter not owned"
+  (final review): a loss with the counter owned is explained too ("got through on the N%"). The `no counter` branch
+  stays for a config strain without one. Entries carry `parcelId` (final review), the replay-dedupe key: two
+  same-label parcels lost on one tick are two entries.
+- **`sorter.clearedMalware`** counts malware the sorter judged clean and left in the bay — the Toss-only sorter's
+  (Q-B2-3) version of a Clear. **`overseas.handedOff`** = clearances done + parcels still waiting; `cleared` includes
+  malware.
+- **The fun bar 2 thresholds live in code** (`FUN_TARGETS` in `src/metrics/playtest.ts`: a quest by 900 s, L3 in
+  15–22 min, 1,500 s played before opening the card, the stretch by 2,400 s), like v1's `FUN_KEEP_PLAYING_S`: playtest
+  instrumentation, not balance numbers. `SUMMARY_OFFER_S` = 1,800 (the offer at 30:00).
+- **Card rows merged to fit 360×604**: "First delivery · catch", "Level 2 · 3 · 4 · 5", "Taps/min · FPS p50 · p5";
+  "Machines · docks · desks" replaces "Inspectors · machines"; 14 fixed rows + up to 4 lost-life rows, tightened down to
+  one text line each when they would not fit. Fun bar items 1 and 5 read "? … you judge" when the data passes; 2, 3, 4
+  and 6 are pass/fail from the data, or "not yet" while their window is open.
+- **`tests/playtest/seed-7.json` comes from a fast-forwarded 35-minute run** (e2e `playtest-35min`: 6 real minutes at
+  4×, 5:00–6:00 in the Warehouse, then 20-s `__pm.advance` chunks with real frames between them), so its `elapsedS`
+  and fps samples cover only ~108 s of real time and its fun bar item 4 is a ✗ by design. Its level times match the
+  headless CLI exactly. Every `vlr shots` run rewrites it.
+- **Recorder blind spot (unchanged from v1)**: fields fed by sim events (hires, sorter, malware at clearance,
+  deliveries by type, lives lost) miss what happened before the recorder attached — a `?fastForward=` boot, a loaded
+  fixture, `?level=` and the tycoon recipe below. Command-log fields (`docksBought[]`, `fired`, `adsPosted`) do include
+  the recipe's commands (its docks show at 0 s); its hires are not in `hires[]`, which is right for fun bar item 1 (they
+  were not choices).
+
+### Configs: `spicy.json` for build 2 and `tycoon.json` (plan-build2 §8.7 task 3)
+
+- **spicy.json "late quests" cadence**: keeps the playtest-1 levers and adds `quests.offer {firstOfferDay: 1,
+  intervalDays: 1}` (base tables 3 and 2): the first offer at 1:00 (tick 600 on seeds 1, 7 and 42, and in the browser on
+  seed 7), then one day after each quest ends. The quest templates are unchanged.
+- **A config may carry a `start` recipe**: a reserved top-level key, kept out of the merge and the data hash
+  (`applyConfig` rejects any other unknown key with "… or start") and checked against the merged tables
+  (`src/data/configStart.ts checkConfigStart`, problems with their paths; a bad recipe is a `DataError` in
+  `loadConfigured`). Boot plays it (`src/boot/configStart.ts applyConfigStart`) only on a fresh game (tick 0, empty
+  command log) in a build with the debug API, through ordinary ViewSim commands after one `debugForceLevel`:
+  `placeDesk`, `buyMachine`, `hire` (inspectors), the Arm, `buyDock`, `buyVehicle` with the best driver. So the command
+  log replays it, the save resumes it (Continue never re-runs it) and the attract sim never gets it. A refused step is
+  reported and warned about, never thrown.
+- **The recipe runs before `?level=` and `?quest=`**, which then find the game no longer fresh and stay out of it.
+  Under the Title flow Boot's own throwaway sim also gets the recipe before the attract sim replaces it (invisible).
+- **Applicants are picked like the competent policy picks them** (`bestApplicant`), so each seed builds the same crew.
+- **The money comes from data**: `economy.startMoney` 14,500 leaves about $3,340 after setup (seeds 1–10:
+  $3,329–3,355). The CLI `--config` plays `start` too (final review): `tools/sim/load.node.ts loadConfigured` validates
+  it like the browser loader and `runSeed` applies it through a debug ViewSim at tick 0, after the recorder and before
+  the policy; the header says `start recipe Lv 5` and a `# config start: N commands applied` line follows the recipe.
+- **`debugForceLevel` books no income** (final review): it used to raise lifetime earned to the forced row's
+  threshold, which added ~$7,400 to every tycoon run's first minute row, the profile's `lifetimeEarned` /
+  `moneyPerMin[0]`, the cards' "Lifetime earned" and "Best day", and broke `stats.income === lifetimeEarned`. Lifetime
+  earned now stays the money the game paid; the level bar already clamps a total below the forced row's threshold to an
+  empty bar (`$0 / $N` at a forced L4, `$N · Tycoon` at L5).
+- **tycoon.json mirrors the competent policy's L5 end state**: desk 1, metal detector, shaker, battery checker, X-ray,
+  desk 2, 2 inspectors per desk, the Sorter Arm, docks 2–3, 3 bikes / 2 vans / 3 trucks. Seed 7 builds a 20-command log
+  (one `debugForceLevel 5` + 19 player commands, all at tick 0) and the Golden Release is offered on the first tick.
+- **Measured**: from this start, tapping Accept alone wins in 4.2–4.9 min (Victory ticks 2526–2955) on seeds 1–5 in a
+  Node run. Cross-reference the M9 open item (Victory by 45 min not met): with a full L5 fleet from the start the
+  Golden Release is won on its first try. The session is easy (the Arm clears the Hold Bay); `"holdStation": null`
+  would leave the bay to the player — the author's call.
+- **`tools/check-dist.mjs`** checks both configs the same way (in dist, valid JSON, byte-identical to
+  `public/configs/`). The tycoon e2e (`e2e/configs.spec.ts`) asserts a fleet of 8 and a log of 20: changing the recipe
+  means updating those numbers.
+
+### Docs (plan-build2 §8.7 tasks 4 and 6)
+
+- Numbers in the player docs are quoted from `src/data/*.json`; level arrival times are the M9 gate medians (11.72 /
+  17.98 / 22.35 / 27.70 min).
+- `docs/art-todo.md` assigns each PixelLab batch to a milestone by its timestamp against the M5–M9 commit times; the run
+  budget is stated as 1,500 with a 300 reserve (Q-B2-15 as set).
+- In CREDITS, the PixelLab art line now reads "PixelLab (AI image generation)", so the M10 attribution grep over the
+  tree has no hit there.
+- The docs ask the author to say no to the inspector's scan frames in writing, not with `art:reject -- worker`: a reject
+  would reopen the anchor pass and regenerate the inspector.
+
+### Final review fixes (M10: sim, scenes and phone reviews)
+
+- **Card cameras leave no ignore bits** (`src/ui/cameraBits.ts removeCamera`): every full-screen card, dialog, sheet
+  list and picker that draws through its own camera now clears that camera's id bit from every object in the scene
+  (containers' children too) before removing it. Phaser 4 hands a freed id to the next camera, so a bit left behind hid
+  a later camera's objects — after any lost-life, victory, summary or confirm card, landscape showed the paused HUD
+  instead of the rotate card. The rotate card also clears a stale bit on its own root when it opens.
+- **The rotate card holds the keyboard** (`Sheet.ts blockKeys`): while it is up no listener can claim a key, so G no
+  longer lifts the Garage over it and W no longer switches views under it (City's F and arrow pan check it too).
+- **A VictoryCard survives a reload**: a save written within two frames' ticks of `stats.victoryTick` (the HUD saves on
+  the victory tick and holds the sim while the card is up) reopens the card on the HUD's boot sync. Endless play runs
+  10 s between autosaves, so a later save keeps the card closed.
+- **No Paused card over a card on its way**: `onVisible` treats the lost-life and game-over lead-in timers, the victory
+  timer and the `victory` / `gameOver` holds like an open card.
+- **The chips row reveals new chips**: a region unlock scrolls its chip (and NEW badge) into view (the later of two
+  unlocks on one level, so both L5 chips show at 393 and 360), and `<` / `>` marks show at the row's ends while chips
+  hide past them. The README Controls list the swipe.
+- **Money floats add up**: a delta joins a still-opaque float of its kind (earnings, other income, costs) instead of
+  printing over it; another kind starts after the live floats.
+- **The top bar and the ticker are opaque** (were 0.94): world signs no longer read through behind the money and lives.
+- **The warehouse baseboard is an interior-atlas frame** (`baseboard`, 32 × 2 `outline`, procedural, tiled along the
+  south edge): the Rectangle split the back batch (2 draw calls at every tier). A dist test now measures tier 5 with
+  the tycoon lane (six slots, two desks of two, the Arm, three docks), scrolled and not.
+- **The summary offer waits for 25 real minutes too** (`summaryOfferDue`): at 2× the game clock reaches 30:00 after
+  ~15–20 real minutes, and fun bar item 4 counts real minutes, so a tester who opened the card when offered failed it.
+- **`magic.skipsCheckers` is read**: false makes the golden parcel take each checker's process time and pass like a
+  clean parcel (it is never flagged either way); true, as shipped, keeps the skip. The data hash is unchanged.
+- **Docs**: the first job offer is on Day 4 (3:00; spicy: Day 2, 1:00); the tall-room scroll needs a 393 × 659 (or
+  360 × 604) custom device in devtools — at 393 × 852 tier 5 fits; item 4 counts real minutes; check-dist labels the
+  policy chunk as loaded by the Title's demo city.

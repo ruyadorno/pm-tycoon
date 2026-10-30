@@ -17,7 +17,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 - [x] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
 - [x] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
 - [x] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
-- [ ] M10 playtest-2 build: metrics v2, summary card v2, shots, report, Pages deploy, hand-off (commit `M10: …`)
+- [x] M10 playtest-2 build: metrics v2, summary card v2, shots, report, Pages deploy, hand-off (commit `M10: …`)
 
 ## Milestone checklist (playtest 1)
 
@@ -47,7 +47,37 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M9 — L4 + L5 Tycoon — 2026-10-30 14:39 UTC — DONE at (this commit; sha recorded in the M10 entry)
+## M10 — playtest-2 build — 2026-10-30 17:20 UTC — DONE at (this commit; sha in the hand-off docs commit)
+
+Built: the playtest recorder v2 (`src/metrics/playtest.ts`, `pm.playtest.v2` + the per-config suffix: level 3–5 and
+Victory times, `hires[]` with a `cheapest` flag, fired, ads, sorter, quests by template, overseas, docks, desks, endless);
+`tests/playtest/seed-7.json` from a 35-minute automated run; the SummaryCard v2 with fun bar 2 (plan-build2 §9), offered
+at 30:00 of game time and never before 25 real minutes; `public/configs/spicy.json` with a fast job board and the new
+`tycoon.json` (a `start` recipe at L5 with a full lane and fleet, replayed through ordinary commands —
+`src/boot/configStart.ts`, `src/data/configStart.ts`, also honoured by `vlr sim -- --config`); README / playtest-README /
+docs/playtest.md / docs/phone-checklist.md / CREDITS.md / docs/art-todo.md v2; three whole-build review passes (sim,
+scenes, mobile: 17 of 19 findings fixed — the recorder's same-tick losses, `debugForceLevel` booking fake income, the
+rotate card hidden after full-screen cards, a VictoryCard lost on reload, keys under the rotate card, money floats on
+top of each other, region chips unlocking off screen, an opaque top bar, the baseboard as an atlas frame, …);
+docs/report-playtest2.md.
+Gate: unchanged from M9 (outputs byte-identical): first delivery 43.3 s, scripted catch 178.3 s, L2 11.72, truck +1.54,
+lives 0, shelf stall 0, Hold Bay 6.78, quests 7 / 3.5, L3 17.98, first clearance +2.18, L4 22.35, L5 27.70 — PASS;
+35-min gate PASS (Golden Release offered 27.70); delegating PASS (informational, lives 1.5); victory long test PASS
+(seed 2 wins at 45.70; the 45-min target waived pending the author).
+Tests: 2,151 passing (vitest, 103 files incl. the long sweeps, + 1 todo); e2e: final full `vlr e2e` 135 passed / 104
+project-skipped / 0 failed (8.9 min); `vlr check` ~158 s. Draw calls: city 3, warehouse 4 (6 while a dock loads), attract
+Title 4. Dist 6.35 MB transfer (~4.32 MB gzip) of 8 MB; both atlases hashed.
+Shots: 96 PNGs regenerated at the final tree (every one listed with its verdict in docs/report-playtest2.md §3) — new in
+M10: `summary-card` (the 35-min seed-7 card: L2–L5 11:53 · 17:57 · 22:43 · 27:52, hires 7, quests 7 · 3 · 3, overseas
+17 · 0, fun bar 2 ? ✓ ✓ ✗ ✓ ✓ — item 4 ✗ by design on a fast-forwarded run), `summary-card-360x604`. All in the STYLE.md
+look.
+Deviations from spec-core.md / B2: the fun-bar thresholds and the offer time live in code like playtest 1's; the tycoon
+recipe (decisions.md "Run decisions and deviations (M10 — playtest-2 build)").
+Open for the author: docs/report-playtest2.md §6 (rough edges), §7 (decisions to confirm, incl. the victory-by-45 waiver),
+§9 (G4–G6 approvals), §10.5 (levers left).
+Next: author playtest (30–40 minutes cold on the iPhone 16, then the summary card)
+
+## M9 — L4 + L5 Tycoon — 2026-10-30 14:39 UTC — DONE at bb5646e
 
 Built: the level cap at 5 (B2 §9); L4 "National" (Low-density + Rural live with their unique art, X-ray, the Sorter Arm
 into the Hold Bay station, the `dense` strain with typosquat labels, slot 5, shelf 80, dock 3, tier 4) and L5 "Tycoon"
@@ -133,7 +163,7 @@ truck +1.54 min (−20.2 %, earlier = better), lives 0 (4/10 seeds lose one), sh
 (the L1 plateau has content); golden parcels on time 10/10. Retunes (decisions.md M7): `postVictoryPerDay` 0.01 →
 0.005 (row maxLivesLost 0.5 → 0), `big_haul` count 5 → 3 and `on_time_day` 0.95/8 → 0.85/6 (row
 questsCompletedBy30MinMin, B2 §3.2 reachability). Delegating (informational): lives 0.5, quests 6.5 / 4.
-Tests: {TESTS} (vitest, outside the long sweeps); e2e: full `vlr e2e` 100 passed / 0 failed; `vlr check` 118 s. Draw
+Tests: 1,651 passing outside the long sweeps (vitest, 86 files + 1 todo); e2e: full `vlr e2e` 100 passed / 0 failed; `vlr check` 118 s. Draw
 calls: city 3, warehouse 6. Atlases: world 72.2 %, interior 29.0 %.
 Shots: `quest-offer` (+360×604) — JOB BOARD "Rush hour · Node Heights · Reward $120", Accept · Later · Decline;
 `quest-chip` — gold bar 4/10, `1d 18h`; `magic-parcel` — gold `2:00` chip, markers + rings over A and B;
@@ -292,7 +322,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Cost spent
 
-- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); M8 220 (Airport + Park & civic at 2 candidates); M9 48 (dk_ship, xray re-rolls); run total 877 of 1,500; $0 credits
+- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); M8 220 (Airport + Park & civic at 2 candidates); M9 48 (dk_ship, xray re-rolls); M10 0; run total 877 of 1,500 (balance 3,299 → 2,422); $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)
 - Retro Diffusion: $0 (expected; only with RD_API_KEY and after the author read its ToS)

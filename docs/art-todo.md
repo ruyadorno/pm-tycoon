@@ -1,6 +1,168 @@
-# Art to-do (playtest 1, build 2)
+# Art to-do (playtest 1 + build 2)
 
-## Build 2 — M9 (L4 National + L5 Tycoon, plan-build2 §6 / §8.6, design-m8-m9 §6.1, §6.4, §8 lane F, B2 §4.2-§4.4, §6.6)
+## For the author: what to approve or reject (build 2, G4–G6) — start here
+
+Build 2 added or regenerated **47 PixelLab sprites** (43 new ids + `wh_ext`, `bike`, `ap_terminal` and `dk_ship`
+re-done). The agent picked one candidate per id by reading the contact sheets (`tools/art/decide.ts --manifest`); every
+pick is in the game now and waits for your yes or no (`approved: false` in `art/manifest.json`). Nothing shipped
+procedural for lack of a good candidate: no PixelLab id fell back to procedural in M5–M9.
+
+How the commands work (in a clone after `vlt install`; no token needed for either):
+
+- `vlr art:approve -- id …` sets `approved: true, approvedBy: 'author'` on each id. It edits only
+  `art/manifest.json` (no image changes); commit that file.
+- `vlr art:reject -- id "reason"` takes **one id per command**, logs your reason in the id's `rejects[]` and clears the
+  pick. The current image stays in the game until a re-roll replaces it ("Re-roll a sprite" below: `vlr art:gen` with
+  a token, then `vlr art:approve -- id:N` for the new candidate, `vlr art:build`, `vlr check`).
+- The sheets are committed under `art/contact/` (4× scale, nearest-neighbour). The candidate sheets the agent chose from
+  (`art/contact/candidates-m5-…@4x.png` … `candidates-m9-…@4x.png`) and the raw candidates (`art/candidates/`) are
+  gitignored and exist only on the build VM. In a running build, `?debug=1&view=gallery` (or `dist/gallery.html`) shows
+  every frame.
+
+### G4 — the four fixes (F2 slab, F3 bike, F4 hop, F5 port), made in M5
+
+Sheet: **`art/contact/fixes@4x.png`** — the exterior t1 / t2 on the procedural slab at 2× with the footprint grid, the
+eight bike frames and the bike beside the van and truck, the modern port as the map lays it out (colour and fogged), and
+the hop cell (`node tools/art/contact.ts fixes --hop shots/city-hop-crop.png` fills it from the shots; in the game:
+`shots/city-hop.png` in the shots zip, the pickup icon sinking into the bike).
+
+| id               | What the agent picked                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `wh_ext`         | candidate 6: the corrugated shed with no apron (front corner on the 4×4 diamond); `_t2` = edit 1 (cream trim, a sign board) |
+| `bike`           | candidate 6: a courier on an orange bicycle, white helmet, rear cargo box, 32×32, eight headings                            |
+| `dk_terminal_a`  | candidate 2: container terminal with a reach-stacker and a control tower (on the old `dk_pier_1` spot)                      |
+| `dk_terminal_b`  | candidate 1: ship-to-shore gantry base on rails, a reefer rack (on `dk_pier_2`)                                             |
+| `dk_port_office` | candidate 0: glass-fronted port authority, radar mast, barrier gate (on the old `dk_customs` spot)                          |
+
+```sh
+vlr art:approve -- wh_ext bike dk_terminal_a dk_terminal_b dk_port_office
+vlr art:reject -- bike "reason"          # one line per id you reject; same for the other four
+```
+
+`wh_ext` covers `_t1` and its `_t2` edit (one row). Already done with your reasons: `dk_pier` and `dk_customs` were
+rejected and retired (`manifest.retired[]`). The slab (`lot_slab`, `lot_ramp`, `bollard`) and the hop sink are
+procedural / code: no approval flag.
+
+### G5 — the five live regions, made in M6–M9
+
+Each sheet shows the region on its map window at the level it goes live, in colour, then the fogged `_locked` look it
+has before, then each sprite close up.
+
+| Region (level)                  | Sheet                        | ids                                                                                                                                                                                                                                 |
+| ------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Semver Street, L4 (M6)          | `art/contact/lowres@4x.png`  | `lr_major_house` `lr_patch_bungalow` `lr_prerelease_villa` `lr_range_ranch_house` (2×2); `lr_caret_cottage` `lr_tilde_terrace` `lr_minor_cottage` `lr_exact_pin` `lr_wildcard_shop` `lr_buildmeta_bungalow` (1×1)                   |
+| Pasture Peer Fields, L4 (M7)    | `art/contact/rural@4x.png`   | `ru_peer_pasture` `ru_dev_dairy` `ru_range_ranch` (3×3); `ru_optional_orchard` `ru_hay_barn` `ru_grain_coop` `ru_caret_mill` `ru_tilde_tractors` `ru_semver_stables` (2×2); `ru_farmhouse_once` (1×1)                               |
+| Prefetch International, L5 (M8) | `art/contact/airport@4x.png` | `ap_terminal` (re-rolled for live quality) `ap_cargo_hangar` (3×3); `ap_tower` (prop); `ap_plane` (dock-prop)                                                                                                                       |
+| Monorepo Commons, L5 (M8)       | `art/contact/civic@4x.png`   | `cv_town_hall` `cv_lint_school` `cv_museum` `cv_changelog_stadium` (re-roll: no townhouses) `cv_patch_hospital` (3×3); `cv_police` `cv_fire` `cv_readme_library` `cv_courthouse` (2×2); `cv_park_pavilion` (1×1); `fountain` (prop) |
+| Shrinkwrap Shore, L3 (M8–M9)    | `art/contact/docks@4x.png`   | `dk_ship` (M9 re-roll: it now sails bow first); `dk_crane`, `dk_containers` (the two you kept in F5, never approved by id)                                                                                                          |
+
+```sh
+vlr art:approve -- lr_major_house lr_patch_bungalow lr_prerelease_villa lr_range_ranch_house lr_caret_cottage lr_tilde_terrace lr_minor_cottage lr_exact_pin lr_wildcard_shop lr_buildmeta_bungalow
+vlr art:approve -- ru_peer_pasture ru_dev_dairy ru_range_ranch ru_optional_orchard ru_hay_barn ru_grain_coop ru_caret_mill ru_tilde_tractors ru_semver_stables ru_farmhouse_once
+vlr art:approve -- ap_terminal ap_cargo_hangar ap_tower ap_plane
+vlr art:approve -- cv_town_hall cv_lint_school cv_museum cv_changelog_stadium cv_patch_hospital cv_police cv_fire cv_readme_library cv_courthouse cv_park_pavilion fountain
+vlr art:approve -- dk_ship dk_crane dk_containers
+vlr art:reject -- ap_plane "reason"      # one line per id you reject
+```
+
+Things the agent would look at first: `ap_plane` has one heading and faces +x, across the runway (a plane rolling along
+the runway needs a second heading, ≈ 12 generations); `ru_peer_pasture` keeps a thin earth rim on its front edges (all
+three candidates drew the pasture as a raised island); `cv_museum`, `cv_changelog_stadium` and most new uniques carry
+17–19 colours (lint A12 warnings, inside the 48-colour palette, as the playtest-1 buildings). The fence, hay bales and
+runway threshold / taxiway tiles on these sheets are procedural.
+
+### G6 — tiers, machines, people, made in M6–M9
+
+Sheets: **`art/contact/tiers@4x.png`** (`wh_ext_t1` … `_t5` on the lot slab, tiers 3–5 with their bay lights and
+docked poses), **`art/contact/g6-tiers-machines-people@4x.png`** (1× room mocks of tiers 3 / 4 / 5 at 14 / 16 / 18 rows,
+every tier-4 / tier-5 piece, the four lane machines idle / scanning, the Sorter Arm's three frames, faces, pips and the
+★, the station with the sorter, `worker` beside `worker_sorter`), **`art/contact/people@4x.png`** (faces, pips, ★, the
+station, the three M6 machines) and **`art/contact/warehouse-tier3@4x.png`** (the tier-3 room and its docks).
+
+| id                | What the agent picked                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `wh_ext_t3`       | candidate 1: red-orange brick depot, two hazard-striped bays with amber lamps, a two-storey office, a water tank |
+| `wh_ext_t4`       | edit 0 of `wh_ext_t3`: grey steel cladding with blue bands, a third bay, a blue and yellow logo board            |
+| `wh_ext_t5`       | candidate 2: white steel and glass HQ, a blue glass tower with gold trim, a pink neon parcel sign, a roof garden |
+| `battery_checker` | candidate 0: grey arch, green charge-meter pillars, a battery on the header                                      |
+| `xray`            | candidate 7 (M9 second re-roll): slim pillars under a dark header whose screen shows a parcel's x-ray outline    |
+| `sorter_arm`      | candidate 0: orange column on a round pedestal, yellow segments, a two-finger claw (frames 1–2 scripted from it) |
+
+```sh
+vlr art:approve -- wh_ext_t3 wh_ext_t4 wh_ext_t5 battery_checker xray sorter_arm
+vlr art:reject -- xray "reason"          # one line per id you reject
+```
+
+Procedural, so no approval flag (a "no" is a note for the next build, redrawn in `tools/art/*.ts`): the tier 3–5
+interiors, the faces, pips and ★, `worker_sorter` (the inspector's frames with the vest swapped to orange),
+`hold_station`, the neon strip. One open question from M5: the **inspector's eight scan frames** are scripted edits of
+the PixelLab idle frames (the forearm raised with a handheld scanner). `vlr art:approve -- worker` says yes to them
+and also confirms the G2 anchor below; for a no, write the reason down rather than `art:reject -- worker` (a reject
+clears the anchor approval, so the next token run of `art:gen` would re-open the anchor pass and regenerate the
+inspector).
+
+### Still open from playtest 1 (G2 anchors, G3)
+
+The agent-approved anchors and the playtest-1 sprites wait for you too (details in "Playtest 1" below; sheets
+`art/contact/anchors@4x.png`, `anchors-incontext@4x.png`, `buildings-downtown@4x.png`, `buildings-highres@4x.png`,
+`buildings-industrial@4x.png`, `vehicles@4x.png`, `scenery-locked@4x.png`):
+
+```sh
+vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines van worker metal_detector
+vlr art:approve -- dt_registry_tower dt_semver_bank dt_peer_plaza dt_lockfile_legal dt_hoist_insurance dt_monorepo_media dt_tarball_hotel dt_cache_cafe dt_bundle_boutique dt_transpile_campus dt_yarn_tailors
+vlr art:approve -- hr_towers_a hr_towers_b hr_callback_court hr_promise_place hr_event_loop_lofts hr_is_odd_store hr_rimraf_laundry hr_closure_coop hr_buffer_block hr_pizza hr_daycare
+vlr art:approve -- in_lodash_smelting in_chalk_pigment in_tarball_packing in_gzip_compressors in_webpack_warehouse in_rimraf_yard in_minify_metal in_polyfill_plastics in_glob_silos
+vlr art:approve -- tree_round tree_pine bush truck shaky_shaker
+```
+
+Eight playtest-1 finals still carry 1–42 px of pink key background (`dt_peer_plaza`, `dt_monorepo_media`,
+`dt_tarball_hotel`, `dt_transpile_campus`, `in_lodash_smelting`, `in_chalk_pigment`, `in_tarball_packing`,
+`in_gzip_compressors`; M5 notes below). The route to clear them is `vlr art:gen -- --reprocess --ids <id>` on the
+build VM (it needs the raw downloads in `art/candidates/`) and then `vlr art:build`; untouched until you ask.
+
+### Shipped procedural
+
+- **No PixelLab id fell back to procedural** in build 2; every id got its candidates (`xray` and `dk_ship` were
+  re-rolled in M9, `xray` twice).
+- **Placeholders since playtest 1** (`placeholder: true`, the PixelLab candidates were rejected): `desk`, `shelf_t1`,
+  `shelf_t2`.
+- **Procedural by design, new in build 2** (59 ids, drawn by `tools/art/*.ts`, final unless you say otherwise):
+  - city: `lot_slab` (3 variants), `lot_ramp`, `bollard`, `runway_threshold`, `taxiway`, `hay_bale`;
+  - warehouse tiers 3–5: `floor_t3/t4/t5` (+ `_lane`), `wall_t3/t4/t5`, `wallface_t3/t4/t5`, `sign_t3/t4/t5`,
+    `shelf_t3/t4/t5`, `props_t3/t4/t5`, `wanted_poster_t3/t4/t5`, `neon_strip`, `dock_pad`, `hold_station`,
+    `station_outline`;
+  - people: `face_00` … `face_11`, `ic_star`, `ic_pip_on`, `ic_pip_off`, `worker_sorter`;
+  - quests and hubs: `ic_quest`, `ic_magic`, `magic_ring`, `ui_card_gold`, `ui_bar_fill_gold`, `ic_handoff`,
+    `ic_cleared`, `ic_ship`, `ic_plane`.
+  - Also redrawn or extended: `fx_dust` (one cloud per frame), `lamp_lock` (a fifth `lamp` frame), the m5x7 sheet's
+    drawn glyphs (+ ★ and ✓). The logo is your own art (`source: 'author'`, not in an atlas).
+
+### PixelLab spend (from `art/manifest.json` `batches[]`)
+
+| Milestone   | Batches | Generations | Balance before → after | What                                                                          |
+| ----------- | ------: | ----------: | ---------------------- | ----------------------------------------------------------------------------- |
+| M5          |       7 |         126 | 3,299 → 3,173          | `wh_ext` (3 + two `_t2` edits), `bike`, `dk_terminal_a/b`, `dk_port_office`   |
+| M6          |       3 |         207 | 3,173 → 2,966          | `battery_checker`, `xray`, `sorter_arm`; the ten Low-density uniques; a retry |
+| M7          |       3 |         276 | 2,966 → 2,690          | the ten Rural uniques; `wh_ext_t3`, `_t5`, `_t4` (two edits)                  |
+| M8          |       1 |         220 | 2,690 → 2,470          | the Airport (4) and Park & civic (11) ids, 2 candidates each                  |
+| M9          |       2 |          48 | 2,470 → 2,422          | re-rolls: `dk_ship`, `xray` (twice)                                           |
+| M10         |       0 |           0 | —                      | none (as of the M10 docs)                                                     |
+| **Build 2** |  **16** |     **877** | **3,299 → 2,422**      | 47 ids                                                                        |
+| Playtest 1  |      25 |       1,700 | 5,000 → 3,300          | 66 ids                                                                        |
+
+$0 in credits throughout (Tier 2 subscription generations only). The build-2 run budget was 1,500 generations with a
+300 reserve (Q-B2-15 as set by the run prompt; `tools/art/gen.ts` `PIXELLAB_RUN_BUDGET` / `PIXELLAB_RESERVE`, counted
+from `PIXELLAB_RUN_SINCE` 2026-10-30): 877 spent, 623 left. The balance read 3,300 at the end of playtest 1 and 3,299
+when build 2 started (one generation outside any batch). Re-rolls after the run count against the same budget unless
+you set those variables. Regenerate the table:
+
+```sh
+node -e "const m=require('./art/manifest.json');let t=0;for(const b of m.batches.filter(b=>b.at>='2026-10-30')){t+=b.generations;console.log(b.at.slice(0,16),b.generations,b.balanceBefore+'->'+b.balanceAfter,b.ids.join(' '))}console.log('build 2 total',t)"
+```
+
+## Build 2 — per-milestone notes (newest first; the agent's working record)
+
+### Build 2 — M9 (L4 National + L5 Tycoon, plan-build2 §6 / §8.6, design-m8-m9 §6.1, §6.4, §8 lane F, B2 §4.2-§4.4, §6.6)
 
 Sheets (G5 / G6, plan-build2 §6 approval gates):
 
@@ -69,32 +231,15 @@ PixelLab spend (M9 cap 150; run budget 1,500 / 300 reserve): 48 generations in 2
 xray 3; `m9-xray2` 15: xray 3), balance 2,470 → 2,422, $0 credits, run spent 829 → 877. No failed jobs; no PixelLab id
 fell back to procedural.
 
-The author's gates (approve = `approvedBy: 'author'`, no image change; reject = logs the reason, then re-roll as in
-"Re-roll a sprite" below):
-
-- **G4 — the four fixes** (`art/contact/fixes@4x.png`): `vlr art:approve -- wh_ext bike dk_terminal_a dk_terminal_b
-  dk_port_office` (`wh_ext` covers `_t1` and its `_t2` edit).
-- **G5 — the five live regions** (`lowres@4x`, `rural@4x`, `airport@4x`, `civic@4x`, `docks@4x`):
-  - `vlr art:approve -- lr_major_house lr_patch_bungalow lr_prerelease_villa lr_range_ranch_house lr_caret_cottage
-    lr_tilde_terrace lr_minor_cottage lr_exact_pin lr_wildcard_shop lr_buildmeta_bungalow`
-  - `vlr art:approve -- ru_peer_pasture ru_dev_dairy ru_range_ranch ru_optional_orchard ru_hay_barn ru_grain_coop
-    ru_caret_mill ru_tilde_tractors ru_semver_stables ru_farmhouse_once`
-  - `vlr art:approve -- ap_terminal ap_cargo_hangar ap_tower ap_plane`
-  - `vlr art:approve -- cv_town_hall cv_lint_school cv_museum cv_changelog_stadium cv_patch_hospital cv_police cv_fire
-    cv_readme_library cv_courthouse cv_park_pavilion fountain`
-  - `vlr art:approve -- dk_ship dk_crane dk_containers`
-- **G6 — tiers, machines, people** (`tiers@4x`, `g6-tiers-machines-people@4x`): `vlr art:approve -- wh_ext_t3
-  wh_ext_t4 wh_ext_t5 battery_checker xray sorter_arm`. The interiors t3-t5, faces, pips, the star and
-  `worker_sorter` are procedural (no approval flag): a "no" is a note for the next build, redrawn in `tools/art/*.ts`.
-- Reject any one with `vlr art:reject -- <id> "<reason>"`.
+The author's gates G4–G6: consolidated in "For the author" at the top of this file.
 
 Follow-ups / for other lanes:
 
 - Lane A (`src/data/map.json`, optional): the runway dressing rows, listed before "runway apron" (first match wins):
   `{"name": "runway north threshold", "rect": [45, 3, 47, 3], "frame": "runway_threshold"}`, `{"name": "runway south
   threshold", "rect": [45, 19, 47, 19], "frame": "runway_threshold"}`, `{"name": "taxi line", "rect": [44, 10, 44, 10],
-  "frame": "taxiway"}`; and the fountain prop `{"frame": "fountain", "tile": [22, 41], "region": "civic"}` (still not
-  placed; `civic@4x.png` shows it there).
+  "frame": "taxiway"}`; and the fountain prop `{"frame": "fountain", "tile": [22, 41], "region": "civic"}` (all placed
+  at the M9 integration, with `ap_plane`, `ap_tower` and the two `hay_bale` props).
 - Lane C: tier 5 swaps `strip_light` for `neon_strip_f0` (f1 as an optional flicker) at `STRIP_LIGHTS`; every other
   tier-4 / tier-5 frame resolves through `tierFrame` as named above.
 - Lane G: `dk_ship` and `xray` changed, so the shots that show them (docks-live, ship-departure, warehouse-tier4/5)
@@ -104,7 +249,7 @@ Follow-ups / for other lanes:
 - `ap_plane` still faces +x across the runway (which runs along y); a plane rolling along the runway would need a
   second heading sprite.
 
-## Build 2 — M8 (L3 Regional, plan-build2 §6 / §8.5, design-m8-m9 §6.1-§6.4, B2 §4.1, §6.5, §6.6)
+### Build 2 — M8 (L3 Regional, plan-build2 §6 / §8.5, design-m8-m9 §6.1-§6.4, B2 §4.1, §6.5, §6.6)
 
 Sheets: `art/contact/warehouse-tier3@4x.png` (`node tools/art/contact.ts tier3`: room mocks t1 / t2 / t3 with the M8
 dock geometry — dock 1 open, dock 2 bought with its roller pad, dock 3 locked —, the tier-3 pieces on the floor, the
@@ -179,7 +324,7 @@ Follow-ups:
   tween slides it broadside. A bow-first exit would run along +y (or a second ship heading, ≈ 12 generations).
 - `cv_museum` and `cv_changelog_stadium` carry 17 colours (lint A12 warnings, as the other uniques).
 
-## Build 2 — M7 (quests, plan-build2 §6 / §8.4, design-m7 §6.1, §6.9, B2 §3, §6.5, §6.6)
+### Build 2 — M7 (quests, plan-build2 §6 / §8.4, design-m7 §6.1, §6.9, B2 §3, §6.5, §6.6)
 
 Sheets: `art/contact/rural@4x.png` (`node tools/art/contact.ts rural`: the ten Rural uniques on their map
 positions, colour and the `_locked` look they ship with until M9, then each unique and the fence / hay_bale props
@@ -248,7 +393,7 @@ dock tiles (map `lot.docks`) and the docked pose were laid out for the t1 shed, 
 column; t3-t5 stand inside the 4×4 footprint with their bays at its west end, so M8 / M9 re-check the docked vehicle
 against them on the city (the poses above follow t1's door-relative offset).
 
-## Build 2 — M6 (people, plan-build2 §6 / §8.3 task 8, B2 §2.6, §6.5, §6.7)
+### Build 2 — M6 (people, plan-build2 §6 / §8.3 task 8, B2 §2.6, §6.5, §6.7)
 
 Sheets: `art/contact/people@4x.png` (`node tools/art/contact.ts people`: faces, ★, pips, worker vs worker_sorter,
 the Hold Bay station with the sorter on duty, the three new machines) and `art/contact/lowres@4x.png` (`node
@@ -303,7 +448,7 @@ Follow-ups: the new Low-density finals carry 17-19 colours (lint A12 warnings, a
 tunnel because the belt opening is cleared below row 16 — re-roll at G6 if the author wants curtains (they would
 have to stay above row 16).
 
-## Build 2 — M5 (the author's four fixes, plan-build2 §6 / §8.2, B2 §6.1-§6.4)
+### Build 2 — M5 (the author's four fixes, plan-build2 §6 / §8.2, B2 §6.1-§6.4)
 
 G4 sheet: `art/contact/fixes@4x.png` (`node tools/art/contact.ts fixes [--hop <crop.png>]`): the exterior t1 / t2 on
 the slab tiles at 2x (with a footprint-grid overlay), the eight bike frames and the bike beside the van and truck at 4x,
@@ -387,7 +532,7 @@ G2 anchors, G3 category sheets). Status as of the M4 build; regenerate the lists
 PixelLab spend: 1,700 generations in 25 batches, $0 in credits (Tier 2 subscription; balance 5,000 → 3,300), against
 a 2,500-generation run budget.
 
-## Procedural placeholders still in use (`placeholder: true`)
+### Procedural placeholders still in use (`placeholder: true`)
 
 The PixelLab candidates for these three were rejected in the vision pass and the procedural drawings kept
 (`vlr art:lint` warns `A12 3 placeholder sprites in use`):
@@ -401,7 +546,7 @@ The PixelLab candidates for these three were rejected in the vision pass and the
 The other 168 procedural ids (ground and road tiles, lot, parcels, icons, UI nine-slices, fx, interior floor/belts,
 signs, the m5x7 glyph sheet) are procedural by design and final; they are listed on `art/contact/procedural@4x.png`.
 
-## G2 — anchors approved provisionally by the agent (`approvedBy: 'agent'`)
+### G2 — anchors approved provisionally by the agent (`approvedBy: 'agent'`)
 
 These were the style anchors of the bulk pass; confirm each (or reject it, which re-opens everything styled after it):
 `art/contact/anchors@4x.png`, `art/contact/anchors-incontext@4x.png`.
@@ -419,7 +564,7 @@ These were the style anchors of the bulk pass; confirm each (or reject it, which
 Confirm: `vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines van worker metal_detector`
 (sets `approvedBy: 'author'`; no image changes).
 
-## G3 — generated sprites awaiting the author's confirmation (`approved: false`)
+### G3 — generated sprites awaiting the author's confirmation (`approved: false`)
 
 56 ids, each with the agent's chosen candidate installed as the final. Review them on the category sheets
 (`art/contact/buildings-downtown@4x.png`, `buildings-highres@4x.png`, `buildings-industrial@4x.png`,
@@ -445,7 +590,7 @@ Confirm: `vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines v
 Confirm a category in one line, e.g. `vlr art:approve -- dt_registry_tower dt_peer_plaza …`; reject one with the
 re-roll below.
 
-## Art notes from the run (author to judge)
+### Art notes from the run (author to judge)
 
 - (superseded in build 2 M5: a courier on a bicycle, 32×32) **`bike` is a scooter.** The chosen candidate is a narrow orange delivery scooter (the van's tool,
   `create-object-pro-flash` at 24×24): the real cargo bicycles came out 24 px tall and broke the 1-px margin (lint
@@ -470,22 +615,25 @@ re-roll below.
 
 Needs `PIXELLAB_TOKEN` in the gitignored `.env` (plan.md §10). Candidate numbers continue after the ones on disk and
 `seed = base + candidate`; `art/candidates/` is gitignored, so on a fresh clone pass a new `--seed` base or the first
-candidates come back identical.
+candidates come back identical. The build-2 budget guard still applies (1,500 generations counted from 2026-10-30, 877
+spent, a 300 reserve under the balance); `PIXELLAB_RUN_BUDGET`, `PIXELLAB_RUN_SINCE` and `PIXELLAB_RESERVE` in the
+environment change it without a code edit.
 
 ```sh
-vlr art:reject -- cv_stadium "townhouses around the pitch"   # logs the reason, clears approval
-vlr art:gen -- --ids cv_stadium --n 3 --seed 5000            # 3 new candidates (budget guard: GET /balance first)
-# look at the contact sheet gen prints (art/contact/candidates-*@4x.png), then pick one:
-vlr art:approve -- cv_stadium:4                              # id:candidate → installed as the final by art:build
-vlr art:build                                                # normalize → … → lint → atlas → gallery (offline)
+vlr art:reject -- ap_plane "faces across the runway"   # logs the reason, clears the pick (the image stays until replaced)
+vlr art:balance                                         # the PixelLab balance
+vlr art:gen -- --ids ap_plane --n 3 --seed 5000         # 3 new candidates (budget guard: GET /balance first)
+# look at the contact sheet gen prints (art/contact/candidates-*@4x.png), then pick one, e.g. candidate 3:
+vlr art:approve -- ap_plane:3                           # id:candidate → installed as the final by art:build
+vlr art:build                                           # install → normalize → … → lint → atlas → gallery (offline)
 vlr check
 ```
 
-`vlr art:balance` prints the PixelLab balance first. A procedural id (`fx_dust`, `desk`, `shelf_t1`, …) is redrawn by
-its generator in `tools/art/*.ts` and picked up by `vlr art:build`; no token needed.
+A procedural id (`fx_dust`, `desk`, `shelf_t1`, `face_03`, `floor_t5`, …) is redrawn by its generator in
+`tools/art/*.ts` and picked up by `vlr art:build`; no token needed.
 
 ## Regenerate these lists
 
 ```sh
-node -e "const m=require('./art/manifest.json');const p=(f)=>m.entries.filter(f).map(e=>e.id).join(' ');console.log('placeholder:',p(e=>e.placeholder));console.log('G2 agent:',p(e=>e.approvedBy==='agent'));console.log('G3:',p(e=>e.source==='pixellab'&&!e.approved&&!e.placeholder))"
+node -e "const m=require('./art/manifest.json');const p=(f)=>m.entries.filter(f).map(e=>e.id).join(' ');console.log('placeholder:',p(e=>e.placeholder));console.log('G2 agent:',p(e=>e.approvedBy==='agent'));console.log('awaiting the author (G3-G6):',p(e=>e.source==='pixellab'&&!e.approved&&!e.placeholder))"
 ```

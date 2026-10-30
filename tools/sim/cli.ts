@@ -7,7 +7,11 @@
 //                      src/sim/policy.ts exists; `delegating` (build 2, M6 —
 //                      SIM_FEATURES.people) hires a sorter at L2 and Clears
 //                      what it tags `looks clean` (spec-build2 §7.2)
-//   --config path      JSON partial deep-merged over src/data (load.node.ts)
+//   --config path      JSON partial deep-merged over src/data (load.node.ts);
+//                      its `start` recipe (src/data/configStart.ts, e.g.
+//                      public/configs/tycoon.json's L5 lane) is played at
+//                      tick 0 before the policy, as ?config= does on a New
+//                      game (src/boot/configStart.ts), and printed
 //   --json             machine output only (see below)
 //   --every N          print every Nth minute row (+ the last)
 //   --gate             per-seed PASS/FAIL + medians vs economy.pacingTargets,
@@ -51,7 +55,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { parseArgs } from 'node:util'
-import { DataError } from '../../src/data/index.ts'
+import {
+  applyConfigStart,
+  type ConfigStartReport,
+} from '../../src/boot/configStart.ts'
+import { DataError, type ConfigStart } from '../../src/data/index.ts'
 import type { GameData } from '../../src/data/types.ts'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
 import type { PolicyFactory, PolicyKind } from '../../src/sim/sim.ts'
@@ -64,7 +72,8 @@ import {
 import type { Conservation } from '../../src/sim/sim.ts'
 import type { MinuteRow, Vehicle, VehicleState } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
-import { loadGameData } from './load.node.ts'
+import { createViewSim } from '../../src/sim/view-api.ts'
+import { loadConfigured } from './load.node.ts'
 import type { GateSummary, RecordedEvent, SeedResult } from './report.ts'
 import {
   compareBaseline,
@@ -275,6 +284,14 @@ export interface RunHooks {
   kind?: PolicyKind
   /** M8: the quick gate — the level windows are informational per seed too. */
   quick?: boolean
+  /**
+   * A config's `start` recipe, played at tick 0 through a debug ViewSim
+   * (applyConfigStart — logged commands, as the browser's New game) after
+   * the recorder attaches and before the policy is built.
+   */
+  start?: ConfigStart | null
+  /** Called once the `start` recipe was played (not without one). */
+  onStart?: (report: ConfigStartReport | null, sim: Sim) => void
 }
 
 export interface RunResult {
@@ -284,6 +301,8 @@ export interface RunResult {
   result: SeedResult
   /** Where every spawned parcel is at the end of the run. */
   conservation: Conservation
+  /** What the config's `start` recipe did (null: none played). */
+  start: ConfigStartReport | null
   perf: { ticks: number; p50Ms: number; p99Ms: number; maxMs: number }
 }
 
@@ -297,6 +316,15 @@ export function runSeed(
 ): RunResult {
   const sim = new Sim(data, seed)
   const recorder = new RunRecorder(sim, (e) => hooks.onEvent?.(e, sim))
+  let start: ConfigStartReport | null = null
+  if (hooks.start) {
+    start = applyConfigStart(
+      createViewSim(sim, { debug: true }),
+      sim,
+      hooks.start,
+    )
+    hooks.onStart?.(start, sim)
+  }
   const kind = hooks.kind ?? 'competent'
   const policy = policyFactory ? policyFactory(sim, kind) : null
   const total = minutes * TICKS_PER_DAY
@@ -370,6 +398,7 @@ export function runSeed(
       hooks.quick === true,
     ),
     conservation: conservation(sim.state),
+    start,
     perf: {
       ticks: ran,
       p50Ms: pct(0.5),
@@ -392,7 +421,7 @@ export function questsLine(run: RunResult): string {
 
 async function main(argv: readonly string[]): Promise<number> {
   const opts = parseCli(argv)
-  const data = loadGameData(opts.config)
+  const { data, start } = loadConfigured(opts.config)
   const factory = opts.policy === 'none' ? null : await loadPolicyFactory()
   const kind: PolicyKind =
     opts.policy === 'delegating' ? 'delegating' : 'competent'
@@ -417,7 +446,7 @@ async function main(argv: readonly string[]): Promise<number> {
     const lights = new Highlights()
     if (!opts.gate || opts.seeds.length === 1) {
       out(
-        `# vlr sim · seed ${seed} · ${opts.minutes} min · policy ${policyName} · data ${data.hash}${opts.config ? ` · config ${opts.config}` : ''}`,
+        `# vlr sim · seed ${seed} · ${opts.minutes} min · policy ${policyName} · data ${data.hash}${opts.config ? ` · config ${opts.config}` : ''}${start ? ` · start recipe Lv ${start.level}` : ''}`,
       )
       out(formatHeader())
     }
@@ -425,6 +454,14 @@ async function main(argv: readonly string[]): Promise<number> {
     const run = runSeed(data, seed, opts.minutes, factory, {
       kind,
       quick: opts.quick,
+      start,
+      onStart: (report) => {
+        if (!verbose) return
+        const refused = report?.failures ?? []
+        console.log(
+          `# config start: ${report?.applied ?? 0} commands applied${refused.length > 0 ? ` · ${refused.length} refused: ${refused.map((f) => `${f.step} (${f.reason})`).join(', ')}` : ''}`,
+        )
+      },
       onEvent: (e, sim) => {
         if (!verbose) return
         const line = lights.line(e, sim)
@@ -500,6 +537,7 @@ async function main(argv: readonly string[]): Promise<number> {
       events: r.events,
       gate: r.result,
       conservation: r.conservation,
+      ...(r.start ? { start: r.start } : {}),
       pass: r.result.pass,
     }))
     const body =

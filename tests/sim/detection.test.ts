@@ -224,6 +224,23 @@ describe('§6.3 the roll', () => {
     expect(parcel.trace.filter((t) => t.what === 'skipped')).toHaveLength(2)
   })
 
+  it("parcels.json magic.skipsCheckers false: the golden parcel takes each checker's process time and passes like a clean parcel (never flagged)", () => {
+    const sim = quietSim(1, { parcels: { magic: { skipsCheckers: false } } })
+    expect(sim.data.parcels.magic.skipsCheckers).toBe(false)
+    openingA(sim)
+    const p = laneParcel(sim, 'conv1', { magic: true })
+    const processing = collect(sim, 'parcel:processing')
+    const flagged = collect(sim, 'parcel:flagged')
+    runTicks(sim, 200)
+    expect(processing.length).toBe(2)
+    expect(flagged).toEqual([])
+    const parcel = sim.state.parcels[String(p.id)]!
+    expect(parcel.flaggedBy).toBeNull()
+    expect(parcel.state).not.toBe('held') // shelved, then loaded
+    expect(parcel.trace.filter((t) => t.what === 'skipped')).toEqual([])
+    expect(parcel.trace.filter((t) => t.what === 'passed')).toHaveLength(2)
+  })
+
   it('debug forceFlagNext: the next parcel to finish is flagged on that trait (a clean one too), once', () => {
     const sim = quietSim(1)
     const vs = createViewSim(sim, { debug: true })

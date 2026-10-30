@@ -1,26 +1,35 @@
-// Run summary card (plan.md §12.7 task 2, §12.9): the playtest profile on
-// one screen, for the author's review. Title `Run summary — seed 7 — 12:22
-// played`; rows lifetime earned / deliveries (on-time %) / first delivery
-// at / first malware caught at (by whom) / level 2 at / malware spawned ·
-// caught · missed / lives lost (label + counter machine each) / fleet bought
-// / inspectors · machines / taps per min / fps p50 · p5; footer the §12.9
-// fun-bar checklist (ticks, crosses, `?` = you judge, `–` = not yet) from
-// the same object; buttons `Download playtest.json` (Blob + <a download>),
-// `Copy summary` (plain text: navigator.clipboard, else a selected textarea
-// + execCommand('copy'), else a selectable text box over the game), and
-// `Keep playing` (`Back` over the game-over screen) / `New game`.
+// Run summary card (plan.md §12.7 task 2, §12.9; v2: plan-build2 §8.7 task
+// 2, §9): the playtest profile on one screen, for the author's review.
+// Title `Run summary — seed 7 — 35:12 played`; rows lifetime earned /
+// deliveries (on-time %) / first delivery · first malware caught (by whom) /
+// levels 2 · 3 · 4 · 5 at / Victory (+ endless time) / malware spawned ·
+// caught · missed / lives lost (label + what explains each: the counter
+// machine, the sorter's `looks clean` call, `cleared by you`, and for an
+// overseas loss `the ship has sailed` / `the plane has left`) / fleet bought
+// / hires · fired · ads / quests offered · done · failed / sorter calls ·
+// wrong / overseas cleared · malware at clearance / machines · docks · desks
+// / taps per min · fps p50 · p5; footer the §9 fun bar 2 checklist (ticks,
+// crosses, `?` = you judge, `–` = not yet) from the same object; buttons
+// `Download playtest.json` (Blob + <a download>), `Copy summary` (plain
+// text: navigator.clipboard, else a selected textarea + execCommand('copy'),
+// else a selectable text box over the game), and `Keep playing` (`Back`
+// over the game-over screen) / `New game`.
 //
 // HudScene owns it like the other cards: it holds the sim while open
 // ('summary', plan.md §5), opens it from the Paused card's `End run — show
 // summary`, from the game-over card's `Run summary`, and offers it once at
-// 20:00 (Q55). Like GameOverCard it draws through its own full-screen
-// camera over an off-screen origin and swallows every tap; it fits 360×604.
-// The text and the checklist are pure (tests/ui/summary-card.test.ts).
+// 30:00 (SUMMARY_OFFER_S). Like GameOverCard it draws through its own
+// full-screen camera over an off-screen origin and swallows every tap; it
+// fits 360×604 (the rows close up to LINE_H when a long lives list would
+// push the buttons off). The text and the checklist are pure
+// (tests/ui/summary-card.test.ts).
 import type Phaser from 'phaser'
+import { removeCamera } from './cameraBits.ts'
 import type { GameData } from '../data/types.ts'
 import {
   clock,
   funBar,
+  FUN_TARGETS,
   PLAYTEST_FILE,
   type FunCheck,
   type FunState,
@@ -28,6 +37,7 @@ import {
 } from '../metrics/playtest.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { Button } from './Button.ts'
+import { sailedText } from './hubText.ts'
 import type { Layout } from './layout.ts'
 import { addPanel } from './Panel.ts'
 import { claimKey, offscreenOrigin, popModal, pushModal } from './Sheet.ts'
@@ -70,7 +80,7 @@ export interface SummaryRow {
   sub?: boolean
 }
 
-/** `Run summary — seed 7 — 12:22 played` (wall time, elapsedS). */
+/** `Run summary — seed 7 — 35:12 played` (wall time, elapsedS). */
 export function summaryTitle(pt: Playtest): string {
   return `Run summary — seed ${pt.seed} — ${clock(pt.elapsedS)} played`
 }
@@ -101,54 +111,69 @@ export function fleetLine(
   return parts.length > 0 ? parts.join(', ') : 'none'
 }
 
-/** A lives-lost entry's value: the counter machine, `cleared by you`. */
+/**
+ * A lives-lost entry's value — what explains it: the counter machine, the
+ * sorter's `looks clean` call (`Mo: looks clean`), `cleared by you`; `no
+ * counter` when none of them; an overseas loss adds `the ship has sailed` /
+ * `the plane has left` (the lost-life card's words, hubText.sailedText).
+ */
 export function lifeLostValue(
   l: Playtest['livesLost'][number],
   data: GameData,
 ): string {
-  const parts = [
-    l.counter !== null ? checkerName(data, l.counter) : 'no counter',
-  ]
+  const parts: string[] = []
+  if (l.counter !== null) parts.push(checkerName(data, l.counter))
+  if (l.sorter !== null) parts.push(`${l.sorter}: looks clean`)
   if (l.clearedByPlayer) parts.push('cleared by you')
+  if (parts.length === 0) parts.push('no counter')
+  if (l.hub !== null) parts.push(sailedText(data, l.hub))
   return parts.join(' · ')
 }
 
-/** The card's rows (§12.9 order); lives-lost entries follow their row. */
+/** `11:42 · 17:58 · —` — the times levels 2..5 were reached (`—` = not yet). */
+export function levelsLine(pt: Playtest): string {
+  return [pt.level2AtS, pt.level3AtS, pt.level4AtS, pt.level5AtS]
+    .map(clock)
+    .join(' · ')
+}
+
+/** The card's rows (plan-build2 §8.7 order); lives-lost entries follow their row. */
 export function summaryRows(pt: Playtest, data: GameData): SummaryRow[] {
   const d = pt.deliveries
   const fm = pt.firstMalware
   const m = pt.malware
+  const q = pt.quests
+  const n = formatInt
   const rows: SummaryRow[] = [
     { label: 'Lifetime earned', value: formatMoney(pt.lifetimeEarned) },
     {
       label: 'Deliveries',
       value:
-        d.total > 0
-          ? `${formatInt(d.total)} (${onTimePct(d)}% on time)`
-          : 'none yet',
+        d.total > 0 ? `${n(d.total)} (${onTimePct(d)}% on time)` : 'none yet',
     },
     {
-      label: 'First delivery at',
-      value: pt.firstDeliveryS !== null ? clock(pt.firstDeliveryS) : 'not yet',
-    },
-    {
-      label: 'First malware caught at',
-      value:
+      label: 'First delivery · catch',
+      value: `${pt.firstDeliveryS !== null ? clock(pt.firstDeliveryS) : 'not yet'} · ${
         fm.caughtS !== null
-          ? `${clock(fm.caughtS)} · ${checkerName(data, fm.by)}`
+          ? `${clock(fm.caughtS)} ${checkerName(data, fm.by)}`
+          : 'not yet'
+      }`,
+    },
+    { label: 'Level 2 · 3 · 4 · 5', value: levelsLine(pt) },
+    {
+      label: 'Victory',
+      value:
+        pt.victoryAtS !== null
+          ? `${clock(pt.victoryAtS)} · endless ${clock(pt.endlessS ?? 0)}`
           : 'not yet',
     },
     {
-      label: 'Level 2 at',
-      value: pt.level2AtS !== null ? clock(pt.level2AtS) : 'not yet',
-    },
-    {
       label: 'Malware spawned · caught · missed',
-      value: `${formatInt(m.spawned)} · ${formatInt(m.caught)} · ${formatInt(m.missed)}`,
+      value: `${n(m.spawned)} · ${n(m.caught)} · ${n(m.missed)}`,
     },
     {
       label: 'Lives lost',
-      value: pt.livesLost.length > 0 ? formatInt(pt.livesLost.length) : 'none',
+      value: pt.livesLost.length > 0 ? n(pt.livesLost.length) : 'none',
     },
   ]
   for (const l of pt.livesLost.slice(0, LIVES_SHOWN))
@@ -162,25 +187,41 @@ export function summaryRows(pt: Playtest, data: GameData): SummaryRow[] {
   rows.push(
     { label: 'Fleet bought', value: fleetLine(pt.vehiclesBought, data) },
     {
-      label: 'Inspectors · machines',
-      value: `${formatInt(pt.inspectorsHired)} · ${formatInt(pt.machinesBought.length)}`,
+      label: 'Hires · fired · ads',
+      value: `${n(pt.hires.length)} · ${n(pt.fired)} · ${n(pt.adsPosted)}`,
     },
-    { label: 'Taps per min', value: pt.tapsPerMin.toFixed(1) },
     {
-      label: 'FPS p50 · p5',
-      value: pt.fps.samples > 0 ? `${pt.fps.p50} · ${pt.fps.p5}` : '—',
+      label: 'Quests offered · done · failed',
+      value: `${n(q.offered)} · ${n(q.completed)} · ${n(q.failed)}`,
+    },
+    {
+      label: 'Sorter calls · wrong',
+      value: `${n(pt.sorter.decisions)} · ${n(pt.sorter.wrong)}`,
+    },
+    {
+      label: 'Overseas cleared · malware',
+      value: `${n(pt.overseas.cleared)} · ${n(pt.overseas.malwareAtClearance)}`,
+    },
+    {
+      label: 'Machines · docks · desks',
+      value: `${n(pt.machinesBought.length)} · ${n(pt.docksBought.length)} · ${n(pt.desks)}`,
+    },
+    {
+      label: 'Taps/min · FPS p50 · p5',
+      value: `${pt.tapsPerMin.toFixed(1)} · ${
+        pt.fps.samples > 0 ? `${pt.fps.p50} · ${pt.fps.p5}` : '—'
+      }`,
     },
   )
   return rows
 }
 
-/** The fun-bar checklist with the data's pacing windows. */
+/** The fun bar 2 checklist (plan-build2 §9 windows, FUN_TARGETS). */
 export function summaryChecks(
   pt: Playtest,
-  data: GameData,
   openedAtS: number | null = null,
 ): FunCheck[] {
-  return funBar(pt, data.economy.pacingTargets, openedAtS)
+  return funBar(pt, FUN_TARGETS, openedAtS)
 }
 
 /** Plain-text marks for the copied summary. */
@@ -210,7 +251,7 @@ export function summaryText(
         ? `  - ${r.label}${r.value ? `: ${r.value}` : ''}`
         : `${r.label}: ${r.value}`,
     )
-  lines.push('Fun bar:')
+  lines.push('Fun bar 2:')
   for (const c of checks)
     lines.push(`${funMark(c.state)} ${c.n}. ${c.label} (${c.detail})`)
   const dv = pt.device
@@ -219,6 +260,45 @@ export function summaryText(
   )
   lines.push(dv.ua)
   return lines.join('\n')
+}
+
+/**
+ * The card column's height: title, the rows at `rowH`, the `Fun bar 2`
+ * head, the checklist and the two button rows (with their gaps).
+ */
+export function summaryBlockH(
+  titleH: number,
+  rows: number,
+  checks: number,
+  rowH = ROW_H,
+): number {
+  return (
+    titleH +
+    10 +
+    rows * rowH +
+    10 +
+    ROW_H +
+    checks * FUN_ROW_H +
+    14 +
+    2 * BTN_H +
+    BTN_GAP
+  )
+}
+
+/**
+ * The row pitch: ROW_H, closed up (to LINE_H at the least) when the column
+ * would not fit `avail` with a PAD above and below — a long lives list on
+ * the 360×604 profile.
+ */
+export function summaryRowPitch(
+  avail: number,
+  titleH: number,
+  rows: number,
+  checks: number,
+): number {
+  if (rows <= 0) return ROW_H
+  const fixed = summaryBlockH(titleH, 0, checks) + 2 * PAD
+  return Math.max(LINE_H, Math.min(ROW_H, Math.floor((avail - fixed) / rows)))
 }
 
 // ---- browser helpers (called from a tap) ------------------------------------------
@@ -361,9 +441,7 @@ export class SummaryCard {
 
   /** The checklist the card shows (null while closed). */
   checks(): FunCheck[] | null {
-    return this.pt
-      ? summaryChecks(this.pt, this.opts.data, this.openedAtS)
-      : null
+    return this.pt ? summaryChecks(this.pt, this.openedAtS) : null
   }
 
   /** Show `pt`; `openedAtS` = elapsedS at the run's first opening (fun bar 4). */
@@ -417,7 +495,7 @@ export class SummaryCard {
     this.buttons = []
     this.root?.destroy()
     this.root = null
-    if (this.cam) this.scene.cameras.remove(this.cam, true)
+    removeCamera(this.scene, this.cam)
     this.cam = null
   }
 
@@ -464,7 +542,7 @@ export class SummaryCard {
     const colW = Math.min(W - 2 * PAD, COL_MAX_W)
     const x0 = Math.round((W - colW) / 2)
     const rows = summaryRows(pt, data)
-    const checks = summaryChecks(pt, data, this.openedAtS)
+    const checks = summaryChecks(pt, this.openedAtS)
 
     const title = addText(scene, 0, 0, summaryTitle(pt), {
       tint: THEME.gold,
@@ -472,39 +550,35 @@ export class SummaryCard {
       align: 'center',
     })
     const titleH = lineCount(title) * LINE_H
-    const btnH = 2 * BTN_H + BTN_GAP
-    const blockH =
-      titleH +
-      10 +
-      rows.length * ROW_H +
-      10 +
-      ROW_H +
-      checks.length * FUN_ROW_H +
-      14 +
-      btnH
     const avail = H - L.safeTop - L.safeBottom
+    const rowH = summaryRowPitch(avail, titleH, rows.length, checks.length)
+    const blockH = summaryBlockH(titleH, rows.length, checks.length, rowH)
     let y = L.safeTop + Math.max(PAD, Math.round((avail - blockH) / 2))
 
     title.setPosition(Math.round((W - title.width) / 2), y - 3)
     parts.push(title)
     y += titleH + 10
 
-    // Rows: label left (grey), value right (light); lives-lost entries indented.
+    // Rows: label left (grey), value right (light); lives-lost entries
+    // indented; a value never pushes its label under 24 px.
     for (const r of rows) {
-      const v = addText(scene, 0, y - 3, r.value, { tint: THEME.textLight })
-      v.setX(Math.round(x0 + colW - v.width))
       const lx = r.sub ? x0 + 12 : x0
+      const v = addText(scene, 0, y - 3, r.value, { tint: THEME.textLight })
+      const maxV = x0 + colW - lx - 32
+      if (v.width > maxV)
+        v.setText(ellipsize(r.value, maxV, (s) => v.setText(s).width))
+      v.setX(Math.round(x0 + colW - v.width))
       const room = Math.max(24, Math.round(v.x - lx - 8))
       const l = addText(scene, lx, y - 3, r.label, {
         tint: r.sub ? PALETTE.grey2 : PALETTE.grey3,
       })
       l.setText(ellipsize(r.label, room, (s) => l.setText(s).width))
       parts.push(l, v)
-      y += ROW_H
+      y += rowH
     }
     y += 10
 
-    const head = addText(scene, x0, y - 3, 'Fun bar', { tint: THEME.gold })
+    const head = addText(scene, x0, y - 3, 'Fun bar 2', { tint: THEME.gold })
     parts.push(head)
     y += ROW_H
     for (const c of checks) {

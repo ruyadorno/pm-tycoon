@@ -16,6 +16,7 @@
 // on the modal stack — every HUD shortcut and onboarding card waited on it,
 // and the stale question came back when the Garage reopened.
 import type Phaser from 'phaser'
+import { removeCamera } from './cameraBits.ts'
 import { Button } from './Button.ts'
 import { addPanel } from './Panel.ts'
 import { offscreenOrigin, claimKey, popModal, pushModal } from './Sheet.ts'
@@ -188,7 +189,7 @@ export class Dialog {
     this.scene.events.off('shutdown', this.destroy, this)
     this.scene.events.off('sleep', this.cancel, this)
     this.root.destroy()
-    this.scene.cameras.remove(this.cam, true)
+    removeCamera(this.scene, this.cam)
   }
 
   private layout(W: number, H: number): void {

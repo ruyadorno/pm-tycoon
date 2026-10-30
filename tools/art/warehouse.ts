@@ -600,6 +600,18 @@ function neonStrip(lit: boolean): Grid {
   return g
 }
 
+/**
+ * The room's south-edge baseboard (final review, mobile #6): a 32×2 strip of
+ * `outline`, tiled along the room's bottom edge from the interior atlas. It
+ * was a Rectangle between the walls' interior images — a non-atlas object
+ * that split the back batch (2 draw calls at every tier).
+ */
+function baseboard(): Grid {
+  const g = new Grid(32, 2)
+  g.rect(0, 0, 32, 2, 'outline')
+  return g
+}
+
 const CARD_DARK: BoxScheme = {
   top: 'brown1',
   topHi: 'brown2',
@@ -2558,6 +2570,7 @@ reg('props_t5', () => propsT5())
 reg('wanted_poster_t4', () => posterT4())
 reg('wanted_poster_t5', () => posterT5())
 reg('neon_strip', (s) => neonStrip(s === '_f0'))
+reg('baseboard', () => baseboard())
 reg('belt_h', (_s, i) => beltH(i))
 reg('belt_v', (_s, i) => beltV(i))
 reg('belt_corner', (_s, i) => beltCorner(i))

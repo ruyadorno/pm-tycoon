@@ -74,23 +74,17 @@ export function levelsStep(sim: Sim): void {
 /**
  * Debug (ViewSim debug.forceLevel, the `debugForceLevel` command — design
  * §4.6): level up row by row to `level`, ignoring the thresholds and
- * economy.playtestMaxLevel, then raise lifetime earned to the last applied
- * row's threshold so the level bar reads sensibly. The caller checked
- * current < level ≤ the last row.
+ * economy.playtestMaxLevel. Lifetime earned is left alone: it is money the
+ * game paid (stats.income, the minute rows, the playtest profile and the
+ * cards' "Lifetime earned" / "Best day" all read it), and the level bar
+ * already clamps a total below the forced row's threshold to an empty bar
+ * (hudKit levelProgress). The caller checked current < level ≤ the last row.
  */
 export function forceLevel(sim: Sim, level: number): void {
   const s = sim.state
-  let last: LevelDef | null = null
   for (const row of rows(sim)) {
     if (row.level <= s.level.level || row.level > level) continue
     levelUp(sim, row)
-    last = row
-  }
-  if (last) {
-    s.economy.lifetimeEarned = Math.max(
-      s.economy.lifetimeEarned,
-      last.threshold,
-    )
   }
 }
 

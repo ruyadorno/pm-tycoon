@@ -105,17 +105,19 @@
 // nothing. An Airport clearance's lost life ends `— the plane has left`
 // (hubText.sailedText from its map.hubs vessel, design R11).
 //
-// M4 (plan.md §12.7 tasks 1-2, §12.9): the PlaytestRecorder
-// (src/metrics/playtest.ts) follows the sim from create (resumed from
-// pm.playtest.v1 when this is the same run as the save, a fresh profile
-// otherwise and on every Sim swap), counts canvas pointerdowns, samples
-// game.loop.actualFps and the view, and is stored with every autosave (and
-// every 10 s while the sim is held); registry REG_PLAYTEST hands it to
-// __pm. The SummaryCard ('summary' hold) opens from the Paused card's
-// `End run — show summary` — the Paused card is also the pause menu: ❚❚
-// tapped while already paused opens it (the first pause toasts the hint) —
-// from the game-over card's `Run summary` (its `Back` returns there), and is
-// offered once at 20:00 of sim time by a ticker line + toast (Q55). `Keep
+// M4 (plan.md §12.7 tasks 1-2, §12.9; v2 at M10, plan-build2 §8.7 tasks
+// 1-2): the PlaytestRecorder (src/metrics/playtest.ts) follows the sim from
+// create (resumed from the stored profile — pm.playtest.v2 since M10 — when
+// this is the same run as the save, a fresh profile otherwise and on every
+// Sim swap), counts canvas pointerdowns, samples game.loop.actualFps and the
+// view, and is stored with every autosave (and every 10 s while the sim is
+// held); registry REG_PLAYTEST hands it to __pm. The SummaryCard ('summary'
+// hold) opens from the Paused card's `End run — show summary` — the Paused
+// card is also the pause menu: ❚❚ tapped while already paused opens it (the
+// first pause toasts the hint) — from the game-over card's `Run summary`
+// (its `Back` returns there), and is offered once at 30:00 of sim time
+// (SUMMARY_OFFER_S; 20:00 before M10, Q55), never before 25 real minutes
+// (summaryOfferDue: fun bar item 4), by a ticker line + toast. `Keep
 // playing` resumes at the last running speed; `New game` asks first during
 // a live run.
 //
@@ -147,14 +149,16 @@ import {
   REG,
   SIM_REPLACED,
 } from '../boot/simBinding.ts'
-import type { Stepper } from '../boot/stepper.ts'
+import { MAX_TICKS_PER_FRAME, type Stepper } from '../boot/stepper.ts'
 import type { GameData } from '../data/types.ts'
 import { mountOverlay } from '../debug/overlay.ts'
 import { debugEnabled, params } from '../debug/params.ts'
 import {
+  clock,
   PlaytestRecorder,
   REG_PLAYTEST,
   SUMMARY_OFFER_S,
+  summaryOfferDue,
   type PlaytestDevice,
 } from '../metrics/playtest.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
@@ -207,6 +211,12 @@ import {
   payrollShortLine,
   questCardAutoOpens,
   regionOpenLine,
+  victoryCardPending,
+  chipOverflow,
+  chipRevealScroll,
+  floatKind,
+  floatX,
+  type FloatKind,
   setZoneRect,
   speedSegment,
   strainLine,
@@ -347,16 +357,22 @@ export const POLL_MS = 500
 export const FLOAT_MS = 900
 export const FLOAT_RISE = 12
 export const FLOAT_POOL = 4
+/** A delta joins a live float of its kind while that float is still fully opaque. */
+export const FLOAT_MERGE_MS = Math.round(FLOAT_MS * 0.66)
 export const TOOLTIP_MS = 2000
 export const CHIP_FLASH_MS = 300
 /** A chip stays active until the camera centre is this far from its region. */
 export const CHIP_ACTIVE_RADIUS = 360
 // city-view §4.1 says 0.85; at that alpha the world's district labels and
 // sign boards (dark text on cream) read through the bar and collide with the
-// money / lives / mood readouts (UX review), so the top bar is as opaque as
-// the bottom bar.
-const TOP_ALPHA = 0.94
+// money / lives / mood readouts (UX review). 0.94 still let them through
+// behind the money and lives, worst at zoom 2 (final review, mobile #5):
+// the top bar is opaque.
+const TOP_ALPHA = 1
 const BOTTOM_ALPHA = 0.92
+/** The chips row's `<` / `>` edge marks (mobile #1): 12 px wide, chip high. */
+const CHIP_MORE_W = 12
+const CHIP_MORE_ALPHA = 0.92
 const MOOD_ROW_H = 30
 const MOOD_POP_W = 200
 /** Level-up refill (§9.6 step 4): the bar shows full, then grows from 0. */
@@ -377,12 +393,10 @@ export const FLAG_FOLLOW_MS = 10_000
 /** The bouncing arrow over the Warehouse button: 1-px bob every 300 ms. */
 const FLAG_ARROW_BOB_MS = 300
 
-// M4 (plan.md §12.7 task 2, §12.9, Q55).
-/** The 20:00 offer (ticker line + toast), once per run. */
-export const SUMMARY_OFFER_LINE =
-  '20:00 on the clock — tap pause twice to see your run summary'
-export const SUMMARY_OFFER_TOAST =
-  'Twenty minutes in! Tap pause twice for your run summary'
+// M4 (plan.md §12.7 task 2, §12.9, Q55); M10: at 30:00 (plan-build2 §8.7).
+/** The SUMMARY_OFFER_S offer (ticker line + toast), once per run. */
+export const SUMMARY_OFFER_LINE = `${clock(SUMMARY_OFFER_S)} on the clock — tap pause twice to see your run summary`
+export const SUMMARY_OFFER_TOAST = `${Math.round(SUMMARY_OFFER_S / 60)} minutes in! Tap pause twice for your run summary`
 /** The first ❚❚ of a session: where the pause menu lives. */
 export const PAUSE_MENU_HINT_TEXT = 'Paused — tap pause again for the menu'
 export const NEW_GAME_CONFIRM_TITLE = 'Start a new game?'
@@ -449,6 +463,9 @@ interface MoneyFloat {
   text: Phaser.GameObjects.BitmapText
   tween: Phaser.Tweens.Tween | null
   startedAt: number
+  /** What it adds up (floatKind) and the running total it shows. */
+  kind: FloatKind | null
+  sum: number
 }
 
 export class HudScene extends Phaser.Scene {
@@ -505,6 +522,13 @@ export class HudScene extends Phaser.Scene {
   private chipDrag: { id: number; x0: number; s0: number } | null = null
   private activeChip: string | null = null
   private newChips = new Set<string>()
+  /** A region just unlocked: the next rebuild scrolls its chip into view. */
+  private chipReveal: string | null = null
+  /** The `<` / `>` edge marks while the row hides chips at that end. */
+  private chipMore: {
+    bg: Phaser.GameObjects.NineSlice
+    text: Phaser.GameObjects.BitmapText
+  }[] = []
 
   // bottom bar
   private bottomBg!: Phaser.GameObjects.NineSlice
@@ -650,6 +674,8 @@ export class HudScene extends Phaser.Scene {
     this.chipsDirty = false
     this.moodDirty = false
     this.chipScroll = 0
+    this.chipReveal = null
+    this.chipMore = []
     this.chipDrag = null
     this.activeChip = null
     this.newChips = new Set()
@@ -1183,7 +1209,7 @@ export class HudScene extends Phaser.Scene {
   private newGame(): void {
     this.paper.clear()
     this.saveSoon = null
-    // The ended run's profile stays in pm.playtest.v1 until the next run's
+    // The ended run's profile stays in pm.playtest.v2 until the next run's
     // first autosave replaces it.
     this.autosave.savePlaytest()
     this.autosave.enabled = false
@@ -1213,7 +1239,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
-   * The recorder for this HUD: it resumes pm.playtest.v1 only when the
+   * The recorder for this HUD: it resumes pm.playtest.v2 only when the
    * running sim is the run the autosave holds (Continue, a reload) and the
    * stored profile matches it; a New game starts a fresh profile.
    */
@@ -1242,11 +1268,14 @@ export class HudScene extends Phaser.Scene {
     )
   }
 
-  /** Q55: once per run at 20:00 of sim time, a ticker line + toast offer. */
+  /**
+   * Once per run at SUMMARY_OFFER_S (30:00) of sim time — and past fun bar
+   * item 4's 25 real minutes (summaryOfferDue) — a ticker line + toast offer.
+   */
   private pollSummaryOffer(): void {
     const r = this.recorder
     if (r.offered || this.vs.gameOver || this.summary.isOpen()) return
-    if (this.vs.tick < SUMMARY_OFFER_S * TICKS_PER_S) return
+    if (!summaryOfferDue(this.vs.tick, r.elapsedS)) return
     r.markOffered()
     this.ticker.push(SUMMARY_OFFER_LINE, 'offer')
     this.longToast(SUMMARY_OFFER_TOAST, false, HINT_TOAST_MS)
@@ -1714,9 +1743,11 @@ export class HudScene extends Phaser.Scene {
   /**
    * create / WAKE / Sim swap: the chip from quests(), the card closed, a
    * stale victory screen or stamp gone (the victory shows on its event
-   * only). At create a standing offer opens its card (a reload, Boot's
-   * `?quest=` offer, made before the HUD listened); after a swap (__pm.load,
-   * a fixture) the chip just pulses, so a swap leaves the modal stack empty.
+   * only — or at create from a save written on the victory tick, before
+   * Continue: a reload then reopens the VictoryCard, victoryCardPending). At
+   * create a standing offer opens its card (a reload, Boot's `?quest=`
+   * offer, made before the HUD listened); after a swap (__pm.load, a
+   * fixture) the chip just pulses, so a swap leaves the modal stack empty.
    */
   private syncQuests(): void {
     const boot = this.questBootSync
@@ -1734,6 +1765,18 @@ export class HudScene extends Phaser.Scene {
     this.questAutoOpen =
       boot && qs.offer && !qs.active ? { id: qs.offer.id, force: true } : null
     this.refreshQuest()
+    if (
+      boot &&
+      victoryCardPending(
+        qs,
+        getSim(this).state.tick,
+        this.vs.gameOver,
+        // One frame after the event in the saved state, one more between
+        // the Title's Continue and this create (autosaves are 10 s apart).
+        2 * MAX_TICKS_PER_FRAME,
+      )
+    )
+      this.onVictory()
   }
 
   // ---------------------------------------------------------------- step 2
@@ -1983,6 +2026,9 @@ export class HudScene extends Phaser.Scene {
   /** region:unlocked: the chip with its NEW badge, the region line and paper. */
   private onRegionUnlocked(p: SimEventPayloads['region:unlocked']): void {
     this.newChips.add(p.district)
+    // Its NEW chip may sit past the screen edge (L5 at 393 / 360): scroll
+    // it in on the rebuild (two unlocks on one level: the later, rightmost).
+    this.chipReveal = p.district
     this.refreshChips()
     this.refreshMood()
     this.refreshDistrict()
@@ -2370,42 +2416,64 @@ export class HudScene extends Phaser.Scene {
   /**
    * `+$12` / `−$28` rising next to the money cell (city-view §3.1), placed
    * after the balance it counts to (the cell is still mid-tween: placed after
-   * the shorter old text, `+$29` sat on `$1,445`).
+   * the shorter old text, `+$29` sat on `$1,445`). Final review (mobile #2):
+   * a delta of the kind of a float still fully opaque adds to that float
+   * (`+$40` then `+$20` read `+$60`, its rise restarted); another kind
+   * starts after the live floats, so floats never print on top of each
+   * other at L3–L5's pace.
    */
   private floatMoney(delta: number, gold: boolean, balance: number): void {
     if (delta === 0) return
-    let f = this.floats.find((x) => x.tween === null)
+    const kind = floatKind(delta, gold)
+    const now = this.time.now
+    const L = this.L
+    const maxRight = L.lives.rect.x - 4
+    const merge = this.floats.find(
+      (x) =>
+        x.tween !== null &&
+        x.kind === kind &&
+        now - x.startedAt < FLOAT_MERGE_MS,
+    )
+    let f = merge ?? this.floats.find((x) => x.tween === null)
     if (!f) {
       if (this.floats.length < FLOAT_POOL) {
         const text = addText(this, 0, 0, '', { shadow: true })
         text.setDepth(D.floats)
-        f = { text, tween: null, startedAt: 0 }
+        f = { text, tween: null, startedAt: 0, kind: null, sum: 0 }
         this.floats.push(f)
       } else {
         f = this.floats.reduce((a, b) => (a.startedAt <= b.startedAt ? a : b))
-        f.tween?.stop()
-        f.tween = null
       }
     }
     const float = f
-    const L = this.L
-    const shown = this.moneyText.text
-    const finalW = this.moneyText.setText(formatMoney(balance)).width
-    this.moneyText.setText(shown)
-    const x = Math.round(
-      this.moneyText.x + Math.max(finalW, this.moneyText.width) + 6,
-    )
+    float.tween?.stop()
+    float.tween = null
+    float.sum = merge ? float.sum + delta : delta
+    float.kind = kind
     const y0 = textTop(L.safeTop, L.rowA.h)
     // Rise at most to 1 px under the screen top: with no safe-area inset the
     // full FLOAT_RISE would carry the glyphs off the canvas.
     const rise = Math.max(0, Math.min(FLOAT_RISE, y0 + CAP_TOP - 1))
     float.text
-      .setText(formatMoneyDelta(delta))
-      .setTint(gold ? THEME.gold : THEME.danger)
-      .setPosition(Math.min(x, L.lives.rect.x - 4 - float.text.width), y0)
-      .setAlpha(1)
-      .setVisible(true)
-    float.startedAt = this.time.now
+      .setText(formatMoneyDelta(float.sum))
+      .setTint(kind === 'gold' ? THEME.gold : THEME.danger)
+    let x: number
+    if (merge) {
+      x = Math.min(float.text.x, maxRight - float.text.width)
+    } else {
+      const shown = this.moneyText.text
+      const finalW = this.moneyText.setText(formatMoney(balance)).width
+      this.moneyText.setText(shown)
+      const base = Math.round(
+        this.moneyText.x + Math.max(finalW, this.moneyText.width) + 6,
+      )
+      const live = this.floats
+        .filter((o) => o !== float && o.tween !== null)
+        .map((o) => ({ x: o.text.x, w: o.text.width }))
+      x = floatX(base, live, float.text.width, maxRight)
+    }
+    float.text.setPosition(Math.round(x), y0).setAlpha(1).setVisible(true)
+    float.startedAt = now
     const proxy = { t: 0 }
     float.tween = this.tweens.add({
       targets: proxy,
@@ -2580,7 +2648,39 @@ export class HudScene extends Phaser.Scene {
 
   private buildChips(): void {
     this.chipsRoot = this.add.container(0, 0).setDepth(D.chips)
+    // `<` / `>` at the row's ends while it hides chips there (a swipe
+    // scrolls it; mobile #1): drawn over the chips, never tappable.
+    this.chipMore = ['<', '>'].map((glyph) => {
+      const bg = addPanel(this, 0, 0, CHIP_MORE_W, 16, 'ui_panel_dark')
+        .setAlpha(CHIP_MORE_ALPHA)
+        .setDepth(D.chips + 0.5)
+        .setVisible(false)
+      const text = addText(this, 0, 0, glyph, { tint: THEME.textLight })
+        .setDepth(D.chips + 0.6)
+        .setVisible(false)
+      return { bg, text }
+    })
     this.refreshChips()
+  }
+
+  /** Place and show the edge marks for the row's current scroll. */
+  private updateChipMore(): void {
+    const L = this.L
+    const ch = L.chip
+    const on = this.chipsRoot.visible
+    const o = chipOverflow(this.chipScroll, this.chipRowW, ch.maxRowW)
+    const y = L.chips.y + Math.floor((L.chips.h - ch.h) / 2)
+    this.chipMore.forEach((m, i) => {
+      const show = on && (i === 0 ? o.left : o.right)
+      const x = i === 0 ? 0 : L.W - CHIP_MORE_W
+      m.bg.setPosition(x, y).setSize(CHIP_MORE_W, ch.h).setVisible(show)
+      m.text
+        .setPosition(
+          Math.round(x + (CHIP_MORE_W - m.text.width) / 2),
+          textTop(y, ch.h),
+        )
+        .setVisible(show)
+    })
   }
 
   /**
@@ -2682,8 +2782,23 @@ export class HudScene extends Phaser.Scene {
       x += w + ch.gap
     }
     this.chipRowW = x - ch.gap - ch.x0
-    this.clampChipScroll()
+    const reveal = this.chips.find((c) => c.entry.id === this.chipReveal)
+    this.chipReveal = null
+    if (reveal) {
+      const right = Math.max(
+        reveal.x + reveal.w,
+        reveal.badge ? reveal.badge.x + reveal.badge.width : 0,
+      )
+      this.chipScroll = chipRevealScroll(
+        this.chipScroll,
+        ch.x0,
+        ch.maxRowW,
+        reveal.x,
+        right,
+      )
+    }
     this.chipsRoot.setVisible(this.view === 'city')
+    this.clampChipScroll()
   }
 
   private clampChipScroll(): void {
@@ -2691,6 +2806,7 @@ export class HudScene extends Phaser.Scene {
     const min = Math.min(0, max - this.chipRowW)
     this.chipScroll = Math.min(0, Math.max(min, this.chipScroll))
     this.chipsRoot.setX(Math.round(this.chipScroll))
+    this.updateChipMore()
   }
 
   private onChipTap(id: string): void {
@@ -2971,6 +3087,7 @@ export class HudScene extends Phaser.Scene {
     this.recorder?.setView(name)
     this.toast.relayout({ W: this.L.W, toast: this.toastLane() })
     this.chipsRoot.setVisible(name === 'city')
+    this.updateChipMore()
     if (name !== 'city') {
       this.follow.hide()
       this.closeMood()
@@ -3226,13 +3343,19 @@ export class HudScene extends Phaser.Scene {
 
   private onVisible(): void {
     if (!this.autoPaused || this.paused.isOpen()) return
-    // A lost-life / game-over / summary card already holds the sim and
-    // asks for a tap: no Paused card on top of it.
+    // A lost-life / game-over / summary / victory card already holds the
+    // sim and asks for a tap — or is on its way (its lead-in timer runs, its
+    // hold is set): no Paused card under or over it (final review, scenes #4).
     if (
       this.lostCard.isOpen() ||
       this.overCard.isOpen() ||
       this.summary.isOpen() ||
-      this.victoryCard.isOpen
+      this.victoryCard.isOpen ||
+      this.lostTimer !== null ||
+      this.overTimer !== null ||
+      this.victoryTimer !== null ||
+      this.holds.has('victory') ||
+      this.holds.has('gameOver')
     ) {
       this.autoPaused = false
       this.release('hidden')

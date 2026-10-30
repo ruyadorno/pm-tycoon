@@ -34,7 +34,7 @@
 import { readFileSync } from 'node:fs'
 import type { CDPSession, Page } from '@playwright/test'
 import sharp from 'sharp'
-import { expect, READY_TIMEOUT_MS, test } from './fixtures.ts'
+import { expect, questUi, READY_TIMEOUT_MS, test } from './fixtures.ts'
 import { sceneTarget, settleUntil, tapTarget, worlds } from './warehouse.ts'
 
 const NEW_GAME = 'title:new-game'
@@ -45,6 +45,9 @@ const SAVE_VERSION = 5
 const CITY_DRAW_CALLS = 3
 const WAREHOUSE_DRAW_CALLS = 7
 const POLICY_URL = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1'
+/** The tycoon recipe on Boot's fresh game (L5, the full lane, docks 2–3, 8 vehicles). */
+const TYCOON_URL =
+  '/?seed=7&debug=1&skipTitle=1&audio=0&config=tycoon&newGame=1'
 /** dist/assets/<stem>-<hash>.<ext> for every `?url` import of src/render/assetUrls.ts. */
 const HASHED_ASSETS = [
   'world.png',
@@ -499,6 +502,85 @@ test.describe('dist build (vite preview of dist/)', () => {
       warehouse5,
       'Warehouse tier 5 (cover up) + HUD draw calls',
     ).toBeLessThanOrEqual(WAREHOUSE_DRAW_CALLS)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('tier 5 with a full lane (?config=tycoon: six slots, two desks of two, the Sorter Arm, three docks): warehouse ≤ 7 draw calls, scrolled and not', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await page.goto(TYCOON_URL)
+    await page.evaluate(() => localStorage.clear())
+    await pm.open(TYCOON_URL)
+    await pm.freeze()
+    await pm.overlay(false)
+    const lane = await page.evaluate(() => {
+      const s = window.__pm!.core.state
+      return {
+        level: s.level.level,
+        fixtures: s.lane.nodes.filter((n) => n.fixture).length,
+        docks: s.lane.docks.length,
+      }
+    })
+    expect(lane).toMatchObject({ level: 5, docks: 3 })
+    expect(lane.fixtures).toBeGreaterThanOrEqual(6)
+    // The Golden Release is offered on the first tick and its card opens (a
+    // card draws through a camera of its own): Accept it on the card, as a
+    // player does, so the count is the room's and the HUD's alone.
+    await pm.advance(200)
+    expect(
+      await settleUntil(page, pm, async () => (await questUi(page)).card.open),
+      'the Golden Release card opens',
+    ).toBe(true)
+    await pm.settle(30) // the card's pop-in lands before the tap
+    await tapTarget(page, pm, 'HUD', 'quest:accept')
+    expect(
+      await settleUntil(page, pm, async () => {
+        const ui = await questUi(page)
+        return !ui.card.open && ui.active !== null
+      }),
+      'accepted: the card closes, the quest is active',
+    ).toBe(true)
+    await pm.advance(30_000)
+    await page.evaluate(() => window.__pm!.goto('warehouse'))
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await worlds(page)).warehouse === 'active',
+      ),
+      'the Warehouse is active',
+    ).toBe(true)
+    await pm.settle(24)
+    const ui = await questUi(page)
+    expect(ui.card.open, 'no quest card over the room').toBe(false)
+    expect(ui.modalDepth, 'nothing modal').toBe(0)
+    const top = await page.evaluate(() => window.__pm!.metrics().drawCalls)
+    const t5 = await page.evaluate(() => {
+      const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+        stats(): { tier: number; maxScroll: number }
+        scrollTo(y: number): number
+      }
+      wh.scrollTo(wh.stats().maxScroll)
+      return wh.stats()
+    })
+    await pm.settle(4)
+    const scrolled = await page.evaluate(() => window.__pm!.metrics().drawCalls)
+    console.log(
+      `dist: draw calls tier 5 full lane ${JSON.stringify({ lane, tier: t5.tier, maxScroll: t5.maxScroll, top, scrolled })}`,
+    )
+    test.info().annotations.push({
+      type: 'draw calls tier 5 full lane',
+      description: `top ${top}, scrolled ${scrolled}`,
+    })
+    expect(t5.tier).toBe(5)
+    expect(top, 'full tier 5 + HUD draw calls').toBeLessThanOrEqual(
+      WAREHOUSE_DRAW_CALLS,
+    )
+    expect(scrolled, 'full tier 5 scrolled + HUD').toBeLessThanOrEqual(
+      WAREHOUSE_DRAW_CALLS,
+    )
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

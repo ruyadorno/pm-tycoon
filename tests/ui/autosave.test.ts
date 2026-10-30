@@ -19,6 +19,7 @@ import {
   checkSave,
   clearAllKeys,
   discardSave,
+  LEGACY_PLAYTEST_KEY,
   LEGACY_SAVE_KEY,
   loadGame,
   newGame,
@@ -145,17 +146,19 @@ describe('plan.md §5 / spec-build2 §8: the pm.* keys', () => {
     expect(SAVE_KEY).toBe('pm.save.v2')
     expect(LEGACY_SAVE_KEY).toBe('pm.save.v1')
     expect(SETTINGS_KEY).toBe('pm.settings.v1')
-    // The profile stays v1 until M10; only the per-config suffix is new.
-    expect(PLAYTEST_KEY).toBe('pm.playtest.v1')
+    // The profile is v2 since M10 (plan-build2 §8.7); v1 is only cleared.
+    expect(PLAYTEST_KEY).toBe('pm.playtest.v2')
+    expect(LEGACY_PLAYTEST_KEY).toBe('pm.playtest.v1')
     expect(saveConfig()).toBeNull()
     expect(saveKey()).toBe('pm.save.v2')
-    expect(playtestKey()).toBe('pm.playtest.v1')
+    expect(playtestKey()).toBe('pm.playtest.v2')
     expect(saveKey('spicy')).toBe('pm.save.v2:cfg:spicy')
-    expect(playtestKey('spicy')).toBe('pm.playtest.v1:cfg:spicy')
+    expect(playtestKey('spicy')).toBe('pm.playtest.v2:cfg:spicy')
     expect(STORAGE_KEYS).toEqual([
       'pm.save.v1',
       'pm.save.v2',
       'pm.settings.v1',
+      'pm.playtest.v2',
       'pm.playtest.v1',
     ])
   })
@@ -170,6 +173,9 @@ describe('plan.md §5 / spec-build2 §8: the pm.* keys', () => {
       'pm.settings.v1',
       'pm.playtest.v1',
       'pm.playtest.v1:cfg:spicy',
+      'pm.playtest.v2',
+      'pm.playtest.v2:cfg:spicy',
+      'pm.playtest.v2:cfg:tycoon',
     ])
       store.setItem(k, '{}')
     store.setItem('other', 'kept')
@@ -542,7 +548,7 @@ describe('report-playtest1 §6.13: a ?config session keeps its own save', () => 
     setSaveConfig('spicy')
     expect(saveConfig()).toBe('spicy')
     expect(saveKey()).toBe('pm.save.v2:cfg:spicy')
-    expect(playtestKey()).toBe('pm.playtest.v1:cfg:spicy')
+    expect(playtestKey()).toBe('pm.playtest.v2:cfg:spicy')
     const spicyData = dataFixture({ economy: { startMoney: 600 } })
     expect(spicyData.hash).not.toBe(data.hash)
     // Nothing saved for spicy yet: none (not stale), so no toast and no
@@ -562,10 +568,10 @@ describe('report-playtest1 §6.13: a ?config session keeps its own save', () => 
     }))
     expect(spicySaver.saver.save('manual')).toBe(true)
     expect(store.getItem('pm.save.v2')).toBe(coldText)
-    expect(JSON.parse(store.getItem('pm.playtest.v1')!)).toEqual({
+    expect(JSON.parse(store.getItem('pm.playtest.v2')!)).toEqual({
       run: 'cold',
     })
-    expect(JSON.parse(store.getItem('pm.playtest.v1:cfg:spicy')!)).toEqual({
+    expect(JSON.parse(store.getItem('pm.playtest.v2:cfg:spicy')!)).toEqual({
       run: 'spicy',
     })
     const s = readSave(spicyData, store)

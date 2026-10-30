@@ -41,8 +41,8 @@ export const TICKER_FILLER_MS = 90_000
  */
 export const TICKER_MAX_AGE_MS = 90_000
 export const PAUSED_BLINK_MS = 500
-/** city-view §8.1 says 0.85; matched to the top bar's 0.94 (world text read through). */
-export const TICKER_ALPHA = 0.94
+/** city-view §8.1 says 0.85; opaque like the top bar (world text read through 0.94 — final review, mobile #5). */
+export const TICKER_ALPHA = 1
 export const DAY_FILL_ALPHA = 0.3
 
 /**

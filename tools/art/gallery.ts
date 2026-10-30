@@ -7,7 +7,7 @@
 // - public/gallery/index.json (gitignored): entries, frames, categories,
 //   provenance, rejects and candidate copies (public/gallery/candidates/)
 //   read by the committed dev page public/gallery.html (1x and 3x views).
-// Claude pre-reviews each sheet with the image Read tool before the author.
+// The agent pre-reviews each sheet with the image Read tool before the author.
 
 import {
   copyFileSync,

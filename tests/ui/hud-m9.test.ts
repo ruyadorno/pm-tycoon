@@ -98,6 +98,17 @@ describe('L4 National (B2 §4.2): the bar, the tap toast, the paper', () => {
       expect(pic === null || typeof pic === 'string', d).toBe(true)
     }
   })
+
+  it('a debug-forced level books no income: the bar reads the real total, empty below the row threshold (L4) and "$N · Tycoon" at L5', () => {
+    const sim = h.noOffers(h.quietSim(32))
+    const vs = createViewSim(sim, { debug: true })
+    expect(vs.debug!.forceLevel(4)).toEqual({ ok: true })
+    const p4 = bar(sim)
+    expect(p4.frac).toBe(0)
+    expect(p4.text).toBe(`$0 / $${L5.threshold.toLocaleString('en-US')}`)
+    expect(vs.debug!.forceLevel(5)).toEqual({ ok: true })
+    expect(bar(sim).text).toBe('$0 · Tycoon')
+  })
 })
 
 describe('L5 Tycoon (B2 §3.4, §4.3): the Golden Release offer, Victory and endless', () => {
@@ -228,6 +239,69 @@ describe('L5 Tycoon (B2 §3.4, §4.3): the Golden Release offer, Victory and end
     expect(news.filter((n) => n.text === ENDLESS)).toHaveLength(1)
     // The bar keeps its mark in endless play.
     expect(bar(sim).text).toMatch(/ · Tycoon ✓$/)
+  })
+})
+
+describe('the L5 chips scroll into view on unlock; edge marks while the row overflows (final review, mobile #1)', () => {
+  // 393 px: x0 6, maxRowW 381, the row 495 wide; Airport at 391, Commons at
+  // 443 to 501 (+ its NEW badge 4 px past the chip).
+  it('chipRevealScroll brings the rightmost new chip and its badge fully inside, with the least movement', () => {
+    const s = kit.chipRevealScroll(0, 6, 381, 443, 505)
+    expect(s).toBe(6 + 381 - 505)
+    expect(505 + s).toBeLessThanOrEqual(6 + 381)
+    expect(391 + s).toBeGreaterThanOrEqual(6) // Airport is in view too
+    // Already in view: no movement; a chip left of the view scrolls back.
+    expect(kit.chipRevealScroll(-40, 6, 381, 100, 160)).toBe(-40)
+    expect(kit.chipRevealScroll(-200, 6, 381, 100, 160)).toBe(-94)
+    expect(kit.chipRevealScroll(0, 6, 381, 6, 60)).toBe(0)
+  })
+
+  it('chipOverflow: `>` while chips hide past the right edge, `<` once scrolled', () => {
+    expect(kit.chipOverflow(0, 495, 381)).toEqual({ left: false, right: true })
+    expect(kit.chipOverflow(-114, 495, 381)).toEqual({
+      left: true,
+      right: false,
+    })
+    expect(kit.chipOverflow(0, 300, 381)).toEqual({ left: false, right: false })
+  })
+})
+
+describe('a reload of the victory-tick save reopens the VictoryCard (final review, scenes #2)', () => {
+  it('victoryCardPending: within the slack of stats.victoryTick, before Continue; never before the Victory, after endless play ran, or after a game over', () => {
+    const won = { victory: true, victoryTick: 30_000 }
+    expect(kit.victoryCardPending(won, 30_000, false, 20)).toBe(true)
+    expect(kit.victoryCardPending(won, 30_020, false, 20)).toBe(true)
+    // Endless play ran (the next autosave is 10 s = 100 ticks at 1x later).
+    expect(kit.victoryCardPending(won, 30_100, false, 20)).toBe(false)
+    expect(kit.victoryCardPending(won, 30_000, true, 20)).toBe(false)
+    expect(
+      kit.victoryCardPending(
+        { victory: false, victoryTick: null },
+        0,
+        false,
+        20,
+      ),
+    ).toBe(false)
+    expect(
+      kit.victoryCardPending(
+        { victory: true, victoryTick: null },
+        5,
+        false,
+        20,
+      ),
+    ).toBe(false)
+  })
+
+  it('the HUD calls it on the boot sync only (a WAKE / sim swap keeps the card closed)', () => {
+    const src = readFileSync('src/scenes/HudScene.ts', 'utf8')
+    const body = src.slice(
+      src.indexOf('  private syncQuests(): void {'),
+      src.indexOf(
+        '  // ---------------------------------------------------------------- step 2',
+      ),
+    )
+    expect(body).toMatch(/boot &&\s+victoryCardPending\(/)
+    expect(body).toContain('this.onVictory()')
   })
 })
 

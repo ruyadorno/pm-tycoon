@@ -52,15 +52,19 @@
 //                       Shaky shaker in slot 4 (+ `-360x604`)
 // The two warehouse shots also run at the 360×604 profile.
 //
-// M4 (plan.md §12.7 tasks 1-2, §12.9):
-//   playtest-12min  iPhone 16: the 12-minute automated run (seed 7, policy)
-//                   in real time at 4× — the recorder's wall clock, fps
-//                   sampler and pause clock see a real session; 5:00-6:00 in
-//                   the Warehouse — then ❚❚, ❚❚ again (the pause menu) and
-//                   `End run — show summary` by real taps: the `summary-card`
-//                   shot, and the profile written to tests/playtest/seed-7.json
-//                   (the committed format example; tests/metrics/
-//                   playtest-schema.test.ts validates it)
+// M4 (plan.md §12.7 tasks 1-2, §12.9; M10 v2, plan-build2 §8.7 tasks 1-2):
+//   playtest-35min  iPhone 16: the 35-minute automated run (seed 7, policy):
+//                   the first 6:00 in real time at 4× — the recorder's wall
+//                   clock, fps sampler and pause clock see a real session;
+//                   5:00-6:00 in the Warehouse — then fast-forwarded in
+//                   20-s __pm.advance chunks with real frames between them
+//                   (the HUD's recorder hears every sim event: hires,
+//                   quests, hand-offs), the last 4 s at 1× — then ❚❚, ❚❚
+//                   again (the pause menu) and `End run — show summary` by
+//                   real taps: the `summary-card` shot (the v2 rows + fun
+//                   bar 2), and the profile written to
+//                   tests/playtest/seed-7.json (the committed format example;
+//                   tests/metrics/playtest-schema.test.ts validates it)
 //   summary-card    360×604 (`-360x604`): policy 10 min frozen, the same taps
 //   summary-over    iPhone 16 (no PNG): one-life.json to game over, the
 //                   game-over card's `Run summary` → the card in `Back` mode
@@ -217,7 +221,7 @@
 //                          inside the button, `Lv 5` dropped if too wide)
 // Every M9 shot but title-tycoon marks the page's one-time hints done after
 // the load (quietHints: the tour skipped, the first-flag funnel, the
-// first-Toss hint and the 20-minute summary offer seen), so no toast covers
+// first-Toss hint and the 30-minute summary offer seen), so no toast covers
 // the M9 art.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -1126,8 +1130,8 @@ async function levelUpAt(
  * M9 shots: the one-time hints a fresh page would raise over a loaded
  * mid-game fixture are marked done, as a player of that run has seen them —
  * the tour skipped (its Skip tour), the first-flag funnel and the first-Toss
- * hint seen (the policy Tosses as the player) and the 20-minute summary offer
- * made (fixtures past 20:00) — and any toast up is cleared, so nothing
+ * hint seen (the policy Tosses as the player) and the 30-minute summary offer
+ * made (victory.json is past 30:00) — and any toast up is cleared, so nothing
  * covers the M9 art. Every
  * other HUD reaction (level stamp, paper, chips, quest UI) is untouched.
  */
@@ -1343,8 +1347,10 @@ test.describe('M3 shots', () => {
 
 /** The committed playtest.json format example (plan.md §12.7 task 1). */
 const PLAYTEST_EXAMPLE = 'tests/playtest/seed-7.json'
-/** The automated run's length in sim seconds (12 minutes). */
-const PLAYTEST_RUN_S = 720
+/** The automated run's length in sim seconds (35 minutes, plan-build2 §8.7 task 1). */
+const PLAYTEST_RUN_S = 2100
+/** Sim ms per __pm.advance chunk while the run is fast-forwarded. */
+const PLAYTEST_FF_CHUNK_MS = 20_000
 
 interface SummaryState {
   open: boolean
@@ -1472,9 +1478,9 @@ async function restingPaperOk(page: Page): Promise<boolean> {
  * mode) if one is up (a guard: the HUD never auto-opens one while the
  * policy drives the stepper); then every newspaper (OK), once its slide
  * has landed,
- * until none is up or queued: seed 7 now reaches L2 at ~11.9 min (tick
- * ~7131, quest cash), so the level / region / quest papers sit over the
- * bottom bar when the 12-minute run ends.
+ * until none is up or queued: the level / region / quest papers (seed 7
+ * reaches L5 at ~27.9 min) can sit over the bottom bar when the automated
+ * run ends.
  */
 async function dismissQuestUi(
   page: Page,
@@ -1537,17 +1543,41 @@ async function openSummaryByTaps(
 }
 
 test.describe('M4 shots', () => {
-  test('playtest-12min', async ({ page, pm, consoleErrors }) => {
+  test('playtest-35min', async ({ page, pm, consoleErrors }) => {
     phoneOnly()
-    test.setTimeout(420_000)
+    test.setTimeout(600_000)
     await pm.open(POLICY)
-    // Real time at 4× (debug speed): 12 sim minutes in ~3 wall minutes.
+    // Real time at 4× (debug speed) for the first 6 sim minutes.
     await page.evaluate(() => window.__pm!.speed(4))
     await untilSimS(page, 300, 150_000)
     await page.evaluate(() => window.__pm!.goto('warehouse'))
     await untilSimS(page, 360, 60_000)
     await page.evaluate(() => window.__pm!.goto('city'))
-    await untilSimS(page, PLAYTEST_RUN_S - 4, 150_000)
+    // The HUD (and the recorder's warehouseS) follow the awake view a few
+    // frames later: wait for it before ticking the sim in big chunks.
+    await page.waitForFunction(
+      () =>
+        (
+          window.__pm!.game.scene.getScene('HUD') as unknown as {
+            view: string
+          }
+        ).view === 'city',
+      undefined,
+      { timeout: 10_000, polling: 50 },
+    )
+    // Fast-forward to 4 s before the end: sim-only chunks (the policy and
+    // the HUD's event handlers run inside them), real frames between.
+    const ffEnd = (PLAYTEST_RUN_S - 4) * 10
+    for (let guard = 0; guard < 400; guard++) {
+      const tick = await page.evaluate(() => window.__pm!.core.state.tick)
+      const left = ffEnd - tick
+      if (left <= 0) break
+      await page.evaluate(
+        (ms) => window.__pm!.advance(ms),
+        Math.min(PLAYTEST_FF_CHUNK_MS, left * 100),
+      )
+      await page.waitForTimeout(100)
+    }
     await page.evaluate(() => window.__pm!.speed(1))
     await untilSimS(page, PLAYTEST_RUN_S, 30_000)
     await openSummaryByTaps(page, pm, () => page.waitForTimeout(250))
@@ -1560,8 +1590,14 @@ test.describe('M4 shots', () => {
       `shots: playtest seed ${p.seed} simS ${p.simS} elapsedS ${p.elapsedS} pausedS ${p.pausedS} ` +
         `fps p50 ${p.fps.p50} p5 ${p.fps.p5} min ${p.fps.min} (${p.fps.samples}) taps ${p.taps} ` +
         `views ${p.viewSwitches} warehouseS ${p.warehouseS} deliveries ${p.deliveries.total} ` +
-        `firstDelivery ${p.firstDeliveryS} caught ${p.firstMalware.caughtS} by ${p.firstMalware.by}`,
+        `firstDelivery ${p.firstDeliveryS} caught ${p.firstMalware.caughtS} by ${p.firstMalware.by} ` +
+        `L2-5 ${p.level2AtS}/${p.level3AtS}/${p.level4AtS}/${p.level5AtS} victory ${p.victoryAtS} ` +
+        `hires ${p.hires.length} (${p.hires.filter((h) => !h.cheapest).length} not cheapest) ` +
+        `quests ${JSON.stringify({ ...p.quests, byTemplate: undefined })} ` +
+        `overseas ${JSON.stringify(p.overseas)} docks ${JSON.stringify(p.docksBought)} ` +
+        `desks ${p.desks} sorter ${JSON.stringify(p.sorter)} lives ${p.livesLost.length}`,
     )
+    expect(p.version).toBe(2)
     expect(p.seed).toBe(7)
     expect(p.simS).toBeGreaterThanOrEqual(PLAYTEST_RUN_S)
     expect(p.moneyPerMin.length).toBe(Math.floor(p.simS / 60))
@@ -1571,6 +1607,12 @@ test.describe('M4 shots', () => {
     expect(p.taps).toBeGreaterThanOrEqual(3)
     expect(p.fps.samples).toBeGreaterThan(30)
     expect(p.firstDeliveryS).not.toBeNull()
+    // The fast-forward kept the event-fed fields: L3+ with its hand-offs,
+    // the policy's hires and quests.
+    expect(p.level3AtS).not.toBeNull()
+    expect(p.hires.length).toBeGreaterThan(0)
+    expect(p.quests.offered).toBeGreaterThan(0)
+    expect(p.overseas.handedOff).toBeGreaterThanOrEqual(p.overseas.cleared)
     const st = await summaryState(page)
     // The card shows elapsedS as of its opening (the recorder's
     // summaryOpenedS, the same frame); the wall clock runs on until
@@ -1587,13 +1629,31 @@ test.describe('M4 shots', () => {
     expect(st.title).toBe(
       `Run summary — seed 7 — ${Math.floor(shown / 60)}:${String(Math.floor(shown % 60)).padStart(2, '0')} played`,
     )
-    expect(st.checks.map((c) => c.n)).toEqual([1, 2, 3, 4, 5])
+    console.log(`shots: fun bar 2 ${JSON.stringify(st.checks)}`)
+    expect(st.checks.map((c) => c.n)).toEqual([1, 2, 3, 4, 5, 6])
+    // Every button live and inside the canvas with the v2 rows.
+    const L = await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        L: { W: number; H: number }
+      }
+      return { W: hud.L.W, H: hud.L.H }
+    })
+    for (const id of [
+      'summary:download',
+      'summary:copy',
+      'summary:keep',
+      'summary:newGame',
+    ]) {
+      const r = await sceneTarget(page, 'HUD', id)
+      expect(r, `${id} is live`).not.toBeNull()
+      expect(r!.y + r!.h, `${id} bottom`).toBeLessThanOrEqual(L.H)
+    }
     await pm.shot('summary-card', 20)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
   test('summary-card', async ({ page, pm, consoleErrors }) => {
-    test.skip(!isMinFit(), 'the iPhone shot comes from playtest-12min')
+    test.skip(!isMinFit(), 'the iPhone shot comes from playtest-35min')
     await pm.open(POLICY)
     await runFor(page, pm, 600_000)
     await openSummaryByTaps(page, pm, () => pm.settle(8))
@@ -3526,6 +3586,25 @@ test.describe('M9 shots', () => {
     expect(width, 'the line fits the button').not.toBeNull()
     expect(width!).toBeLessThanOrEqual(cont!.w)
     await pm.shot(shotName('title-tycoon'), 10)
+    // The save was written on the victory tick, before Continue on the card:
+    // Continue reopens the VictoryCard and its hold (final review, scenes #2).
+    await tapTarget(page, pm, 'Title', 'title:continue')
+    expect(
+      await settleUntil(page, pm, () =>
+        page.evaluate(() => {
+          const sm = window.__pm!.game.scene
+          return sm.isActive('HUD') && !sm.isActive('Title')
+        }),
+      ),
+      'Continue brings the game up',
+    ).toBe(true)
+    expect(await victoryCardUp(page, pm), 'the VictoryCard reopens').toBe(true)
+    const ui = await questUi(page)
+    console.log(
+      `shots: title-tycoon continue ${JSON.stringify({ holds: ui.holds, paused: ui.paused, victory: ui.victory })}`,
+    )
+    expect(ui.holds).toContain('victory')
+    expect(ui.paused).toBe(true)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

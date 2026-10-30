@@ -3,11 +3,20 @@
 // Node-runnable: the JSON files themselves are read by load.browser.ts (static
 // imports under Vite) or tools/sim/load.node.ts (fs).
 
+import { CONFIG_START_KEY } from './configStart.ts'
 import { dataHash } from './hash.ts'
 import { DATA_FILES, validateGameData } from './schema.ts'
 import type { GameData, RawGameData } from './types.ts'
 
 export type * from './types.ts'
+export {
+  CONFIG_START_KEY,
+  checkConfigStart,
+  configStartOf,
+  DESK_SLOT,
+  SORTER_STATION,
+} from './configStart.ts'
+export type { ConfigStart, ConfigStartSlot } from './configStart.ts'
 export { canonicalJson, dataHash, fnv1a32 } from './hash.ts'
 export {
   DATA_FILES,
@@ -78,7 +87,12 @@ export function deepMerge<T>(base: T, patch: unknown): T {
   return structuredClone(patch) as T
 }
 
-/** Merge a config partial keyed by data file (`{"economy": {...}}`) over `raw`. */
+/**
+ * Merge a config partial keyed by data file (`{"economy": {...}}`) over `raw`.
+ * The reserved key `start` (configStart.ts: the config's scripted New game,
+ * M10) is not a data file: it is left out of the merge (and so of the data
+ * hash); checkConfigStart validates it against the merged tables.
+ */
 export function applyConfig(
   raw: RawGameData,
   patch: unknown,
@@ -89,11 +103,18 @@ export function applyConfig(
       `${label}: expected an object keyed by data file name`,
     ])
   const problems = Object.keys(patch)
-    .filter((k) => !(DATA_FILES as readonly string[]).includes(k))
+    .filter(
+      (k) =>
+        k !== CONFIG_START_KEY &&
+        !(DATA_FILES as readonly string[]).includes(k),
+    )
     .map(
       (k) =>
-        `${label}.${k}: unknown data file (expected ${DATA_FILES.join('|')})`,
+        `${label}.${k}: unknown data file (expected ${DATA_FILES.join('|')} or ${CONFIG_START_KEY})`,
     )
   if (problems.length > 0) throw new DataError(problems)
-  return deepMerge(raw, patch)
+  const tables = Object.fromEntries(
+    Object.entries(patch).filter(([k]) => k !== CONFIG_START_KEY),
+  )
+  return deepMerge(raw, tables)
 }

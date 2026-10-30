@@ -9,7 +9,9 @@ import {
   chipEntries,
   ENDLESS_TAIL,
   detectionColour,
+  floatKind,
   floatsGold,
+  floatX,
   garageAlert,
   isEarned,
   levelLabel,
@@ -299,6 +301,30 @@ describe('city-view §4.1: money cell tap and floats', () => {
     // Refunds are not earnings (spec §7.3: lifetime excludes refunds).
     expect(isEarned('refund')).toBe(false)
     expect(isEarned('delivery')).toBe(true)
+  })
+
+  it('final review (mobile #2): deltas of one kind share a float; another kind starts after the live ones', () => {
+    expect(floatKind(40, true)).toBe('gold')
+    expect(floatKind(-25, false)).toBe('minus')
+    expect(floatKind(12, false)).toBe('plus')
+    // Lone float: right after the balance.
+    expect(floatX(80, [], 24, 300)).toBe(80)
+    // `+$500` live at 80 (24 px): the `−$25` goes after it, not on it.
+    expect(floatX(80, [{ x: 80, w: 24 }], 20, 300)).toBe(108)
+    // Two live floats: after the rightmost.
+    expect(
+      floatX(
+        80,
+        [
+          { x: 80, w: 24 },
+          { x: 108, w: 20 },
+        ],
+        20,
+        300,
+      ),
+    ).toBe(132)
+    // Never past the lives cell.
+    expect(floatX(80, [{ x: 80, w: 24 }], 30, 120)).toBe(90)
   })
 })
 

@@ -1,0 +1,18 @@
+{
+  "economy": { "startMoney": 14500 },
+  "start": {
+    "level": 5,
+    "slots": [
+      "desk",
+      "metal_detector",
+      "shaky_shaker",
+      "battery_checker",
+      "xray",
+      "desk"
+    ],
+    "inspectorsPerDesk": 2,
+    "holdStation": "sorter_arm",
+    "docks": [2, 3],
+    "fleet": { "bike": 3, "van": 2, "truck": 3 }
+  }
+}

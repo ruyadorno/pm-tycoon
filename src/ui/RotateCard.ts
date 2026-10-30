@@ -12,10 +12,13 @@
 // draws through its own camera, kept last in its scene's camera list (it
 // ignores every other object, including ones added later), and its scene is
 // lifted above the scenes over it; closing puts those scenes back on top in
-// their old order and clears the camera's ignore bits.
+// their old order and clears the camera's ignore bits. It also holds the
+// keyboard while up (Sheet.ts blockKeys): G, W, Space, Esc do nothing.
 import type Phaser from 'phaser'
 import { UI_ATLAS } from '../render/atlases.ts'
+import { removeCamera } from './cameraBits.ts'
 import { addPanel } from './Panel.ts'
+import { blockKeys } from './Sheet.ts'
 import { addText, lineCount, LINE_H } from './text.ts'
 import { THEME } from './theme.ts'
 
@@ -88,6 +91,9 @@ export class RotateCard {
   setOpen(on: boolean): void {
     if (on === this.isOpen()) return
     this.root.setVisible(on)
+    // No key acts under the card either (G would lift the Garage over it,
+    // W switch views under it): every listener's claim fails while it is up.
+    blockKeys(this, on)
     if (on) this.raise()
     else this.lower()
   }
@@ -110,6 +116,7 @@ export class RotateCard {
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true
+    blockKeys(this, false)
     this.lower()
     this.scene.events.off('shutdown', this.destroy, this)
     this.root.destroy()
@@ -123,6 +130,9 @@ export class RotateCard {
     for (const c of s.cameras.cameras) c.ignore(this.root)
     const cam = s.cameras.add(0, 0, this.W, this.H)
     this.cam = cam
+    // The id may be one a removed camera held (Phaser reuses freed ids): a
+    // bit it left on the root would hide the card from its own camera.
+    ;(this.root as unknown as Filtered).cameraFilter &= ~cam.id
     for (const obj of s.children.list) this.ignore(obj)
     s.events.on('addedtoscene', this.ignore, this)
     s.events.on('prerender', this.keepLast, this)
@@ -149,7 +159,7 @@ export class RotateCard {
     s.events.off('prerender', this.keepLast, this)
     for (const o of this.ignored) o.cameraFilter &= ~cam.id
     this.ignored.clear()
-    s.cameras?.remove(cam, true)
+    removeCamera(s, cam)
     const sp = s.scene
     for (const key of this.above) {
       const o = sp.get(key)

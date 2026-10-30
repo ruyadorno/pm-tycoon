@@ -22,6 +22,7 @@
 //   (report-playtest1 §6.14: the district panel and the Garage size to
 //   their rows instead of a fixed share of the canvas).
 import type Phaser from 'phaser'
+import { removeCamera } from './cameraBits.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { addPanel, type PanelFrame } from './Panel.ts'
 import { THEME } from './theme.ts'
@@ -43,6 +44,24 @@ export const DEFAULT_DEPTH = 5000
 
 const modalStack: object[] = []
 let lastClaimed: KeyboardEvent | null = null
+/**
+ * A full-screen blocker above every modal (the rotate card, final review
+ * scenes #3): while set, no listener may claim a key and every event reads
+ * as handled, so G / W / Space / Esc do nothing under it. It is not on the
+ * modal stack (the cards under it keep their places).
+ */
+let keyBlocker: object | null = null
+
+/** `owner` blocks every key while `on`; only the owner lifts its block. */
+export function blockKeys(owner: object, on: boolean): void {
+  if (on) keyBlocker = owner
+  else if (keyBlocker === owner) keyBlocker = null
+}
+
+/** A blocker (the rotate card) holds the keyboard. */
+export function keysBlocked(): boolean {
+  return keyBlocker !== null
+}
 
 export function pushModal(owner: object): void {
   const i = modalStack.indexOf(owner)
@@ -70,15 +89,16 @@ export function modalCount(): number {
  * when no modal is open (e.g. HUD shortcuts).
  */
 export function claimKey(ev: KeyboardEvent, owner: object | null): boolean {
+  if (keyBlocker !== null) return false
   if (ev === lastClaimed) return false
   if (topModal() !== owner) return false
   lastClaimed = ev
   return true
 }
 
-/** True when some listener already claimed `ev`. */
+/** True when some listener already claimed `ev` (or a blocker holds the keys). */
 export function keyClaimed(ev: KeyboardEvent): boolean {
-  return ev === lastClaimed
+  return keyBlocker !== null || ev === lastClaimed
 }
 
 // ---- off-screen origins for clipped content --------------------------------
@@ -424,7 +444,7 @@ export class Sheet {
     this.scene.events.off('sleep', this.onSleep, this)
     this.scene.events.off('wake', this.onWake, this)
     this.scene.events.off('shutdown', this.destroy, this)
-    if (this.listCam) this.scene.cameras.remove(this.listCam, true)
+    removeCamera(this.scene, this.listCam)
     this.content?.destroy()
     this.root.destroy()
     this.scrim.destroy()

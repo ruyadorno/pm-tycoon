@@ -14,6 +14,10 @@
 // the same fresh games, after ?level= (so a level-scaled goal reads the
 // forced level) and before ?fastForward=; the HUD opens a standing offer's
 // card when it starts (a swap leaves the chip pulsing).
+// M10 (plan-build2 §8.7 task 3): a ?config= whose file carries a `start`
+// recipe (src/data/configStart.ts; ?config=tycoon) plays it on the same
+// fresh games through src/boot/configStart.ts — first, so a ?level= or
+// ?quest= on top finds the game no longer fresh and stays out of it.
 import Phaser from 'phaser'
 import type { AudioDirector, SimLookups } from '../audio/director.ts'
 import {
@@ -27,10 +31,11 @@ import {
   SIM_REPLACED,
   type SimReplaced,
 } from '../boot/simBinding.ts'
+import { applyConfigStart } from '../boot/configStart.ts'
 import { installNav } from '../boot/nav.ts'
 import { installStepper, type Stepper } from '../boot/stepper.ts'
-import { DataError, type GameData } from '../data/index.ts'
-import { loadGameData } from '../data/load.browser.ts'
+import { DataError, type ConfigStart, type GameData } from '../data/index.ts'
+import { loadConfigured } from '../data/load.browser.ts'
 import { installDebugApi } from '../debug/pm.ts'
 import { debugEnabled, params, type Params } from '../debug/params.ts'
 import type { CommandResult } from '../sim/commands.ts'
@@ -285,8 +290,8 @@ export class BootScene extends Phaser.Scene {
       }
     }
 
-    loadGameData(configName)
-      .then((data) => this.boot(data))
+    loadConfigured(configName)
+      .then(({ data, start }) => this.boot(data, start))
       .catch((err: unknown) => {
         if (err instanceof DataError) {
           showCard('Game data failed validation', err.problems, {
@@ -300,7 +305,10 @@ export class BootScene extends Phaser.Scene {
       })
   }
 
-  private async boot(data: GameData): Promise<void> {
+  private async boot(
+    data: GameData,
+    start: ConfigStart | null = null,
+  ): Promise<void> {
     const game = this.game
     const p = params()
     game.registry.set(REG.data, data)
@@ -336,6 +344,14 @@ export class BootScene extends Phaser.Scene {
         )
     }
     const vs = setSim(game, sim)
+    // The config's scripted start (M10, ?config=tycoon): Boot's fresh sim now,
+    // each New game's on its swap — before ?level= and ?quest= (registered
+    // first), so the views and the director only ever see the built game.
+    if (!resume.game) applyConfigStart(vs, sim, start)
+    if (start !== null)
+      game.events.on(SIM_REPLACED, (e: SimReplaced) => {
+        if (!e.attract) applyConfigStart(e.viewSim, e.sim, start)
+      })
     // ?level=N: Boot's fresh sim now, each New game's on its swap. This
     // listener is registered before any scene's and the director's, so the
     // forced level:up events reach nobody: the views sync from state.

@@ -627,6 +627,116 @@ test.describe('lifecycle', () => {
     expect(consoleErrors).toEqual([])
   })
 
+  test("after a lost-life card the rotate card still draws and holds the keys; a hide inside the card's lead-in shows no Paused card", async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await openGame(page)
+    const visibility = (hidden: boolean): Promise<void> =>
+      page.evaluate((h) => {
+        Object.defineProperty(document, 'hidden', {
+          value: h,
+          configurable: true,
+        })
+        Object.defineProperty(document, 'visibilityState', {
+          value: h ? 'hidden' : 'visible',
+          configurable: true,
+        })
+        document.dispatchEvent(new Event('visibilitychange'))
+      }, hidden)
+    const hud = (): Promise<{
+      lost: boolean
+      paused: boolean
+      depth: number
+      holds: string[]
+    }> =>
+      page.evaluate(() => {
+        const h = window.__pm!.game.scene.getScene('HUD') as unknown as {
+          lostCard: { isOpen(): boolean }
+          paused: { isOpen(): boolean }
+          holds: Set<string>
+          modalDepth(): number
+        }
+        return {
+          lost: h.lostCard.isOpen(),
+          paused: h.paused.isOpen(),
+          depth: h.modalDepth(),
+          holds: [...h.holds].toSorted(),
+        }
+      })
+    // A life lost, and the tab hidden and shown inside the card's 600-ms
+    // lead-in (scenes #4): the lost-life card alone, no Paused card.
+    await page.evaluate(() => window.__pm!.sim.debug!.forceMalwareDelivery())
+    await visibility(true)
+    await frames(page, 2)
+    await visibility(false)
+    await frames(page, 2)
+    await page.waitForFunction(() => {
+      const h = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        lostCard: { isOpen(): boolean }
+      }
+      return h.lostCard.isOpen()
+    })
+    await frames(page, 30)
+    expect(await hud(), 'the lost-life card only').toEqual({
+      lost: true,
+      paused: false,
+      depth: 1,
+      holds: ['lostLife'],
+    })
+    await tapTarget(page, pm, 'HUD', 'lostLife:continue')
+    await restInCity(page)
+    expectAtRest(await invariants(page), 'after the lost-life card')
+
+    // Landscape after that card (its camera's id is free again, scenes #1):
+    // the rotate card is drawn by its own camera; G and W do nothing (#3).
+    const rot = (): Promise<{
+      open: boolean
+      drawn: boolean
+      holds: string[]
+      garage: boolean
+      warehouse: boolean
+    }> =>
+      page.evaluate(() => {
+        const sm = window.__pm!.game.scene
+        const h = sm.getScene('HUD') as unknown as {
+          rotate: { isOpen(): boolean; root: { cameraFilter: number } }
+          cameras: { cameras: { id: number }[] }
+          holds: Set<string>
+        }
+        const cams = h.cameras.cameras
+        const last = cams[cams.length - 1]!
+        return {
+          open: h.rotate.isOpen(),
+          drawn: (h.rotate.root.cameraFilter & last.id) === 0,
+          holds: [...h.holds],
+          garage: sm.isActive('Garage') && !sm.isSleeping('Garage'),
+          warehouse: sm.isActive('Warehouse') && !sm.isSleeping('Warehouse'),
+        }
+      })
+    const up = {
+      open: true,
+      drawn: true,
+      holds: ['rotate'],
+      garage: false,
+      warehouse: false,
+    }
+    const vp = page.viewportSize()!
+    await page.setViewportSize({ width: vp.height, height: vp.width })
+    await frames(page, 20)
+    expect(await rot(), 'the rotate card is drawn').toEqual(up)
+    for (const key of ['g', 'w', 'Space']) {
+      await page.keyboard.press(key)
+      await frames(page, 20)
+      expect(await rot(), `${key} under the rotate card`).toEqual(up)
+    }
+    await page.setViewportSize(vp)
+    await frames(page, 20)
+    expectAtRest(await invariants(page), 'after the rotate round trip')
+    expect(consoleErrors).toEqual([])
+  })
+
   test('landscape ↔ portrait and tab hide/show release their holds', async ({
     page,
     pm,

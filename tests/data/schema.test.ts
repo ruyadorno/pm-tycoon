@@ -1,12 +1,17 @@
 // plan.md §6.6 / §6.9.1: the shipped tables pass the boot validator, every
 // crafted defect is reported with its path, shipped configs validate merged
 // over the tables, and the ?config= / --config deep merge is by index.
+// M10 (plan-build2 §8.7 task 3): spicy.json's build-2 quest cadence, the
+// tycoon.json data override + `start` recipe (src/data/configStart.ts:
+// validated against the merged tables, kept out of the merge and the hash).
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   applyConfig,
   buildGameData,
+  checkConfigStart,
+  configStartOf,
   dataHash,
   DataError,
   deepMerge,
@@ -22,6 +27,7 @@ import {
   validateGameData,
 } from '../../src/data/index.ts'
 import {
+  loadConfigured,
   loadGameData as loadBrowserData,
   rawGameData,
 } from '../../src/data/load.browser.ts'
@@ -588,13 +594,192 @@ describe('configs (plan.md §6.6)', () => {
   const dir = new URL('../../public/configs/', import.meta.url)
   const names = readdirSync(dir).filter((f) => f.endsWith('.json'))
 
-  it('ships spicy.json', () => {
+  const patchOf = (name: string): Record<string, any> =>
+    JSON.parse(readFileSync(new URL(name, dir), 'utf8'))
+
+  it('ships spicy.json and tycoon.json', () => {
     expect(names).toContain('spicy.json')
+    expect(names).toContain('tycoon.json')
   })
 
-  it.each(names)('%s merged over the tables validates', (name) => {
-    const patch: unknown = JSON.parse(readFileSync(new URL(name, dir), 'utf8'))
-    expect(problemsOf(applyConfig(loadRawData(), patch, name))).toEqual([])
+  it.each(names)(
+    '%s merged over the tables validates, its start recipe too',
+    (name) => {
+      const patch: unknown = patchOf(name)
+      const raw = applyConfig(loadRawData(), patch, name)
+      expect(problemsOf(raw)).toEqual([])
+      const check = checkConfigStart(
+        configStartOf(patch),
+        buildGameData(raw),
+        name,
+      )
+      expect(check.problems).toEqual([])
+    },
+  )
+
+  it('spicy.json: the late quest cadence — offers sooner and more often than the base tables, nothing else in quests moves', () => {
+    const d = loadGameData('public/configs/spicy.json')
+    const base = buildGameData(loadRawData())
+    const o = d.quests.offer
+    const b = base.quests.offer
+    expect(o.firstOfferDay).toBeLessThan(b.firstOfferDay)
+    expect(o.intervalDays).toBeLessThan(b.intervalDays)
+    expect(o.firstOfferDay).toBeGreaterThan(0)
+    expect(o.intervalDays).toBeGreaterThan(0)
+    expect({ ...o, firstOfferDay: 0, intervalDays: 0 }).toEqual({
+      ...b,
+      firstOfferDay: 0,
+      intervalDays: 0,
+    })
+    expect(d.quests.templates).toEqual(base.quests.templates)
+    expect(checkConfigStart(configStartOf(patchOf('spicy.json')), d)).toEqual({
+      start: null,
+      problems: [],
+    })
+  })
+
+  it('tycoon.json: only economy.startMoney moves in the tables; its start is the L5 lane, docks 2-3 and a fleet', () => {
+    const patch = patchOf('tycoon.json')
+    const d = loadGameData('public/configs/tycoon.json')
+    const base = buildGameData(loadRawData())
+    expect(d.economy.startMoney).toBe(patch.economy.startMoney)
+    expect(d.economy.startMoney).toBeGreaterThan(base.economy.startMoney)
+    expect({
+      ...d,
+      hash: '',
+      economy: { ...d.economy, startMoney: 0 },
+    }).toEqual({
+      ...base,
+      hash: '',
+      economy: { ...base.economy, startMoney: 0 },
+    })
+    const { start, problems } = checkConfigStart(
+      configStartOf(patch),
+      d,
+      'tycoon.json',
+    )
+    expect(problems).toEqual([])
+    const last = d.levels[d.levels.length - 1]!
+    expect(start).toEqual({
+      level: last.level,
+      slots: [
+        'desk',
+        'metal_detector',
+        'shaky_shaker',
+        'battery_checker',
+        'xray',
+        'desk',
+      ],
+      inspectorsPerDesk: 2,
+      holdStation: 'sorter_arm',
+      docks: [2, 3],
+      fleet: [
+        { type: 'bike', count: 3 },
+        { type: 'van', count: 2 },
+        { type: 'truck', count: 3 },
+      ],
+    })
+    // Every slot of the top level, the Golden Release's level.
+    expect(start!.slots).toHaveLength(last.slots)
+    expect(last.ultimateQuest).toBeDefined()
+  })
+
+  it('the start key is not a data file: out of the merge and the hash', () => {
+    const raw = loadRawData()
+    const merged = applyConfig(raw, { start: { level: 2 } }, 's.json')
+    expect(merged).toEqual(raw)
+    expect(dataHash(merged)).toBe(dataHash(raw))
+    expect('start' in merged).toBe(false)
+    expect(configStartOf({ start: { level: 2 } })).toEqual({ level: 2 })
+    expect(configStartOf({ economy: {} })).toBeUndefined()
+    expect(configStartOf(null)).toBeUndefined()
+  })
+
+  it('checkConfigStart reports every defect with its path', () => {
+    const d = buildGameData(loadRawData())
+    const problems = (start: unknown): string[] =>
+      checkConfigStart(start, d, 'x.json').problems
+    expect(checkConfigStart(undefined, d)).toEqual({
+      start: null,
+      problems: [],
+    })
+    expect(checkConfigStart(null, d)).toEqual({ start: null, problems: [] })
+    expect(problems([])).toEqual(['x.json.start: expected an object'])
+    expect(problems({ lvl: 5 })).toEqual([
+      'x.json.start.lvl: unknown field (expected level|slots|inspectorsPerDesk|holdStation|docks|fleet)',
+    ])
+    expect(problems({ level: 6 })).toEqual([
+      'x.json.start.level: expected an integer 1..5',
+    ])
+    expect(problems({ level: 0 })).toHaveLength(1)
+    expect(problems({ level: 2.5 })).toHaveLength(1)
+    // L1 has 3 slots; the start desk's slot; unknown / locked checkers; desks.
+    expect(problems({ slots: [null, null, null, null] })).toEqual([
+      'x.json.start.slots: 4 entries, level 1 has 3 slots',
+    ])
+    expect(problems({ level: 2, slots: ['metal_detector'] })).toEqual([
+      'x.json.start.slots[0]: slot 1 holds the start desk (null or "desk")',
+    ])
+    expect(problems({ slots: [null, 'scanner', 'xray'] })).toEqual([
+      'x.json.start.slots[1]: unknown checker "scanner"',
+      'x.json.start.slots[2]: xray unlocks at level 4, start level 1',
+    ])
+    expect(problems({ slots: [null, 7] })).toEqual([
+      'x.json.start.slots[1]: expected "desk", a checker id or null',
+    ])
+    expect(problems({ slots: ['desk', 'desk'] })).toEqual([
+      'x.json.start.slots: 2 desks, level 1 allows 1',
+    ])
+    expect(problems({ level: 3, slots: [null, 'desk', 'desk'] })).toEqual([
+      'x.json.start.slots: 3 desks, level 3 allows 2',
+    ])
+    expect(problems({ level: 3, slots: [null, 'desk'] })).toEqual([])
+    expect(problems({ inspectorsPerDesk: 4 })).toEqual([
+      'x.json.start.inspectorsPerDesk: expected an integer 0..3',
+    ])
+    expect(problems({ holdStation: 'sorter' })).toEqual([
+      'x.json.start.holdStation: the station unlocks at level 2, start level 1',
+    ])
+    expect(problems({ level: 3, holdStation: 'sorter_arm' })).toEqual([
+      'x.json.start.holdStation: sorter_arm unlocks at level 4, start level 3',
+    ])
+    expect(problems({ holdStation: 'xray' })).toEqual([
+      'x.json.start.holdStation: expected null, "sorter" or a Hold Bay upgrade id',
+    ])
+    expect(problems({ level: 4, docks: [2, 2, 1, 3] })).toEqual([
+      'x.json.start.docks[1]: dock 2 listed twice',
+      'x.json.start.docks[2]: expected an economy.docks index',
+    ])
+    expect(problems({ level: 3, docks: [3] })).toEqual([
+      'x.json.start.docks[0]: dock 3 unlocks at level 4, start level 3',
+    ])
+    expect(problems({ docks: 2 })).toEqual([
+      'x.json.start.docks: expected an array',
+    ])
+    expect(
+      problems({ fleet: { bike: 1, truck: 1, boat: 1, van: -1 } }),
+    ).toEqual([
+      'x.json.start.fleet.boat: unknown vehicle type',
+      'x.json.start.fleet.van: expected a non-negative integer',
+      'x.json.start.fleet.truck: unlocks at level 2, start level 1',
+    ])
+    expect(problems({ fleet: [] })).toEqual([
+      'x.json.start.fleet: expected an object {vehicle type: count}',
+    ])
+    // A clean recipe: defaults, fleet in vehicles.json order, zero counts dropped.
+    expect(
+      checkConfigStart({ fleet: { truck: 0, van: 1, bike: 2 } }, d).start,
+    ).toEqual({
+      level: 1,
+      slots: [],
+      inspectorsPerDesk: 0,
+      holdStation: null,
+      docks: [],
+      fleet: [
+        { type: 'bike', count: 2 },
+        { type: 'van', count: 1 },
+      ],
+    })
   })
 
   it('spicy.json raises malware and decoys above the base tables, caps the Hold Bay at 2 on L1-L2 only', () => {
@@ -699,6 +884,31 @@ describe('browser loader (static JSON imports, ?config=)', () => {
     expect(d.hash).toBe(loadGameData('public/configs/spicy.json').hash)
     const plain = await loadBrowserData(null, { fetch: fakeFetch })
     expect(plain.hash).toBe(buildGameData(loadRawData()).hash)
+  })
+
+  it('loadConfigured hands Boot the validated start recipe (tycoon), none for spicy or no config', async () => {
+    const t = await loadConfigured('tycoon', { fetch: fakeFetch })
+    expect(t.data.hash).toBe(loadGameData('public/configs/tycoon.json').hash)
+    expect(t.start?.level).toBe(5)
+    expect(t.start?.docks).toEqual([2, 3])
+    expect((await loadConfigured('spicy', { fetch: fakeFetch })).start).toBe(
+      null,
+    )
+    expect((await loadConfigured(null, { fetch: fakeFetch })).start).toBe(null)
+  })
+
+  it('a defective start recipe rejects with DataError, its path in problems', async () => {
+    const bad = (async () =>
+      new Response(
+        JSON.stringify({ start: { level: 2, fleet: { boat: 1 } } }),
+      )) as unknown as typeof fetch
+    const err: unknown = await loadConfigured('bad', { fetch: bad }).catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(DataError)
+    expect((err as DataError).problems).toEqual([
+      'configs/bad.json.start.fleet.boat: unknown vehicle type',
+    ])
   })
 
   it('rejects a missing config and an unsafe name with DataError', async () => {

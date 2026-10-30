@@ -31,6 +31,27 @@
      }
     },
     {
+     "filename": "baseboard",
+     "rotated": false,
+     "trimmed": false,
+     "sourceSize": {
+      "w": 32,
+      "h": 2
+     },
+     "spriteSourceSize": {
+      "x": 0,
+      "y": 0,
+      "w": 32,
+      "h": 2
+     },
+     "frame": {
+      "x": 498,
+      "y": 190,
+      "w": 32,
+      "h": 2
+     }
+    },
+    {
      "filename": "battery_checker_f0",
      "rotated": false,
      "trimmed": false,
@@ -6253,6 +6274,6 @@
   "app": "pm-tycoon tools/art/atlas.ts (free-tex-packer-core 0.3.9)",
   "format": "Phaser3 JSON (textures[].frames[])",
   "atlas": "interior",
-  "frames": 297
+  "frames": 298
  }
 }

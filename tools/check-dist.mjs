@@ -11,7 +11,7 @@
 //     assets/attract-<hash>.json, each exactly once and each named by a JS chunk (the bundle pairs with
 //     those bytes); no unhashed assets/world.png / world.json / m5x7.xml (the playtest-1 public/assets/
 //     copies) in dist/, and no public/assets/ in the repo;
-//   - configs/spicy.json (valid JSON, identical to public/configs/spicy.json), every vendored sample of
+//   - configs/spicy.json and configs/tycoon.json (valid JSON, identical to public/configs/), every vendored sample of
 //     public/audio/sf/ (same bytes count) + LICENSE.txt, and playtest-README.txt are present.
 // Lists the biggest files, the JS chunks with gzip estimates against the §6.11 targets, the samples, and any
 // dev-only files that slipped into dist/ (public/gallery/ is gitignored but copied when it exists locally).
@@ -195,21 +195,25 @@ for (const key of ATLASES) {
   }
 }
 
-// configs/spicy.json (?debug=1&config=spicy, plan.md §13.4 "How to play").
-const spicyDist = join(dist, 'configs/spicy.json')
-const spicySrc = join(ROOT, 'public/configs/spicy.json')
-if (!existsSync(spicyDist)) fail('configs/spicy.json missing')
-else {
-  try {
-    JSON.parse(readFileSync(spicyDist, 'utf8'))
-  } catch (err) {
-    fail(`configs/spicy.json is not JSON: ${err.message}`)
+// The session configs (?debug=1&config=<name>, plan.md §13.4 "How to play"; plan-build2 §8.7 task 3):
+// spicy (playtest-1 levers + early quests) and tycoon (an L5 start for a short Golden Release session).
+const CONFIGS = ['spicy.json', 'tycoon.json']
+const configPresent = {}
+for (const name of CONFIGS) {
+  const inDist = join(dist, 'configs', name)
+  const inSrc = join(ROOT, 'public/configs', name)
+  configPresent[name] = existsSync(inDist)
+  if (!configPresent[name]) {
+    fail(`configs/${name} missing`)
+    continue
   }
-  if (
-    existsSync(spicySrc) &&
-    !readFileSync(spicySrc).equals(readFileSync(spicyDist))
-  ) {
-    fail('configs/spicy.json differs from public/configs/spicy.json')
+  try {
+    JSON.parse(readFileSync(inDist, 'utf8'))
+  } catch (err) {
+    fail(`configs/${name} is not JSON: ${err.message}`)
+  }
+  if (existsSync(inSrc) && !readFileSync(inSrc).equals(readFileSync(inDist))) {
+    fail(`configs/${name} differs from public/configs/${name}`)
   }
 }
 
@@ -266,7 +270,8 @@ const ROLE = {
   phaser: 'engine',
   index: 'main (game code)',
   director: 'audio (Tone Transport + smplr + director), lazy',
-  policy: 'scripted policy, only with ?policy=1',
+  policy:
+    'scripted policy: the demo city behind the Title (every first load) and ?policy=1',
   offline: 'offline audio render, debug only',
 }
 
@@ -331,7 +336,10 @@ if (json) {
   )
   console.log(
     `  samples    ${mp3s.length} mp3 + ${presets.length} presets ${mb(samplesBytes)} ` +
-      `(≤ ${mb(TARGETS.samplesMax)}, audio.md §8.1) · spicy.json ${existsSync(spicyDist) ? 'present' : 'MISSING'}`,
+      `(≤ ${mb(TARGETS.samplesMax)}, audio.md §8.1) · ` +
+      CONFIGS.map(
+        (n) => `${n} ${configPresent[n] ? 'present' : 'MISSING'}`,
+      ).join(' · '),
   )
   console.log('  biggest files (transfer set)')
   for (const f of biggest) {

@@ -1,6 +1,7 @@
-// The playtest recorder (plan.md §12.7 task 1, §12.9): one `playtest.json`
-// profile per run, the object the summary card shows and downloads,
-// `__pm.playtest()` returns and `pm.playtest.v1` stores.
+// The playtest recorder (plan.md §12.7 task 1, §12.9; v2: plan-build2 §8.7
+// task 1, §9): one `playtest.json` profile per run, the object the summary
+// card shows and downloads, `__pm.playtest()` returns and `pm.playtest.v2`
+// stores.
 //
 // Phaser- and DOM-free (tools/check-sim-purity.mjs keeps it so): the HUD
 // injects the wall clock, `game.loop.actualFps`, the count of canvas
@@ -8,22 +9,36 @@
 //
 //   - the sim state, read when the profile is built, for everything the sim
 //     already keeps (so a profile started late — a Continue, ?fastForward=,
-//     a fixture — still reports them): simS, firstDeliveryS, level2AtS,
-//     truckBoughtS, deliveries total / onTime / late, moneyPerMin (the steps
-//     of stats.minutes[].earned, one row per in-game minute = 60 sim s),
-//     lifetimeEarned, balanceEnd, malware spawned / caught / missed,
-//     tossedClean (the bin's clean count), holdBayEvents, stalls.totalS
-//     (stats.minutes[].stallS + today's), satisfactionEnd (live local
-//     districts) and, from the command log (it rides along in every save),
-//     vehiclesBought, machinesBought, inspectorsHired (`hire` commands with
-//     role 'inspector' — build 2 M6; not re-hires) and rushTaps (rush
-//     commands applied);
+//     a fixture — still reports them): simS, firstDeliveryS, level2AtS …
+//     level5AtS (stats.levelTick), victoryAtS (stats.victoryTick) and
+//     endlessS (sim seconds since it), truckBoughtS, deliveries total /
+//     onTime / late, moneyPerMin (the steps of stats.minutes[].earned, one
+//     row per in-game minute = 60 sim s), lifetimeEarned, balanceEnd,
+//     malware spawned / caught / missed, tossedClean (the bin's clean
+//     count), holdBayEvents, stalls.totalS (stats.minutes[].stallS +
+//     today's), satisfactionEnd (live local districts), quests (offered /
+//     accepted / declined / completed / failed, per template, from
+//     state.quests: the history, the open offer and the active quest),
+//     overseas.handedOff / cleared (stats.cleared + the parcels still
+//     clearing), desks (desk fixtures in the lane) and, from the command log
+//     (it rides along in every save), vehiclesBought, machinesBought,
+//     docksBought, inspectorsHired (`hire` commands with role 'inspector' —
+//     build 2 M6; not re-hires), fired (`fire`), adsPosted (`postAd`) and
+//     rushTaps (rush commands applied);
 //   - sim events while attached: firstMalware (the first malware spawned;
 //     the first malware flagged — `by` = the flagging checker's machine id,
 //     or 'inspector' for the desk — and when that parcel was tossed),
 //     deliveries.byType (the vehicle of the parcel's last `loaded` hop),
 //     malware.cleared (malware the player Cleared from the Hold Bay),
-//     livesLost, stalls.count (stalled-from-flowing transitions), payroll
+//     livesLost (one per parcel id; + v2: the sorter whose `looks clean`
+//     call it carried, the overseas hub whose clearance cost it), hires (worker:hired, not
+//     re-hires: role, pips, salary, ★, when, and whether the pick was the
+//     cheapest applicant left in that pool — fun bar 2 item 1), sorter
+//     {decisions, wrong, clearedMalware} (sorter:decided; clearedMalware =
+//     malware the sorter judged clean and left in the bay — the Toss-only
+//     sorter's equivalent of a Clear), overseas.malwareAtClearance
+//     (parcel:cleared with malware), quests.firstCompletedS (also read from
+//     the history), stalls.count (stalled-from-flowing transitions), payroll
 //     {paid, short, walkouts} (payroll:paid / payroll:short / walkout events);
 //   - the view layer: elapsedS / pausedS (wall seconds while the page is
 //     visible; a hidden tab does not count, a frame gap is capped at 1 s),
@@ -33,11 +48,14 @@
 //     seconds while the Warehouse is the awake view).
 //
 // Rules (§12.9): every `*S` is sim seconds (ticks ÷ 10) except elapsedS and
-// pausedS (wall clock); null = not reached. `pm.playtest.v1` holds the
+// pausedS (wall clock); null = not reached. `pm.playtest.v2` (src/boot/
+// autosave.ts playtestKey, `:cfg:<name>` in a config session) holds the
 // profile plus a `restore` record (the accumulators the profile alone cannot
-// rebuild: the fps histogram, the first-malware parcel id, …); attach()
-// resumes from it only for the same run (same seed, simS within one autosave
-// period of the sim's) — a New game starts a fresh profile.
+// rebuild: the fps histogram, the first-malware parcel id, the hires, …);
+// attach() resumes from it only for the same run (version 2, same seed, simS
+// within one autosave period of the sim's) — a New game starts a fresh
+// profile, and a v1 profile (build 1, M5–M9) is never resumed.
+import type { GameData } from '../data/types.ts'
 import {
   onSimEvent,
   type SimEmitter,
@@ -45,9 +63,10 @@ import {
   type SimEventPayloads,
 } from '../sim/events.ts'
 import type { CommandLogEntry } from '../sim/commands.ts'
-import type { SimState, VehicleType } from '../sim/types.ts'
+import { salaryOf } from '../sim/systems/people.ts'
+import type { LostLifeReport, SimState, VehicleType } from '../sim/types.ts'
 
-export const PLAYTEST_VERSION = 1
+export const PLAYTEST_VERSION = 2
 /** Game registry key of the live PlaytestRecorder (HudScene sets it; __pm reads it). */
 export const REG_PLAYTEST = 'playtest'
 /** The download's file name (the summary card, __pm.downloadPlaytest()). */
@@ -58,15 +77,55 @@ export const FPS_SAMPLE_MS = 1000
 export const MAX_FRAME_GAP_MS = 1000
 /** A stored profile resumes only when its simS is this close to the sim's. */
 export const RESTORE_WINDOW_S = 15
-/** §12.9 fun bar (4): the author keeps playing past 15 min (elapsedS). */
-export const FUN_KEEP_PLAYING_S = 900
-/** Q55: the summary card is offered once at 20:00 of sim time. */
-export const SUMMARY_OFFER_S = 1200
+/** plan-build2 §8.7 task 2: the summary card is offered once at 30:00 of sim time. */
+export const SUMMARY_OFFER_S = 1800
+
+/**
+ * plan-build2 §9, the fun bar 2 windows: instrumentation for the author's
+ * playtest, not game balance (the sim never reads them; the gate's windows
+ * stay in economy.pacingTargets).
+ */
+export interface FunTargets {
+  /** (2) the first quest completed by this sim second. */
+  questByS: number
+  /** (3) level 3 reached inside this window, sim minutes (inclusive). */
+  level3Min: readonly [number, number]
+  /** (4) wall seconds played before the summary card first opened. */
+  keepPlayingS: number
+  /** (6, stretch) level 5 or Victory by this sim second. */
+  stretchS: number
+}
+
+export const FUN_TARGETS: Readonly<FunTargets> = {
+  questByS: 900,
+  level3Min: [15, 22],
+  keepPlayingS: 1500,
+  stretchS: 2400,
+}
+/** §9 fun bar 2 (4): the author keeps playing past 25 min (elapsedS). */
+export const FUN_KEEP_PLAYING_S = FUN_TARGETS.keepPlayingS
+
+/**
+ * The summary offer is due: SUMMARY_OFFER_S (30:00) of sim time, and more
+ * than fun bar item 4's keepPlayingS (25:00) of wall time on screen — at 2×
+ * the game clock reaches 30:00 after ~15–20 real minutes, and a tester who
+ * opens the card when it is offered must not fail item 4 for it (final
+ * review, mobile #7).
+ */
+export function summaryOfferDue(
+  simTick: number,
+  elapsedS: number,
+  targets: Readonly<FunTargets> = FUN_TARGETS,
+): boolean {
+  return (
+    simTick >= SUMMARY_OFFER_S * TICKS_PER_S && elapsedS > targets.keepPlayingS
+  )
+}
 
 const TICKS_PER_S = 10
 const VEHICLE_TYPES: readonly VehicleType[] = ['bike', 'van', 'truck']
 
-// ---- the profile (plan.md §12.9, exactly) ----------------------------------------
+// ---- the profile (plan.md §12.9 + plan-build2 §8.7 task 1) ---------------------------
 
 export interface PlaytestDevice {
   ua: string
@@ -92,6 +151,12 @@ export interface PlaytestFirstMalware {
 }
 
 export interface PlaytestLifeLost {
+  /**
+   * The lost parcel's id (unique per run; the recorder's replay dedupe key —
+   * two parcels with the same label can be lost on one tick). null in a
+   * profile restored from before the field.
+   */
+  parcelId: number | null
   atS: number
   label: string
   strain: string | null
@@ -100,10 +165,55 @@ export interface PlaytestLifeLost {
   /** The strain's counter machine id (parcels.json), or null. */
   counter: string | null
   clearedByPlayer: boolean
+  /** v2: the sorter whose `looks clean` call the parcel carried, or null. */
+  sorter: string | null
+  /** v2: the overseas hub whose clearance cost it (null = a local delivery). */
+  hub: string | null
+}
+
+/** v2: one hire from a picker (worker:hired, not a re-hire). */
+export interface PlaytestHire {
+  role: string
+  /** The role's stats, 1..5 each (employees.json roles[role].stats). */
+  pips: Record<string, number>
+  /** $/day, fixed at hire (a driver's for its vehicle's class). */
+  salary: number
+  star: boolean
+  atS: number
+  /**
+   * No applicant left in that pool would have cost less (for a driver: for
+   * the same vehicle class); a lone applicant is the cheapest. Fun bar 2
+   * item 1 wants at least one hire where this is false.
+   */
+  cheapest: boolean
+}
+
+/** v2: quest counts (one set overall, one per template). */
+export interface PlaytestQuestCounts {
+  /** Every quest offered (incl. the Golden Release). */
+  offered: number
+  /** Accepted (completed + failed + abandoned + the active one). */
+  accepted: number
+  /** Declined by the player or left to expire. */
+  declined: number
+  completed: number
+  /**
+   * Failed (timeout, malware) or abandoned. An Accept refused because nothing
+   * can carry the golden parcel withdraws the offer (history `withdrawn`,
+   * reason `unavailable`): it counts toward `offered` only.
+   */
+  failed: number
+}
+
+export interface PlaytestQuests extends PlaytestQuestCounts {
+  /** The first quest completed, or null. */
+  firstCompletedS: number | null
+  /** quests.json / levels.json ultimateQuest id → its counts. */
+  byTemplate: Record<string, PlaytestQuestCounts>
 }
 
 export interface Playtest {
-  version: 1
+  version: 2
   buildStamp: string
   seed: number
   /** ISO 8601 UTC, seconds (`2026-10-30T18:02:11Z`). */
@@ -115,6 +225,13 @@ export interface Playtest {
   firstDeliveryS: number | null
   firstMalware: PlaytestFirstMalware
   level2AtS: number | null
+  level3AtS: number | null
+  level4AtS: number | null
+  level5AtS: number | null
+  /** The Golden Release shipped (game:victory). */
+  victoryAtS: number | null
+  /** Sim seconds played in endless mode since the Victory; null before it. */
+  endlessS: number | null
   truckBoughtS: number | null
   deliveries: {
     total: number
@@ -139,6 +256,32 @@ export interface Playtest {
   vehiclesBought: { type: string; atS: number }[]
   inspectorsHired: number
   machinesBought: { id: string; atS: number }[]
+  /** v2: loading docks bought (economy.docks index 2, 3). */
+  docksBought: { index: number; atS: number }[]
+  /** v2: desks in the lane at the end (the start desk included). */
+  desks: number
+  hires: PlaytestHire[]
+  /** Employees fired by the player (`fire` commands). */
+  fired: number
+  /** `Post an ad` taps (`postAd` commands). */
+  adsPosted: number
+  sorter: {
+    /** Calls the seated sorter made (Toss or leave). */
+    decisions: number
+    /** Calls that were wrong (a clean parcel tossed, malware left). */
+    wrong: number
+    /** Malware the sorter judged clean and left in the bay. */
+    clearedMalware: number
+  }
+  quests: PlaytestQuests
+  overseas: {
+    /** Parcels handed off at a pier / terminal. */
+    handedOff: number
+    /** Clearances done (malware included). */
+    cleared: number
+    /** Malware that reached its clearance (a life each). */
+    malwareAtClearance: number
+  }
   taps: number
   tapsPerMin: number
   rushTaps: number
@@ -173,15 +316,21 @@ export interface PlaytestRestore {
   stalled: boolean
   stallCount: number
   payroll: { paid: number; short: number; walkouts: number }
+  /** v2 (events): the hires, the sorter's calls, malware at clearance. */
+  hires: PlaytestHire[]
+  sorter: { decisions: number; wrong: number; clearedMalware: number }
+  malwareAtClearance: number
+  /** v2: the first quest:completed tick (the history keeps only the last 50). */
+  firstQuestCompletedTick: number | null
   /** elapsedS when the summary card was first opened (fun bar 4), or null. */
   summaryOpenedS: number | null
-  /** The 20:00 offer ran (once per run, Q55). */
+  /** The 30:00 offer ran (once per run). */
   offered: boolean
 }
 
 /**
- * `pm.playtest.v1` (`pm.playtest.v1:cfg:<name>` in a `?config=` session, so a
- * config run never replaces the cold run's profile — src/boot/autosave.ts
+ * `pm.playtest.v2` (`pm.playtest.v2:cfg:<name>` in a `?config=` session, so
+ * a config run never replaces the cold run's profile — src/boot/autosave.ts
  * playtestKey, report-playtest1 §6.13): the profile and the accumulators
  * that resume it.
  */
@@ -196,6 +345,8 @@ export interface PlaytestSim {
   readonly state: SimState
   readonly events: SimEmitter
   readonly commandLog: readonly CommandLogEntry[]
+  /** The tables (applicant salaries for hires[].cheapest, building districts). */
+  readonly data: GameData
 }
 
 export interface RecorderDeps {
@@ -301,6 +452,90 @@ function deliveringType(state: SimState, parcelId: number): VehicleType | null {
   return null
 }
 
+const zeroCounts = (): PlaytestQuestCounts => ({
+  offered: 0,
+  accepted: 0,
+  declined: 0,
+  completed: 0,
+  failed: 0,
+})
+
+/**
+ * The quest counts from state.quests (the history — at most the last 50
+ * ended quests, QUEST_HISTORY_MAX —, the open offer, the active quest):
+ * offered = all of them; accepted = completed + failed + abandoned + the
+ * active one; declined = declined + expired; failed = failed + abandoned (a
+ * withdrawn offer is offered only). firstCompletedS = the earliest
+ * completion in the history, or `firstTick` when that is earlier (the
+ * recorder's own first quest:completed, in case the history dropped it).
+ */
+export function questCounts(
+  state: SimState,
+  firstTick: number | null = null,
+): PlaytestQuests {
+  const total = zeroCounts()
+  const byTemplate: Record<string, PlaytestQuestCounts> = {}
+  const bump = (templateId: string, key: keyof PlaytestQuestCounts): void => {
+    total[key] += 1
+    const t = (byTemplate[templateId] ??= zeroCounts())
+    t[key] += 1
+  }
+  const qs = state.quests
+  let first = firstTick
+  for (const h of qs.history) {
+    bump(h.templateId, 'offered')
+    switch (h.outcome) {
+      case 'completed':
+        bump(h.templateId, 'accepted')
+        bump(h.templateId, 'completed')
+        if (first === null || h.tick < first) first = h.tick
+        break
+      case 'failed':
+      case 'abandoned':
+        bump(h.templateId, 'accepted')
+        bump(h.templateId, 'failed')
+        break
+      case 'declined':
+      case 'expired':
+        bump(h.templateId, 'declined')
+        break
+      default:
+        break
+    }
+  }
+  if (qs.offer) bump(qs.offer.templateId, 'offered')
+  if (qs.active) {
+    bump(qs.active.templateId, 'offered')
+    bump(qs.active.templateId, 'accepted')
+  }
+  return { ...total, firstCompletedS: ticksToSOrNull(first), byTemplate }
+}
+
+/** Desk fixtures in the lane (the start desk included). */
+function deskCount(state: SimState): number {
+  return state.lane.nodes.filter((n) => n.fixture?.kind === 'desk').length
+}
+
+/** Parcels handed off so far: cleared + still clearing (state 'handed_off'). */
+function handedOffCount(state: SimState): number {
+  let n = state.stats.cleared
+  for (const p of Object.values(state.parcels))
+    if (p.state === 'handed_off') n += 1
+  return n
+}
+
+/** The hub of a clearance loss: the `customsCleared` hop, else the destination's district. */
+function lossHub(data: GameData | null, r: LostLifeReport): string | null {
+  if (!r.viaClearance) return null
+  for (let i = r.path.length - 1; i >= 0; i--) {
+    const e = r.path[i]
+    if (e?.what === 'customsCleared' && e.ref !== null) return e.ref
+  }
+  return (
+    data?.buildings.find((b) => b.id === r.destBuildingId)?.district ?? null
+  )
+}
+
 function freshRestore(): PlaytestRestore {
   return {
     elapsedMs: 0,
@@ -321,6 +556,10 @@ function freshRestore(): PlaytestRestore {
     stalled: false,
     stallCount: 0,
     payroll: { paid: 0, short: 0, walkouts: 0 },
+    hires: [],
+    sorter: { decisions: 0, wrong: 0, clearedMalware: 0 },
+    malwareAtClearance: 0,
+    firstQuestCompletedTick: null,
     summaryOpenedS: null,
     offered: false,
   }
@@ -334,16 +573,36 @@ const numOrNull = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null
 const strOrNull = (v: unknown): string | null =>
   typeof v === 'string' ? v : null
+const count = (v: unknown): number => Math.max(0, Math.floor(num(v)))
 
 function parseLifeLost(v: unknown): PlaytestLifeLost | null {
   if (!isObj(v) || typeof v.label !== 'string') return null
   return {
+    parcelId: numOrNull(v.parcelId),
     atS: num(v.atS),
     label: v.label,
     strain: strOrNull(v.strain),
     laneRate: num(v.laneRate),
     counter: strOrNull(v.counter),
     clearedByPlayer: v.clearedByPlayer === true,
+    sorter: strOrNull(v.sorter),
+    hub: strOrNull(v.hub),
+  }
+}
+
+function parseHire(v: unknown): PlaytestHire | null {
+  if (!isObj(v) || typeof v.role !== 'string') return null
+  const pips: Record<string, number> = {}
+  if (isObj(v.pips))
+    for (const [k, n] of Object.entries(v.pips))
+      if (typeof n === 'number' && Number.isFinite(n)) pips[k] = n
+  return {
+    role: v.role,
+    pips,
+    salary: num(v.salary),
+    star: v.star === true,
+    atS: num(v.atS),
+    cheapest: v.cheapest !== false,
   }
 }
 
@@ -358,8 +617,8 @@ export function parseRestore(v: unknown): PlaytestRestore {
     for (const [k, n] of Object.entries(v.fpsHist))
       if (Number.isFinite(Number(k)) && num(n) > 0)
         r.fpsHist[k] = Math.floor(num(n))
-  r.taps = Math.max(0, Math.floor(num(v.taps)))
-  r.viewSwitches = Math.max(0, Math.floor(num(v.viewSwitches)))
+  r.taps = count(v.taps)
+  r.viewSwitches = count(v.viewSwitches)
   r.warehouseTicks = Math.max(0, num(v.warehouseTicks))
   r.firstMalwareSpawnedTick = numOrNull(v.firstMalwareSpawnedTick)
   r.firstCaughtId = numOrNull(v.firstCaughtId)
@@ -380,14 +639,26 @@ export function parseRestore(v: unknown): PlaytestRestore {
     r.payroll.short = Math.max(0, num(v.payroll.short))
     r.payroll.walkouts = Math.max(0, num(v.payroll.walkouts))
   }
+  if (Array.isArray(v.hires))
+    r.hires = v.hires
+      .map(parseHire)
+      .filter((x): x is PlaytestHire => x !== null)
+  if (isObj(v.sorter)) {
+    r.sorter.decisions = count(v.sorter.decisions)
+    r.sorter.wrong = count(v.sorter.wrong)
+    r.sorter.clearedMalware = count(v.sorter.clearedMalware)
+  }
+  r.malwareAtClearance = count(v.malwareAtClearance)
+  r.firstQuestCompletedTick = numOrNull(v.firstQuestCompletedTick)
   r.summaryOpenedS = numOrNull(v.summaryOpenedS)
   r.offered = v.offered === true
   return r
 }
 
 /**
- * The stored profile belongs to this run: version 1, same seed, its simS
- * within RESTORE_WINDOW_S of the sim's, and a `restore` record.
+ * The stored profile belongs to this run: version 2 (a v1 profile is never
+ * resumed), same seed, its simS within RESTORE_WINDOW_S of the sim's, and a
+ * `restore` record.
  */
 export function sameRun(stored: unknown, state: SimState): boolean {
   if (!isObj(stored) || stored.version !== PLAYTEST_VERSION) return false
@@ -401,24 +672,17 @@ export function sameRun(stored: unknown, state: SimState): boolean {
   )
 }
 
-// ---- fun bar (§12.9) -----------------------------------------------------------------------
+// ---- fun bar 2 (plan-build2 §9) -------------------------------------------------------------
 
 export type FunState = 'pass' | 'fail' | 'judge' | 'pending'
 
 export interface FunCheck {
-  /** 1..5 as numbered in plan.md §12.9. */
+  /** 1..6 as numbered in plan-build2 §9. */
   n: number
   label: string
   state: FunState
-  /** What the check read (`0:47`, `not yet`, `you judge`). */
+  /** What the check read (`17:58`, `not yet`, `you judge`). */
   detail: string
-}
-
-/** The windows the fun bar reads (economy.pacingTargets). */
-export interface FunTargets {
-  firstDeliveryS: number
-  firstMalwareCaughtMaxS: number
-  level2Min: readonly [number, number] | readonly number[]
 }
 
 /** `m:ss` (minutes not wrapped into hours); `—` for null. */
@@ -428,89 +692,124 @@ export function clock(s: number | null): string {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
 }
 
+/** A lost life the data explains: a counter, a sorter's call, or the player's Clear. */
+export function lifeExplained(l: PlaytestLifeLost): boolean {
+  return l.counter !== null || l.sorter !== null || l.clearedByPlayer
+}
+
 /**
- * The §12.9 fun bar from the profile: (1) first delivery < 60 s; (2) the
- * first malware caught by a checker by 5 min; (3) L2 in 8–15 min; (4) kept
- * playing past 15 min before opening the summary (`openedAtS` = elapsedS at
- * the first opening, default the profile's elapsedS); (5) every lost life
- * explainable (a counter, or Cleared by the player) — the data can only say
- * "explainable"; whether the card made sense is the author's call, so a
- * clean record reads `judge`. `pending` = the window is still open.
+ * Fun bar 2 (plan-build2 §9) from the profile. `judge` = the data part
+ * holds but the item also asks how it felt (only the author can say), read
+ * `you judge`; `pending` = the window is still open.
+ *
+ *  1. Hiring was a choice — ≥ 1 hire whose pick was not the cheapest
+ *     applicant (hires[].cheapest false) → judge (could you say why?); hires
+ *     but always the cheapest → fail; none yet → pending.
+ *  2. A quest completed by 15:00 (quests.firstCompletedS ≤ questByS).
+ *  3. Level 3 between 15:00 and 22:00 (level3AtS).
+ *  4. Kept playing past 25:00 — elapsedS at the first opening of the card
+ *     (`openedAtS`, default the profile's elapsedS) > keepPlayingS.
+ *  5. Every lost life explained — each has a counter, a sorter name or
+ *     clearedByPlayer (an overseas one also says the ship has sailed / the
+ *     plane has left on its card) → judge (did the card make sense?); none
+ *     lost → pass; any without → fail.
+ *  6. (stretch) Level 5 or Victory by 40:00 (level5AtS, victoryAtS).
  */
 export function funBar(
   pt: Playtest,
-  targets: FunTargets,
+  targets: Readonly<FunTargets> = FUN_TARGETS,
   openedAtS: number | null = null,
 ): FunCheck[] {
   const out: FunCheck[] = []
-  const fd = targets.firstDeliveryS
-  const d = pt.firstDeliveryS
+  const inWindow = (
+    at: number | null,
+    lo: number,
+    hi: number,
+    none: string,
+  ): Pick<FunCheck, 'state' | 'detail'> => {
+    if (at !== null)
+      return {
+        state: at >= lo && at <= hi ? 'pass' : 'fail',
+        detail: clock(at),
+      }
+    return pt.simS <= hi
+      ? { state: 'pending', detail: 'not yet' }
+      : { state: 'fail', detail: none }
+  }
+
+  const hires = pt.hires
+  const choices = hires.filter((h) => !h.cheapest).length
   out.push({
     n: 1,
-    label: `First delivery under ${clock(fd)}`,
-    state:
-      d !== null
-        ? d < fd
-          ? 'pass'
-          : 'fail'
-        : pt.simS < fd
-          ? 'pending'
-          : 'fail',
-    detail: d !== null ? clock(d) : 'not yet',
+    label: 'Hiring was a choice',
+    ...(hires.length === 0
+      ? { state: 'pending', detail: 'no hires yet' }
+      : choices === 0
+        ? { state: 'fail', detail: 'always the cheapest' }
+        : {
+            state: 'judge',
+            detail: `${choices} not cheapest · you judge`,
+          }),
   })
-  const cm = targets.firstMalwareCaughtMaxS
-  const c = pt.firstMalware.caughtS
+
+  const qBy = targets.questByS
   out.push({
     n: 2,
-    label: `Malware caught by ${clock(cm)}`,
-    state:
-      c !== null
-        ? c <= cm
-          ? 'pass'
-          : 'fail'
-        : pt.simS < cm
-          ? 'pending'
-          : 'fail',
-    detail: c !== null ? clock(c) : 'not yet',
+    label: `A quest done by ${clock(qBy)}`,
+    ...inWindow(pt.quests.firstCompletedS, 0, qBy, `none by ${clock(qBy)}`),
   })
-  const lo = (targets.level2Min[0] ?? 8) * 60
-  const hi = (targets.level2Min[1] ?? 15) * 60
-  const l2 = pt.level2AtS
+
+  const lo = (targets.level3Min[0] ?? 15) * 60
+  const hi = (targets.level3Min[1] ?? 22) * 60
   out.push({
     n: 3,
-    label: `Level 2 between ${clock(lo)} and ${clock(hi)}`,
-    state:
-      l2 !== null
-        ? l2 >= lo && l2 <= hi
-          ? 'pass'
-          : 'fail'
-        : pt.simS <= hi
-          ? 'pending'
-          : 'fail',
-    detail: l2 !== null ? clock(l2) : 'not yet',
+    label: `Level 3 between ${clock(lo)} and ${clock(hi)}`,
+    ...inWindow(pt.level3AtS, lo, hi, `none by ${clock(hi)}`),
   })
+
+  const keep = targets.keepPlayingS
   const opened = openedAtS ?? pt.elapsedS
   out.push({
     n: 4,
-    label: `Kept playing past ${clock(FUN_KEEP_PLAYING_S)}`,
-    state: opened > FUN_KEEP_PLAYING_S ? 'pass' : 'fail',
+    label: `Kept playing past ${clock(keep)}`,
+    state: opened > keep ? 'pass' : 'fail',
     detail: `summary at ${clock(opened)}`,
   })
+
   const lost = pt.livesLost
-  const unexplained = lost.filter(
-    (l) => l.counter === null && !l.clearedByPlayer,
-  )
+  const unexplained = lost.filter((l) => !lifeExplained(l)).length
   out.push({
     n: 5,
     label: 'Every lost life explained',
-    state:
-      lost.length === 0 ? 'pass' : unexplained.length > 0 ? 'fail' : 'judge',
+    state: lost.length === 0 ? 'pass' : unexplained > 0 ? 'fail' : 'judge',
     detail:
       lost.length === 0
         ? 'none lost'
-        : unexplained.length > 0
-          ? `${unexplained.length} without a counter`
+        : unexplained > 0
+          ? `${unexplained} unexplained`
           : 'you judge',
+  })
+
+  const by = targets.stretchS
+  const v = pt.victoryAtS
+  const l5 = pt.level5AtS
+  const reached =
+    v !== null && v <= by
+      ? `Victory ${clock(v)}`
+      : l5 !== null && l5 <= by
+        ? `Lv 5 ${clock(l5)}`
+        : null
+  out.push({
+    n: 6,
+    label: `Stretch: Lv 5 or Victory by ${clock(by)}`,
+    ...(reached !== null
+      ? { state: 'pass', detail: reached }
+      : pt.simS <= by
+        ? { state: 'pending', detail: 'not yet' }
+        : {
+            state: 'fail',
+            detail: l5 !== null ? `Lv 5 ${clock(l5)}` : `none by ${clock(by)}`,
+          }),
   })
   return out
 }
@@ -555,13 +854,18 @@ export class PlaytestRecorder {
     return this.r.summaryOpenedS
   }
 
-  /** The 20:00 offer already ran this run. */
+  /** The 30:00 offer already ran this run. */
   get offered(): boolean {
     return this.r.offered
   }
 
+  /** Wall seconds on screen so far (the profile's elapsedS, unrounded). */
+  get elapsedS(): number {
+    return this.r.elapsedMs / 1000
+  }
+
   /**
-   * Follow `sim`. With `stored` (pm.playtest.v1) of the same run the
+   * Follow `sim`. With `stored` (pm.playtest.v2) of the same run the
    * profile resumes from it; otherwise a fresh profile starts now. Returns
    * true when it resumed.
    */
@@ -636,12 +940,12 @@ export class PlaytestRecorder {
       this.r.summaryOpenedS = round1(this.r.elapsedMs / 1000)
   }
 
-  /** The 20:00 offer ran. */
+  /** The 30:00 offer ran. */
   markOffered(): void {
     this.r.offered = true
   }
 
-  /** The live profile (plan.md §12.9). */
+  /** The live profile (plan.md §12.9 + plan-build2 §8.7 task 1). */
   snapshot(): Playtest {
     this.countViewTicks()
     const sim = this.sim
@@ -653,16 +957,23 @@ export class PlaytestRecorder {
     const log = sim?.commandLog ?? []
     const vehiclesBought: { type: string; atS: number }[] = []
     const machinesBought: { id: string; atS: number }[] = []
+    const docksBought: { index: number; atS: number }[] = []
     let inspectorsHired = 0
     let rushTaps = 0
+    let fired = 0
+    let adsPosted = 0
     for (const e of log) {
       const c = e.cmd
       if (c.kind === 'buyVehicle')
         vehiclesBought.push({ type: c.type, atS: ticksToS(e.tick) })
       else if (c.kind === 'buyMachine')
         machinesBought.push({ id: c.defId, atS: ticksToS(e.tick) })
+      else if (c.kind === 'buyDock')
+        docksBought.push({ index: c.index, atS: ticksToS(e.tick) })
       else if (c.kind === 'hire' && c.role === 'inspector') inspectorsHired += 1
       else if (c.kind === 'rush') rushTaps += 1
+      else if (c.kind === 'fire') fired += 1
+      else if (c.kind === 'postAd') adsPosted += 1
     }
     const minutes = st?.minutes ?? []
     const stallS =
@@ -677,6 +988,10 @@ export class PlaytestRecorder {
           satisfactionEnd[d.id] = Math.round(d.satisfaction)
     const holdBayEvents = st?.holdBayEvents ?? 0
     const firstCaught = this.r.firstCaughtTick ?? st?.firstCatchTick ?? null
+    const victoryAtS = ticksToSOrNull(st?.victoryTick)
+    const quests: PlaytestQuests = s
+      ? questCounts(s, this.r.firstQuestCompletedTick)
+      : { ...zeroCounts(), firstCompletedS: null, byTemplate: {} }
     return {
       version: PLAYTEST_VERSION,
       buildStamp: this.deps.buildStamp,
@@ -694,6 +1009,11 @@ export class PlaytestRecorder {
         tossedS: ticksToSOrNull(this.r.firstTossedTick),
       },
       level2AtS: ticksToSOrNull(st?.levelTick['2']),
+      level3AtS: ticksToSOrNull(st?.levelTick['3']),
+      level4AtS: ticksToSOrNull(st?.levelTick['4']),
+      level5AtS: ticksToSOrNull(st?.levelTick['5']),
+      victoryAtS,
+      endlessS: victoryAtS !== null ? round1(simS - victoryAtS) : null,
       truckBoughtS: ticksToSOrNull(st?.truckTick),
       deliveries: {
         total: st?.deliveries ?? 0,
@@ -715,6 +1035,18 @@ export class PlaytestRecorder {
       vehiclesBought,
       inspectorsHired,
       machinesBought,
+      docksBought,
+      desks: s ? deskCount(s) : 0,
+      hires: this.r.hires.map((h) => ({ ...h, pips: { ...h.pips } })),
+      fired,
+      adsPosted,
+      sorter: { ...this.r.sorter },
+      quests,
+      overseas: {
+        handedOff: s ? handedOffCount(s) : 0,
+        cleared: st?.cleared ?? 0,
+        malwareAtClearance: this.r.malwareAtClearance,
+      },
       taps,
       tapsPerMin: elapsedS > 0 ? round1((taps * 60) / elapsedS) : 0,
       rushTaps,
@@ -730,7 +1062,7 @@ export class PlaytestRecorder {
     }
   }
 
-  /** What pm.playtest.v1 stores: the profile plus its accumulators. */
+  /** What pm.playtest.v2 stores: the profile plus its accumulators. */
   persisted(): StoredPlaytest {
     const pt = this.snapshot()
     const r = this.r
@@ -743,6 +1075,8 @@ export class PlaytestRecorder {
         byType: { ...r.byType },
         livesLost: r.livesLost.map((l) => ({ ...l })),
         payroll: { ...r.payroll },
+        hires: r.hires.map((h) => ({ ...h, pips: { ...h.pips } })),
+        sorter: { ...r.sorter },
       },
     }
   }
@@ -806,6 +1140,40 @@ export class PlaytestRecorder {
     return this.sim?.state.parcels[String(id)]?.malware === true
   }
 
+  /**
+   * A hire from a picker (worker:hired, not a re-hire). At the event the
+   * hired applicant has left its pool and the pool is not topped up yet
+   * (people.ts hireApplicant's event order), so the pool holds exactly the
+   * applicants the player passed over; a driver's salaries are for the
+   * vehicle it drives (the class its own salary was fixed for).
+   */
+  private noteHire(p: SimEventPayloads['worker:hired']): void {
+    const sim = this.sim
+    if (!sim || p.rehire) return
+    const s = sim.state
+    const e = s.employees.find((x) => x.id === p.employeeId)
+    if (!e) return
+    const type =
+      p.role === 'driver'
+        ? (s.vehicles.find((v) => v.id === e.vehicleId)?.type ?? 'bike')
+        : undefined
+    const cost = (pips: typeof e.pips): number =>
+      salaryOf(sim.data, p.role, pips, type)
+    const own = cost(e.pips)
+    const others = s.applicants[p.role] ?? []
+    const pips: Record<string, number> = {}
+    for (const [k, n] of Object.entries(e.pips))
+      if (typeof n === 'number') pips[k] = n
+    this.r.hires.push({
+      role: p.role,
+      pips,
+      salary: e.salaryPerDay,
+      star: e.star,
+      atS: ticksToS(s.tick),
+      cheapest: others.every((a) => cost(a.pips) >= own),
+    })
+  }
+
   private subscribe(events: SimEmitter): void {
     const on = <K extends SimEventName>(name: K, fn: Handler<K>): void => {
       this.off.push(onSimEvent(events, name, fn))
@@ -835,19 +1203,45 @@ export class PlaytestRecorder {
       const type = s ? deliveringType(s, p.id) : null
       if (type) this.r.byType[type] += 1
     })
+    on('parcel:cleared', (p) => {
+      if (p.malware) this.r.malwareAtClearance += 1
+    })
     on('life:lost', (p) => {
       const atS = ticksToS(p.report?.tick ?? this.tick())
-      // A replayed loss (a reload just before it) is recorded once.
-      if (this.r.livesLost.some((l) => l.atS === atS && l.label === p.label))
+      // A replayed loss (a reload just before it) is recorded once: the same
+      // parcel id (ids are unique per run — two parcels sharing a label can
+      // both be lost on one tick). A record restored from before parcelId
+      // falls back to the time + label match.
+      if (
+        this.r.livesLost.some((l) =>
+          l.parcelId !== null
+            ? l.parcelId === p.parcelId
+            : l.atS === atS && l.label === p.label,
+        )
+      )
         return
       this.r.livesLost.push({
+        parcelId: p.parcelId,
         atS,
         label: p.label,
         strain: p.strain,
         laneRate: Math.round(p.laneRate * 1000) / 1000,
         counter: p.counterMachineId,
         clearedByPlayer: p.clearedByPlayerAt !== null,
+        sorter: p.sorterCall?.name ?? null,
+        hub: p.report ? lossHub(this.sim?.data ?? null, p.report) : null,
       })
+    })
+    on('worker:hired', (p) => this.noteHire(p))
+    on('sorter:decided', (p) => {
+      this.r.sorter.decisions += 1
+      if (!p.correct) this.r.sorter.wrong += 1
+      if (p.call === 'leave' && this.isMalware(p.parcelId))
+        this.r.sorter.clearedMalware += 1
+    })
+    on('quest:completed', () => {
+      if (this.r.firstQuestCompletedTick === null)
+        this.r.firstQuestCompletedTick = this.tick()
     })
     on('lane:stalled', () => {
       if (!this.r.stalled) this.r.stallCount += 1

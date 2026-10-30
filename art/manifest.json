@@ -13333,6 +13333,22 @@
       "finalSha256": "4cd249f25550663df49bea81f0f8b6e5829c6deec928e5acedf04b95288c1595"
     },
     {
+      "id": "baseboard",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [32, 2],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "final review (mobile #6): the room's 2-px south-edge baseboard in `outline`, tiled 11x along the bottom edge in the walls layer; it was a Rectangle that split the interior batch (2 draw calls)",
+      "finalSha256": "8aa0e035d8c2d9d485f8fb073659c04f57a5d75f021ea9ce583b6c15900a9ae3"
+    },
+    {
       "id": "props_t1",
       "class": "interior-prop",
       "source": "procedural",

@@ -300,17 +300,20 @@ const isFlagged = (p: Parcel): boolean => p.flaggedBy !== null
 
 /**
  * Seat a parcel in a free station: a parcel already rolled at this node (it
- * came back from a fixture change), a magic one (checkers skip it, §5.5) or
- * one this very checker already rolled in another slot (one roll per parcel
- * per checker, §6.3 — trace "already checked") is done at once; anything
- * else starts its process time (`parcel:processing`).
+ * came back from a fixture change), a magic one while
+ * parcels.json magic.skipsCheckers (checkers skip it, §5.5 — false: it takes
+ * each checker's process time like any clean parcel and passes) or one this
+ * very checker already rolled in another slot (one roll per parcel per
+ * checker, §6.3 — trace "already checked") is done at once; anything else
+ * starts its process time (`parcel:processing`).
  */
 function seat(sim: Sim, node: LaneNode, st: Station, id: number): void {
   const tick = sim.state.tick
   const p = parcelOf(sim, id)
   const c = node.fixture?.checker
   st.parcelId = id
-  if (!p || !c || p.nodeDoneTick !== null || p.magic) {
+  const skipped = p?.magic === true && sim.data.parcels.magic.skipsCheckers
+  if (!p || !c || p.nodeDoneTick !== null || skipped) {
     st.doneTick = tick
     return
   }

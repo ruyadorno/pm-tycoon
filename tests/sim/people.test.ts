@@ -841,9 +841,11 @@ describe('desk 2 (spec-build2 §2.4, Q-B2-4)', () => {
       sim.dispatch({ kind: 'placeDesk', nodeId: 'slot2', index: 2 }),
     ).toEqual({ ok: false, reason: 'desk-locked' })
     const vs = createViewSim(sim, { debug: true })
+    const earned = sim.state.economy.lifetimeEarned
     expect(vs.debug!.forceLevel(3)).toEqual({ ok: true })
     expect(sim.state.level.level).toBe(3)
-    expect(sim.state.economy.lifetimeEarned).toBe(data.levels[2]!.threshold)
+    // Forcing books no income (final review): lifetime earned is unchanged.
+    expect(sim.state.economy.lifetimeEarned).toBe(earned)
     const placed = collect(sim, 'desk:placed')
     sim.state.economy.balance = 399
     expect(vs.lane.placeDesk('slot2', 2)).toEqual({

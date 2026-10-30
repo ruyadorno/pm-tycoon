@@ -9,7 +9,15 @@
 // clears its ignore bits and puts those scenes back on top in order.
 // RotateCard type-imports Phaser only: a fake scene stands in.
 import { describe, expect, it } from 'vitest'
+import { clearCameraBit, removeCamera } from '../../src/ui/cameraBits.ts'
 import { keepCameraLast, RotateCard } from '../../src/ui/RotateCard.ts'
+import {
+  claimKey,
+  keyClaimed,
+  keysBlocked,
+  popModal,
+  pushModal,
+} from '../../src/ui/Sheet.ts'
 
 type Bag = Record<string | symbol, unknown>
 
@@ -110,7 +118,6 @@ function fakeHud(aboveActive: boolean) {
   const garage = sceneSys('Garage', aboveActive)
   const list: unknown[] = []
   const main = new Cam(1)
-  let nextId = 2
   const scene = {
     sys: sceneSys('HUD', true).sys,
     events: emitter(),
@@ -139,8 +146,12 @@ function fakeHud(aboveActive: boolean) {
     children: { list },
     cameras: {
       cameras: [main] as Cam[],
+      // Phaser 4 CameraManager.getNextID: the lowest bit no live camera
+      // holds — a removed camera's id goes to the next camera added.
       add() {
-        const c = new Cam(1 << nextId++)
+        let id = 1
+        while (this.cameras.some((c) => c.id === id)) id <<= 1
+        const c = new Cam(id)
         this.cameras.push(c)
         return c
       },
@@ -223,6 +234,86 @@ describe('the rotate card covers every camera and scene while open', () => {
     scene.events.emit('shutdown')
     expect(scene.cameras.cameras.length).toBe(1)
     expect(scene.events.count('prerender')).toBe(0)
+  })
+})
+
+describe('a removed card camera leaves no ignore bits behind (Phaser reuses its id)', () => {
+  /** A card or dialog: its own camera ignoring everything else, then closed. */
+  function cardRoundTrip(
+    scene: ReturnType<typeof fakeHud>['scene'],
+    list: unknown[],
+    clean: boolean,
+  ): number {
+    const cam = scene.cameras.add()
+    for (const o of list) cam.ignore(o as Obj)
+    if (clean) removeCamera(scene as never, cam as never)
+    else scene.cameras.remove(cam)
+    return cam.id
+  }
+
+  it('after a confirm dialog the rotate card still draws through its camera (same id): removeCamera cleared the bit', () => {
+    const { scene, list } = fakeHud(false)
+    const card = new RotateCard(scene as never, 430, 393)
+    const hudObj = list[0] as Obj
+    const dialogId = cardRoundTrip(scene, list, true)
+    expect(card.root.cameraFilter & dialogId).toBe(0)
+    expect(hudObj.cameraFilter & dialogId).toBe(0)
+    card.setOpen(true)
+    const rot = scene.cameras.cameras.at(-1)!
+    expect(rot.id).toBe(dialogId) // the freed id, reused
+    expect(card.root.cameraFilter & rot.id).toBe(0)
+    expect(hudObj.cameraFilter & rot.id).toBe(rot.id)
+    card.setOpen(false)
+  })
+
+  it('raise clears a stale bit on its root even when a camera was removed without the helper', () => {
+    const { scene, list } = fakeHud(false)
+    const card = new RotateCard(scene as never, 430, 393)
+    const staleId = cardRoundTrip(scene, list, false)
+    expect(card.root.cameraFilter & staleId).toBe(staleId)
+    card.setOpen(true)
+    const rot = scene.cameras.cameras.at(-1)!
+    expect(rot.id).toBe(staleId)
+    expect(card.root.cameraFilter & rot.id).toBe(0)
+    card.setOpen(false)
+  })
+
+  it("clearCameraBit walks containers and keeps other cameras' bits", () => {
+    const child = { cameraFilter: 0b110 }
+    const box = { cameraFilter: 0b101, list: [child, { list: [] }] }
+    const plain = { cameraFilter: 0b100 }
+    clearCameraBit([box, plain, null, 7], 0b100)
+    expect(box.cameraFilter).toBe(0b001)
+    expect(child.cameraFilter).toBe(0b010)
+    expect(plain.cameraFilter).toBe(0)
+  })
+})
+
+describe('the rotate card holds the keyboard while up (final review, scenes #3)', () => {
+  const key = (k: string) => ({ key: k, repeat: false }) as KeyboardEvent
+
+  it('no listener claims G / W / Space / Esc under it; closing (or a shutdown) hands the keys back', () => {
+    const { scene } = fakeHud(false)
+    const card = new RotateCard(scene as never, 430, 393)
+    expect(keysBlocked()).toBe(false)
+    card.setOpen(true)
+    expect(keysBlocked()).toBe(true)
+    const g = key('g')
+    expect(claimKey(g, null)).toBe(false) // the HUD's G / W / Space
+    expect(keyClaimed(g)).toBe(true) // every later listener skips it
+    const sheet = {}
+    pushModal(sheet)
+    expect(claimKey(key('Escape'), sheet)).toBe(false) // a card's Esc
+    popModal(sheet)
+    card.setOpen(false)
+    expect(keysBlocked()).toBe(false)
+    const w = key('w')
+    expect(keyClaimed(w)).toBe(false)
+    expect(claimKey(w, null)).toBe(true)
+
+    card.setOpen(true)
+    scene.events.emit('shutdown')
+    expect(keysBlocked()).toBe(false)
   })
 })
 

@@ -1,4 +1,5 @@
 {
   "parcels": { "malware": { "baseShare": 0.09 }, "decoyShare": 0.3 },
-  "levels": [{ "holdBayCap": 2 }, { "holdBayCap": 2 }]
+  "levels": [{ "holdBayCap": 2 }, { "holdBayCap": 2 }],
+  "quests": { "offer": { "firstOfferDay": 1, "intervalDays": 1 } }
 }

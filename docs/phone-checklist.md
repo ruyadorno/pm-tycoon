@@ -1,22 +1,45 @@
-# Phone checklist (playtest 1)
+# Phone checklist (playtest 2)
 
-The checks only a real device can answer (phaser4-notes.md "Install-time verification checklist", plan.md §6.11 and
-§12.7 task 4), for one session on the **iPhone 16 (Safari)** and one in **desktop devtools mobile mode**. Serve the build
-first (README "How to serve on a phone", or `playtest-README.txt` in the zip). Tick each line; a failed line names
-the file to look at.
+The checks only a real device can answer (phaser4-notes.md "Install-time verification checklist", plan.md §6.11,
+plan-build2.md §8.7 and §9), for one session on the **iPhone 16 (Safari)** and one in **desktop devtools mobile
+mode**. Serve the build first (README "How to serve on a phone", or `playtest-README.txt` in the zip). Tick each line;
+a failed line names the file to look at. The playtest-1 lines are kept; the build-2 lines are marked **(B2)**.
 
-The automated side already passed on the VM: `e2e/smoke.spec.ts` (max texture ≥ 4096, `OES_standard_derivatives`,
-`displayScale` = 1/zoom, m5x7 font, ≤ 8 draw calls, hit rects ≥ 44 px) and `e2e/dist.spec.ts` (the production build,
-no `__pm` without `?debug=1`) — in headless Chromium, not Safari.
+The automated side already passed on the VM, in headless Chromium (not Safari): `e2e/smoke.spec.ts` (max texture ≥
+4096, `OES_standard_derivatives`, `displayScale` = 1/zoom, m5x7 font, ≤ 8 draw calls, hit rects ≥ 44 px, the logo over
+the attract city, the Garage driver picker, the sorter, the tall rooms' scroll at L5), `e2e/quests.spec.ts` (offer,
+Accept / Later / Decline, the golden parcel, the Golden Release and the VictoryCard), `e2e/lifecycle.spec.ts` (view
+storms, rotate and hide/show holds) and `e2e/dist.spec.ts` (the production build, hashed assets, no `__pm` without
+`?debug=1`, `?config=` only with it).
+
+Shortcuts for the build-2 lines that come late in a cold run (use them **after** the cold session; each keeps its own
+save, see README "Saves"): `?debug=1&config=tycoon` starts at level 5 with a full lane, fleet and docks 2–3 (the tall
+tier-5 room, the plane, the Golden Release); `?debug=1&config=spicy` brings a quest offer on day 2 (1:00) and a lost life
+within minutes.
 
 ## iPhone 16, Safari
 
 Open `http://<mac-lan-ip>:4173/` (portrait).
 
+**Title (B2)** (`src/scenes/TitleScene.ts`, `src/render/AttractCamera.ts`, B2 §5)
+
+- [ ] The author's logo sits at the top, whole and centred, not cut by the Dynamic Island; at DPR 3 it is upscaled
+      nearest-neighbour like the rest of the game (sharp pixel steps, no blur).
+- [ ] Behind it the demo city moves: bikes, vans and trucks drive and deliver while the camera drifts from region to
+      region (12-s legs with a short hold); no HUD, no cards, no toasts.
+- [ ] Nothing plays before the first tap; that tap (anywhere) starts the music, and "tuning up…" disappears once the
+      instruments are loaded. The demo city stays silent until then.
+- [ ] The buttons (Continue when a save exists, New game, Reset, Credits) are each easy to hit; Credits opens a modal
+      card that a tap closes.
+- [ ] New game (or Continue) fades into the player's own city within about half a second and the HUD appears; the demo
+      city never leaks into the save (Continue later shows your day and money, not the demo's).
+- [ ] The Title feels smooth (no visible stutter while the city drifts); the build stamp is readable.
+
 **Page and gestures** (`index.html` CSS, `src/input/GestureClassifier.ts`)
 
 - [ ] No rubber-band: dragging the city hard up/down/left/right never pulls the page or shows Safari's grey
-      overscroll background; pull-to-refresh never triggers.
+      overscroll background; pull-to-refresh never triggers. **(B2)** The same in a tall tier-4/5 warehouse room
+      dragged past its top or bottom.
 - [ ] No double-tap zoom: double-tapping a building zooms the **game camera** 1× ⇄ 2× (and rushes once), the page
       itself never zooms.
 - [ ] No page pinch-zoom over the canvas: a pinch changes only the game zoom (discrete 1×/2×), never Safari's page zoom.
@@ -33,6 +56,61 @@ Open `http://<mac-lan-ip>:4173/` (portrait).
 - [ ] Safe areas: the top bar clears the Dynamic Island / status bar; the bottom bar clears the home indicator.
 - [ ] Rotate to landscape: the "rotate" card appears and the sim pauses; back to portrait: the game resumes as it was.
 - [ ] Every button is comfortably tappable (≥ 44 pt) and no two bottom-bar buttons are hit by one tap.
+- [ ] **(B2)** With a quest active, the quest chip, the shortened level bar and the shield share the second top row
+      without overlapping, and each one opens its own card or popover.
+
+**Hiring (B2)** (`src/ui/HireSheet.ts`, `src/scenes/GarageSheet.ts`, `src/ui/warehouse/SlotCard.ts`,
+`src/ui/warehouse/StationCard.ts`, B2 §2)
+
+- [ ] Garage → Bike opens `Who drives the Bike?` with three applicant cards side by side: face, name, pips (speed,
+      energy, charisma) readable at 1×, `$N/day · fee $N`, a **Hire** button per card, then **Post an ad $30** and
+      **Hire later**. The pick drives the new bike (toast `Bike 1 bought — <name> hired`).
+- [ ] The desk card's **Hire inspector** opens the same sheet for inspectors (eye, pace, charisma); the cards differ in
+      salary as their pips differ, and `New faces in m:ss` counts down to the daily refresh.
+- [ ] Post an ad replaces the three cards (and charges $30); a refused hire (not enough money, a full desk) shakes the
+      button with a reason instead of doing nothing.
+- [ ] A Garage row's `···` opens Replace driver / Fire driver / Sell; Replace waits for the trip (`→ <name> after this
+      trip`).
+- [ ] From L2 a tap on the Hold Bay station (right of the rack) opens its card: **Hire a sorter**; once hired, the
+      sorter stands at the podium, tosses on their own, and a held parcel's card reads `<name>: looks clean (NN%)`.
+- [ ] A ★ applicant (a Clean sweep or Like clockwork reward) shows the gold star and `fee $0`.
+
+**Quests (B2)** (`src/ui/QuestCard.ts`, `src/ui/QuestChip.ts`, `src/render/cityHub.ts`, B2 §3)
+
+- [ ] On Day 4 (3:00 of game time) the JOB BOARD card opens by itself in the city (or the chip pulses if another card is up):
+      title, flavour line, objective, `Reward: …`, `Time: …`, and **Accept** · **Later** · **Decline**, each easy to
+      hit; the sim keeps running under it.
+- [ ] After Accept the chip in the top bar shows the gold progress bar and the time left; a chip tap reopens the card
+      with **Abandon** (asks first) and **Close**.
+- [ ] A Special delivery: the golden parcel and its markers over A and B are easy to spot at zoom 1, the 2:00
+      countdown runs, and an on-time delivery lights a new life slot (`+1 life — 4 of 5`).
+- [ ] QUEST COMPLETE: the gold stamp rises at the money cell, the sting plays, and the card's **OK** closes it.
+
+**Levels 3–5 (B2)** (`src/scenes/CityScene.ts`, `src/scenes/WarehouseScene.ts`, `src/render/warehouse/RoomLayout.ts`,
+B2 §4)
+
+- [ ] Each level-up: the dust cloud over the warehouse, the new region's fog lifting, the newspaper, the NEW chip —
+      at levels 4–5 the chips row scrolls by itself so the new chips and their NEW badges are on screen; a `>` / `<`
+      at the row's ends marks chips past the edge, and a swipe on the row scrolls it.
+- [ ] L3: an overseas delivery shows the clearance ring over the port office; on a clearance the ship sails out bow
+      first and comes back later.
+- [ ] L5: on an Airport clearance the plane taxis and climbs off the map; the ring sits over the terminal.
+- [ ] Tier 4 (16 rows) and tier 5 (18 rows) rooms (in Safari with its toolbars the tier-5 room overflows by ~73 px,
+      tier 4 by ~9 px; with the toolbars collapsed or on a Pro Max they may fit and not scroll): a vertical drag
+      scrolls the room 1:1 with the finger (no page scroll, no inertia), the lane readout stays fixed above it, the bottom (shelf, bin) and the top (docks) are both
+      reachable, and the finger lifting after a drag opens nothing.
+- [ ] After scrolling, a tap still lands on the slot under the finger (slot 6 at tier 5); a long-press without moving
+      still lifts a fixture to move it; a drag released over a HUD bar leaves nothing stuck (the next tap is a tap).
+- [ ] A lost life at a hub reads `Handed off at <pier> 14:02` then `Cleared 14:47 — the ship has sailed` (`— the
+      plane has left` at the Airport), and the lines fit the card at 393 px.
+
+**Victory and Tycoon ✓ (B2)** (`src/ui/VictoryCard.ts`, `src/boot/autosave.ts`, B2 §3.4)
+
+- [ ] The Golden Release offer has a gold frame and only Accept / Later; once accepted its chip reads `41/60` on the
+      bar and `0✕ 94%` beside it (malware delivered, on-time rate), both glyphs drawn, not boxes.
+- [ ] Shipping it pauses on the **TYCOON** card: the stats fit at 393 px, Continue / New game / Run summary tappable.
+- [ ] After Continue the level bar reads `$… · Tycoon ✓` and, back on the Title (reload), the Continue line reads
+      `Day N · $… · Lv 5 · Tycoon ✓` — the ✓ is a real glyph, not a box or a question mark.
 
 **Sound** (`src/audio/director.ts`, audio.md §3)
 
@@ -49,25 +127,31 @@ Open `http://<mac-lan-ip>:4173/` (portrait).
 - [ ] Switch to another app (or lock the phone) mid-game, come back: the **Paused — tap to resume** card is up, the
       clock did not run while away, the tap resumes the sim and the music.
 - [ ] Swipe Safari away entirely (or reload) and reopen the URL: the Title offers **Continue**, and it resumes the
-      same money, fleet and day (autosave every 10 s and on hide).
+      same money, fleet, staff, quest and day (autosave every 10 s and on hide).
 - [ ] Title → Reset clears the save (the Title shows only New game / Reset / Credits).
 
-**Performance** (plan.md §6.11; R4 cut order in `src/render/quality.ts`)
+**Performance** (plan.md §6.11; R4 cut order in `src/render/quality.ts`; plan-build2 §8.8 R14)
 
 - [ ] Boot to Title under ~2 s on the Wi-Fi (first load; reloads are faster).
-- [ ] City ⇄ Warehouse switches feel instant (< 150 ms).
-- [ ] After the twenty-minute run, the summary card's **fps p50 · p5** row reads p50 ≥ 50 and p5 ≥ 30 (target: 60 at
-      1× with three bikes and a truck, ≥ 45 at 2×). Below that, the profile's `fps` block is the evidence for the R4
-      cut order.
-- [ ] The phone does not get hot and the battery drain over twenty minutes is unremarkable.
-- [ ] Optional, with `?debug=1`: the overlay's `dc` (draw calls) stays ≤ 8 and `fps` near 60 in the city with
-      vehicles moving.
+- [ ] City ⇄ Warehouse switches feel instant (< 150 ms), at every tier.
+- [ ] After the thirty-to-forty-minute run, the summary card's **fps p50 · p5** row reads p50 ≥ 50 and p5 ≥ 30
+      (target: 60 at 1× with the L3+ fleet, ≥ 45 at 2×). Below that, the profile's `fps` block is the evidence for the
+      R4 cut order.
+- [ ] **(B2)** The attract Title does not stutter or heat the phone while it sits for a minute (R14: its fps is not in
+      `playtest.json`; the devtools section reads it).
+- [ ] The phone does not get hot and the battery drain over the session is unremarkable.
+- [ ] Optional, with `?debug=1`: the overlay's `dc` (draw calls) stays ≤ 8 in the city with vehicles moving and in the
+      warehouse at every tier (measured on the VM with the overlay hidden: city 3, warehouse 4 — tier 5 with the tycoon
+      lane too, 6 while a dock's loading bar shows; the overlay itself adds 1, and an open card or sheet adds its own
+      camera's), and `fps` stays near 60.
 
 **The run** (docs/playtest.md)
 
-- [ ] Played twenty minutes cold, then opened the summary card (❚❚, ❚❚ again → End run — show summary).
-- [ ] **Download playtest.json** saved the file (Safari Downloads); **Copy summary** pasted into Notes.
-- [ ] `playtest.json` → `device`: `cssW` 393, `dpr` 3, `zoom` 1, `maxTexture` ≥ 4096.
+- [ ] Played thirty to forty minutes cold, then opened the summary card (offered at 30:00 of game time, once 25 real
+      minutes have passed; or ❚❚, ❚❚ again → End run — show summary).
+- [ ] **Download playtest.json** saved the file (Files → Downloads); **Copy summary** pasted into Notes; both sent back
+      (AirDrop / Mail).
+- [ ] `playtest.json` → `device`: `cssW` 393, `dpr` 3, `zoom` 1, `maxTexture` ≥ 4096; `version` 2.
 
 ## Desktop devtools, iPhone 16 preset
 
@@ -79,16 +163,24 @@ switching the preset (the canvas measures `#game` at boot).
       unequal value means `#game` was measured before layout — phaser4-notes.md §1, `src/main.ts`).
 - [ ] `__pm.game.renderer.getMaxTextureSize()` ≥ 4096.
 - [ ] The canvas is 393 CSS px wide and fills the viewport height (`100dvh`); no scrollbars.
+- [ ] **(B2)** On the Title, before any tap: `__pm.game.loop.actualFps` reads ≥ 50 a few times over ten seconds (R14
+      trigger: below 50), and `__pm.attractSim` is an object; after New game, `__pm.attractSim` is `null`.
 - [ ] Touch emulation: drag pans with inertia, Shift-drag (pinch emulation) toggles the game zoom, a long-press opens
       the district panel; no page zoom or scroll.
+- [ ] **(B2)** `?debug=1&config=tycoon` → New game → Warehouse, on a custom device of **393 × 659** (Safari's iPhone 16
+      viewport with its toolbars; or 360 × 604) — at 393 × 852 the tier-5 room fits and does not scroll: the room
+      scrolls with a touch drag and with the mouse wheel (32 px a notch), the readout stays put, and `__pm.quests()`
+      shows the Golden Release offered.
 - [ ] Rotate the emulated device: the rotate card appears; rotate back: the game resumes.
 - [ ] Switch to another browser tab and back: the Paused card is up; a reload offers Continue.
 - [ ] Console: no errors during a five-minute session (warnings are fine).
 - [ ] Performance monitor (devtools → More tools → Performance monitor): JS heap stays under 150 MB over ten minutes;
       the overlay's `dc` stays ≤ 8.
 - [ ] Desktop parity with the device toolbar **off** (430 px portrait column centred): mouse drag pans, wheel zooms,
-      right-click opens the district panel, keys Space / 1 / 2 / W / G / Esc / arrows / F work.
-- [ ] `__pm.playtest()` returns the live profile; its `device` block matches the preset (393, DPR 3, zoom 1).
+      right-click opens the district panel, keys Space / 1 / 2 / W / G / Esc / Enter / arrows / F work; the hire sheet,
+      quest card and TYCOON card are centred in the column.
+- [ ] `__pm.playtest()` returns the live profile; its `device` block matches the preset (393, DPR 3, zoom 1), and
+      `localStorage['pm.playtest.v2']` holds the same run.
 
 Record anything unticked with the device, the URL and what you saw; screenshots (or a screen recording) help most for
-the rubber-band, toolbar and audio items.
+the rubber-band, toolbar, tall-room scroll and audio items.

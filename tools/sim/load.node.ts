@@ -8,9 +8,12 @@ import { resolve } from 'node:path'
 import {
   applyConfig,
   buildGameData,
+  checkConfigStart,
+  configStartOf,
   DATA_FILES,
   DataError,
   roadTiles,
+  type ConfigStart,
 } from '../../src/data/index.ts'
 import type { GameData, RawGameData } from '../../src/data/types.ts'
 
@@ -39,9 +42,34 @@ export function readConfig(path: string): unknown {
 
 /** Validated GameData with the optional config partial merged in. */
 export function loadGameData(configPath?: string | null): GameData {
+  return loadConfigured(configPath).data
+}
+
+/**
+ * loadGameData plus the config's `start` recipe (src/data/configStart.ts —
+ * the scripted New game, e.g. tycoon.json's L5 lane), validated against the
+ * merged tables like the browser's loadConfigured; a defect in it is a
+ * DataError. `start` is null without a config or a `start` key.
+ */
+export function loadConfigured(configPath?: string | null): {
+  data: GameData
+  start: ConfigStart | null
+} {
   let raw = loadRawData()
-  if (configPath) raw = applyConfig(raw, readConfig(configPath), configPath)
-  return buildGameData(raw)
+  let startRaw: unknown
+  if (configPath) {
+    const patch = readConfig(configPath)
+    raw = applyConfig(raw, patch, configPath)
+    startRaw = configStartOf(patch)
+  }
+  const data = buildGameData(raw)
+  const { start, problems } = checkConfigStart(
+    startRaw,
+    data,
+    configPath ?? 'config',
+  )
+  if (problems.length > 0) throw new DataError(problems)
+  return { data, start }
 }
 
 /** `--config <path>` or `--config=<path>` from argv, else null. */
@@ -62,11 +90,11 @@ export function configPathFromArgv(argv: readonly string[]): string | null {
 if (import.meta.main) {
   try {
     const cfg = configPathFromArgv(process.argv.slice(2))
-    const d = loadGameData(cfg)
+    const { data: d, start } = loadConfigured(cfg)
     const live = d.districts.filter((x) => x.kind === 'district').length
     console.log(
       [
-        `data ok${cfg ? ` (config ${cfg})` : ''} · hash ${d.hash}`,
+        `data ok${cfg ? ` (config ${cfg})` : ''} · hash ${d.hash}${start ? ` · start recipe: Lv ${start.level}` : ''}`,
         `${d.districts.length} districts (${live} live), ${d.buildings.length} buildings, ${d.levels.length} levels, playtestMaxLevel ${d.economy.playtestMaxLevel}`,
         `${d.vehicles.types.length} vehicle types, ${d.machines.checkers.length} checkers + ${d.machines.upgrades.length} upgrades, ${d.parcels.malware.strains.length} strains`,
         `map ${d.map.size.join('x')}: ${roadTiles(d.map).length} road tiles, ${d.map.regions.length} regions, ${d.map.props.length} props, lot entrance [${d.map.lot.entrance.join(',')}]`,

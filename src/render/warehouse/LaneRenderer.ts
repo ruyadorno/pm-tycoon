@@ -771,10 +771,19 @@ export class LaneRenderer {
       this.faceImgs.push(
         this.img(this.L.walls, c * TILE, 0, this.tierName('wallface', t)),
       )
-    const base = this.scene.add
-      .rectangle(0, lay.baseboardY(), ROOM_W, 2, PALETTE.outline, 1)
-      .setOrigin(0, 0)
-    this.L.walls.add(base)
+    // The south-edge baseboard: `baseboard` tiles from the interior atlas,
+    // so the back layers stay one batch (a Rectangle here split it — 2 draw
+    // calls at every tier, final review mobile #6); the Rectangle only while
+    // the frame is not packed yet.
+    if (frameOrNull('baseboard') !== null) {
+      for (let c = 0; c < ROOM_COLS; c++)
+        this.img(this.L.walls, c * TILE, lay.baseboardY(), 'baseboard')
+    } else {
+      const base = this.scene.add
+        .rectangle(0, lay.baseboardY(), ROOM_W, 2, PALETTE.outline, 1)
+        .setOrigin(0, 0)
+      this.L.walls.add(base)
+    }
     // North-wall sign, crack overlay, lights.
     this.sign = this.img(this.L.walls, SIGN.x, SIGN.y, this.tierName('sign', t))
     this.signText = this.text(this.L.walls, SIGN_TEXT.x, 0, '', THEME.textLight)

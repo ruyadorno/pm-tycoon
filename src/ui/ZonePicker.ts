@@ -15,6 +15,7 @@
 //   - addTapZone: an invisible interactive rectangle with the kit's tap rule
 //     (≤ TAP_PX travel) that emits `ui:tap`.
 import type Phaser from 'phaser'
+import { removeCamera } from './cameraBits.ts'
 import type { GameData, MapData } from '../data/types.ts'
 import type { CommandResult } from '../sim/commands.ts'
 import type { VehicleType, Zone } from '../sim/types.ts'
@@ -266,7 +267,7 @@ export class PopoverLayer {
     if (!this.alive) return
     this.alive = false
     this.root.destroy()
-    this.scene.cameras.remove(this.cam, true)
+    removeCamera(this.scene, this.cam)
   }
 }
 

@@ -203,7 +203,8 @@ export function checkerName(data: GameData, c: Checker): string {
 
 /**
  * The trace entry of a parcel leaving a slot (one per slot, ref = node id):
- * 'empty' (no station), 'skipped' (magic), 'flagged', 'missed' (malware not
+ * 'empty' (no station), 'skipped' (magic, while parcels.json
+ * magic.skipsCheckers; else it passes like any clean parcel), 'flagged', 'missed' (malware not
  * flagged — with the checker's p vs its strain) or 'passed' (clean). At a
  * desk (M6) `who` names the inspector: "Slot 1 desk — Lin: missed (80% vs
  * metal)", with `by` / `who` on the entry.
@@ -227,7 +228,7 @@ export function slotResultEntry(
   const person: Pick<TraceEntry, 'by' | 'who'> = who
     ? { by: who.id, who: who.name }
     : {}
-  if (p.magic) {
+  if (p.magic && data.parcels.magic.skipsCheckers) {
     return {
       tick,
       what: 'skipped',

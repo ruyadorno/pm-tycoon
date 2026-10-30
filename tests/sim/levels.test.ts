@@ -497,7 +497,21 @@ describe('L3 "Regional" unlocks (spec-build2 §4.1; design-m8-m9 §4.5, §7 M8 1
       warehouseTier: 3,
     })
     expect(sim.state.districts.docks!.live).toBe(true)
-    expect(sim.state.economy.lifetimeEarned).toBe(L3.threshold)
+    // Forcing is not income: lifetime earned stays the money the game paid
+    // (stats.income === lifetimeEarned; the minute rows and the profile).
+    expect(sim.state.economy.lifetimeEarned).toBe(0)
+    expect(sim.state.stats.income).toBe(sim.state.economy.lifetimeEarned)
+  })
+
+  it('debug.forceLevel(5) (the tycoon recipe) books no income: the first minute row earns what was paid, not the L5 threshold', () => {
+    const sim = quietSim(2)
+    const vs = createViewSim(sim, { debug: true })
+    expect(vs.debug!.forceLevel(5)).toEqual({ ok: true })
+    expect(sim.state.economy.lifetimeEarned).toBe(0)
+    for (let i = 0; i < 600; i++) sim.tick()
+    const row = sim.state.stats.minutes[0]!
+    expect(row.earned).toBe(sim.state.stats.income)
+    expect(row.earned).toBeLessThan(L5.threshold)
   })
 })
 

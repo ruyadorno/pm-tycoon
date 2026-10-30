@@ -206,6 +206,34 @@ export function floatsGold(reason: MoneyReason): boolean {
   return GOLD_REASONS.has(reason)
 }
 
+/**
+ * The money float a delta joins (final review, mobile #2): earnings (gold),
+ * other income and costs float separately; deltas of one kind inside a
+ * float's lifetime add up in that one float instead of printing on top of
+ * each other.
+ */
+export type FloatKind = 'gold' | 'plus' | 'minus'
+
+export function floatKind(delta: number, gold: boolean): FloatKind {
+  return gold ? 'gold' : delta < 0 ? 'minus' : 'plus'
+}
+
+/**
+ * x of a new money float `w` wide: `base` (after the balance), or after the
+ * floats still on screen (`live`, + `gap`) so two kinds sit side by side;
+ * kept to end by `maxRight` (the lives cell), as a lone float always was.
+ */
+export function floatX(
+  base: number,
+  live: readonly { x: number; w: number }[],
+  w: number,
+  maxRight: number,
+  gap = 4,
+): number {
+  const after = live.reduce((r, f) => Math.max(r, f.x + f.w + gap), base)
+  return Math.min(after, maxRight - w)
+}
+
 export function isEarned(reason: MoneyReason): boolean {
   return EARNED_REASONS.has(reason)
 }
@@ -450,6 +478,58 @@ export interface QuestAutoOpen {
    * itself, so a card would only follow the quest and stay up.
    */
   policy: boolean
+}
+
+/**
+ * The chips row scroll (≤ 0) that brings the span [left, right) — a chip and
+ * its NEW badge, in row coordinates — inside the visible row [x0, x0 +
+ * maxRowW) with the least movement (final review, mobile #1: the L5 chips
+ * unlocked off-screen at 393 / 360). The result still needs the row clamp.
+ */
+export function chipRevealScroll(
+  scroll: number,
+  x0: number,
+  maxRowW: number,
+  left: number,
+  right: number,
+): number {
+  let s = scroll
+  if (right + s > x0 + maxRowW) s = x0 + maxRowW - right
+  if (left + s < x0) s = x0 - left
+  return Math.min(0, s)
+}
+
+/** Which ends of the chips row hide chips at `scroll` (the edge arrows). */
+export function chipOverflow(
+  scroll: number,
+  rowW: number,
+  maxRowW: number,
+): { left: boolean; right: boolean } {
+  return {
+    left: Math.round(scroll) < 0,
+    right: Math.round(rowW + scroll) > maxRowW,
+  }
+}
+
+/**
+ * A save written on the victory tick (final review, scenes #2): HudScene
+ * saves right after `game:victory` and holds the sim while the VictoryCard
+ * is up, so a save whose tick is within `slack` ticks of stats.victoryTick
+ * (the HUD passes two frames' worth of the stepper's MAX_TICKS_PER_FRAME:
+ * ticks after the event in the saved frame, and a frame between Continue on
+ * the Title and the HUD's create) was written before Continue was tapped: a
+ * reload of it reopens the card. Once endless play has run, later autosaves are past
+ * the slack and the card stays closed. Never after a game over.
+ */
+export function victoryCardPending(
+  q: { victory: boolean; victoryTick: number | null },
+  tick: number,
+  gameOver: boolean,
+  slack: number,
+): boolean {
+  if (!q.victory || gameOver || q.victoryTick === null) return false
+  const d = tick - q.victoryTick
+  return d >= 0 && d <= slack
 }
 
 /**

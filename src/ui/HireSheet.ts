@@ -40,6 +40,7 @@
 // Phaser is a type-only import here; the pure model below is unit-tested
 // under Node (tests/ui/hire-sheet.test.ts).
 import type Phaser from 'phaser'
+import { removeCamera } from './cameraBits.ts'
 import type { StatId, VehicleTypeDef } from '../data/types.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { frameOrNull, type FrameName } from '../render/frames.ts'
@@ -491,7 +492,7 @@ export class HireSheet {
     this.stopShake()
     this.cards = []
     this.root.destroy()
-    this.scene.cameras.remove(this.cam, true)
+    removeCamera(this.scene, this.cam)
   }
 
   /** Close and run onCancel (backdrop tap, Esc, target gone). */

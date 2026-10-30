@@ -108,8 +108,8 @@ export const LOGO_ID = 'title:logo'
 /**
  * audio.md §10 / CREDITS.md (Q52): the card shows the two Music bullets — the
  * CC BY 3.0 attribution of the samples in full (author, pre-renderer, licence)
- * — then the audio code, the font and the engine. One screen, ≤ 36 chars a
- * line (fits the 300-px card at W = 360).
+ * — then the audio code, the font, the logo (the author's art/logo.png) and
+ * the engine. One screen, ≤ 36 chars a line (fits the 300-px card at W = 360).
  */
 export const CREDITS_LINES: readonly string[] = [
   'Package Management Tycoon',
@@ -122,6 +122,7 @@ export const CREDITS_LINES: readonly string[] = [
   'CC BY 3.0',
   'Audio: Tone.js, smplr, ZzFX (MIT)',
   'Font: m5x7 by Daniel Linssen (CC0)',
+  'Logo: Ruy Adorno',
   'Engine: Phaser 4',
   '',
   'Tap to close',

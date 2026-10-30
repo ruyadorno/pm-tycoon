@@ -39,6 +39,7 @@
 // backdrop swallows taps. Esc / Enter = Continue. The model functions are
 // pure (tests/ui/lost-life-card.test.ts); Phaser is a type-only import.
 import type Phaser from 'phaser'
+import { removeCamera } from './cameraBits.ts'
 import type { GameData, StrainId } from '../data/types.ts'
 import type { FrameName } from '../render/frames.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
@@ -713,7 +714,7 @@ export class LostLifeCard {
     this.lives = null
     this.root?.destroy()
     this.root = null
-    if (this.cam) this.scene.cameras.remove(this.cam, true)
+    removeCamera(this.scene, this.cam)
     this.cam = null
   }
 

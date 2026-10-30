@@ -35,7 +35,13 @@ describe('Toss (spec §6.6)', () => {
     const money = collect(sim, 'money:changed')
     expect(sim.dispatch({ kind: 'toss', parcelId: p.id })).toEqual({ ok: true })
     expect(tossed).toEqual([
-      { id: p.id, wasMalware: true, bounty: eco.tossBounty },
+      {
+        id: p.id,
+        wasMalware: true,
+        bounty: eco.tossBounty,
+        source: 'player',
+        employeeId: null,
+      },
     ])
     expect(money).toEqual([
       {
@@ -69,7 +75,15 @@ describe('Toss (spec §6.6)', () => {
     const tossed = collect(sim, 'parcel:tossed')
     const sat = collect(sim, 'satisfaction:changed')
     sim.dispatch({ kind: 'toss', parcelId: p.id })
-    expect(tossed).toEqual([{ id: p.id, wasMalware: false, bounty: 0 }])
+    expect(tossed).toEqual([
+      {
+        id: p.id,
+        wasMalware: false,
+        bounty: 0,
+        source: 'player',
+        employeeId: null,
+      },
+    ])
     expect(sim.state.economy.balance).toBe(balance - eco.wrongTossFee)
     expect(sim.state.economy.lifetimeEarned).toBe(0)
     expect(sim.state.stats.wrongToss).toBe(1)
@@ -131,6 +145,8 @@ describe('Clear (spec §6.6, Q35)', () => {
         strain: 'metal',
         checkerName: 'Inspection desk',
         nodeId: 'slot1',
+        inspectorName: 'Audrey',
+        sorted: null,
       },
     ])
     const cleared = collect(sim, 'parcel:cleared_by_player')

@@ -2,7 +2,11 @@
 // pure model — the route lines from life:lost `path` with mm:ss sim
 // timestamps (§10 wording), the lane rate line, the counter line incl. the
 // counterOwned two-line branch and the "Cleared by you" variant, and the
-// fit rules for long paths. Phaser is stubbed (the module imports the kit).
+// fit rules for long paths. M6 (spec-build2 §2.3, design-m6 §6.3 / D14): the
+// desk line names the inspector, the sorter's tag is shown, and the better
+// of the machine and the 5-eye inspector lines is the counter (machine first
+// on ties) — also end to end from a real Sim's life:lost. Phaser is stubbed
+// (the module imports the kit).
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -19,10 +23,21 @@ vi.mock('phaser', () => {
 })
 
 const card = await import('../../src/ui/LostLifeCard.ts')
-const { dataFixture } = await import('../sim/helpers.ts')
+const helpers = await import('../sim/helpers.ts')
+const { dataFixture } = helpers
+const { deliverParcel } = await import('../../src/sim/systems/economy.ts')
+const { takeFrom } = await import('../../src/sim/systems/lane.ts')
+const { laneNode } = await import('../../src/sim/types.ts')
 
 import type { LifeLostPayload } from '../../src/sim/events.ts'
-import type { Checker, LaneNode, TraceEntry } from '../../src/sim/types.ts'
+import type { Sim } from '../../src/sim/sim.ts'
+import type {
+  Checker,
+  LaneNode,
+  Parcel,
+  Strain,
+  TraceEntry,
+} from '../../src/sim/types.ts'
 
 const data = dataFixture()
 const s = (sec: number): number => sec * 10
@@ -30,7 +45,7 @@ const s = (sec: number): number => sec * 10
 function checker(defId: string, id = 'chk1'): Checker {
   const row =
     defId === 'inspector'
-      ? data.employees.inspector
+      ? card.checkerRow(data, 'inspector')!
       : data.machines.checkers.find((c) => c.id === defId)!
   return {
     id,
@@ -39,7 +54,7 @@ function checker(defId: string, id = 'chk1'): Checker {
     strain: row.strain as Checker['strain'],
     pMatch: row.pMatch,
     pOther: row.pOther,
-    decoyFlag: row.decoyFlag,
+    decoyFlag: 0.15,
     processTicks: 10,
     stations: 1,
     price: 0,
@@ -58,6 +73,7 @@ function slot(id: string, defId: string | null, chk = 'chk1'): LaneNode {
       ? defId === 'inspector'
         ? {
             kind: 'desk',
+            index: 1,
             checker: checker(defId, chk),
             inspectorIds: [1],
             walkedOutIds: [],
@@ -102,6 +118,9 @@ function payload(over: Partial<LifeLostPayload> = {}): LifeLostPayload {
     counterOwned: false,
     counterRate: 0.83,
     clearedByPlayerAt: null,
+    missedBy: null,
+    inspectorRate: null,
+    sorterCall: null,
     report: {
       tick: s(12 * 60 + 40),
       parcelId: 7,
@@ -118,6 +137,9 @@ function payload(over: Partial<LifeLostPayload> = {}): LifeLostPayload {
       clearedByPlayerAt: null,
       livesLeft: 2,
       viaClearance: false,
+      missedBy: null,
+      inspectorRate: null,
+      sorterCall: null,
     },
     ...over,
   }
@@ -399,5 +421,189 @@ describe('spec §10: the sim-stored card lines (TraceEntry.text) win', () => {
       'Slot 1 Metal detector: missed (15% vs rattle)',
       'Slots 2–3: empty',
     ])
+  })
+})
+
+describe('M6 (spec-build2 §2.3, design D14): the card names the person', () => {
+  it('checkerRow("inspector") is the start inspector from roles (Audrey 3/3/0 = 85%, any strain)', () => {
+    expect(card.checkerRow(data, 'inspector')).toEqual({
+      name: card.DESK_NAME,
+      strain: 'any',
+      pMatch: 0.85,
+      pOther: 0.85,
+    })
+  })
+
+  it('a desk line is the sim\'s "Slot 1 desk — Lin: missed (80% vs metal)"; the sorter\'s tag is shown, untimed', () => {
+    const path: TraceEntry[] = [
+      {
+        tick: s(60),
+        what: 'flagged',
+        ref: 'slot1',
+        text: 'Slot 1 desk — Lin: flagged (metal)',
+        by: 2,
+        who: 'Lin',
+      },
+      { tick: s(60), what: 'held', ref: 'hold', text: 'Held in the Hold Bay' },
+      {
+        tick: s(66),
+        what: 'sorted',
+        ref: 'hold',
+        text: 'Pat: looks clean (85%)',
+      },
+      { tick: s(70), what: 'cleared', ref: 'hold', text: 'Cleared by you' },
+      {
+        tick: s(90),
+        what: 'missed',
+        ref: 'slot1',
+        text: 'Slot 1 desk — Lin: missed (80% vs metal)',
+        by: 2,
+        who: 'Lin',
+        p: 0.8,
+      },
+    ]
+    const items = card.routeItems(path, 'metal', deps())
+    expect(card.routeText(items, 'metal')).toEqual([
+      'Slot 1 desk — Lin: flagged (metal) 01:00',
+      'Pat: looks clean (85%)',
+      'Cleared by you 01:10',
+      'Slot 1 desk — Lin: missed (80% vs metal)',
+    ])
+  })
+
+  it('the 5-eye line replaces the machine line only when strictly better (machine first on ties)', () => {
+    // Lin 0.80 alone vs metal; a Metal detector → 96%; a 5-eye 94%.
+    const base = payload({
+      strain: 'metal',
+      laneRate: 0.8,
+      counterMachineId: 'metal_detector',
+      counterRate: 0.96,
+      inspectorRate: 0.94,
+    })
+    expect(card.counterLines(base, data)).toEqual([
+      'A Metal detector would make it 96%',
+    ])
+    expect(card.counterPick(base)).toBe('machine')
+    // Same shown % → the machine.
+    const tie = { ...base, counterRate: 0.9404, inspectorRate: 0.9396 }
+    expect(card.counterLines(tie, data)).toEqual([
+      'A Metal detector would make it 94%',
+    ])
+    // The inspector strictly better (an X-ray vs dense, 92.5% vs 94%).
+    const better = payload({
+      strain: 'dense',
+      laneRate: 0.75,
+      counterMachineId: 'xray',
+      counterRate: 0.925,
+      inspectorRate: 0.94,
+    })
+    expect(card.counterLines(better, data)).toEqual([
+      'A 5-eye inspector at this desk would make it 94%',
+    ])
+    // The lane already holds the counter: the dice line stays.
+    expect(card.counterLines({ ...better, counterOwned: true }, data)).toEqual([
+      'This one got through on the 25%',
+      'A 5-eye inspector at this desk would make it 94%',
+    ])
+    // From 99% on, one decimal (never "100%").
+    expect(
+      card.counterLines(
+        { ...better, counterRate: 0.99, inspectorRate: 0.9988 },
+        data,
+      ),
+    ).toEqual(['A 5-eye inspector at this desk would make it 99.8%'])
+    // No counter machine at all: the inspector line alone.
+    expect(
+      card.counterLines(
+        { ...better, counterMachineId: null, counterRate: null },
+        data,
+      ),
+    ).toEqual(['A 5-eye inspector at this desk would make it 94%'])
+    // Cleared by the player: neither (D14).
+    expect(
+      card.counterLines({ ...better, clearedByPlayerAt: s(70) }, data),
+    ).toEqual(['Cleared by you at 01:10'])
+  })
+
+  it('"Open warehouse" highlights the machine, or nothing when the inspector line wins', () => {
+    const m = card.lostLifeModel(
+      payload({
+        strain: 'dense',
+        counterMachineId: 'xray',
+        counterRate: 0.925,
+        inspectorRate: 0.94,
+      }),
+      { ...deps(), lives: 2 },
+    )
+    expect(m.highlight).toBeNull()
+    expect(m.counter).toEqual([
+      'A 5-eye inspector at this desk would make it 94%',
+    ])
+    const mm = card.lostLifeModel(payload({ inspectorRate: 0.5 }), {
+      ...deps(),
+      lives: 2,
+    })
+    expect(mm.highlight).toBe('shaky_shaker')
+  })
+})
+
+/** Malware of `strain` fed through the lane until it ends on the shelf. */
+function missed(sim: Sim, n: number, strain: Strain): Parcel[] {
+  const shelf = laneNode(sim.state.lane, 'shelf')!
+  shelf.cap = null
+  const feed = helpers.feeder(sim, n, { malware: true, strain })
+  for (let t = 0; t < n * 50; t++) {
+    feed()
+    const hold = laneNode(sim.state.lane, 'hold')!
+    for (const id of hold.queue.slice())
+      sim.dispatch({ kind: 'toss', parcelId: id })
+    sim.tick()
+  }
+  return shelf.queue.map((id) => sim.state.parcels[String(id)]!)
+}
+
+function lose(sim: Sim, p: Parcel): LifeLostPayload {
+  const lost = helpers.collect(sim, 'life:lost')
+  takeFrom(laneNode(sim.state.lane, 'shelf')!, p.id)
+  deliverParcel(sim, null, p)
+  return lost[0]!
+}
+
+const model = (sim: Sim, p: LifeLostPayload) =>
+  card.lostLifeModel(p, {
+    data: sim.data,
+    vehicleName: () => null,
+    nodes: sim.state.lane.nodes,
+    lives: sim.state.economy.lives,
+  })
+
+describe('M6 end to end: a real Sim life:lost through the card model', () => {
+  it('Audrey missed it at the desk: her line, and the Metal detector (97%) beats a 5-eye (94%)', () => {
+    const sim = helpers.quietSim(11)
+    const p = missed(sim, 40, 'metal')[0]!
+    const m = model(sim, lose(sim, p))
+    expect(card.routeText(m.route, m.strain)).toContain(
+      'Slot 1 desk — Audrey: missed (85% vs metal)',
+    )
+    expect(m.counter).toEqual(['A Metal detector would make it 97%'])
+    expect(m.highlight).toBe('metal_detector')
+  })
+
+  it('a 1-eye inspector vs dense: the 5-eye line beats the X-ray and nothing is highlighted', () => {
+    const sim = helpers.quietSim(12)
+    sim.state.economy.balance = 1000
+    sim.dispatch({ kind: 'fire', employeeId: sim.state.employees[0]!.id })
+    expect(
+      helpers.hireInspector(sim, { eye: 1, pace: 3, charisma: 0 }).ok,
+    ).toBe(true)
+    const p = missed(sim, 40, 'dense')[0]!
+    const l = lose(sim, p)
+    expect(l.missedBy?.p).toBe(0.75)
+    const m = model(sim, l)
+    expect(card.counterPick(l)).toBe('inspector')
+    expect(m.counter).toEqual([
+      `A 5-eye inspector at this desk would make it ${card.ratePct(l.inspectorRate!)}%`,
+    ])
+    expect(m.highlight).toBeNull()
   })
 })

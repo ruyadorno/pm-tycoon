@@ -217,5 +217,32 @@ describe('District panel (city-view §5.1)', () => {
   it('row copy: earned and homed lines', () => {
     expect(dp.earnedLine(1240)).toBe('Earned here: $1,240')
     expect(dp.homedLine(2)).toBe('Vehicles homed here: 2')
+    // M6 (spec-build2 §2.5): the drivers' names.
+    expect(dp.homedLine(2, ['Dee', 'Pax'])).toBe(
+      'Vehicles homed here: 2 (Dee, Pax)',
+    )
+    expect(dp.homedLine(3, ['Dee', null, 'Pax'])).toBe(
+      'Vehicles homed here: 3 (Dee, Pax, no driver)',
+    )
+    expect(dp.homedLine(2, [null, null])).toBe(
+      'Vehicles homed here: 2 (2 no driver)',
+    )
+    expect(dp.homedLine(0, [])).toBe('Vehicles homed here: 0')
+  })
+})
+
+describe('M6 (spec-build2 §2.5): the district panel names the homed drivers', () => {
+  it('homedDrivers lists the active drivers of the vehicles homed there, fleet order', () => {
+    const fleet = [
+      { zone: 'highres', driverName: 'Dee' },
+      { zone: 'any', driverName: 'Rae' },
+      { zone: 'highres', driverName: null },
+      { zone: 'highres', driverName: 'Pax' },
+    ]
+    expect(dp.homedDrivers(fleet, 'highres')).toEqual(['Dee', null, 'Pax'])
+    expect(dp.homedDrivers(fleet, 'downtown')).toEqual([])
+    expect(dp.homedLine(3, dp.homedDrivers(fleet, 'highres'))).toBe(
+      'Vehicles homed here: 3 (Dee, Pax, no driver)',
+    )
   })
 })

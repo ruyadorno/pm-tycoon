@@ -50,8 +50,10 @@ import type { BuildingId, Parcel, Stop, TileXY, Vehicle } from '../types.ts'
 import { ticksFromS } from '../types.ts'
 import { deliverParcel } from './economy.ts'
 import { laneParcelIds, shelfNode } from './lane.ts'
+import { driverNumbers, driverOf, swapPendingDriver } from './people.ts'
 import { changeSatisfaction } from './satisfaction.ts'
 import {
+  driverMults,
   emitQueueLength,
   freeUnits,
   hasDriver,
@@ -409,8 +411,9 @@ function rushStep(sim: Sim, pass: boolean): void {
 
 // Leg transitions (§4.6) ----------------------------------------------------------------
 
-function stopTicks(sim: Sim): number {
-  return ticksFromS(sim.data.vehicles.stopS)
+/** A building stop: vehicles.stopS × the driver's stopMult (energy pip, M6). */
+export function stopTicks(sim: Sim, v: Vehicle): number {
+  return ticksFromS(sim.data.vehicles.stopS * driverMults(sim, v).stopMult)
 }
 
 /** Make `buildingId` the current collect stop (reserving its parcels) and drive there. */
@@ -503,26 +506,45 @@ export function goIdle(sim: Sim, v: Vehicle): void {
 }
 
 /**
- * → inactive (`vehicle:inactive`, §4.6 / §7.4): the driver walked out and
- * the trip is over (nothing aboard). Leaves the dock queue / bay if in one,
- * drops its reservations and rush, and drives to a free parking tile; never
- * dispatched, never docked, no payroll line until re-hired (payroll.ts
- * rehire → goIdle).
+ * → inactive (`vehicle:inactive`, §4.6 / §7.4): the driver walked out (or
+ * was fired, or there is none) and the trip is over (nothing aboard). Leaves
+ * the dock queue / bay if in one, drops its reservations and rush, and
+ * drives to a free parking tile; never dispatched, never docked, no payroll
+ * line until a driver is re-hired / hired (payroll.ts rehire, people.ts →
+ * goIdle). Every "trip over without a working driver" path reaches here, so
+ * a pending Replace (M6, `nextDriverId`) lands here instead: the new driver
+ * takes over ON THE LOT (spec-build2 §2.5) and the vehicle parks idle
+ * (people.ts swapPendingDriver) — a trip that ends in the city (the last
+ * delivery or collect stop, nothing aboard) first drives home (`returning`;
+ * its arrival at the entrance comes back here).
  */
 export function goInactive(sim: Sim, v: Vehicle): void {
+  if (
+    v.nextDriverId !== null &&
+    (v.state === 'collecting' || v.state === 'delivering')
+  ) {
+    goReturning(sim, v)
+    return
+  }
   const q = sim.state.lane.dockQueue
   const qi = q.indexOf(v.id)
   if (qi >= 0) q.splice(qi, 1)
   leaveDockBay(sim, v)
-  v.state = 'inactive'
-  v.stops = []
-  v.stopIndex = 0
-  v.waitUntilTick = null
-  v.collectedThisLeg = false
-  v.rushBuildingId = null
-  releaseReservations(sim, v)
-  sim.emit('vehicle:inactive', { id: v.id })
-  routeTo(sim, v, parkingTile(sim, v.id))
+  if (v.nextDriverId !== null) {
+    swapPendingDriver(sim, v)
+    goIdle(sim, v)
+  } else {
+    delete v.tripMults
+    v.state = 'inactive'
+    v.stops = []
+    v.stopIndex = 0
+    v.waitUntilTick = null
+    v.collectedThisLeg = false
+    v.rushBuildingId = null
+    releaseReservations(sim, v)
+    sim.emit('vehicle:inactive', { id: v.id })
+    routeTo(sim, v, parkingTile(sim, v.id))
+  }
   if (qi >= 0) {
     emitQueueLength(sim)
     repositionQueue(sim)
@@ -644,16 +666,16 @@ function pickupAt(sim: Sim, v: Vehicle, buildingId: BuildingId): void {
   }
   const district = districtDef(sim.data, districtOf(sim.data, buildingId))
   const favoured = district.favoured.includes(def.id)
+  // M6: a charisma-2 driver adds pickupBonus per pickup (inside the cap).
+  const driver = driverOf(sim, v)
+  const bonus = driver
+    ? driverNumbers(sim.data, driver.pips, driver.affinity, v.type).pickupBonus
+    : 0
+  const delta =
+    (favoured ? sim.data.economy.satisfaction.favouredPickup : 0) + bonus
   for (const id of picked) {
     sim.emit('parcel:pickedUp', { id, vehicleId: v.id })
-    if (favoured) {
-      changeSatisfaction(
-        sim,
-        district.id,
-        sim.data.economy.satisfaction.favouredPickup,
-        'positive',
-      )
-    }
+    if (delta > 0) changeSatisfaction(sim, district.id, delta, 'positive')
   }
   if (picked.length > 0) {
     v.collectedThisLeg = true
@@ -704,7 +726,7 @@ export const LEG_HOOKS: LegHooks = {
           return
         }
         pickupAt(sim, v, stop.buildingId)
-        v.waitUntilTick = sim.state.tick + stopTicks(sim)
+        v.waitUntilTick = sim.state.tick + stopTicks(sim, v)
         return
       }
       case 'delivering': {
@@ -714,7 +736,7 @@ export const LEG_HOOKS: LegHooks = {
           return
         }
         deliverAt(sim, v, stop)
-        v.waitUntilTick = sim.state.tick + stopTicks(sim)
+        v.waitUntilTick = sim.state.tick + stopTicks(sim, v)
         return
       }
       case 'returning':

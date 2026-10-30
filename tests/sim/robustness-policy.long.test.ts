@@ -7,10 +7,15 @@
 // in-game minutes; every 10th seed's whole log replays to the same hash.
 // ~40 s of CPU: tagged [long], excluded from `vlr check:quick` like
 // policy.test.ts (tools/check.mjs), run by the full `vlr check`.
+// Build 2, M6 (spec-build2 §7.2; design-m6 §5.2, §4.9 "saves mid-state"):
+// the `delegating` policy — a sorter hired at L2 who takes over the Hold Bay
+// — 5 seeds × 60 min under the same Monitor, with saves while the sorter's
+// clock runs and while a tagged parcel waits, continuing identically.
 
 import { describe, expect, it } from 'vitest'
+import { createPolicy } from '../../src/sim/policy.ts'
 import { replay, Sim, stateHash } from '../../src/sim/sim.ts'
-import { TICKS_PER_DAY } from '../../src/sim/types.ts'
+import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { dataFixture } from './helpers.ts'
 import {
   continuationProblems,
@@ -53,6 +58,60 @@ describe('[long] the §7 policy, 20 seeds × 90 min: every invariant holds; save
       expect(at60.deliv).toBeGreaterThan(300)
       expect(continuationProblems(run)).toEqual([])
       if (seed % 10 === 0) {
+        const again = replay(data, seed, sim.commandLog, s.tick)
+        expect(stateHash(again.state)).toBe(stateHash(s))
+      }
+    },
+    30_000,
+  )
+})
+
+/** A held parcel the sorter tagged `looks clean` waits in the Hold Bay. */
+const taggedHeld = (sim: Sim): boolean => {
+  const st = sim.state
+  const hold = laneNode(st.lane, st.lane.holdBayNodeId)
+  return (hold?.queue ?? []).some(
+    (id) => st.parcels[String(id)]?.sorted !== undefined,
+  )
+}
+
+describe('[long] the delegating policy, 5 seeds × 60 min: every invariant holds with a sorter on the station; saves mid-call continue identically', () => {
+  it.each([1, 2, 3, 4, 5])(
+    'seed %i',
+    (seed) => {
+      const sim = new Sim(data, seed)
+      const policy = createPolicy(sim, 'delegating')
+      const run = recordRun(
+        sim,
+        { name: 'delegating', step: () => policy.step() },
+        60,
+        {
+          at: randomTicks(seed, 60, 2),
+          onEvent: ['level:up', 'sorter:decided', 'life:lost', 'game:over'],
+          when: [
+            {
+              why: 'sorter clock running',
+              test: (s) => s.state.lane.holdStation.nextDecisionTick !== null,
+            },
+            { why: 'tagged parcel held', test: taggedHeld },
+          ],
+          monitor: { every: 10 },
+        },
+      )
+      expect(run.monitor.problems).toEqual([])
+      const s = sim.state
+      expect(s.tick).toBe(60 * TICKS_PER_DAY)
+      expect(s.level.level).toBe(2)
+      // The policy hired one sorter at L2 and never fires, so it holds the station.
+      const sorters = s.employees.filter((e) => e.role === 'sorter')
+      expect(sorters).toHaveLength(1)
+      expect(s.lane.holdStation.fixture).toBe(sorters[0]!.id)
+      expect(
+        run.snapshots.map((x) => x.why),
+        'a save while the sorter decides',
+      ).toContain('sorter clock running')
+      expect(continuationProblems(run)).toEqual([])
+      if (seed === 5) {
         const again = replay(data, seed, sim.commandLog, s.tick)
         expect(stateHash(again.state)).toBe(stateHash(s))
       }

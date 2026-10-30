@@ -5,8 +5,10 @@
 // payroll. SIM_FEATURES.payroll.
 //
 // Payday: active workers in employees.json payOrder — inspectors by hire time
-// (hiredTick, then id), then drivers by their vehicle's purchase (boughtTick,
-// then vehicle id). For each, against the balance left after the ones before:
+// (hiredTick, then id), then sorters by hire time (M6), then drivers by their
+// vehicle's purchase (boughtTick, then vehicle id; a pending Replace driver
+// sorts with the vehicle it will take over — pending drivers are hired, so
+// they are paid). For each, against the balance left after the ones before:
 // balance ≥ salary → paid, the unpaid mark cleared (one paid payday clears
 // it); else the mark counts up (Employee.unpaidPaydays) and, at
 // walkoutAfterUnpaidPaydays consecutive unpaid paydays, the worker walks out.
@@ -17,26 +19,34 @@
 // bankruptcy: money only blocks purchases and thins the workforce.
 //
 // Walkout (Employee.active = false, the mark kept for the "!" badge):
-//   - inspector: leaves the desk (moved to the desk's walkedOutIds, one
-//     station fewer — a free one when there is one, else the last, whose
-//     parcel goes back to the front of the buffer; the desk stays);
+//   - inspector: leaves the desk (moved to the desk's walkedOutIds — the
+//     seat stays held; people.ts syncDesk drops its station, whose parcel
+//     goes back to the front of the buffer; the desk stays);
+//   - sorter (M6): stays on the Hold Bay station (the seat held) and does
+//     nothing until re-hired or fired;
 //   - driver: the vehicle finishes its trip (dispatch.ts: a driverless
 //     vehicle starts no new collect leg or target) and parks `inactive`
 //     right after its next unload (docks.ts) — at once when it is idle on the
 //     lot, queued with nothing aboard, or in the dock with nothing aboard (it
 //     would load a new trip; M4). An inactive vehicle is never
-//     dispatched, never in a dock, and has no payroll line.
+//     dispatched, never in a dock, and has no payroll line. A PENDING
+//     Replace driver (M6, Vehicle.nextDriverId) who walks out cancels the
+//     Replace: they leave (people.ts dropPendingDriver) and the current
+//     driver stays.
 // Re-hire (the `rehire` command): employees.rehireFeeDays × the worker's
 // daily salary ('hire'), immediate; the mark is cleared, the inspector takes
-// a desk station again / the driver drives again (an `inactive` vehicle →
-// `idle_lot`); `worker:hired`.
+// a desk station again / the sorter its station (only while it still holds
+// it) / the driver drives again (an `inactive` vehicle → `idle_lot`; refused
+// while a Replace waits for that vehicle — the swap lets them go anyway);
+// `worker:hired {rehire: true}`.
 
 import type { Sim } from '../sim.ts'
 import type { Employee, LaneNode, SimState, Vehicle } from '../types.ts'
 import { ticksFromS } from '../types.ts'
 import type { GameData } from '../../data/types.ts'
 import { goIdle, goInactive } from './dispatch.ts'
-import { removeDeskStation } from './lane.ts'
+import { dropPendingDriver, syncDesk } from './people.ts'
+import { hasDriver } from './vehicles.ts'
 
 /** Ticks between paydays (employees.payrollIntervalS; one day = 600). */
 export function payrollTicks(data: GameData): number {
@@ -61,24 +71,29 @@ export function deskOf(sim: Sim, employeeId: number): LaneNode | null {
   )
 }
 
-/** The vehicle a driver drives, or null. */
+/** The vehicle a driver drives (or takes over after a Replace), or null. */
 export function vehicleOf(sim: Sim, e: Employee): Vehicle | null {
-  return sim.state.vehicles.find((v) => v.driverId === e.id) ?? null
+  if (e.role !== 'driver' || e.vehicleId === null) return null
+  return sim.state.vehicles.find((v) => v.id === e.vehicleId) ?? null
 }
 
-/** Active workers in payOrder (§7.4: inspectors by hire time, then drivers by vehicle purchase). */
+const byHire = (a: Employee, b: Employee): number =>
+  a.hiredTick - b.hiredTick || a.id - b.id
+
+/** Active workers in payOrder (§7.4: inspectors by hire time, then sorters, then drivers by vehicle purchase). */
 export function payOrder(sim: Sim): Employee[] {
   const s = sim.state
   const active = s.employees.filter((e) => e.active)
   const inspectors = active
-    .filter((e) => e.kind === 'inspector')
-    .toSorted((a, b) => a.hiredTick - b.hiredTick || a.id - b.id)
+    .filter((e) => e.role === 'inspector')
+    .toSorted(byHire)
+  const sorters = active.filter((e) => e.role === 'sorter').toSorted(byHire)
   const bought = (e: Employee): [number, number] => {
     const v = vehicleOf(sim, e)
     return v ? [v.boughtTick, v.id] : [Number.MAX_SAFE_INTEGER, e.id]
   }
   const drivers = active
-    .filter((e) => e.kind === 'driver')
+    .filter((e) => e.role === 'driver')
     .toSorted((a, b) => {
       const [ta, ia] = bought(a)
       const [tb, ib] = bought(b)
@@ -87,6 +102,7 @@ export function payOrder(sim: Sim): Employee[] {
   const out: Employee[] = []
   for (const group of sim.data.employees.payOrder) {
     if (group === 'inspectors') out.push(...inspectors)
+    else if (group === 'sorters') out.push(...sorters)
     else if (group === 'drivers') out.push(...drivers)
   }
   return out
@@ -131,27 +147,48 @@ export function paydayStep(sim: Sim): void {
 export function walkOut(sim: Sim, e: Employee): void {
   if (!e.active) return
   e.active = false
-  if (e.kind === 'inspector') {
+  if (e.role === 'inspector') {
     const node = deskOf(sim, e.id)
     if (node?.fixture?.kind === 'desk') {
       const f = node.fixture
       f.inspectorIds = f.inspectorIds.filter((id) => id !== e.id)
       if (!f.walkedOutIds.includes(e.id)) f.walkedOutIds.push(e.id)
-      removeDeskStation(node)
+      syncDesk(sim, node)
     }
     sim.emit('worker:walkedOut', {
       employeeId: e.id,
-      kind: 'inspector',
+      role: 'inspector',
       nodeId: node?.id ?? e.nodeId,
+      vehicleId: null,
+    })
+    return
+  }
+  if (e.role === 'sorter') {
+    const hs = sim.state.lane.holdStation
+    if (hs.fixture === e.id) hs.nextDecisionTick = null
+    sim.emit('worker:walkedOut', {
+      employeeId: e.id,
+      role: 'sorter',
+      nodeId: e.nodeId,
+      vehicleId: null,
     })
     return
   }
   sim.emit('worker:walkedOut', {
     employeeId: e.id,
-    kind: 'driver',
+    role: 'driver',
     nodeId: null,
+    vehicleId: e.vehicleId,
   })
-  const v = vehicleOf(sim, e)
+  const found = vehicleOf(sim, e)
+  // A pending Replace driver walking out never takes the wheel: the Replace
+  // is cancelled at once (they leave, `worker:fired {replaced}`), the
+  // current driver stays and the trip carries on.
+  if (found && found.nextDriverId === e.id) {
+    dropPendingDriver(sim, found)
+    return
+  }
+  const v = found && found.driverId === e.id ? found : null
   // Nothing left of the trip: parked on the lot, queued with nothing to
   // unload, or in the dock with nothing aboard (unloaded, waiting for or
   // starting to load an outbound set — a new trip; M4 hunt).
@@ -176,27 +213,39 @@ export function rehireFee(sim: Sim, e: Employee): number {
  * Returns false (nothing changed) when the worker has nowhere to go back to.
  */
 export function rehire(sim: Sim, e: Employee): boolean {
-  if (e.kind === 'inspector') {
-    const node = deskOf(sim, e.id)
-    if (node?.fixture?.kind !== 'desk') return false
-    const f = node.fixture
+  let desk: LaneNode | null = null
+  if (e.role === 'inspector') {
+    desk = deskOf(sim, e.id)
+    if (desk?.fixture?.kind !== 'desk') return false
+  } else if (e.role === 'sorter') {
+    if (sim.state.lane.holdStation.fixture !== e.id) return false
+  } else {
+    // A driver being replaced (a Replace waits for the trip) would be let go
+    // at the swap anyway: no re-hire, so no fee is wasted.
+    const v = vehicleOf(sim, e)
+    if (!v || v.nextDriverId !== null) return false
+  }
+  if (desk?.fixture?.kind === 'desk') {
+    const f = desk.fixture
     f.walkedOutIds = f.walkedOutIds.filter((id) => id !== e.id)
     f.inspectorIds.push(e.id)
-    f.checker.stations += 1
-    node.stations.push({ parcelId: null, doneTick: null })
-    e.nodeId = node.id
-  } else if (!vehicleOf(sim, e)) {
-    return false
+    e.nodeId = desk.id
   }
   e.active = true
   e.unpaidPaydays = 0
+  if (desk) syncDesk(sim, desk)
   sim.debit(rehireFee(sim, e), 'hire')
   sim.emit('worker:hired', {
     employeeId: e.id,
-    kind: e.kind,
-    nodeId: e.kind === 'inspector' ? e.nodeId : null,
+    role: e.role,
+    nodeId: e.role === 'driver' ? null : e.nodeId,
+    vehicleId: e.role === 'driver' ? e.vehicleId : null,
+    pips: { ...e.pips },
+    star: e.star,
+    rehire: true,
   })
-  const v = e.kind === 'driver' ? vehicleOf(sim, e) : null
-  if (v && v.state === 'inactive') goIdle(sim, v)
+  const v = vehicleOf(sim, e)
+  if (v && v.driverId === e.id && v.state === 'inactive' && hasDriver(sim, v))
+    goIdle(sim, v)
   return true
 }

@@ -35,7 +35,9 @@ import { auditState, Sim, stateHash } from '../../src/sim/sim.ts'
 import type { SimSnapshot } from '../../src/sim/sim.ts'
 import { unitsOf } from '../../src/sim/map.ts'
 import { outboundEligible } from '../../src/sim/systems/dispatch.ts'
+import { salaryOf } from '../../src/sim/systems/people.ts'
 import type {
+  Applicant,
   LaneNode,
   Parcel,
   ParcelState,
@@ -302,6 +304,12 @@ export class Monitor {
       if (v.state === 'idle_lot' && driver && !driver.active) {
         this.fail(`${v.name} idle_lot with a walked-out driver`)
       }
+      if (v.state === 'idle_lot' && v.driverId === null) {
+        this.fail(`${v.name} idle_lot with no driver`)
+      }
+      if (v.state === 'idle_lot' && v.nextDriverId !== null) {
+        this.fail(`${v.name} idle_lot with a Replace still pending`)
+      }
       if (v.state === 'inactive' && driver && driver.active) {
         this.fail(`${v.name} inactive with an active driver`)
       }
@@ -318,12 +326,18 @@ export class Monitor {
         }
       }
     }
-    // Employees: drivers drive their vehicle; inspectors sit at a desk.
+    // Employees: drivers drive (or wait to take over, M6) their vehicle;
+    // a sorter holds the Hold Bay station; inspectors sit at a desk.
     for (const e of s.employees) {
-      if (e.kind === 'driver') {
+      if (e.role === 'driver') {
         const v = s.vehicles.find((x) => x.id === e.vehicleId)
-        if (!v || v.driverId !== e.id)
+        if (!v || (v.driverId !== e.id && v.nextDriverId !== e.id))
           this.fail(`driver ${e.id} has no vehicle`)
+        continue
+      }
+      if (e.role === 'sorter') {
+        if (s.lane.holdStation.fixture !== e.id)
+          this.fail(`sorter ${e.id} is not on the Hold Bay station`)
         continue
       }
       const seats = s.lane.nodes.filter((n) => {
@@ -343,7 +357,7 @@ export class Monitor {
       const f = n.fixture
       if (f?.kind !== 'desk') continue
       for (const id of [...f.inspectorIds, ...f.walkedOutIds]) {
-        if (!s.employees.some((e) => e.id === id && e.kind === 'inspector')) {
+        if (!s.employees.some((e) => e.id === id && e.role === 'inspector')) {
           this.fail(`${n.id}: desk lists unknown inspector ${id}`)
         }
       }
@@ -569,7 +583,22 @@ export function badPlayer(seed: number, sellAtS = 480): Player {
       if (s.economy.gameOver) return
       // Six bikes, payroll be damned.
       if (bikesBought < 6 && s.economy.balance >= 200) {
-        if (m.dispatch({ kind: 'buyVehicle', type: 'bike' }).ok) {
+        // M6: the priciest driver in the pool (payroll be damned; replay-safe).
+        const a = s.applicants.driver.reduce<Applicant | null>(
+          (best, x) =>
+            best === null ||
+            salaryOf(sim.data, 'driver', x.pips, 'bike') >
+              salaryOf(sim.data, 'driver', best.pips, 'bike')
+              ? x
+              : best,
+          null,
+        )
+        const cmd: Command = {
+          kind: 'buyVehicle',
+          type: 'bike',
+          applicantId: a ? a.id : null,
+        }
+        if (m.dispatch(cmd).ok) {
           bikesBought += 1
         }
       }
@@ -602,9 +631,17 @@ export function badPlayer(seed: number, sellAtS = 480): Player {
         const free = liveSlotIds(s.lane).find(
           (id) => !laneNode(s.lane, id)?.fixture,
         )
-        if (free) m.dispatch({ kind: 'placeDesk', nodeId: free })
+        if (free) m.dispatch({ kind: 'placeDesk', nodeId: free, index: 1 })
       }
-      if (desk && r() < 0.002) m.dispatch({ kind: 'hireInspector' })
+      const a = s.applicants.inspector[0]
+      if (desk && a && r() < 0.002) {
+        m.dispatch({
+          kind: 'hire',
+          role: 'inspector',
+          applicantId: a.id,
+          target: { nodeId: desk.id },
+        })
+      }
       // Move fixtures around.
       if (s.tick % 70 === 0) {
         const slots = liveSlotIds(s.lane)
@@ -831,7 +868,12 @@ export function chaosPlayer(seed: number, rate = 0.08): Player {
           cmd = { kind: r() < 0.5 ? 'toss' : 'clear', parcelId: id }
         }
       } else if (k < 0.22) {
-        cmd = { kind: 'buyVehicle', type: pick(VEHICLE_TYPES) ?? 'bike' }
+        cmd = {
+          kind: 'buyVehicle',
+          type: pick(VEHICLE_TYPES) ?? 'bike',
+          applicantId:
+            pick([...s.applicants.driver.map((a) => a.id), null, 999]) ?? null,
+        }
       } else if (k < 0.3) {
         const v = pick(s.vehicles)
         if (v) cmd = { kind: 'sellVehicle', id: v.id }
@@ -853,7 +895,11 @@ export function chaosPlayer(seed: number, rate = 0.08): Player {
           nodeId: pick(slots) ?? 'slot1',
         }
       } else if (k < 0.6) {
-        cmd = { kind: 'placeDesk', nodeId: pick(slots) ?? 'slot1' }
+        cmd = {
+          kind: 'placeDesk',
+          nodeId: pick(slots) ?? 'slot1',
+          index: pick([1, 2, 3]) ?? 1,
+        }
       } else if (k < 0.7) {
         cmd = {
           kind: 'moveFixture',
@@ -863,10 +909,29 @@ export function chaosPlayer(seed: number, rate = 0.08): Player {
       } else if (k < 0.74) {
         cmd = { kind: 'removeFixture', nodeId: pick(slots) ?? 'slot1' }
       } else if (k < 0.82) {
-        cmd = { kind: 'hireInspector' }
+        // M6: hire any role from its pool into a random target (valid or not).
+        const role = pick([
+          'inspector',
+          'inspector',
+          'sorter',
+          'driver',
+        ] as const)!
+        const a = pick(s.applicants[role])
+        const target =
+          role === 'inspector'
+            ? { nodeId: pick(slots) ?? 'slot1' }
+            : role === 'sorter'
+              ? { station: 'hold' as const }
+              : { vehicleId: pick(s.vehicles)?.id ?? 1 }
+        if (a) cmd = { kind: 'hire', role, applicantId: a.id, target }
+        else if (r() < 0.5) cmd = { kind: 'postAd', role }
       } else if (k < 0.86) {
-        const e = pick(s.employees.filter((x) => x.kind === 'inspector'))
-        if (e) cmd = { kind: 'fireInspector', employeeId: e.id }
+        const e = pick(s.employees)
+        if (e) cmd = { kind: 'fire', employeeId: e.id }
+        else {
+          const id = pick(held(m.sim))
+          if (id !== undefined) cmd = { kind: 'touchHeld', parcelId: id }
+        }
       } else if (k < 0.92) {
         const e = pick(s.employees.filter((x) => !x.active))
         if (e) cmd = { kind: 'rehire', employeeId: e.id }

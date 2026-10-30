@@ -39,6 +39,12 @@ export const EV_GOTO = 'pm:goto'
 export const EV_VIEW = 'pm:view'
 /** Game event: the City left attract mode (the player's sim is installed). */
 export const EV_ATTRACT_END = 'pm:attractEnd'
+/**
+ * Game event: the Garage is about to open (GarageSheet toggleGarage). The
+ * Warehouse drops its open HireSheet so two applicant pickers never stack
+ * (the Garage's own buy / Replace picker would open over it).
+ */
+export const EV_GARAGE_OPENING = 'pm:garageOpening'
 /** Attract → game: each half of the 300-ms swap fade (out, then in; B2 §5). */
 export const ATTRACT_FADE_MS = 150
 

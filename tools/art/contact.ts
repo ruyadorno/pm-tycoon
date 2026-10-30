@@ -16,6 +16,12 @@
 //   art/contact/candidates-<k>@4x.png     the same blocks for a bulk batch.
 //   art/contact/fixes@4x.png              G4 (build 2): `node
 //     tools/art/contact.ts fixes [--hop <crop.png>]` (fixesSheet below).
+//   art/contact/people@4x.png             M6 (build 2): `node
+//     tools/art/contact.ts people` — faces, ★, pips, worker vs
+//     worker_sorter, the Hold Bay station, the three new machines.
+//   art/contact/lowres@4x.png             M6 / G5 (build 2): `node
+//     tools/art/contact.ts lowres` — the ten Low-density uniques on their
+//     map positions (colour and the _locked look they ship with until M9).
 // Never writes art/final, the manifest or public/.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -387,7 +393,7 @@ const NEIGHBOURS: Record<string, [string, string]> = {
   downtown: ['dt_semver_bank', 'dt_lockfile_legal'],
   highres: ['hr_callback_court', 'hr_promise_place'],
   industrial: ['in_webpack_warehouse', 'in_polyfill_plastics'],
-  civic: ['lr_villa', 'dt_semver_bank'],
+  civic: ['lr_major_house', 'dt_semver_bank'],
 }
 
 function streetScene(
@@ -1190,16 +1196,347 @@ export function fixesSheet(m: Manifest, hop: string | null = null): string {
   return out.replace(ROOT, '')
 }
 
+// ---------------------------------------------------------------------------
+// M6 (build 2): art/contact/people@4x.png and art/contact/lowres@4x.png
+
+/** the shipped frames of an id (finals), as a contact Source */
+function finals(m: Manifest, id: string, tag = id): Source {
+  return { n: -1, get: (s) => fin(m, id, s), tag }
+}
+
+/** a cream card panel (grey5, 1-px outline) w x h at 1x */
+function panel(w: number, h: number): Canvas {
+  const cv = createCanvas(w, h)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('outline')
+  ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = PALETTE.hex('grey5')
+  ctx.fillRect(1, 1, w - 2, h - 2)
+  return cv
+}
+
+/** face_00 … face_11 as a 3 x 4 grid: rows = skins, columns = hair / hat */
+function faceGridScene(m: Manifest): Canvas {
+  const cv = panel(4 * 20 + 4, 3 * 20 + 4)
+  const ctx = cv.getContext('2d')
+  for (let n = 0; n < 12; n++) {
+    const f = fin(m, `face_${String(n).padStart(2, '0')}`)
+    if (f) ctx.drawImage(f, 4 + (n % 4) * 20, 4 + Math.floor(n / 4) * 20)
+  }
+  return cv
+}
+
+/** pips at the 7-px pitch: `lit` of `max` */
+function pipRow(
+  ctx: SKRSContext2D,
+  m: Manifest,
+  x: number,
+  y: number,
+  lit: number,
+  max: number,
+): void {
+  const on = fin(m, 'ic_pip_on')
+  const off = fin(m, 'ic_pip_off')
+  for (let i = 0; i < max; i++) {
+    const p = i < lit ? on : off
+    if (p) ctx.drawImage(p, x + i * 7, y)
+  }
+}
+
+/**
+ * A hire-card mock (layout of design-m6 §6.1, not the game's text): the
+ * face, the ★ top-right of a star applicant's face, eye / pace / charisma
+ * pips.
+ */
+function cardMock(
+  m: Manifest,
+  face: number,
+  star: boolean,
+  pips: [number, number, number],
+): Canvas {
+  const cv = panel(64, 30)
+  const ctx = cv.getContext('2d')
+  const f = fin(m, `face_${String(face).padStart(2, '0')}`)
+  if (f) ctx.drawImage(f, 4, 6)
+  const st = fin(m, 'ic_star')
+  if (star && st) ctx.drawImage(st, 12, 0)
+  pipRow(ctx, m, 26, 3, pips[0], 5)
+  pipRow(ctx, m, 26, 11, pips[1], 5)
+  pipRow(ctx, m, 26, 19, pips[2], 2)
+  return cv
+}
+
+/** floor tiles w x h cells (32 px) */
+function floorScene(m: Manifest, cw: number, ch: number): Canvas {
+  const cv = createCanvas(cw * 32, ch * 32)
+  const ctx = cv.getContext('2d')
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const t = fin(m, 'floor_t1', `_${(x + y) % 3}`)
+      if (t) ctx.drawImage(t, x * 32, y * 32)
+    }
+  }
+  return cv
+}
+
+/**
+ * The Hold Bay station in the room: the podium (back layer), the sorter
+ * standing on the east half of the mat facing west (front layer), the bin
+ * beside it; `who` = the worker id standing there.
+ */
+function stationScene(m: Manifest, who: string): Canvas {
+  const cv = floorScene(m, 5, 3)
+  const ctx = cv.getContext('2d')
+  const st = fin(m, 'hold_station')
+  if (st) ctx.drawImage(st, 8, 24)
+  const w = fin(m, who, '_w_idle_0')
+  if (w) ctx.drawImage(w, 8 + 24, 24 + 48 - 32 - 2)
+  const bin = fin(m, 'bin', '_closed')
+  if (bin) ctx.drawImage(bin, 88, 16)
+  return cv
+}
+
+/** a 64x64 fixture's frames, each on 3x3 floor cells */
+function fixtureFrames(m: Manifest, e: ManifestEntry): Block[] {
+  return e.frames.map((f) => {
+    const cv = floorScene(m, 3, 3)
+    const im = fin(m, e.id, f)
+    if (im) cv.getContext('2d').drawImage(im, 16, 16)
+    return { cv, label: `${e.id} ${f.replace(/^_/, '')}` }
+  })
+}
+
+export function peopleSheet(m: Manifest): string {
+  const S = 4
+  const blocks = (id: string): Block[] => {
+    const e = entry(m, id)
+    return e ? blocksFor(m, e, finals(m, id, id)) : []
+  }
+  const arm = entry(m, 'sorter_arm')
+  const sections: Section[] = [
+    {
+      title:
+        'face_00-11: rows peach / tan / deep skin; columns short hair, ' +
+        'long auburn hair, blue cap, hard hat',
+      blocks: [
+        { cv: faceGridScene(m), label: 'face_NN, NN = skin * 4 + hair' },
+        {
+          cv: cardMock(m, 0, false, [3, 3, 0]),
+          label: 'Audrey (face_00) 3 / 3 / 0',
+        },
+        {
+          cv: cardMock(m, 6, true, [4, 2, 2]),
+          label: 'star applicant: ic_star on the face',
+        },
+      ],
+    },
+    {
+      title: 'ic_star (icon16), ic_pip_on / ic_pip_off (ui 8x8, 7-px pitch)',
+      blocks: (['ic_star', 'ic_pip_on', 'ic_pip_off'] as const).flatMap(
+        (id) => {
+          const im = fin(m, id)
+          if (!im) return []
+          const cv = panel(44, im.height + 4)
+          cv.getContext('2d').drawImage(im, 22 - im.width / 2, 2)
+          return [{ cv, label: id }]
+        },
+      ),
+    },
+    { title: 'worker (inspector, yellow vest)', blocks: blocks('worker') },
+    {
+      title: 'worker_sorter (the sorter: orange-vest palette swap)',
+      blocks: blocks('worker_sorter'),
+    },
+    {
+      title:
+        'hold_station (interior back layer, 48x48) with the sorter on duty, ' +
+        'the bin beside it',
+      blocks: [
+        { cv: stationScene(m, 'worker_sorter'), label: 'sorter on duty' },
+        { cv: stationScene(m, ''), label: 'empty station' },
+      ],
+    },
+    {
+      title: 'machines: battery_checker, xray (idle f0 / scan f1 on the belt)',
+      blocks: [...blocks('battery_checker'), ...blocks('xray')],
+    },
+    {
+      title: 'sorter_arm (fixture 64x64): f0 rest, f1 reach (-x), f2 toss (+x)',
+      blocks: arm ? fixtureFrames(m, arm) : [],
+    },
+  ]
+  const out = join(CONTACT, 'people@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 700, S))
+  return out.replace(ROOT, '')
+}
+
+/** road tiles of map.json: avenue lines minus trimmed segments */
+function roadAt(x: number, y: number): boolean {
+  const map = dataJson('map.json') as {
+    avenues: number[]
+    trimmed: { axis: 'x' | 'y'; at: number; from: number; to: number }[]
+  }
+  const a = map.avenues
+  const lo = a[0] as number
+  const hi = a[a.length - 1] as number
+  const onAv =
+    (a.includes(x) && y >= lo && y <= hi) ||
+    (a.includes(y) && x >= lo && x <= hi)
+  if (!onAv) return false
+  return !map.trimmed.some((t) =>
+    t.axis === 'x'
+      ? x === t.at && y >= t.from && y <= t.to
+      : y === t.at && x >= t.from && x <= t.to,
+  )
+}
+
+/**
+ * A district as the map lays it out: tiles [x0, x0 + nx) x [y0, y0 + ny),
+ * roads on the avenues (autotiled), grass elsewhere, the district's
+ * buildings on their buildings.json footprints (sprite = their own id or
+ * the coversBuildings row) and its map props; `locked` = the fogged frames.
+ */
+export function regionScene(
+  m: Manifest,
+  district: string,
+  x0: number,
+  y0: number,
+  nx: number,
+  ny: number,
+  locked: boolean,
+): Canvas {
+  const top = 160
+  const W = (nx + ny) * 32
+  const H = (nx + ny) * 16 + top
+  const cv = createCanvas(W, H)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('water1')
+  ctx.fillRect(0, 0, W, H)
+  const ox = ny * 32 - 32
+  const L = locked ? '_locked' : ''
+  const lk = (id: string) =>
+    entry(m, id)?.variants.includes('locked') ? L : ''
+  for (let ty = 0; ty < ny; ty++) {
+    for (let tx = 0; tx < nx; tx++) {
+      const x = x0 + tx
+      const y = y0 + ty
+      let t: Canvas | null
+      if (roadAt(x, y)) {
+        const k =
+          (roadAt(x, y - 1) ? 1 : 0) |
+          (roadAt(x + 1, y) ? 2 : 0) |
+          (roadAt(x, y + 1) ? 4 : 0) |
+          (roadAt(x - 1, y) ? 8 : 0)
+        const f = `_${String(k).padStart(2, '0')}`
+        t = fin(m, 'road', f + lk('road')) ?? fin(m, 'road', f)
+      } else t = fin(m, 'grass', lk('grass'))
+      if (!t) continue
+      const p = scr(ox, top, tx, ty)
+      ctx.drawImage(t, p.x, p.y)
+    }
+  }
+  const buildings = dataJson('buildings.json') as {
+    id: string
+    district: string
+    footprint: [number, number]
+    tile: [number, number]
+  }[]
+  const map = dataJson('map.json') as {
+    props: { frame: string; tile: [number, number]; region: string }[]
+  }
+  const sprite = new Map<string, string>()
+  for (const e of m.entries) {
+    for (const b of e.coversBuildings ?? []) sprite.set(b, e.id)
+  }
+  const draws: { d: number; f: () => void }[] = []
+  const put = (id: string, ax: number, ay: number) => {
+    const im = fin(m, id, lk(id))
+    if (!im) return
+    const p = scr(ox, top, ax - x0, ay - y0)
+    draws.push({
+      d: ax + ay,
+      f: () => ctx.drawImage(im, p.x + 32 - im.width / 2, p.y + 32 - im.height),
+    })
+  }
+  for (const b of buildings.filter((x) => x.district === district)) {
+    put(
+      sprite.get(b.id) ?? b.id,
+      b.tile[0] + b.footprint[0] - 1,
+      b.tile[1] + b.footprint[1] - 1,
+    )
+  }
+  for (const pr of map.props.filter((x) => x.region === district)) {
+    put(pr.frame, pr.tile[0], pr.tile[1])
+  }
+  draws.sort((a, b) => a.d - b.d)
+  for (const d of draws) d.f()
+  return cv
+}
+
+/** the ten Low-density uniques (buildings.json district lowres) */
+export function lowresIds(): string[] {
+  const rows = dataJson('buildings.json') as { id: string; district: string }[]
+  return rows.filter((r) => r.district === 'lowres').map((r) => r.id)
+}
+
+export function lowresSheet(m: Manifest): string {
+  const S = 2
+  const ids = lowresIds()
+  const closeups: Block[] = ids.flatMap((id) => {
+    const e = entry(m, id)
+    if (!e) return []
+    return buildingBlock(m, e, finals(m, id, id)).map((b) => ({
+      cv: b.cv,
+      label: b.label.replace(/^PH /, `${id} `),
+    }))
+  })
+  const sections: Section[] = [
+    {
+      title:
+        'Low-density (Semver St) on the map, tiles x 18-36, y 2-12 (2x = ' +
+        'camera zoom 2): colour (live from M9)',
+      blocks: [
+        {
+          cv: regionScene(m, 'lowres', 18, 2, 19, 11, false),
+          label: 'in colour',
+        },
+      ],
+    },
+    {
+      title: 'as shipped until M9: the _locked frames',
+      blocks: [
+        {
+          cv: regionScene(m, 'lowres', 18, 2, 19, 11, true),
+          label: '_locked',
+        },
+      ],
+    },
+    {
+      title: 'the ten uniques (2x): colour | _locked',
+      blocks: closeups,
+    },
+  ]
+  const out = join(CONTACT, 'lowres@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 2000, S))
+  return out.replace(ROOT, '')
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2)
+  const { loadManifest } = await import('./manifest.ts')
   if (cmd === 'fixes') {
     const i = rest.indexOf('--hop')
     const hop = i >= 0 ? (rest[i + 1] ?? null) : null
-    const { loadManifest } = await import('./manifest.ts')
     console.log(`contact: ${fixesSheet(loadManifest(), hop)}`)
+  } else if (cmd === 'people') {
+    console.log(`contact: ${peopleSheet(loadManifest())}`)
+  } else if (cmd === 'lowres') {
+    console.log(`contact: ${lowresSheet(loadManifest())}`)
   } else {
-    console.error('usage: node tools/art/contact.ts fixes [--hop <crop.png>]')
+    console.error(
+      'usage: node tools/art/contact.ts fixes [--hop <crop.png>] | people | lowres',
+    )
     process.exitCode = 1
   }
 }

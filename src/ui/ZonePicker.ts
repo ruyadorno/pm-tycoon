@@ -148,8 +148,17 @@ export function pickerHeight(options: readonly ZoneOption[]): number {
   return h
 }
 
-/** Tooltip/toast text for a command failure reason (plan.md §5 strings). */
-export function failText(reason: string): string {
+/**
+ * Tooltip/toast text for a command failure reason (plan.md §5 strings; M6
+ * people reasons, spec-build2 §8 / design-m6 §6.3). Pass `data` for the
+ * unlock levels (`Opens at Lv 2`, `Second desk opens at Lv 3`, from
+ * employees.json holdStation / desks.rows); without it those read without a
+ * number, so code never hard-codes a level.
+ */
+export function failText(
+  reason: string,
+  data?: Pick<GameData, 'employees'>,
+): string {
   switch (reason) {
     case 'trucks-only':
       return 'Trucks only'
@@ -163,6 +172,22 @@ export function failText(reason: string): string {
       return 'Keep at least one vehicle'
     case 'locked':
       return 'Not available yet'
+    case 'no-applicant':
+      return 'That applicant took another job'
+    case 'station-locked': {
+      const lv = data?.employees.holdStation.unlockLevel
+      return lv !== undefined ? `Opens at Lv ${lv}` : 'Not open yet'
+    }
+    case 'station-occupied':
+      return 'The station is taken'
+    case 'desk-locked': {
+      const lv = data?.employees.desks.rows.find((r) => r.index === 2)
+      return lv
+        ? `Second desk opens at Lv ${lv.unlockLevel}`
+        : 'Second desk not open yet'
+    }
+    case 'desk-exists':
+      return 'That desk is already placed'
     default:
       return 'Not possible right now'
   }

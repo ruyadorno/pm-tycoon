@@ -5,16 +5,29 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  AISLE_X,
   BAY_COUNT,
+  bayRect,
   BIN_COUNTER,
+  DOCK_PANEL,
+  DOOR_POINT,
   FixedLaneLayout,
+  HOLD_STATION,
+  HOLD_STATION_HIT,
+  LOCKED_DOORS,
   MIN_VIEW_H,
   MIN_VIEW_W,
   PLATE_H,
   PLATE_PAD,
   POSTER,
+  POSTER_HIT,
+  PROP_T1_SIZE,
+  PROP_T2_SIZE,
+  PROPS_T1,
   PROPS_T2,
   RACK,
+  RACK_LAMP,
+  RACK_S_BADGE,
   ROOM_H,
   ROOM_W,
   roomPlacement,
@@ -23,12 +36,18 @@ import {
   SHELF_ROWS,
   SIGN,
   SIGNAGE,
+  SORTER_ARM_AT,
+  SORTER_ARM_SIZE,
+  SORTER_FACING,
+  SORTER_STAND,
+  STATION_ROW_Y,
   STRIP_LIGHTS,
   TILE,
   type Point,
   type Rect,
 } from '../../src/render/warehouse/RoomLayout.ts'
 import { HUD_BOTTOM_H, HUD_TOP_H } from '../../src/ui/layout.ts'
+import { CAP_H, CAP_TOP } from '../../src/ui/text.ts'
 import { laneNode } from '../../src/sim/types.ts'
 import type { LaneNode } from '../../src/sim/types.ts'
 import { dataFixture, makeSim } from '../sim/helpers.ts'
@@ -136,7 +155,7 @@ describe('warehouse-view §1.3: anchors', () => {
       const a = layout.anchorsFor(id)
       expect(a.buffer).toHaveLength(dataFixture().machines.slotBufferCap)
       expect(a.stations.length).toBeGreaterThanOrEqual(
-        dataFixture().employees.inspector.maxPerDesk,
+        dataFixture().employees.desks.maxPerDesk,
       )
       for (const p of [...a.buffer, ...a.stations]) {
         expect(inside(p, r), `${id} ${p.x},${p.y}`).toBe(true)
@@ -312,5 +331,294 @@ describe('warehouse-view §5.2: tier-2 props and signage plates', () => {
       expect(overlaps(unit, RACK)).toBe(false)
       expect(unit.x + unit.w).toBeLessThanOrEqual(ROOM_W - TILE)
     }
+  })
+})
+
+// ---- M6: the Hold Bay station (spec-build2 §2.6, §4.4; design-m6 §6.4) --------
+
+/** A worker sprite's box for feet (x, y): 24 × 32, origin (0.5, 1), 4 px below the feet. */
+const spriteBox = (p: Point): Rect => ({
+  x: p.x - 12,
+  y: p.y - 28,
+  w: 24,
+  h: 32,
+})
+
+const ROOM_FLOOR: Rect = {
+  x: TILE,
+  y: TILE,
+  w: ROOM_W - 2 * TILE,
+  h: ROOM_H - TILE,
+}
+
+const within = (a: Rect, b: Rect): boolean =>
+  a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h
+
+const signagePlates = (): [string, Rect][] =>
+  SIGNAGE.map((p) => [
+    `plate ${p.text}`,
+    { x: p.x, y: p.y, w: textW(p.text) + PLATE_PAD, h: PLATE_H },
+  ])
+
+const propRects = (): { tier: 1 | 2; name: string; r: Rect }[] => [
+  ...PROPS_T1.map((p, i) => ({
+    tier: 1 as const,
+    name: `props_t1[${i}]`,
+    r: { x: p.x, y: p.y, ...PROP_T1_SIZE },
+  })),
+  ...PROPS_T2.map((p, i) => ({
+    tier: 2 as const,
+    name: `props_t2[${i}]`,
+    r: { x: p.x, y: p.y, ...PROP_T2_SIZE },
+  })),
+]
+
+/** Every tap rect of the room (the scene's pick order covers the same set). */
+function tapRects(): [string, Rect][] {
+  const out: [string, Rect][] = [
+    ['poster hit', POSTER_HIT],
+    ['station hit', HOLD_STATION_HIT],
+    ['sign', SIGN],
+    ['dock panel', DOCK_PANEL],
+  ]
+  for (let i = 0; i < BAY_COUNT; i++) out.push([`bay ${i}`, bayRect(i)])
+  LOCKED_DOORS.forEach((r, i) => out.push([`locked door ${i + 2}`, r]))
+  for (const id of ['dock1', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5']) {
+    out.push([`${id} hit`, layout.hitFor(id) as Rect])
+  }
+  out.push(['bin hit', layout.hitFor('bin') as Rect])
+  out.push(['shelf hit', layout.hitFor('shelf') as Rect])
+  for (let k = 1; k <= 4; k++)
+    out.push([`desk hit slot${k}`, layout.deskHit(`slot${k}`) as Rect])
+  return out
+}
+
+/** Points every `step` px along from → pts (the endpoints included). */
+function samples(from: Point, pts: readonly Point[], step = 2): Point[] {
+  const out: Point[] = [{ ...from }]
+  let prev = from
+  for (const p of pts) {
+    const len = Math.hypot(p.x - prev.x, p.y - prev.y)
+    for (let d = step; d < len; d += step)
+      out.push({
+        x: prev.x + ((p.x - prev.x) * d) / len,
+        y: prev.y + ((p.y - prev.y) * d) / len,
+      })
+    out.push({ ...p })
+    prev = p
+  }
+  return out
+}
+
+describe('spec-build2 §4.4 (M6): the Hold Bay station, the poster and the props', () => {
+  it('the station sits east of the rack above the bin, the poster at (272, 120)', () => {
+    expect({ ...HOLD_STATION }).toEqual({ x: 264, y: 300, w: 48, h: 48 })
+    expect({ x: POSTER.x, y: POSTER.y }).toEqual({ x: 272, y: 120 })
+    expect(HOLD_STATION.x).toBeGreaterThanOrEqual(RACK.x + RACK.w)
+    const bin = layout.rectFor('bin') as Rect
+    expect(HOLD_STATION.y + HOLD_STATION.h).toBeLessThanOrEqual(bin.y)
+    expect(within(HOLD_STATION, ROOM_FLOOR)).toBe(true)
+    expect(within(POSTER, ROOM_FLOOR)).toBe(true)
+  })
+
+  it('the station and poster tap rects are ≥ 44 px and cover their art', () => {
+    for (const [name, hit, art] of [
+      ['station', HOLD_STATION_HIT, HOLD_STATION],
+      ['poster', POSTER_HIT, POSTER],
+    ] as const) {
+      expect(Math.min(hit.w, hit.h), name).toBeGreaterThanOrEqual(44)
+      expect(within(art, hit), name).toBe(true)
+      expect(within(hit, ROOM_FLOOR), name).toBe(true)
+    }
+  })
+
+  for (const [W, H] of [
+    [360, 604],
+    [393, 659],
+  ] as const) {
+    it(`at ${W}×${H}: the poster hit, the station, the bays and every other tap rect never overlap and sit between the HUD bands`, () => {
+      const p = fit(W, H)
+      expect(p.fits).toBe(true)
+      const screen = (r: Rect): Rect => ({
+        x: p.roomX + r.x,
+        y: p.roomY + r.y,
+        w: r.w,
+        h: r.h,
+      })
+      const taps = tapRects().map(([n, r]) => [n, screen(r)] as const)
+      const band: Rect = {
+        x: 0,
+        y: HUD_TOP_H,
+        w: W,
+        h: H - HUD_TOP_H - HUD_BOTTOM_H,
+      }
+      for (const [n, r] of taps) expect(within(r, band), n).toBe(true)
+      for (let i = 0; i < taps.length; i++)
+        for (let j = i + 1; j < taps.length; j++) {
+          const [a, ra] = taps[i] as readonly [string, Rect]
+          const [b, rb] = taps[j] as readonly [string, Rect]
+          expect(overlaps(ra, rb), `${a} vs ${b}`).toBe(false)
+        }
+    })
+  }
+
+  it('the station, the poster and each tier’s props share the east column apart, clear of the fixtures and plates', () => {
+    const fixed: [string, Rect][] = [
+      ['rack', RACK],
+      ['bin', layout.rectFor('bin') as Rect],
+      ['shelf', layout.rectFor('shelf') as Rect],
+      ['shelf badge', SHELF_BADGE],
+      ['dock panel', DOCK_PANEL],
+      ...signagePlates(),
+    ]
+    const props = propRects()
+    const east: [string, Rect][] = [
+      ['station', HOLD_STATION],
+      ['poster', POSTER],
+      ['poster hit', POSTER_HIT],
+      ['station hit', HOLD_STATION_HIT],
+      ...props.map((p) => [p.name, p.r] as [string, Rect]),
+    ]
+    for (const [n, r] of east) {
+      expect(within(r, ROOM_FLOOR), n).toBe(true)
+      for (const [f, fr] of fixed)
+        expect(overlaps(r, fr), `${n} vs ${f}`).toBe(false)
+    }
+    // A prop never sits under the poster, its hit, the station or its hit
+    // (a tap there must never land on scenery).
+    for (const p of props)
+      for (const [n, r] of east.slice(0, 4))
+        expect(overlaps(p.r, r), `${p.name} vs ${n}`).toBe(false)
+    expect(overlaps(POSTER_HIT, HOLD_STATION_HIT)).toBe(false)
+    // Props of one tier never overlap each other (tiers never show together).
+    for (let i = 0; i < props.length; i++)
+      for (let j = i + 1; j < props.length; j++) {
+        const a = props[i] as (typeof props)[number]
+        const b = props[j] as (typeof props)[number]
+        if (a.tier !== b.tier) continue
+        expect(overlaps(a.r, b.r), `${a.name} vs ${b.name}`).toBe(false)
+      }
+  })
+
+  it('stationAt hits the station cell only; nodeAt never returns it', () => {
+    const cx = HOLD_STATION.x + HOLD_STATION.w / 2
+    const cy = HOLD_STATION.y + HOLD_STATION.h / 2
+    expect(layout.stationAt(cx, cy)).toBe(true)
+    expect(layout.nodeAt(cx, cy)).toBeNull()
+    expect(layout.stationAt(264, 300)).toBe(true)
+    expect(layout.stationAt(311, 347)).toBe(true)
+    expect(layout.stationAt(312, 300)).toBe(false)
+    expect(layout.stationAt(264, 348)).toBe(false)
+    expect(layout.stationAt(263, 320)).toBe(false)
+    for (let i = 0; i < BAY_COUNT; i++) {
+      const r = bayRect(i)
+      expect(layout.stationAt(r.x + r.w / 2, r.y + r.h / 2), `bay ${i}`).toBe(
+        false,
+      )
+    }
+    for (const r of [POSTER, layout.rectFor('bin') as Rect])
+      expect(layout.stationAt(r.x + r.w / 2, r.y + r.h / 2)).toBe(false)
+  })
+
+  it('the sorter stands in the station’s east half facing the rack, its sprite on the floor and off the rack, bin, poster and props', () => {
+    expect(inside(SORTER_STAND, HOLD_STATION)).toBe(true)
+    expect(SORTER_STAND.x).toBeGreaterThanOrEqual(
+      HOLD_STATION.x + HOLD_STATION.w / 2,
+    )
+    expect(SORTER_FACING).toBe('w')
+    const box = spriteBox(SORTER_STAND)
+    expect(within(box, ROOM_FLOOR)).toBe(true)
+    const avoid: [string, Rect][] = [
+      ['rack', RACK],
+      ['bin', layout.rectFor('bin') as Rect],
+      ['poster hit', POSTER_HIT],
+      ...propRects().map((p) => [p.name, p.r] as [string, Rect]),
+      ...signagePlates(),
+    ]
+    for (const [n, r] of avoid) expect(overlaps(box, r), n).toBe(false)
+  })
+
+  it('the sorter walks in from the dock door on axis-aligned legs, south of the rack, never under a badge-layer plate', () => {
+    const path = layout.stationWalkPath()
+    expect(path[0]).toEqual(DOOR_POINT)
+    expect(path[path.length - 1]).toEqual(SORTER_STAND)
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1] as Point
+      const b = path[i] as Point
+      expect(a.x === b.x || a.y === b.y, `leg ${i}`).toBe(true)
+    }
+    expect(path.some((p) => p.x === AISLE_X)).toBe(true)
+    expect(path.some((p) => p.y === STATION_ROW_Y)).toBe(true)
+    // Front-layer rects drawn ABOVE the workers (badges): the walker never
+    // passes under one, so it never vanishes behind a plate or the panel.
+    const above: [string, Rect][] = [
+      ['dock panel', DOCK_PANEL],
+      ['shelf badge', SHELF_BADGE],
+      ['ext strip', layout.extRect()],
+      ...signagePlates(),
+    ]
+    const room: Rect = { x: 0, y: 0, w: ROOM_W, h: ROOM_H }
+    const feetOff: [string, Rect][] = [
+      ['rack', RACK],
+      ['bin', layout.rectFor('bin') as Rect],
+      ['shelf', layout.rectFor('shelf') as Rect],
+    ]
+    // The stretch every slot-1 inspector already walks (door → aisle → its
+    // row, under the tier-2 INTAKE plate) is the playtest-1 path, not M6's.
+    const shared = layout.walkPath(
+      'slot1',
+      layout.standPoints('slot1')[0] as Point,
+    )
+    const sharedRowY = (shared[2] as Point).y
+    const own = samples(path[0] as Point, path.slice(1)).filter(
+      (pt) => !(pt.x <= AISLE_X && pt.y <= sharedRowY),
+    )
+    expect(own.length).toBeGreaterThan(100)
+    for (const pt of own) {
+      const box = spriteBox({ x: Math.round(pt.x), y: Math.round(pt.y) })
+      expect(within(box, room), `${pt.x},${pt.y}`).toBe(true)
+      for (const [n, r] of above)
+        expect(overlaps(box, r), `${n} at ${pt.x},${pt.y}`).toBe(false)
+      for (const [n, r] of feetOff)
+        expect(inside(pt, r), `feet on ${n} at ${pt.x},${pt.y}`).toBe(false)
+    }
+  })
+
+  it('the Sorter Arm’s 64 × 64 canvas sits bottom-centred on the station, between the rack and the east wall, clear of the props and the bin', () => {
+    const arm: Rect = { ...SORTER_ARM_AT, ...SORTER_ARM_SIZE }
+    expect(arm.x + arm.w / 2).toBe(HOLD_STATION.x + HOLD_STATION.w / 2)
+    expect(arm.y + arm.h).toBe(HOLD_STATION.y + HOLD_STATION.h)
+    expect(within(arm, ROOM_FLOOR)).toBe(true)
+    const avoid: [string, Rect][] = [
+      ['rack', RACK],
+      ['bin', layout.rectFor('bin') as Rect],
+      ['poster hit', POSTER_HIT],
+      ...propRects().map((p) => [p.name, p.r] as [string, Rect]),
+      ...signagePlates(),
+    ]
+    for (const [n, r] of avoid) expect(overlaps(arm, r), n).toBe(false)
+  })
+
+  it('the way out reverses the walk-in back to the dock door', () => {
+    const out = layout.stationExitPath(SORTER_STAND)
+    const back = layout.stationWalkPath().slice(0, -1).toReversed()
+    expect(out).toEqual(back)
+    expect(out[out.length - 1]).toEqual(DOOR_POINT)
+  })
+
+  it('the rack lamp `S` badge sits on the rack under the lamp, clear of every bay pad', () => {
+    const cap: Rect = {
+      x: RACK_S_BADGE.x,
+      y: RACK_S_BADGE.y + CAP_TOP,
+      w: textW('S'),
+      h: CAP_H,
+    }
+    expect(cap.w).toBeGreaterThan(0)
+    expect(within(cap, RACK)).toBe(true)
+    const lamp: Rect = { x: RACK_LAMP.x, y: RACK_LAMP.y, w: 8, h: 8 }
+    expect(overlaps(cap, lamp)).toBe(false)
+    expect(cap.y).toBeGreaterThanOrEqual(lamp.y + lamp.h)
+    for (let i = 0; i < BAY_COUNT; i++)
+      expect(overlaps(cap, bayRect(i)), `bay ${i}`).toBe(false)
   })
 })

@@ -15,8 +15,9 @@
 //     tossedClean (the bin's clean count), holdBayEvents, stalls.totalS
 //     (stats.minutes[].stallS + today's), satisfactionEnd (live local
 //     districts) and, from the command log (it rides along in every save),
-//     vehiclesBought, machinesBought, inspectorsHired (hireInspector, not
-//     re-hires) and rushTaps (rush commands applied);
+//     vehiclesBought, machinesBought, inspectorsHired (`hire` commands with
+//     role 'inspector' — build 2 M6; not re-hires) and rushTaps (rush
+//     commands applied);
 //   - sim events while attached: firstMalware (the first malware spawned;
 //     the first malware flagged — `by` = the flagging checker's machine id,
 //     or 'inspector' for the desk — and when that parcel was tossed),
@@ -660,7 +661,7 @@ export class PlaytestRecorder {
         vehiclesBought.push({ type: c.type, atS: ticksToS(e.tick) })
       else if (c.kind === 'buyMachine')
         machinesBought.push({ id: c.defId, atS: ticksToS(e.tick) })
-      else if (c.kind === 'hireInspector') inspectorsHired += 1
+      else if (c.kind === 'hire' && c.role === 'inspector') inspectorsHired += 1
       else if (c.kind === 'rush') rushTaps += 1
     }
     const minutes = st?.minutes ?? []

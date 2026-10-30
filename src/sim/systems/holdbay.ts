@@ -1,7 +1,9 @@
 // The Hold Bay (spec §6.6, §9.1, §7.3; plan.md §12.5 task 3; warehouse-view.md
 // §3): flagged parcels wait here (cap from the level row) for the player.
 //
-//   Toss  → the Quarantine Bin (`parcel:tossed {id, wasMalware, bounty}`):
+//   Toss  → the Quarantine Bin (`parcel:tossed {id, wasMalware, bounty,
+//           source, employeeId}` — by the player, the sorter or the Sorter
+//           Arm, M6; a malware label joins `state.wanted`):
 //           malware pays economy.tossBounty (balance AND lifetime earned,
 //           "DEFUSED"); a clean parcel is destroyed (its value is lost), the
 //           sender is compensated economy.wrongTossFee (clamped to the
@@ -18,6 +20,7 @@
 // on the next lane step (`lane:resumed`) into the lowest free bay.
 
 import { checkerName, slotLabel } from '../detection.ts'
+import type { TossSource } from '../events.ts'
 import type { Sim } from '../sim.ts'
 import type { BuildingId, Parcel, Strain } from '../types.ts'
 import { laneNode, liveSlotIds } from '../types.ts'
@@ -29,6 +32,7 @@ import {
   shelfNode,
   takeFrom,
 } from './lane.ts'
+import { addWanted, employeeById } from './people.ts'
 import { changeSatisfaction } from './satisfaction.ts'
 
 /** A parcel id currently in the Hold Bay. */
@@ -37,8 +41,21 @@ export function isHeld(sim: Sim, parcelId: number): boolean {
   return p !== undefined && p.state === 'held'
 }
 
+/** Who tosses (M6): the player (default), the seated sorter, or the Sorter Arm. */
+export interface TossBy {
+  source: TossSource
+  /** The sorter's Employee id; null for the player and the Arm. */
+  employeeId: number | null
+}
+
+const BY_PLAYER: TossBy = { source: 'player', employeeId: null }
+
 /** §6.6 Toss. Returns the bounty paid (0 on a wrong Toss). */
-export function tossParcel(sim: Sim, p: Parcel): number {
+export function tossParcel(
+  sim: Sim,
+  p: Parcel,
+  by: TossBy = BY_PLAYER,
+): number {
   const s = sim.state
   const lane = s.lane
   const eco = sim.data.economy
@@ -47,22 +64,41 @@ export function tossParcel(sim: Sim, p: Parcel): number {
   p.state = 'tossed'
   p.nodeId = lane.binNodeId
   p.nodeEnterTick = s.tick
-  p.trace.push({ tick: s.tick, what: 'tossed', ref: lane.binNodeId })
+  const who =
+    by.source === 'arm'
+      ? 'the Sorter Arm'
+      : by.employeeId === null
+        ? null
+        : (employeeById(s, by.employeeId)?.name ?? null)
+  p.trace.push({
+    tick: s.tick,
+    what: 'tossed',
+    ref: lane.binNodeId,
+    ...(who === null ? {} : { text: `Tossed by ${who}` }),
+  })
   const q = lane.quarantine
   q.count += 1
+  const source = { source: by.source, employeeId: by.employeeId }
   if (p.malware) {
     q.malware += 1
+    addWanted(s, p.label)
     sim.emit('parcel:tossed', {
       id: p.id,
       wasMalware: true,
       bounty: eco.tossBounty,
+      ...source,
     })
     sim.credit(eco.tossBounty, 'bounty', true)
     return eco.tossBounty
   }
   q.clean += 1
   s.stats.wrongToss += 1
-  sim.emit('parcel:tossed', { id: p.id, wasMalware: false, bounty: 0 })
+  sim.emit('parcel:tossed', {
+    id: p.id,
+    wasMalware: false,
+    bounty: 0,
+    ...source,
+  })
   const fee = Math.min(eco.wrongTossFee, s.economy.balance)
   if (fee > 0) sim.debit(fee, 'wrongToss')
   const origin = mapIndex(sim.data).buildingIdx[p.origin]

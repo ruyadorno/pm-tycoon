@@ -1,7 +1,8 @@
 // M2 HUD rules (city-view.md §3.3, §4.1, §8.1, §9.1-§9.2; plan.md §5
 // localStorage keys): the bomb-slot fuse on a lost life (the rightmost lit
 // slot fuses 400 ms, puffs, empties), the stall / incident ticker lines and
-// the registry accessor the warehouse's wanted poster reads.
+// the registry accessor of the onboarding object (M6: the wanted poster
+// reads the sim's `state.wanted` through ViewSim.wanted instead).
 import { describe, expect, it } from 'vitest'
 import { getOnboarding, REG_ONBOARDING } from '../../src/boot/autosave.ts'
 import {
@@ -12,6 +13,8 @@ import {
 } from '../../src/ui/LivesRow.ts'
 import { freshOnboarding } from '../../src/ui/Onboarding.ts'
 import { defusedLine, incidentLine, stallLine } from '../../src/ui/Ticker.ts'
+import { createViewSim } from '../../src/sim/view-api.ts'
+import { makeSim } from '../sim/helpers.ts'
 
 describe('city-view §3.3 step 3: the rightmost lit bomb slot fuses then empties', () => {
   it('3 → 2 lives fuses slot 3 (index 2); slots 4-5 stay outlines', () => {
@@ -92,8 +95,8 @@ describe('plan.md §5: pm.save.v2.onboarding lives in the game registry', () => 
     const ob = freshOnboarding()
     reg.set(REG_ONBOARDING, ob)
     expect(getOnboarding(reg)).toBe(ob)
-    getOnboarding(reg).wanted.push('evil-lodash')
-    expect(ob.wanted).toEqual(['evil-lodash'])
+    getOnboarding(reg).sawTossHint = true
+    expect(ob.sawTossHint).toBe(true)
   })
 
   it('replaces a missing or malformed value with a normalised one', () => {
@@ -103,8 +106,24 @@ describe('plan.md §5: pm.save.v2.onboarding lives in the game registry', () => 
     expect(reg.get(REG_ONBOARDING)).toBe(a)
     reg.set(REG_ONBOARDING, { step: 2, wanted: 'x' })
     const b = getOnboarding(reg)
-    expect(b.step).toBe(2)
-    expect(b.wanted).toEqual([])
+    expect(b).toEqual({ ...freshOnboarding(), step: 2 })
     expect(reg.get(REG_ONBOARDING)).toBe(b)
+  })
+
+  it('spec-build2 §2.8: the wanted list is sim state now — the onboarding object has none', () => {
+    const reg = registry()
+    // An M5 registry / save object with the old UI-side list.
+    reg.set(REG_ONBOARDING, {
+      step: 1,
+      skipped: false,
+      sawFirstFlag: true,
+      sawTossHint: false,
+      wanted: ['evil-lodash'],
+    })
+    expect(getOnboarding(reg).step).toBe(1)
+    expect('wanted' in freshOnboarding()).toBe(false)
+    const sim = makeSim(1)
+    expect(createViewSim(sim).wanted).toEqual([])
+    expect(sim.state.wanted).toEqual([])
   })
 })

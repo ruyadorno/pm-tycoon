@@ -307,7 +307,8 @@ describe('plan.md §12.9 rules: sim seconds, null = not reached', () => {
     expect(pt.vehiclesBought[0]?.type).toBe('bike')
     expect(pt.machinesBought.map((m) => m.id)).toContain('metal_detector')
     expect(pt.inspectorsHired).toBe(
-      log.filter((e) => e.cmd.kind === 'hireInspector').length,
+      log.filter((e) => e.cmd.kind === 'hire' && e.cmd.role === 'inspector')
+        .length,
     )
     expect(pt.rushTaps).toBe(log.filter((e) => e.cmd.kind === 'rush').length)
   })
@@ -417,8 +418,9 @@ describe('plan.md §12.9: lives, stalls, payroll and the Hold Bay from sim event
     sim.events.emit('payroll:short', { employeeIds: [1] })
     sim.events.emit('worker:walkedOut', {
       employeeId: 1,
-      kind: 'driver',
+      role: 'driver',
       nodeId: null,
+      vehicleId: 1,
     })
     expect(r.rec.snapshot().payroll).toEqual({ paid: 2, short: 1, walkouts: 1 })
   })

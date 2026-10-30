@@ -124,29 +124,110 @@ export interface MachinesData {
 }
 
 // employees.json ------------------------------------------------------------
+// Build 2 (spec-build2 §2, §9): three hireable roles whose stats are pips
+// (1-5; charisma 0-2) mapped to numbers through the per-role tables.
 
-export interface InspectorDef {
-  name: string
-  salaryPerDay: number
-  hireFee: number
-  processS: number
+export type RoleId = 'inspector' | 'sorter' | 'driver'
+export type StatId =
+  | 'eye'
+  | 'pace'
+  | 'charisma'
+  | 'judgement'
+  | 'speed'
+  | 'energy'
+export type AffinityId = 'none' | VehicleTypeId
+/** Pip counts keyed by the role's `stats` (1-5; charisma 0-2). Exactly the role's keys. */
+export type PipsDef = Partial<Record<StatId, number>>
+
+export interface SalaryDef {
+  base: number
+  perPip: number
+  perCharisma: number
+}
+
+export interface InspectorRoleDef {
+  stats: StatId[]
+  /** Own detection p by eye pip (index = pip − 1). */
+  p: number[]
+  decoyFlag: number[]
+  /** Process time by pace pip. */
+  processS: number[]
+  /** + p to every OTHER active inspector at the same desk, by charisma (index = pip). */
+  charismaBonus: number[]
+  pCap: number
   strain: 'any'
-  pMatch: number
-  pOther: number
-  decoyFlag: number
-  maxPerDesk: number
-  startCount: number
-  startSlot: number
+  salary: SalaryDef
+  hireFeeDays: number
+}
+
+export interface SorterRoleDef {
+  stats: StatId[]
+  /** Correct-call chance by judgement pip. */
+  correct: number[]
+  /** Seconds per decision by pace pip. */
+  decisionS: number[]
+  playerGraceS: number
+  usesWantedList: boolean
+  canClear: false
+  tagsClean: boolean
+  salary: SalaryDef
+  hireFeeDays: number
+}
+
+export interface DriverRoleDef {
+  stats: StatId[]
+  /** × the class speed by (speed + affinity) pip. */
+  speedMult: number[]
+  /** × vehicles.stopS by energy pip. */
+  stopMult: number[]
+  /** + satisfaction per on-time delivery / per pickup, by charisma (index = pip). */
+  charismaDelivery: number[]
+  charismaPickup: number[]
+  affinityPips: number
+  salary: SalaryDef
+  hireFeeDays: number
+}
+
+export interface ApplicantsDef {
+  poolSize: number
+  refreshEveryDays: number
+  adPrice: number
+  starExpiryDays: number
+  /** Level band ("1".."5") → weights of pips 1..5. Band = min(level, largest key). */
+  pipWeights: Record<string, number[]>
+  /** Weights of charisma 0, 1, 2. */
+  charismaWeights: number[]
+  affinityWeights: Record<AffinityId, number>
+}
+
+export interface DeskRowDef {
+  index: number
+  unlockLevel: number
+  price: number
 }
 
 export interface EmployeesData {
-  inspector: InspectorDef
-  maxDesks: number
-  deskPrice: number
+  roles: {
+    inspector: InspectorRoleDef
+    sorter: SorterRoleDef
+    driver: DriverRoleDef
+  }
+  applicants: ApplicantsDef
+  start: { inspector: { name: string; pips: PipsDef; slot: number } }
+  desks: { maxPerDesk: number; rows: DeskRowDef[] }
+  holdStation: { unlockLevel: number }
   payrollIntervalS: number
-  payOrder: ('inspectors' | 'drivers')[]
+  payOrder: ('inspectors' | 'sorters' | 'drivers')[]
   walkoutAfterUnpaidPaydays: number
   rehireFeeDays: number
+}
+
+/** A ★ applicant (quests.json rewards, M7 — the type lands now so people.ts can take it). */
+export interface StarApplicantDef {
+  role: RoleId
+  name: string
+  pips: PipsDef
+  affinity?: AffinityId
 }
 
 // parcels.json --------------------------------------------------------------
@@ -250,6 +331,13 @@ export interface PacingTargets {
   level3Min: [min: number, max: number]
   level4Min: [min: number, max: number]
   level5Min: [min: number, max: number]
+  /** Build 2 (spec-build2 §7.3, §9): informational until their milestone. */
+  firstOverseasClearedAfterLevel3MaxMin: number
+  questsOfferedBy30MinMin: number
+  questsCompletedBy30MinMin: number
+  payrollShareOfGrossMax: number
+  goldenReleaseOfferedMaxMin: number
+  victoryMaxMin: number
 }
 
 export interface EconomyData {
@@ -300,8 +388,8 @@ export interface PunsData {
   decoyLabels: Record<StrainId, string[]>
   streets: string[]
   tracks: string[]
-  inspectorNames: string[]
-  driverNames: string[]
+  /** Build 2: every hireable person's name (spec-build2 §9); the start inspector first. */
+  peopleNames: string[]
   companyName: string
   tossHint: string
   wantedTitle: string

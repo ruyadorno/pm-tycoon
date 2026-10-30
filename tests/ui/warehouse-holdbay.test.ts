@@ -3,8 +3,11 @@
 // "Flagged by: Metal detector (metal)", "Value now $38 · falling",
 // "Inspector Audrey"; TOSS / CLEAR 160 × 48; never reveals malware), §3.5
 // (CLEAR refused at shelf cap — Q35; "$5 · floor" at the value floor),
-// spec §5.3 (decay while held), §5.4 (reading the label is the skill).
-// Pure helpers; Phaser is stubbed.
+// spec §5.3 (decay while held), §5.4 (reading the label is the skill);
+// design-m6 §6.2 / spec-build2 §2.6 (the sorter's hint "Pat: looks clean
+// (85%)" under the label, +20 px → 268; line 6 names the flagging inspector;
+// opening the card touches the parcel, D3). Pure helpers + a headless Sim;
+// Phaser is stubbed.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -23,8 +26,10 @@ vi.mock('phaser', () => {
 const hb = await import('../../src/ui/warehouse/HoldBayCard.ts')
 const bs = await import('../../src/ui/warehouse/BuySheet.ts')
 const { computeLayout, HUD_TOP_H } = await import('../../src/ui/layout.ts')
-const { dataFixture } = await import('../sim/helpers.ts')
+const { dataFixture, fund, heldParcel, quietSim, standardApplicant } =
+  await import('../sim/helpers.ts')
 const { TICKS_PER_S } = await import('../../src/sim/types.ts')
+const { createViewSim } = await import('../../src/sim/view-api.ts')
 
 const data = dataFixture()
 const S = data.parcels.sizes.S.value
@@ -165,5 +170,91 @@ describe('§3.1 card geometry', () => {
     const L = computeLayout(360, 604, 0, 0, 1)
     expect(bs.sheetBottom(L) - hb.HOLD_CARD_H).toBeGreaterThanOrEqual(HUD_TOP_H)
     expect(hb.CAPTION_Y + 14).toBeLessThanOrEqual(hb.HOLD_CARD_H)
+  })
+})
+
+describe('design-m6 §6.2 the sorter hint and the flagging inspector', () => {
+  it('"Pat: looks clean (85%)" from the sorter tag', () => {
+    expect(hb.sorterHintLine({ name: 'Pat', pct: 85 })).toBe(
+      'Pat: looks clean (85%)',
+    )
+    expect(hb.sorterHintLine({ name: 'Rae', pct: 70 })).toBe(
+      'Rae: looks clean (70%)',
+    )
+  })
+
+  it('line 6 names the one inspector whose roll flagged it', () => {
+    expect(hb.inspectorLine('Lin')).toBe('Inspector Lin')
+    expect(hb.inspectorLine(null)).toBeNull()
+  })
+
+  it('the hint adds one 20-px line: 248 → 268, every line below moves down 20', () => {
+    const plain = hb.holdCardLayout(false)
+    const hint = hb.holdCardLayout(true)
+    expect(plain).toMatchObject({
+      h: 248,
+      hintY: null,
+      routeY: hb.ROUTE_Y,
+      actionsY: hb.ACTIONS_Y,
+      captionY: hb.CAPTION_Y,
+    })
+    expect(hint.h).toBe(268)
+    expect(hb.HOLD_CARD_HINT_H).toBe(268)
+    for (const k of [
+      'routeY',
+      'flagY',
+      'valueY',
+      'crewY',
+      'actionsY',
+      'captionY',
+    ] as const)
+      expect(hint[k] - plain[k]).toBe(20)
+    // the hint band sits between the size line (y 36..52) and the route
+    expect(hint.hintY).toBeGreaterThanOrEqual(52)
+    expect((hint.hintY ?? 0) + hb.HINT_LINE_H).toBeLessThanOrEqual(hint.routeY)
+  })
+
+  it('the 268-px card still fits under the HUD top band at 360 × 604', () => {
+    const L = computeLayout(360, 604, 0, 0, 1)
+    expect(bs.sheetBottom(L) - hb.HOLD_CARD_HINT_H).toBeGreaterThanOrEqual(
+      HUD_TOP_H,
+    )
+    const hint = hb.holdCardLayout(true)
+    expect(hint.captionY + 14).toBeLessThanOrEqual(hint.h)
+  })
+
+  it('the facade item carries the tag and the flagging inspector; touch marks the parcel', () => {
+    const sim = fund(quietSim(1))
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 2 }).ok).toBe(true)
+    const a = standardApplicant(sim, 'sorter')
+    const hired = sim.dispatch({
+      kind: 'hire',
+      role: 'sorter',
+      applicantId: a.id,
+      target: { station: 'hold' },
+    })
+    if (!hired.ok || hired.employeeId === undefined) throw new Error('hire')
+    const p = heldParcel(sim, { malware: false })
+    p.sorted = { by: hired.employeeId, name: a.name, pct: 85 }
+    p.trace.push({
+      tick: sim.state.tick,
+      what: 'flagged',
+      ref: 'slot1',
+      text: 'Slot 1 desk — Audrey: flagged (metal)',
+      by: 1,
+      who: 'Audrey',
+    })
+    const vs = createViewSim(sim)
+    const item = vs.holdBay.items.find((i) => i.parcelId === p.id)
+    expect(item?.sorted).toEqual({ name: a.name, pct: 85 })
+    expect(item?.inspectorName).toBe('Audrey')
+    expect(item?.checkerName).toBe('Inspection desk')
+    expect(hb.sorterHintLine(item!.sorted!)).toBe(
+      `${a.name}: looks clean (85%)`,
+    )
+    // HoldBayCard.open dispatches this (design D3)
+    expect(vs.holdBay.touch(p.id)).toEqual({ ok: true })
+    expect(sim.state.parcels[String(p.id)]?.touchedTick).toBe(sim.state.tick)
+    expect(vs.holdBay.touch(999_999)).toEqual({ ok: false, reason: 'invalid' })
   })
 })

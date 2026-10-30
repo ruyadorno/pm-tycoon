@@ -17,6 +17,7 @@ import {
   dataFixture,
   eventLog,
   feeder,
+  hireInspector,
   injectParcel,
   laneParcel,
   noCheckers,
@@ -139,8 +140,8 @@ describe('throughput (spec §6.3)', () => {
 
     const three = quietSim(1)
     three.state.economy.balance = 1000
-    three.dispatch({ kind: 'hireInspector' })
-    three.dispatch({ kind: 'hireInspector' })
+    hireInspector(three)
+    hireInspector(three)
     expect(laneNode(three.state.lane, 'slot1')?.stations).toHaveLength(3)
     expect(steadyRate(three, 200)).toBe(45)
     expect(createViewSim(three).lane.rate()).toBe(45)
@@ -165,7 +166,9 @@ describe('throughput (spec §6.3)', () => {
       (e) =>
         e.name === 'parcel:enteredSlot' && (e.p as { id: number }).id === a.id,
     )
-    expect(firstOut?.tick).toBe(t0 + data.employees.inspector.processS * 10)
+    expect(firstOut?.tick).toBe(
+      t0 + data.employees.roles.inspector.processS[2]! * 10,
+    )
     expect(processing.at(-1)).toEqual({ id: b.id, nodeId: 'slot1' })
   })
 })

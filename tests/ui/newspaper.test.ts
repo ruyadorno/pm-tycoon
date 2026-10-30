@@ -70,11 +70,44 @@ describe('city-view §8.2: a 48×48 picture by kind', () => {
     expect(np.heroBuilding(data, 'nowhere')).toBeNull()
   })
 
+  it("M6 hired → the role's worker idle frame (the sorter's own variant)", () => {
+    expect(np.newsPicture('hired', data, { role: 'inspector' })).toBe(
+      'worker_s_idle_0',
+    )
+    expect(np.newsPicture('hired', data, { role: 'sorter' })).toBe(
+      'worker_sorter_s_idle_0',
+    )
+    expect(np.newsPicture('hired', data)).toBe('worker_s_idle_0')
+  })
+
   it('fits a frame inside the box keeping its aspect, never upscaling', () => {
     expect(np.fitBox(32, 32, 48)).toEqual({ w: 32, h: 32 })
     expect(np.fitBox(24, 32, 48)).toEqual({ w: 24, h: 32 })
     expect(np.fitBox(256, 170, 46)).toEqual({ w: 46, h: 31 })
     expect(np.fitBox(192, 183, 46)).toEqual({ w: 46, h: 44 })
+  })
+})
+
+describe('spec-build2 §2.5: a one-line "hired" item for star applicants only', () => {
+  it('"Star hire: Wren joins as a sorter" (m5x7 has no ★ glyph)', () => {
+    expect(np.starHireHeadline('Wren', 'sorter')).toBe(
+      'Star hire: Wren joins as a sorter',
+    )
+    expect(np.starHireHeadline('Ivy', 'inspector')).toBe(
+      'Star hire: Ivy joins as an inspector',
+    )
+    expect(np.starHireHeadline('Kit', 'driver')).toBe(
+      'Star hire: Kit joins as a driver',
+    )
+    // One line in the 236-px headline box.
+    expect(
+      np.wrapHeadline(
+        np.starHireHeadline('Wren', 'inspector'),
+        np.HEADLINE_W,
+        4,
+        measure,
+      ),
+    ).toHaveLength(1)
   })
 })
 

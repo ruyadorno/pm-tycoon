@@ -1,7 +1,7 @@
 // spec §7.3-§7.4 payroll, unpaid marks, walkouts and re-hire (+ §4.6
 // `inactive`, §6.7; plan.md §12.6 tasks 2 + 11): payday on every day
-// boundary in the fixed order (inspectors by hire, then drivers by vehicle
-// purchase), balance ≥ salary → paid, else unpaid; the second consecutive
+// boundary in the fixed order (inspectors by hire, then sorters — M6,
+// people.test.ts — then drivers by vehicle purchase), balance ≥ salary → paid, else unpaid; the second consecutive
 // unpaid payday walks the worker out (an inspector leaves the desk, a driver's
 // vehicle finishes its trip, unloads and parks inactive); one paid payday
 // clears the mark; re-hire = one day's salary, immediate; the balance never
@@ -18,11 +18,13 @@ import {
 import type { Employee, Vehicle } from '../../src/sim/types.ts'
 import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
+import { salaryOf } from '../../src/sim/systems/people.ts'
 import {
   buy,
   collect,
   dataFixture,
   eventLog,
+  hireInspector,
   injectParcel,
   makeSim,
   openingA,
@@ -33,7 +35,8 @@ import {
 } from './helpers.ts'
 
 const data = dataFixture()
-const INSPECTOR = data.employees.inspector.salaryPerDay
+/** The standard 3/3/0 inspector's salary (Audrey, the helpers' hires): $20. */
+const INSPECTOR = salaryOf(data, 'inspector', { eye: 3, pace: 3, charisma: 0 })
 const salary = (type: string): number =>
   data.vehicles.types.find((t) => t.id === type)!.driverSalaryPerDay
 
@@ -46,7 +49,7 @@ const employee = (sim: Sim, id: number): Employee =>
   sim.state.employees.find((e) => e.id === id)!
 const driverOf = (sim: Sim, v: Vehicle): Employee => employee(sim, v.driverId!)
 const inspectorIds = (sim: Sim): number[] =>
-  sim.state.employees.filter((e) => e.kind === 'inspector').map((e) => e.id)
+  sim.state.employees.filter((e) => e.role === 'inspector').map((e) => e.id)
 
 describe('payday (spec §7.3)', () => {
   it('payday 1 under opening A totals $28 (inspector $20 + bike driver $8), one ledger line at t = 60 s', () => {
@@ -87,7 +90,7 @@ describe('payday (spec §7.3)', () => {
     const bikeA = buy(sim, 'bike') // tick 0
     runTicks(sim, 10)
     sim.state.economy.balance = 100
-    expect(sim.dispatch({ kind: 'hireInspector' })).toEqual({ ok: true })
+    expect(hireInspector(sim)).toMatchObject({ ok: true })
     runTicks(sim, 10)
     const bikeB = buy(sim, 'bike')
     const [insp1, insp2] = inspectorIds(sim) as [number, number]
@@ -141,8 +144,13 @@ describe('unpaid marks and walkouts (spec §7.4)', () => {
     expect(createViewSim(sim).vehicles[0]!.unpaid).toBe(true)
     toPayday(sim)
     expect(out).toEqual([
-      { employeeId: insp, kind: 'inspector', nodeId: 'slot1' },
-      { employeeId: driverOf(sim, bike).id, kind: 'driver', nodeId: null },
+      { employeeId: insp, role: 'inspector', nodeId: 'slot1', vehicleId: null },
+      {
+        employeeId: driverOf(sim, bike).id,
+        role: 'driver',
+        nodeId: null,
+        vehicleId: bike.id,
+      },
     ])
     const desk = laneNode(sim.state.lane, 'slot1')!
     expect(desk.fixture?.kind).toBe('desk')
@@ -393,7 +401,15 @@ describe('re-hire (spec §7.4) and the desk seats', () => {
       { delta: -salary('bike'), reason: 'hire', balance: 100 - salary('bike') },
     ])
     expect(hired).toEqual([
-      { employeeId: driver.id, kind: 'driver', nodeId: null },
+      {
+        employeeId: driver.id,
+        role: 'driver',
+        nodeId: null,
+        vehicleId: v.id,
+        pips: { speed: 3, energy: 3, charisma: 0 },
+        star: false,
+        rehire: true,
+      },
     ])
     expect(driver).toMatchObject({ active: true, unpaidPaydays: 0 })
     expect(parked).toEqual([{ id: v.id }])
@@ -421,16 +437,16 @@ describe('re-hire (spec §7.4) and the desk seats', () => {
     expect(auditState(sim.state, data)).toEqual([])
   })
 
-  it('hireInspector counts walked-out inspectors against maxPerDesk (they keep their seat for a re-hire)', () => {
+  it('hiring counts walked-out inspectors against maxPerDesk (they keep their seat for a re-hire)', () => {
     const sim = quietSim(1)
     sim.state.economy.balance = 1000
-    const max = data.employees.inspector.maxPerDesk
+    const max = data.employees.desks.maxPerDesk
     for (let i = 1; i < max; i++) {
-      expect(sim.dispatch({ kind: 'hireInspector' })).toEqual({ ok: true })
+      expect(hireInspector(sim)).toMatchObject({ ok: true })
     }
     const [first] = inspectorIds(sim) as [number]
     walkOut(sim, employee(sim, first))
-    expect(sim.dispatch({ kind: 'hireInspector' })).toEqual({
+    expect(hireInspector(sim)).toEqual({
       ok: false,
       reason: 'desk-full',
     })
@@ -457,7 +473,7 @@ describe('money and the clock (spec §7.2-§7.3)', () => {
         if (rand() < 0.4) buy(sim, rand() < 0.7 ? 'bike' : 'van')
         if (rand() < 0.4) {
           sim.state.economy.balance += 40
-          sim.dispatch({ kind: 'hireInspector' })
+          hireInspector(sim)
         }
         sim.state.economy.balance = Math.floor(rand() * 60)
         for (let t = 0; t < TICKS_PER_DAY; t++) {
@@ -538,9 +554,12 @@ describe('money and the clock (spec §7.2-§7.3)', () => {
           return e ? { kind: 'rehire', employeeId: e.id } : null
         }
         if (k < 0.66) {
+          // M6: a pool driver (replay-safe), or now and then "Hire later".
           return {
             kind: 'buyVehicle',
             type: pick(['bike', 'bike', 'truck'] as const)!,
+            applicantId:
+              r() < 0.9 ? (s.applicants.driver[0]?.id ?? null) : null,
           }
         }
         if (k < 0.74) {
@@ -550,10 +569,21 @@ describe('money and the clock (spec §7.2-§7.3)', () => {
             nodeId: pick(slots)!,
           }
         }
-        if (k < 0.8) return { kind: 'hireInspector' }
+        if (k < 0.8) {
+          const desk = s.lane.nodes.find((n) => n.fixture?.kind === 'desk')
+          const hiree = s.applicants.inspector[0]
+          return desk && hiree
+            ? {
+                kind: 'hire',
+                role: 'inspector',
+                applicantId: hiree.id,
+                target: { nodeId: desk.id },
+              }
+            : null
+        }
         if (k < 0.84) {
-          const e = pick(s.employees.filter((x) => x.kind === 'inspector'))
-          return e ? { kind: 'fireInspector', employeeId: e.id } : null
+          const e = pick(s.employees.filter((x) => x.role === 'inspector'))
+          return e ? { kind: 'fire', employeeId: e.id } : null
         }
         if (k < 0.88) {
           return { kind: 'moveFixture', from: pick(slots)!, to: pick(slots)! }
@@ -585,7 +615,7 @@ describe('money and the clock (spec §7.2-§7.3)', () => {
       live.addTap((name, p) => {
         if (
           name === 'worker:walkedOut' &&
-          (p as { kind: string }).kind === 'driver'
+          (p as { role: string }).role === 'driver'
         ) {
           walkedOutAt = live.state.tick
         }

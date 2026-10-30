@@ -4,6 +4,17 @@
 // policy test) can reuse them without the CLI. A window whose sim system is
 // not built yet (src/sim/features.ts SIM_FEATURES) is printed as
 // "informational (Mn)" and does not fail the gate.
+//
+// Build 2, M6 (spec-build2 §7.3; design-m6 §5.3): the people rows —
+// payrollShareOfGross (payroll paid ÷ gross income, target
+// payrollShareOfGrossMax), sorterDecisions / sorterWrongToss / sorterMissed
+// (from sorter:decided) and hires — are informational; the five pacing
+// keys whose systems land in M7-M9 print as "build 2 — informational". The
+// `delegating` policy marks every window informational and prints its lives
+// median as delegatingLivesLost. A `--baseline` gate JSON adds the Δ% of
+// the seven playtest-1 medians and the "within ±5 %" line (plan-build2
+// §8.3 task 11: the people layer must not move them; informational, the
+// exit code is unchanged).
 
 import type { PacingTargets } from '../../src/data/types.ts'
 import type { SimEventName } from '../../src/sim/events.ts'
@@ -178,7 +189,19 @@ export class Highlights {
       case 'worker:fired': {
         const who = s.employees.find((x) => x.id === e.employeeId)
         const verb = e.name.slice('worker:'.length)
-        return `${at} ${e.kind} ${who?.name ?? e.employeeId} ${verb}`
+        const why =
+          e.name === 'worker:fired' && e.reason !== 'fired'
+            ? ` (${String(e.reason)})`
+            : ''
+        return `${at} ${String(e.role)} ${who?.name ?? e.employeeId} ${verb}${why}`
+      }
+      case 'sorter:decided': {
+        if (e.correct === true) return null
+        const key = e.call === 'toss' ? 'sorterWrongToss' : 'sorterMissed'
+        if (!this.#first(key)) return null
+        return e.call === 'toss'
+          ? `${at} first sorter wrong toss #${e.parcelId} (clean parcel)`
+          : `${at} first malware the sorter left as looks clean #${e.parcelId}`
       }
       case 'lane:stalled':
         return this.#first(`stall:${e.reason}`)
@@ -231,6 +254,16 @@ export interface RunMetrics {
   level3Min: number | null
   level4Min: number | null
   level5Min: number | null
+  /** M6: stats.payrollPaid ÷ stats.income (gross), 3 dp; null with no income yet. */
+  payrollShareOfGross: number | null
+  /** M6: sorter:decided calls. */
+  sorterDecisions: number
+  /** M6: sorter Tosses of a clean parcel (call toss, not correct). */
+  sorterWrongToss: number
+  /** M6: malware the sorter left tagged `looks clean` (call leave, not correct). */
+  sorterMissed: number
+  /** M6: worker:hired that are not re-hires (the pre-hired start inspector is not one). */
+  hires: number
 }
 
 export interface GateCheck {
@@ -253,6 +286,7 @@ export const WINDOW_NEEDS: Partial<Record<keyof PacingTargets, SimFeature[]>> =
     holdBayEventsPer10MinMin: ['lane'],
     level2Min: ['levels'],
     truckAfterLevel2MaxMin: ['levels'],
+    payrollShareOfGrossMax: ['people'],
   }
 
 export type SimFeatures = Record<SimFeature, boolean>
@@ -324,6 +358,7 @@ export function computeMetrics(
 
   const l2 = levelTick(2)
   const held = events.filter((e) => e.name === 'parcel:held')
+  const calls = events.filter((e) => e.name === 'sorter:decided')
   const l1End = l2 ?? endTick
   const heldL1 = held.filter((e) => e.tick < l1End).length
   const truck = stats.truckTick
@@ -354,6 +389,14 @@ export function computeMetrics(
     level3Min: toMin(levelTick(3)),
     level4Min: toMin(levelTick(4)),
     level5Min: toMin(levelTick(5)),
+    payrollShareOfGross:
+      stats.income > 0 ? round(stats.payrollPaid / stats.income, 3) : null,
+    sorterDecisions: calls.length,
+    sorterWrongToss: calls.filter((e) => e.call === 'toss' && !e.correct)
+      .length,
+    sorterMissed: calls.filter((e) => e.call === 'leave' && !e.correct).length,
+    hires: events.filter((e) => e.name === 'worker:hired' && e.rehire !== true)
+      .length,
   }
 }
 
@@ -370,11 +413,16 @@ export interface GateInputs {
 
 const le = (v: number | null, max: number): boolean => v !== null && v <= max
 
-/** The seven playtest-1 windows (spec §7, plan.md §6.9.2) against economy.pacingTargets. */
+/**
+ * The seven playtest-1 windows (spec §7, plan.md §6.9.2) against
+ * economy.pacingTargets. `override` (e.g. "informational (delegating)")
+ * notes every window, so none gates.
+ */
 export function checkMetrics(
   m: GateInputs,
   t: PacingTargets,
   features: SimFeatures = SIM_FEATURES,
+  override: string | null = null,
 ): GateCheck[] {
   const [lo, hi] = t.level2Min
   const checks: Omit<GateCheck, 'note'>[] = [
@@ -430,7 +478,10 @@ export function checkMetrics(
         m.holdBayEventsPer10MinL1 >= t.holdBayEventsPer10MinMin,
     },
   ]
-  return checks.map((c) => ({ ...c, note: windowNote(c.key, features) }))
+  return checks.map((c) => ({
+    ...c,
+    note: override ?? windowNote(c.key, features),
+  }))
 }
 
 /** Median with null = "never happened" = +∞ (fails every window); returns null for ∞. */
@@ -455,6 +506,11 @@ export interface MedianMetrics extends GateInputs {
   level3Min: number | null
   level4Min: number | null
   level5Min: number | null
+  payrollShareOfGross: number | null
+  sorterDecisions: number | null
+  sorterWrongToss: number | null
+  sorterMissed: number | null
+  hires: number | null
 }
 
 /** Medians of the gated metrics + the informational ones. */
@@ -476,6 +532,11 @@ export function medianMetrics(runs: readonly RunMetrics[]): MedianMetrics {
     level3Min: pick('level3Min'),
     level4Min: pick('level4Min'),
     level5Min: pick('level5Min'),
+    payrollShareOfGross: pick('payrollShareOfGross'),
+    sorterDecisions: pick('sorterDecisions'),
+    sorterWrongToss: pick('sorterWrongToss'),
+    sorterMissed: pick('sorterMissed'),
+    hires: pick('hires'),
   }
 }
 
@@ -500,13 +561,15 @@ export interface GateSummary {
   checks: GateCheck[]
   /** SIM_FEATURES when the gate ran (which windows were gated). */
   features: SimFeatures
-  /** Printed only: hold density over the run, malware share at the end, the build-2 level windows. */
+  /** Printed only: hold density over the run, malware share at the end, the build-2 rows. */
   informational: {
     key: string
     target: string
     median: number | null
     note: string
   }[]
+  /** M6: the seven medians against a previous gate JSON (`--baseline`); absent without one. */
+  baseline?: BaselineCompare
   pass: boolean
 }
 
@@ -515,8 +578,9 @@ export function seedResult(
   targets: PacingTargets,
   asserts: string[],
   features: SimFeatures = SIM_FEATURES,
+  override: string | null = null,
 ): SeedResult {
-  const checks = checkMetrics(metrics, targets, features)
+  const checks = checkMetrics(metrics, targets, features, override)
   return {
     metrics,
     checks,
@@ -525,7 +589,14 @@ export function seedResult(
   }
 }
 
-/** Medians must pass every playtest-1 window and no seed may break an invariant. */
+/** The note every window carries under the `delegating` policy (B2 §7.2: its rows are informational). */
+export const DELEGATING_NOTE = 'informational (delegating)'
+
+/**
+ * Medians must pass every playtest-1 window and no seed may break an
+ * invariant. Under the `delegating` policy (meta.policy) every window is
+ * informational, so only an invariant fails it.
+ */
 export function summarise(
   runs: SeedResult[],
   meta: {
@@ -538,10 +609,18 @@ export function summarise(
   },
 ): GateSummary {
   const features = meta.features ?? SIM_FEATURES
+  const delegating = meta.policy === 'delegating'
   const medians = medianMetrics(runs.map((r) => r.metrics))
-  const checks = checkMetrics(medians, meta.targets, features)
+  const checks = checkMetrics(
+    medians,
+    meta.targets,
+    features,
+    delegating ? DELEGATING_NOTE : null,
+  )
   const t = meta.targets
   const build2 = 'build 2 — informational'
+  const people =
+    windowNote('payrollShareOfGrossMax', features) ?? 'informational'
   const informational = [
     {
       key: 'holdBayEventsPer10Min',
@@ -585,6 +664,76 @@ export function summarise(
       median: medians.level5Min,
       note: build2,
     },
+    {
+      key: 'payrollShareOfGross',
+      target: `≤ ${t.payrollShareOfGrossMax} (payroll paid ÷ gross income at ${meta.minutes} min)`,
+      median: medians.payrollShareOfGross,
+      note: people,
+    },
+    {
+      key: 'sorterDecisions',
+      target: 'Hold Bay sorter calls',
+      median: medians.sorterDecisions,
+      note: people,
+    },
+    {
+      key: 'sorterWrongToss',
+      target: 'clean parcels the sorter tossed',
+      median: medians.sorterWrongToss,
+      note: people,
+    },
+    {
+      key: 'sorterMissed',
+      target: 'malware the sorter left as looks clean',
+      median: medians.sorterMissed,
+      note: people,
+    },
+    {
+      key: 'hires',
+      target: 'hires (not re-hires)',
+      median: medians.hires,
+      note: people,
+    },
+    ...(delegating
+      ? [
+          {
+            key: 'delegatingLivesLost',
+            target: 'lives lost trusting the sorter (B2 §7.3)',
+            median: medians.livesLost,
+            note: DELEGATING_NOTE,
+          },
+        ]
+      : []),
+    {
+      key: 'firstOverseasClearedAfterLevel3MaxMin',
+      target: `≤ ${t.firstOverseasClearedAfterLevel3MaxMin} min after L3`,
+      median: null,
+      note: build2,
+    },
+    {
+      key: 'questsOfferedBy30MinMin',
+      target: `≥ ${t.questsOfferedBy30MinMin} by 30 min`,
+      median: null,
+      note: build2,
+    },
+    {
+      key: 'questsCompletedBy30MinMin',
+      target: `≥ ${t.questsCompletedBy30MinMin} by 30 min`,
+      median: null,
+      note: build2,
+    },
+    {
+      key: 'goldenReleaseOfferedMaxMin',
+      target: `≤ ${t.goldenReleaseOfferedMaxMin} min`,
+      median: null,
+      note: build2,
+    },
+    {
+      key: 'victoryMaxMin',
+      target: `≤ ${t.victoryMaxMin} min`,
+      median: null,
+      note: build2,
+    },
   ]
   return {
     version: 1,
@@ -601,6 +750,94 @@ export function summarise(
     informational,
     pass: runs.every((r) => r.asserts.length === 0) && checks.every(checkOk),
   }
+}
+
+// Baseline (--baseline) ---------------------------------------------------------------
+
+/**
+ * plan-build2 §8.3 task 11 / B2 §7.3: a milestone that adds no balance change
+ * keeps each playtest-1 median within ±5 % of the previous gate's. A
+ * comparison band of the report, not a balance number.
+ */
+export const BASELINE_TOLERANCE = 0.05
+
+export interface BaselineRow {
+  key: keyof PacingTargets
+  base: number | null
+  value: number | null
+  /** (value − base) ÷ |base| × 100, 1 dp; null when either never happened or base is 0. */
+  deltaPct: number | null
+  within: boolean
+}
+
+export interface BaselineCompare {
+  /** The baseline file as given on the command line. */
+  file: string
+  dataHash: string
+  tolerance: number
+  rows: BaselineRow[]
+  within: boolean
+}
+
+/** Is `value` within `tol` (a fraction) of `base`? Never-happened on both sides counts as within. */
+export function withinBand(
+  base: number | null,
+  value: number | null,
+  tol: number = BASELINE_TOLERANCE,
+): boolean {
+  if (base === null || value === null) return base === value
+  return Math.abs(value - base) <= tol * Math.abs(base) + 1e-9
+}
+
+/** The seven windows' medians of `g` against those of `base` (a previous GateSummary JSON). */
+export function compareBaseline(
+  g: Pick<GateSummary, 'checks'>,
+  base: Pick<GateSummary, 'checks' | 'dataHash'>,
+  file: string,
+  tol: number = BASELINE_TOLERANCE,
+): BaselineCompare {
+  const rows = g.checks.map((c): BaselineRow => {
+    const b = base.checks.find((x) => x.key === c.key)?.value ?? null
+    const v = c.value
+    const deltaPct =
+      b === null || v === null || b === 0
+        ? null
+        : round(((v - b) / Math.abs(b)) * 100, 1)
+    return {
+      key: c.key,
+      base: b,
+      value: v,
+      deltaPct,
+      within: withinBand(b, v, tol),
+    }
+  })
+  return {
+    file,
+    dataHash: base.dataHash,
+    tolerance: tol,
+    rows,
+    within: rows.every((r) => r.within),
+  }
+}
+
+/** A Δ% cell: `+4.7%`, `0.0%`, `=` (both equal), `abs +0.50` (from a 0 baseline), `—` (never happened on one side). */
+export function deltaCell(r: BaselineRow): string {
+  if (r.deltaPct !== null) {
+    return `${r.deltaPct > 0 ? '+' : ''}${r.deltaPct.toFixed(1)}%`
+  }
+  if (r.base === r.value) return r.base === null ? '— (never)' : '='
+  // A zero baseline has no relative change: the absolute one.
+  if (r.base === 0 && r.value !== null) {
+    return `abs ${r.value > 0 ? '+' : ''}${val(r.value)}`
+  }
+  return '—'
+}
+
+/** `playtest-1 rows within ±5 %: yes` / `no (rows: level2Min −6.1%, …)`. */
+export function baselineLine(b: BaselineCompare): string {
+  const pct = Math.round(b.tolerance * 100)
+  const out = b.rows.filter((r) => !r.within)
+  return `playtest-1 rows within ±${pct} %: ${b.within ? 'yes' : `no (rows: ${out.map((r) => `${r.key} ${deltaCell(r)}`).join(', ')})`}`
 }
 
 // Gate tables ------------------------------------------------------------------------
@@ -632,7 +869,29 @@ const GATE_COLS: readonly {
         ? '—'
         : `${(m.malwareShareAtEnd * 100).toFixed(1)}%`,
   },
+  {
+    head: 'pay%',
+    w: 5,
+    cell: (m) =>
+      m.payrollShareOfGross === undefined || m.payrollShareOfGross === null
+        ? '—'
+        : (m.payrollShareOfGross * 100).toFixed(1),
+  },
+  {
+    head: 'sorter d/w/m',
+    w: 12,
+    cell: (m) =>
+      [m.sorterDecisions, m.sorterWrongToss, m.sorterMissed]
+        .map((x) => count(x))
+        .join('/'),
+  },
 ]
+
+/** An integer count (a median of counts may end in .5). */
+function count(v: number | null | undefined): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—'
+  return Number.isInteger(v) ? String(v) : v.toFixed(1)
+}
 
 function num(v: number | null | undefined, digits = 1): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—'
@@ -676,15 +935,26 @@ export function formatGate(g: GateSummary): string[] {
       passWord(g.pass),
     ].join(' '),
   )
+  const delta = (key: string): string => {
+    const r = g.baseline?.rows.find((x) => x.key === key)
+    return r
+      ? ` · Δ ${deltaCell(r)} vs ${val(r.base)}${r.within ? '' : ' ✗'}`
+      : ''
+  }
   for (const c of g.checks) {
     const word = c.note === null ? passWord(c.pass) : 'info'
     lines.push(
-      `  ${word} ${c.key}: median ${val(c.value)} (target ${c.target})${c.note === null ? '' : ` — ${c.note}`}`,
+      `  ${word} ${c.key}: median ${val(c.value)} (target ${c.target})${c.note === null ? '' : ` — ${c.note}`}${delta(c.key)}`,
     )
   }
   for (const i of g.informational) {
     lines.push(
       `  info ${i.key}: median ${num(i.median, 3)} (${i.target}) — ${i.note}`,
+    )
+  }
+  if (g.baseline) {
+    lines.push(
+      `${baselineLine(g.baseline)} — baseline ${g.baseline.file} (data ${g.baseline.dataHash})`,
     )
   }
   lines.push(
@@ -715,13 +985,16 @@ const mdRow = (cells: string[]): string => `| ${cells.join(' | ')} |`
 
 /** docs/gate/*.md */
 export function gateMarkdown(g: GateSummary, cmd: string): string {
+  const b = g.baseline
   const head = ['seed', ...GATE_COLS.map((c) => c.head), 'result']
   const lines = [
     `# Sim gate — ${passWord(g.pass)}`,
     '',
     `\`${cmd}\` · seeds ${g.seeds.join(', ')} × ${g.minutes} min · policy \`${g.policy}\` · data \`${g.dataHash}\`${g.config ? ` · config \`${g.config}\`` : ''}`,
     '',
-    'Thresholds: `economy.pacingTargets` (spec §7, plan.md §6.9.2). Medians must pass; null = never happened.',
+    g.policy === 'delegating'
+      ? 'Thresholds: `economy.pacingTargets` (spec §7, plan.md §6.9.2). The `delegating` policy (spec-build2 §7.2) is informational: only an invariant fails it; null = never happened.'
+      : 'Thresholds: `economy.pacingTargets` (spec §7, plan.md §6.9.2). Medians must pass; null = never happened.',
     '',
     mdRow(head),
     mdRow(head.map(() => '---')),
@@ -739,20 +1012,42 @@ export function gateMarkdown(g: GateSummary, cmd: string): string {
       `**${passWord(g.pass)}**`,
     ]),
     '',
-    '| window | median | target | result |',
-    '| --- | --- | --- | --- |',
-    ...g.checks.map((c) =>
-      mdRow([
+    b
+      ? '| window | median | target | result | Δ% vs baseline |'
+      : '| window | median | target | result |',
+    b ? '| --- | --- | --- | --- | --- |' : '| --- | --- | --- | --- |',
+    ...g.checks.map((c) => {
+      const r = b?.rows.find((x) => x.key === c.key)
+      return mdRow([
         `\`${c.key}\``,
         val(c.value),
         c.target,
         c.note === null ? passWord(c.pass) : c.note,
+        ...(b
+          ? [
+              r
+                ? `${deltaCell(r)} (${val(r.base)})${r.within ? '' : ' ✗'}`
+                : '—',
+            ]
+          : []),
+      ])
+    }),
+    ...g.informational.map((i) =>
+      mdRow([
+        `\`${i.key}\``,
+        num(i.median, 3),
+        i.target,
+        i.note,
+        ...(b ? [''] : []),
       ]),
     ),
-    ...g.informational.map((i) =>
-      mdRow([`\`${i.key}\``, num(i.median, 3), i.target, i.note]),
-    ),
     '',
+    ...(b
+      ? [
+          `${baselineLine(b)} — baseline \`${b.file}\` (data \`${b.dataHash}\`, tolerance ±${Math.round(b.tolerance * 100)} %, informational).`,
+          '',
+        ]
+      : []),
   ]
   return lines.join('\n')
 }

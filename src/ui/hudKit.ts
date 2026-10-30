@@ -8,10 +8,10 @@ import type Phaser from 'phaser'
 import type { GameData } from '../data/types.ts'
 import type { FrameName } from '../render/frames.ts'
 import type { MoneyReason } from '../sim/events.ts'
-import type { Size, VehicleType } from '../sim/types.ts'
+import type { Role, Size, VehicleType } from '../sim/types.ts'
 import type { Trend, VehicleSnapshot } from '../sim/view-api.ts'
 import type { Rect } from './layout.ts'
-import { formatMoney } from './text.ts'
+import { ellipsize, formatMoney } from './text.ts'
 import { THEME } from './theme.ts'
 
 /** spec §9.4: the HUD face is happy at ≥ 70, neutral at 40–69, angry below. */
@@ -297,16 +297,57 @@ export function payrollShortLine(names: readonly string[]): string {
 
 /**
  * Walkout line (§8.1 `payroll`): `Audrey walked out — desk short-handed` /
- * `Dee walked out — Bike 2 has no driver`.
+ * `Dee walked out — Bike 2 has no driver` / (M6) `Pat walked out — the Hold
+ * Bay has no sorter`.
  */
 export function walkoutLine(
   name: string,
-  kind: 'inspector' | 'driver',
+  role: Role,
   vehicleName: string | null,
 ): string {
-  if (kind === 'driver')
+  if (role === 'driver')
     return `${name} walked out — ${vehicleName ?? 'a vehicle'} has no driver`
+  if (role === 'sorter')
+    return `${name} walked out — the Hold Bay has no sorter`
   return `${name} walked out — desk short-handed`
+}
+
+/**
+ * M6 (plan-build2 §8.3 task 10, design-m6 §6.3): the HUD toast for a new
+ * inspector or sorter, `Lin hired — $24/day` (drivers toast from the Garage
+ * buy / Replace flow, re-hires from their card).
+ */
+export function hiredToast(name: string, salaryPerDay: number): string {
+  return `${name} hired — ${formatMoney(salaryPerDay)}/day`
+}
+
+/** The worker:hired events the HUD toasts: a new inspector or sorter. */
+export function hiredToastsFor(p: { role: Role; rehire: boolean }): boolean {
+  return !p.rehire && (p.role === 'inspector' || p.role === 'sorter')
+}
+
+/** `Lin let go` — the HUD toast for a fired inspector or sorter (M6). */
+export function firedToast(name: string): string {
+  return `${name} let go`
+}
+
+/**
+ * The worker:fired events the HUD toasts: an inspector or sorter the player
+ * fired (a replaced sorter is covered by the new hire's toast, a removed
+ * desk by its confirm dialog, drivers by the Garage flow).
+ */
+export function firedToastsFor(p: { role: Role; reason: string }): boolean {
+  return p.reason === 'fired' && (p.role === 'inspector' || p.role === 'sorter')
+}
+
+/**
+ * The `defused` ticker line of a Toss by a delegate (M6, parcel:tossed
+ * source): `Pat tossed evil-lodash — DEFUSED`; the Sorter Arm (M9 art, M6
+ * rule) reads `The Sorter Arm tossed evil-lodash — DEFUSED`. Player tosses
+ * keep Ticker.defusedLine.
+ */
+export function delegateDefusedLine(who: string | null, label: string): string {
+  return `${who ?? 'The Sorter Arm'} tossed ${label} — DEFUSED`
 }
 
 /** `Audrey`, `Audrey and Dee`, `Audrey, Dee and Pax`. */
@@ -388,6 +429,67 @@ export function followText(
   if (v.state === 'inactive' || v.driverName === null)
     return `${v.name} · No driver`
   return `${v.name} · ${v.driverName} · ${vehicleStateText(v)}`
+}
+
+/** The follow strip's speed pips: 5 dots (`ic_pip_on` / `ic_pip_off`), 7-px pitch. */
+export const FOLLOW_PIPS = 5
+export const FOLLOW_PIP_PITCH = 7
+/** Air left of the first pip and right of the last one's 7-px cell. */
+export const FOLLOW_PIP_GAP_L = 4
+export const FOLLOW_PIP_GAP_R = 2
+/** The pips block between the head and the tail text. */
+export const FOLLOW_PIPS_W =
+  FOLLOW_PIP_GAP_L + FOLLOW_PIPS * FOLLOW_PIP_PITCH + FOLLOW_PIP_GAP_R
+
+/**
+ * The follow strip parts that fit `maxW` px (`measure` = BitmapText width):
+ * everything; else the tail ellipsized (dropped when only `…` would be
+ * left); else the head alone, ellipsized, without pips.
+ */
+export function followFit(
+  m: { head: string; pips: number | null; tail: string },
+  maxW: number,
+  measure: (s: string) => number,
+): { head: string; pips: boolean; tail: string } {
+  const headW = measure(m.head)
+  if (m.pips === null) {
+    const all = m.tail ? `${m.head} ${m.tail}` : m.head
+    return { head: ellipsize(all, maxW, measure), pips: false, tail: '' }
+  }
+  if (headW + FOLLOW_PIPS_W > maxW)
+    return { head: ellipsize(m.head, maxW, measure), pips: false, tail: '' }
+  const room = maxW - headW - FOLLOW_PIPS_W
+  if (!m.tail || measure(m.tail) <= room)
+    return { head: m.head, pips: true, tail: m.tail }
+  const tail = ellipsize(m.tail, room, measure)
+  // `· …` alone says nothing: drop it.
+  const useful = tail.replace(/[·…\s]/g, '').length > 0
+  return { head: m.head, pips: true, tail: useful ? tail : '' }
+}
+
+/**
+ * M6 (spec-build2 §2.5, design-m6 §6.3): the follow strip in three parts,
+ * `Bike 1 · Dee` + the driver's speed pips (●●●●○) + `· Delivering · 2
+ * stops`; `pips` is null (and `tail` empty) with no active driver
+ * (`Bike 2 · No driver`). Speed only: the strip is one line.
+ */
+export function followModel(
+  v: Pick<
+    VehicleSnapshot,
+    'name' | 'driverName' | 'driverPips' | 'state' | 'queuePos' | 'stopsLeft'
+  >,
+): { head: string; pips: number | null; tail: string } {
+  if (v.state === 'inactive' || v.driverName === null)
+    return { head: `${v.name} · No driver`, pips: null, tail: '' }
+  const speed = v.driverPips?.speed
+  return {
+    head: `${v.name} · ${v.driverName}`,
+    pips:
+      speed === undefined
+        ? null
+        : Math.max(0, Math.min(FOLLOW_PIPS, Math.round(speed))),
+    tail: `· ${vehicleStateText(v)}`,
+  }
 }
 
 /** Cargo counts by size, in S, M, L, XL order, zero sizes omitted. */

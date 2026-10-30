@@ -11,7 +11,9 @@ import { docksStep } from './systems/docks.ts'
 import { laneStep } from './systems/lane.ts'
 import { levelsStep } from './systems/levels.ts'
 import { paydayStep } from './systems/payroll.ts'
+import { peopleDayStep } from './systems/people.ts'
 import { driftStep, waitingStep } from './systems/satisfaction.ts'
+import { holdStationStep } from './systems/sorter.ts'
 import { spawnStep } from './systems/spawn.ts'
 import { vehiclesStep } from './systems/vehicles.ts'
 import type { MinuteRow } from './types.ts'
@@ -67,9 +69,13 @@ export function lane(sim: Sim, _ctx: TickContext): void {
   laneStep(sim)
 }
 
-/** 7. Sorter Arm auto-Toss timer (L4 row; no-op in playtest 1). */
-export function holdBay(_sim: Sim, _ctx: TickContext): void {
-  // build 2: Sorter Arm (machines.json upgrades).
+/**
+ * 7. The Hold Bay station (M6, systems/sorter.ts): the seated sorter's call
+ * (≤ 1 main-stream draw per decision, none via the wanted list) or the
+ * Sorter Arm's auto-Toss.
+ */
+export function holdBay(sim: Sim, _ctx: TickContext): void {
+  holdStationStep(sim)
 }
 
 /** 8. Overseas clearance timers → parcel:cleared (§5.6). */
@@ -91,7 +97,8 @@ export function levels(sim: Sim, _ctx: TickContext): void {
 }
 
 /**
- * 11. On the day boundary: payroll and walkouts, drift, escalation,
+ * 11. On the day boundary: payroll and walkouts, the applicant pools (M6,
+ * applicant stream only), drift, escalation,
  * dock:occupancy, daysSinceIncident, day:ended, the MinuteRow, then the
  * per-day counters reset.
  */
@@ -100,6 +107,8 @@ export function day(sim: Sim, ctx: TickContext): void {
   const s = sim.state
   // Payday, pay order, unpaid marks, walkouts (§7.3-§7.4, systems/payroll.ts).
   if (SIM_FEATURES.payroll) paydayStep(sim)
+  // ★ applicants leave, today's applicants arrive (systems/people.ts).
+  peopleDayStep(sim)
   driftStep(sim)
   // Malware escalation needs no state: malwareShare() derives it from the
   // day count and stats.levelTick (§5.4): + postVictoryPerDay at every day

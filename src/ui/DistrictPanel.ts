@@ -18,7 +18,8 @@
 //   5 `Waiting parcels: 7 at 3 buildings · oldest 1:40` (age tinted by the
 //     decay phase) + per-size counts and a `Show ▸` link; tap → close +
 //     pm:panTo {buildingId} of the building with the most waiting parcels
-//   6 `Vehicles homed here: 2` + `Garage ▸` (toggleGarage)
+//   6 `Vehicles homed here: 2 (Dee, Pax)` (M6: the drivers' names,
+//     ellipsized before the link) + `Garage ▸` (toggleGarage)
 // Locked regions replace rows 2–6 with `Unlocks at Lv 2 — $2,000 lifetime
 // earned`, the trucks-only line for Industrial and the locked sign art.
 // Opening emits pm:panTo {regionId, cover} so the City centres the label in
@@ -41,6 +42,7 @@ import {
   addText,
   CAP_H,
   CAP_TOP,
+  ellipsize,
   formatClock,
   formatInt,
   formatMoney,
@@ -214,9 +216,30 @@ export const NO_WAITING = 'Waiting parcels: none'
 /** The waiting row's link: pans to the busiest building (city-view §5.1 row 5). */
 export const WAIT_LINK = 'Show ▸'
 
-/** `Vehicles homed here: 2` */
-export function homedLine(n: number): string {
-  return `Vehicles homed here: ${n}`
+/**
+ * `Vehicles homed here: 2`; with the homed vehicles' active drivers (M6,
+ * spec-build2 §2.5) `Vehicles homed here: 2 (Dee, Pax)` — a vehicle with no
+ * driver adds `no driver` (`2 no driver` for several).
+ */
+export function homedLine(
+  n: number,
+  drivers: readonly (string | null)[] = [],
+): string {
+  const head = `Vehicles homed here: ${n}`
+  if (n <= 0 || drivers.length === 0) return head
+  const parts = drivers.filter((d): d is string => d !== null)
+  const none = drivers.length - parts.length
+  if (none === 1) parts.push('no driver')
+  else if (none > 1) parts.push(`${none} no driver`)
+  return `${head} (${parts.join(', ')})`
+}
+
+/** The active driver names of the vehicles homed in `districtId` (fleet order). */
+export function homedDrivers(
+  vehicles: readonly { zone: string; driverName: string | null }[],
+  districtId: string,
+): (string | null)[] {
+  return vehicles.filter((v) => v.zone === districtId).map((v) => v.driverName)
 }
 
 /** `Unlocks at Lv 2 — $2,000 lifetime earned` (levels.json threshold). */
@@ -612,11 +635,16 @@ export class DistrictPanel {
       y += TAP_ROW
     }
 
-    // 6 vehicles homed + Garage link (a 44-px row)
-    show(this.homedText)
-      .setText(homedLine(stats.vehiclesHomed))
-      .setY(textTop(y, TAP_ROW))
+    // 6 vehicles homed (+ their drivers, ellipsized) + Garage link (44 px)
     const bx = W - X - this.garageBtn.btnWidth
+    const line = homedLine(
+      stats.vehiclesHomed,
+      homedDrivers(this.vs.vehicles, def.id),
+    )
+    const homed = show(this.homedText)
+    homed
+      .setText(ellipsize(line, bx - 8 - X, (s) => homed.setText(s).width))
+      .setY(textTop(y, TAP_ROW))
     const by = y + Math.floor((TAP_ROW - ROW) / 2)
     show(this.garageBtn).setRect(
       { x: bx, y: by, w: this.garageBtn.btnWidth, h: ROW },

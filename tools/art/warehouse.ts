@@ -27,8 +27,13 @@
 // - worker: feet on row 28 (outline 29), a 2-row ground shadow at rows 30-31
 //   (x 8..15), origin (0.5, 1) puts the shadow on the stand point.
 
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { DrawCtx } from './draw-api.ts'
 import { registerDrawer } from './drawers.ts'
+import { type Img, imgToCanvas, newImg, put, readImg } from './iso.ts'
+import { FINAL_DIR } from './manifest.ts'
+import { SORTER_SWAP, sorterImg } from './variants.ts'
 import {
   type BoxScheme,
   CARDBOARD,
@@ -444,6 +449,18 @@ function chuteOutlet(): Grid {
 function extOutline(): Grid {
   const g = new Grid(56, 24)
   dashedRect(g, 0, 0, 56, 24, 'grey5', 7, 7)
+  return g
+}
+
+/**
+ * The Hold Bay station's dashed outline (48x48 at RoomLayout HOLD_STATION;
+ * B2 §2.6): shown while the station is locked (or live without its podium
+ * art). Drawn like slot_empty_outline so the room's badges layer stays one
+ * image batch (a Graphics there cost a draw call, M6).
+ */
+function stationOutline(): Grid {
+  const g = new Grid(48, 48)
+  dashedRect(g, 0, 0, 48, 48, 'grey5', 8, 8)
   return g
 }
 
@@ -1229,6 +1246,200 @@ function shakyShaker(shift: number): Grid {
   return g
 }
 
+// Build 2 M6 placeholders of the PixelLab machines (shown only while no
+// candidate is chosen): battery_checker and xray keep the metal detector's
+// belt-opening contract (x 12..35 empty below row 16), the sorter_arm is a
+// 64x64 fixture (pedestal, two segments, a claw; f0 rest, f1 reach toward
+// the rack on the left, f2 toss toward the bin on the right).
+
+function batteryChecker(scan: boolean): Grid {
+  const g = new Grid(48, 48)
+  const pillar = (x: number) => {
+    oRect(g, x, 8, 10, 38, 'grass1')
+    g.vline(x + 1, 9, 36, 'grass2')
+    g.vline(x + 8, 9, 36, 'grass0')
+    g.hline(x, x + 9, 36, 'outline')
+    g.rect(x + 1, 37, 8, 8, 'grey2')
+    g.hline(x + 1, x + 8, 37, 'grey3')
+    g.hline(x + 1, x + 9, 46, 'outline')
+    // the charge meter: four cells, lit bottom-up
+    oRect(g, x + 2, 14, 6, 20, 'outline')
+    for (let k = 0; k < 4; k++) {
+      const lit = k < (scan ? 4 : 2)
+      g.rect(x + 3, 29 - k * 5, 4, 4, lit ? 'grass3' : 'grey1')
+    }
+  }
+  pillar(2)
+  pillar(36)
+  oRect(g, 1, 3, 46, 13, 'grey3')
+  g.rect(2, 4, 44, 4, 'grey4')
+  g.hline(2, 45, 4, 'grey5')
+  g.hline(1, 46, 8, 'outline')
+  g.rect(2, 9, 44, 6, 'grey2')
+  g.rect(6, 10, 36, 3, scan ? 'yellow2' : 'blue2')
+  g.hline(6, 41, 12, scan ? 'yellow1' : 'blue1')
+  g.hline(5, 42, 9, 'outline')
+  g.hline(5, 42, 13, 'outline')
+  // the battery on the header: body + terminal
+  oRect(g, 16, 0, 14, 7, 'grass2')
+  g.hline(17, 28, 1, 'grass3')
+  g.rect(30, 2, 3, 3, 'outline')
+  g.set(31, 3, 'grey4')
+  return g
+}
+
+function xrayScanner(scan: boolean): Grid {
+  const g = new Grid(48, 48)
+  // the tunnel housing: thick side walls and a deep roof over the belt
+  for (const x of [1, 35]) {
+    oRect(g, x, 6, 12, 41, 'grey4')
+    g.vline(x + 1, 7, 44, 'grey5')
+    g.vline(x + 10, 7, 44, 'grey3')
+    g.hline(x + 1, x + 10, 45, 'grey3')
+  }
+  oRect(g, 0, 1, 48, 16, 'grey4')
+  g.rect(1, 2, 46, 6, 'grey5')
+  g.hline(0, 47, 8, 'outline')
+  g.rect(1, 9, 46, 7, 'grey3')
+  // the lead curtain lip and the light strip
+  g.rect(12, 14, 24, 2, 'grey1')
+  g.rect(8, 10, 32, 2, scan ? 'yellow2' : 'blue2')
+  // the monitor on the right wall: a parcel on the screen
+  oRect(g, 37, 20, 9, 9, 'outline')
+  g.rect(38, 21, 7, 7, scan ? 'blue2' : 'blue0')
+  g.rect(40, 23, 3, 3, scan ? 'grey5' : 'blue1')
+  return g
+}
+
+/** sorter arm pose: shoulder angle per frame (rest, reach, toss) */
+function sorterArm(frame: number): Grid {
+  const g = new Grid(64, 64)
+  // pedestal: a round base plate and a column
+  const base = new Grid(64, 64)
+  base.disc(32, 55.5, 9, 'grey2')
+  base.disc(32, 54.5, 7, 'grey3')
+  base.rect(28, 38, 8, 16, 'orange2')
+  base.vline(28, 38, 53, 'orange3')
+  base.vline(35, 38, 53, 'orange1')
+  base.outline()
+  g.blit(base, 0, 0)
+  // upper arm and forearm as thick segments
+  const pose = [
+    { elbow: [34, 22], hand: [44, 12] },
+    { elbow: [22, 26], hand: [10, 34] },
+    { elbow: [42, 24], hand: [54, 30] },
+  ][frame] ?? { elbow: [34, 22], hand: [44, 12] }
+  const arm = new Grid(64, 64)
+  const seg = (x0: number, y0: number, x1: number, y1: number, c: string) => {
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        arm.line(x0 + dx, y0 + dy, x1 + dx, y1 + dy, c)
+  }
+  const [ex, ey] = pose.elbow as [number, number]
+  const [hx, hy] = pose.hand as [number, number]
+  seg(32, 38, ex, ey, 'yellow2')
+  seg(ex, ey, hx, hy, 'yellow1')
+  arm.disc(32, 38.5, 3.5, 'grey3')
+  arm.disc(ex + 0.5, ey + 0.5, 3, 'grey3')
+  // the claw: two fingers either side of the hand
+  arm.rect(hx - 3, hy - 1, 7, 3, 'grey2')
+  arm.rect(hx - 3, hy + 2, 2, 3, 'grey2')
+  arm.rect(hx + 2, hy + 2, 2, 3, 'grey2')
+  arm.outline()
+  g.blit(arm, 0, 0)
+  // status lamp on the column: blue at rest, amber while working
+  g.rect(31, 44, 2, 2, frame === 0 ? 'blue2' : 'yellow3')
+  return g
+}
+
+// ---------------------------------------------------------------------------
+// Hold Bay station (build 2 M6, B2 §2.6, design-m6 §6.4/§6.5): the 48x48
+// podium right of the rack where the sorter stands (interior back layer;
+// the sorter sprite is drawn over it by WorkerSprites). A rubber floor mat
+// with painted corner marks (the station zone) and, on its west half, a
+// standing desk seen top-down 3/4 with the sorter's clipboard and a roll of
+// green `looks clean` tags; the east half of the mat stays clear for the
+// sorter's stand point.
+
+function holdStation(): Grid {
+  const g = new Grid(48, 48)
+  // floor mat: dark rubber with a lit top edge and a dot texture
+  oRect(g, 0, 12, 48, 36, 'grey1')
+  g.hline(1, 46, 13, 'grey2')
+  g.vline(1, 13, 46, 'grey2')
+  for (let y = 16; y < 46; y += 3) {
+    for (let x = 3 + (y % 2); x < 46; x += 3) g.set(x, y, 'grey0')
+  }
+  for (const [x, y, sx, sy] of [
+    [3, 15, 1, 1],
+    [44, 15, -1, 1],
+    [3, 44, 1, -1],
+    [44, 44, -1, -1],
+  ] as const) {
+    for (let i = 0; i < 4; i++) {
+      g.set(x + sx * i, y, 'yellow2')
+      g.set(x, y + sy * i, 'yellow2')
+    }
+  }
+  // the standing desk: top face (lit wood), crease, front face, shadow
+  const px = 3
+  const pw = 22
+  oRect(g, px, 1, pw, 36, 'brown1')
+  g.rect(px + 1, 2, pw - 2, 20, 'brown2')
+  g.hline(px + 1, px + pw - 2, 2, 'brown3')
+  g.vline(px + 1, 2, 21, 'brown3')
+  g.hline(px + 1, px + pw - 2, 22, 'outline')
+  g.rect(px + 1, 23, pw - 2, 12, 'brown1')
+  g.hline(px + 1, px + pw - 2, 23, 'brown2')
+  oRect(g, px + 4, 25, pw - 8, 8, 'brown0')
+  g.hline(px + 5, px + pw - 6, 26, 'brown1')
+  g.hline(px, px + pw - 1, 37, 'outline')
+  // the clipboard: board, paper with ticked lines, metal clip
+  oRect(g, px + 2, 4, 13, 16, 'brown0')
+  g.rect(px + 3, 6, 11, 13, 'grey5')
+  for (const y of [9, 12, 15]) {
+    g.set(px + 5, y, 'grass1')
+    g.set(px + 4, y - 1, 'grass1')
+    g.hline(px + 7, px + 12, y, 'grey3')
+  }
+  oRect(g, px + 6, 3, 5, 3, 'grey3')
+  g.set(px + 7, 4, 'grey5')
+  // the tag roll beside the clipboard
+  oRect(g, px + 16, 6, 5, 7, 'grass2')
+  g.hline(px + 17, px + 19, 7, 'grass3')
+  g.set(px + 18, 9, 'grey5')
+  g.hline(px + 16, px + 20, 13, 'outline')
+  return g
+}
+
+// ---------------------------------------------------------------------------
+// worker_sorter (B2 §6.7): the worker in an orange vest — every `worker`
+// final (PixelLab, kept) remapped yellow ramp -> orange ramp
+// (variants.ts SORTER_SWAP); without a final (a fresh placeholder run) the
+// procedural worker frame is swapped instead.
+
+function sorterFrame(suffix: string): Img {
+  const p = join(FINAL_DIR, 'worker', `worker${suffix}.png`)
+  if (existsSync(p)) return sorterImg(readImg(p).img)
+  const g = workerFrame(suffix)
+  for (const [a, b] of SORTER_SWAP) g.swap(a, b)
+  const img = newImg(24, 32)
+  for (let y = 0; y < 32; y++) {
+    for (let x = 0; x < 24; x++) {
+      const c = g.get(x, y)
+      if (c !== null) put(img, x, y, c)
+    }
+  }
+  return img
+}
+
+registerDrawer({ id: 'worker_sorter' }, (d) =>
+  d.entry.frames.map((suffix) => ({
+    suffix,
+    canvas: imgToCanvas(sorterFrame(suffix), d),
+  })),
+)
+
 /** grey silhouette (fill grey2, outline grey1, style-guide §4.3) */
 function silhouette(kind: string): Grid {
   const s = new Grid(48, 48)
@@ -1503,6 +1714,7 @@ reg('chute_v', () => chuteV())
 reg('lane_arrow', (_s, i) => laneArrow(i))
 reg('chute_outlet', () => chuteOutlet())
 reg('ext_outline', () => extOutline())
+reg('station_outline', () => stationOutline())
 reg('bay_pad', () => bayPad())
 reg('bay_pad_locked', () => bayPadLocked())
 reg('lamp', (s) => lamp(s))
@@ -1528,6 +1740,10 @@ reg('sign_t2', () => signT2())
 reg('sign_crack', (s) => signCrack(s === '_1'))
 reg('metal_detector', (_s, i) => metalDetector(i === 1))
 reg('shaky_shaker', (_s, i) => shakyShaker([0, -1, 1][i] ?? 0))
+reg('battery_checker', (_s, i) => batteryChecker(i === 1))
+reg('xray', (_s, i) => xrayScanner(i === 1))
+reg('sorter_arm', (_s, i) => sorterArm(i))
+reg('hold_station', () => holdStation())
 reg('battery_checker_sil', () => silhouette('battery'))
 reg('xray_sil', () => silhouette('xray'))
 reg('sorter_arm_sil', () => silhouette('sorter'))

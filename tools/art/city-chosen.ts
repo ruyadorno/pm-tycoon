@@ -82,10 +82,10 @@ const rows: { ground: string; ids: string[]; locked?: boolean }[] = [
   {
     ground: 'grass',
     ids: [
-      'lr_house_a',
-      'lr_house_c',
-      'lr_house_b',
-      'lr_villa',
+      'lr_caret_cottage',
+      'lr_patch_bungalow',
+      'lr_tilde_terrace',
+      'lr_major_house',
       'ru_farmhouse',
       'ru_barn',
       'ru_orchard',
@@ -96,9 +96,9 @@ const rows: { ground: string; ids: string[]; locked?: boolean }[] = [
       'cv_stadium',
       'ap_terminal',
       'ap_hangar',
-      'dk_customs',
+      'dk_port_office',
       'dk_containers',
-      'dk_pier',
+      'dk_terminal_a',
     ],
   },
 ]

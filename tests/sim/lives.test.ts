@@ -8,8 +8,8 @@
 // player cleared; daysSinceIncident resets; the third loss → game:over;
 // economy.continueWithOneLife → grantLife; debug forceMalwareDelivery.
 
-import { describe, expect, it } from 'vitest'
-import { traceText } from '../../src/sim/detection.ts'
+import { describe, expect, it, vi } from 'vitest'
+import { counterChoice, traceText } from '../../src/sim/detection.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import { deliverParcel } from '../../src/sim/systems/economy.ts'
 import { takeFrom } from '../../src/sim/systems/lane.ts'
@@ -21,6 +21,8 @@ import {
   collect,
   dataFixture,
   feeder,
+  heldParcel,
+  hireInspector,
   injectParcel,
   laneParcel,
   noCheckers,
@@ -29,6 +31,7 @@ import {
   quietSim,
   runTicks,
   runUntil,
+  standardApplicant,
 } from './helpers.ts'
 
 const data = dataFixture()
@@ -78,7 +81,8 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     expect(delivered).toEqual([
       { id: p.id, paid: 0, onTime: true, malware: true },
     ])
-    expect(sim.state.economy.balance).toBe(balance - 200) // the bike only
+    // The bike and its standard driver's hire fee (one day's salary, M6).
+    expect(sim.state.economy.balance).toBe(balance - 200 - 8)
     expect(sim.state.economy.lifetimeEarned).toBe(0)
     expect(sat.find((e) => e.district === 'downtown')?.delta).toBe(
       s.malwareDelivered,
@@ -159,7 +163,7 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
 
   it('the card is about the lane THIS parcel went through (§10 "was N %", "got through on the N %"): D recomputed by hand for four lanes, unchanged when the lane changes after it passed', () => {
     const sp = data.machines.checkers.find((c) => c.id === 'shaky_shaker')!
-    const ins = data.employees.inspector
+    const insP = data.employees.roles.inspector.p[2]!
     // A. The desk alone vs metal: 0.85; a Metal detector would make it
     //    1 − 0.15 × 0.20 = 0.97. A detector bought after it passed changes nothing.
     {
@@ -167,7 +171,7 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
       const p = missed(sim, 40, 'metal')[0]!
       placeMachine(sim, 'metal_detector', 'slot2')
       const l = card(sim, p)
-      expect(l.laneRate).toBeCloseTo(ins.pMatch, 10)
+      expect(l.laneRate).toBeCloseTo(insP, 10)
       expect(l.laneRate).toBeCloseTo(0.85, 10)
       expect(l.counterOwned).toBe(false)
       expect(l.counterRate).toBeCloseTo(0.97, 10)
@@ -181,7 +185,7 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
       const p = missed(sim, 300, 'metal')[0]!
       expect(p.trace.map((t) => t.text)).toEqual(
         expect.arrayContaining([
-          'Slot 1 Inspection desk: missed (85% vs metal)',
+          'Slot 1 desk — Audrey: missed (85% vs metal)',
           'Slot 2 Metal detector: missed (80% vs metal)',
         ]),
       )
@@ -213,8 +217,8 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     {
       const sim = noCheckers(quietSim(14))
       const p = missed(sim, 2, 'metal')[0]!
-      sim.dispatch({ kind: 'placeDesk', nodeId: 'slot1' })
-      sim.dispatch({ kind: 'hireInspector' })
+      sim.dispatch({ kind: 'placeDesk', nodeId: 'slot1', index: 1 })
+      hireInspector(sim)
       const l = card(sim, p)
       expect(l.laneRate).toBe(0)
       expect(l.counterRate).toBeCloseTo(md.pMatch, 10)
@@ -241,7 +245,7 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     expect(l.clearedByPlayerAt).toBe(clearTick)
     expect(l.path.map((t) => t.text)).toEqual(
       expect.arrayContaining([
-        'Slot 1 Inspection desk: flagged (metal)',
+        'Slot 1 desk — Audrey: flagged (metal)',
         'Held in the Hold Bay',
         'Cleared by you',
       ]),
@@ -297,5 +301,99 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     expect(sim.state.parcels[String(p.id)]?.state).toBe('held')
     expect(laneNode(sim.state.lane, 'hold')?.queue).toEqual([p.id])
     expect(sim.state.economy.lives).toBe(data.economy.lives.start)
+  })
+})
+
+describe('M6: the lost-life card names the person (spec-build2 §2.3, design D14)', () => {
+  it('a desk miss: "Slot 1 desk — Audrey: missed (85% vs metal)", missedBy, and the 5-eye what-if (the machine line wins here)', () => {
+    const sim = quietSim(11)
+    const p = missed(sim, 40, 'metal')[0]!
+    const l = card(sim, p)
+    expect(l.path.map((t) => t.text)).toContain(
+      'Slot 1 desk — Audrey: missed (85% vs metal)',
+    )
+    const audrey = sim.state.employees[0]!
+    expect(l.missedBy).toEqual({
+      employeeId: audrey.id,
+      name: 'Audrey',
+      nodeId: 'slot1',
+      p: 0.85,
+    })
+    expect(l.report.missedBy).toEqual(l.missedBy)
+    expect(l.inspectorRate).toBeCloseTo(0.94, 10)
+    expect(l.counterRate).toBeCloseTo(0.97, 10)
+    expect(counterChoice(l)).toBe('machine')
+    expect(l.sorterCall).toBeNull()
+  })
+
+  it('a 5-eye inspector who missed gets no 5-eye line; a machine miss names nobody', () => {
+    const sim = quietSim(12)
+    sim.state.economy.balance = 1000
+    sim.dispatch({ kind: 'fire', employeeId: sim.state.employees[0]!.id })
+    hireInspector(sim, { eye: 5, pace: 3, charisma: 0 })
+    const p = missed(sim, 80, 'metal')[0]!
+    const l = card(sim, p)
+    expect(l.missedBy?.p).toBe(0.94)
+    expect(l.inspectorRate).toBeNull()
+    expect(counterChoice(l)).toBe('machine')
+    const m = noCheckers(quietSim(13))
+    placeMachine(m, 'metal_detector', 'slot1')
+    const mp = missed(m, 20, 'metal')[0]!
+    const ml = card(m, mp)
+    expect(ml.missedBy).toBeNull()
+    expect(ml.inspectorRate).toBeNull()
+  })
+
+  it('counterChoice: the machine on ties (by the shown %), the inspector only when strictly better, null with neither', () => {
+    // Desk + detector both missed: machine 1 − .15 × .2 × .2 = 99.4 %, 5-eye
+    // 1 − .06 × .2 = 98.8 % → both show 99 % → the machine.
+    expect(counterChoice({ inspectorRate: 0.988, counterRate: 0.994 })).toBe(
+      'machine',
+    )
+    // A 1-eye inspector vs dense with the X-ray as the counter: 1 − .25 × .3
+    // = 92.5 % vs a 5-eye 94 % → the inspector.
+    expect(counterChoice({ inspectorRate: 0.94, counterRate: 0.925 })).toBe(
+      'inspector',
+    )
+    expect(counterChoice({ inspectorRate: null, counterRate: 0.97 })).toBe(
+      'machine',
+    )
+    expect(counterChoice({ inspectorRate: 0.9, counterRate: null })).toBe(
+      'inspector',
+    )
+    expect(counterChoice({ inspectorRate: null, counterRate: null })).toBeNull()
+  })
+
+  it('sorterCall: a malware parcel the sorter tagged "looks clean" and the player then Cleared', () => {
+    const sim = quietSim(1)
+    sim.state.economy.balance = 1000
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 2 }).ok).toBe(true)
+    const a = standardApplicant(sim, 'sorter')
+    expect(
+      sim.dispatch({
+        kind: 'hire',
+        role: 'sorter',
+        applicantId: a.id,
+        target: { station: 'hold' },
+      }).ok,
+    ).toBe(true)
+    const p = heldParcel(sim, { malware: true, strain: 'metal' })
+    const spy = vi.spyOn(sim.rng, 'chance').mockReturnValue(false) // the wrong call
+    const decided = collect(sim, 'sorter:decided')
+    runUntil(sim, () => decided.length > 0, 200)
+    spy.mockRestore()
+    expect(decided[0]).toMatchObject({ call: 'leave', correct: false })
+    const sorter = sim.state.employees.find((e) => e.role === 'sorter')!
+    expect(p.sorted).toEqual({ by: sorter.id, name: a.name, pct: 85 })
+    expect(sim.dispatch({ kind: 'clear', parcelId: p.id }).ok).toBe(true)
+    const l = card(sim, p)
+    expect(l.sorterCall).toEqual({ name: a.name, pct: 85 })
+    expect(l.path.map((t) => t.text)).toEqual(
+      expect.arrayContaining([
+        `${a.name}: looks clean (85%)`,
+        'Cleared by you',
+      ]),
+    )
+    expect(sim.state.wanted).toContain(p.label)
   })
 })

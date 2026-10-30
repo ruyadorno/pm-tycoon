@@ -1,5 +1,60 @@
 # Art to-do (playtest 1, build 2)
 
+## Build 2 — M6 (people, plan-build2 §6 / §8.3 task 8, B2 §2.6, §6.5, §6.7)
+
+Sheets: `art/contact/people@4x.png` (`node tools/art/contact.ts people`: faces, ★, pips, worker vs worker_sorter,
+the Hold Bay station with the sorter on duty, the three new machines) and `art/contact/lowres@4x.png` (`node
+tools/art/contact.ts lowres`: the ten Low-density uniques on their map positions, colour and the `_locked` look
+they ship with until M9, plus each unique close up). Atlas fill after M6: world 61.7 % (target ≤ 75 %), interior
+28.8 % (2048×512).
+
+Procedural (by design, no PixelLab id):
+
+- `face_00` … `face_11` (icon16, `tools/art/faces.ts`): NN = skin × 4 + hair — peach / tan / deep skin × short
+  dark hair, long auburn hair, blue cap, yellow hard hat; the shirt colour is seeded per id. The sim's
+  `Employee.look` / `Applicant.look` (people.ts `FACE_LOOKS = 12`) index them. Packed into both atlases (icon16).
+- `ic_star` (icon16, gold) — the ★ mark drawn top-right of a face (a separate icon, not a face overlay variant).
+- `ic_pip_on` / `ic_pip_off` (ui 8×8, world atlas): a 6×6 dot at (1, 1), lit = yellow3 + ink outline, empty = a
+  grey2 ring on a grey4 socket; drawn at a 7-px pitch.
+- `worker_sorter` (class worker, 28 frames): every `worker` final with the vest's yellow ramp swapped to orange step
+  for step (`variants.ts SORTER_SWAP`, drawn from the worker finals by `warehouse.ts`; lint A14 re-draws it, so a
+  `worker` final changed without a rebuild is caught). Packed into both atlases.
+- `hold_station` (interior-prop 48×48, interior atlas): rubber mat with painted corner marks, a standing desk with
+  the clipboard and the roll of green `looks clean` tags on its west half; the east half stays clear for the
+  sorter's stand point.
+- Procedural stand-ins also exist for `battery_checker`, `xray`, `sorter_arm` (shown only without a chosen
+  candidate). Not made (the design doc does not use them): `ic_helmet`, `ui_pip_bar`.
+
+PixelLab (agent picks, `node tools/art/decide.ts --manifest`; `approved: false` until the author's gate G6 / G5):
+
+- Machines (Pro Flash 48² / 64², 5 per candidate): `battery_checker` #0 (grey arch, green charge-meter pillars, a
+  battery with its terminal nub on the header), `xray` #0 (boxy light-grey tunnel with depth, purple trim, a dark
+  blue monitor on the right wall), `sorter_arm` #0 (orange column on a round pedestal, yellow segments, a big
+  two-finger claw). The checkers keep the detector's belt-opening contract (`candidates.ts OPENINGS`, x 12..35 empty
+  below row 16) and its idle/scan header strip (f0 blue / f1 yellow). The arm's `_f1` / `_f2` are scripted from the
+  one image (`candidates.ts SWING_IDS` / `lean`: the upper ~60 % sheared 3 px toward −x = reach, +x = toss; the
+  pedestal stays) — M9 draws it and may replace the swing.
+- Low-density uniques (Pro Flash, 2×2 = 6, 1×1 = 5 per candidate), one per `buildings.json` id (no
+  `coversBuildings`: each id covers itself), shipped `_locked` until M9: `lr_major_house` #2 (round corner turret),
+  `lr_patch_bungalow` #1 (patchwork roof, porch), `lr_prerelease_villa` #0 (scaffolding wing, brick pallet),
+  `lr_range_ranch_house` #0 (long low ranch, picket fence, windmill), `lr_caret_cottage` #1 (steep purple A-frame),
+  `lr_tilde_terrace` #0 (wavy roof edge, blue striped bay), `lr_minor_cottage` #0 (thatch, round window),
+  `lr_exact_pin` #2 (orange ball finial like a map pin), `lr_wildcard_shop` #0 (striped awning, star sign),
+  `lr_buildmeta_bungalow` #2 (solar-panel roof, satellite dish).
+- Retired (`manifest.retired[]`, finals deleted; `decide.ts --retire … --reason`, new in M6 for superseded rows that
+  nobody rejected): `lr_house_a`, `lr_house_b`, `lr_house_c`, `lr_villa` — replaced by the ten uniques.
+
+PixelLab spend (M6 cap 230, run budget 1,500 / 300 reserve): 207 generations in 3 batches (balance 3,173 → 2,966;
+$0 credits; run spent 126 → 333): machines 35 (7 of 9 jobs; 2 failed "heavy load", not billed), Low-density 150
+(28 of 30), a retry of the 4 failed jobs 22 (battery_checker #3, xray #2, lr_major_house #3, lr_prerelease_villa
+#3 — none beat the picks; xray #2 failed the belt-opening contract). Every id got 3 candidates except `xray` (2
+usable). No PixelLab id fell back to procedural.
+
+Follow-ups: the new Low-density finals carry 17-19 colours (lint A12 warnings, as the playtest-1 buildings); the
+`worker_sorter` walk/scan frames inherit the worker's 17-18. `xray` reads more as an arch with depth than a closed
+tunnel because the belt opening is cleared below row 16 — re-roll at G6 if the author wants curtains (they would
+have to stay above row 16).
+
 ## Build 2 — M5 (the author's four fixes, plan-build2 §6 / §8.2, B2 §6.1-§6.4)
 
 G4 sheet: `art/contact/fixes@4x.png` (`node tools/art/contact.ts fixes [--hop <crop.png>]`): the exterior t1 / t2 on
@@ -133,7 +188,7 @@ Confirm: `vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines c
   `in_gzip_compressors`, `in_minify_metal` (3×3); `in_webpack_warehouse`, `in_rimraf_yard`, `in_polyfill_plastics`,
   `in_glob_silos` (2×2).
 - **Locked scenery** (playtest 1 shows only the fogged `_locked` frame): `lr_house_a`, `lr_house_b`, `lr_house_c`,
-  `lr_villa`, `ru_farm`, `ru_barn`, `ru_orchard`, `ru_farmhouse`, `dk_pier` and `dk_customs` (both rejected by the
+  `lr_villa` (all four retired in build 2 M6 for the ten Low-density uniques), `ru_farm`, `ru_barn`, `ru_orchard`, `ru_farmhouse`, `dk_pier` and `dk_customs` (both rejected by the
   author and retired in build 2 M5), `ap_terminal`,
   `ap_hangar`, `cv_hall`, `cv_stadium`, `cv_pavilion`.
 - **Docks and map props**: `dk_crane`, `dk_ship`, `dk_containers`, `tree_round`, `tree_pine`, `bush`.

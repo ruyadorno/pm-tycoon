@@ -9,12 +9,16 @@
 // dispatch.ts, passed in as hooks (no import cycle).
 //
 // Movement is integer: progress along the current unit edge is `edgeT` in
-// 1/MILLI tile, advanced by round(speedTilesPerS × MILLI / TICKS_PER_S) per
-// tick, so a path's timing is tick-exact (plan.md §6.4); pos is derived.
+// 1/MILLI tile, advanced by round(speedTilesPerS × speedMult × MILLI /
+// TICKS_PER_S) per tick — speedMult from the driver's speed pip (+ the
+// affinity pip in its favourite type, M6, spec-build2 §2.5; a driver fired
+// mid-trip keeps theirs until it parks; 1.0 with no driver) — so a path's
+// timing is tick-exact (plan.md §6.4); pos is derived.
 
 import type { VehicleTypeDef } from '../../data/types.ts'
 import { sellRefund } from './economy.ts'
 import { returnToConveyor, returnToShelf } from './lane.ts'
+import { driverNumbers, driverOf } from './people.ts'
 import { mapIndex, sameTile, unitsOf, vehicleTypeDef } from '../map.ts'
 import type { Sim } from '../sim.ts'
 import type { Heading, TileXY, Vehicle } from '../types.ts'
@@ -34,11 +38,26 @@ export function typeOf(sim: Sim, v: Vehicle): VehicleTypeDef {
   return vehicleTypeDef(sim.data, v.type)
 }
 
-/** Edge progress per tick (1/MILLI tile). */
+/**
+ * The driver's speedMult / stopMult in this vehicle (a walked-out driver's
+ * still apply while the trip finishes); with no driver, those of a driver
+ * fired mid-trip (Vehicle.tripMults) until it parks, else 1.0 / 1.0.
+ */
+export function driverMults(
+  sim: Sim,
+  v: Vehicle,
+): { speedMult: number; stopMult: number } {
+  const e = driverOf(sim, v)
+  if (!e) return v.tripMults ?? { speedMult: 1, stopMult: 1 }
+  return driverNumbers(sim.data, e.pips, e.affinity, v.type)
+}
+
+/** Edge progress per tick (1/MILLI tile); a speed-5 driver in a van: 276. */
 export function speedPerTick(sim: Sim, v: Vehicle): number {
+  const mult = driverMults(sim, v).speedMult
   return Math.max(
     1,
-    Math.round((typeOf(sim, v).speedTilesPerS * MILLI) / TICKS_PER_S),
+    Math.round((typeOf(sim, v).speedTilesPerS * mult * MILLI) / TICKS_PER_S),
   )
 }
 
@@ -60,15 +79,17 @@ export function freeUnits(sim: Sim, v: Vehicle): number {
 }
 
 /**
- * The vehicle's driver is on the payroll (spec §7.4): false once the driver
- * walked out (Employee.active false) and until re-hire — the vehicle then
- * finishes its trip and parks `inactive` (payroll.ts, dispatch.ts goInactive).
- * A vehicle without a driver row counts as driven.
+ * The vehicle has a driver who keeps working (spec §7.4, spec-build2 §2.5):
+ * false with no driver (bought with "Hire later", or fired), once the driver
+ * walked out (Employee.active false) and until re-hire, and while a Replace
+ * waits (`nextDriverId`, heading home for the swap) — the vehicle then
+ * finishes its trip and parks (`inactive`, or swaps drivers: dispatch.ts
+ * goInactive).
  */
 export function hasDriver(sim: Sim, v: Vehicle): boolean {
-  if (v.driverId === null) return true
+  if (v.driverId === null || v.nextDriverId !== null) return false
   const e = sim.state.employees.find((x) => x.id === v.driverId)
-  return e?.active ?? true
+  return e?.active ?? false
 }
 
 /** Release every parcel reserved for `v` (collection or loading). */
@@ -293,8 +314,8 @@ const INBOUND = new Set(['picked_up', 'in_transit_in', 'unloading'])
  * ones to the dock conveyor so they still pass every checker (§6.4, M2
  * review: the shelf would wave a malware parcel through) — reservations and
  * its rush go back to the pool, a docked vehicle frees its dock at once, a
- * queued one leaves the queue, the driver leaves the payroll, then the
- * sellRefund × price refund and vehicle:sold.
+ * queued one leaves the queue, the driver (and a pending Replace) leave the
+ * payroll silently, then the sellRefund × price refund and vehicle:sold.
  */
 export function sellVehicle(sim: Sim, v: Vehicle): void {
   const s = sim.state
@@ -315,7 +336,7 @@ export function sellVehicle(sim: Sim, v: Vehicle): void {
     emitQueueLength(sim)
   }
   s.employees = s.employees.filter(
-    (e) => !(e.kind === 'driver' && e.vehicleId === v.id),
+    (e) => !(e.role === 'driver' && e.vehicleId === v.id),
   )
   s.vehicles = s.vehicles.filter((x) => x.id !== v.id)
   if (qi >= 0) repositionQueue(sim)

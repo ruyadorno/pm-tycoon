@@ -15,6 +15,14 @@
 //     `Another Shaky shaker would make it 97%`, or `Cleared by you at 11:58`
 //   lives row (LivesRow) · [Open warehouse] [Continue]
 //
+// M6 (spec-build2 §2.3, design-m6 §6.3 / D14): a desk line names the
+// inspector (`Slot 1 desk — Lin: missed (80% vs metal)`, the sim's trace
+// text) and a sorter's tag shows as its own line (`Pat: looks clean (85%)`);
+// the counter is the better of the machine line and `A 5-eye inspector at
+// this desk would make it 99%` (detection.ts counterChoice: machine first on
+// ties), both quoting the lane's compounded rate. When the inspector line
+// wins, `Open warehouse` highlights no machine.
+//
 // The route list grows the card up to min(H − 80, 440) px (it fits its
 // content below that); when a long path would not fit it tightens the line
 // pitch 18 → 16 → 14 px, then merges runs of empty slots (`Slots 2–4:
@@ -29,12 +37,14 @@ import type Phaser from 'phaser'
 import type { GameData, StrainId } from '../data/types.ts'
 import type { FrameName } from '../render/frames.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
+import { counterChoice } from '../sim/detection.ts'
 import type { LifeLostPayload } from '../sim/events.ts'
 import type { LaneNode, Size, TraceEntry } from '../sim/types.ts'
 import { TICKS_PER_S } from '../sim/types.ts'
 import { Button } from './Button.ts'
 import type { Layout } from './layout.ts'
 import { LivesRow, livesRowWidth } from './LivesRow.ts'
+import { startInspectorP } from './Onboarding.ts'
 import { addPanel } from './Panel.ts'
 import { claimKey, offscreenOrigin, popModal, pushModal } from './Sheet.ts'
 import { addText, lineCount, LINE_H, textTop } from './text.ts'
@@ -94,9 +104,17 @@ interface CheckerRow {
   pOther: number
 }
 
-/** The machines.json / employees.json row of a checker def id. */
+/**
+ * The machines.json row of a checker def id; `inspector` (a desk) reads the
+ * pre-hired start inspector's p from employees.json roles (M6: any strain,
+ * p at the start eye pip) — a desk trace line carries its own text and p.
+ */
 export function checkerRow(data: GameData, defId: string): CheckerRow | null {
-  if (defId === 'inspector') return data.employees.inspector
+  if (defId === 'inspector') {
+    const p = startInspectorP(data)
+    const strain = data.employees.roles.inspector.strain
+    return { name: DESK_NAME, strain, pMatch: p, pOther: p }
+  }
   return data.machines.checkers.find((c) => c.id === defId) ?? null
 }
 
@@ -144,6 +162,11 @@ const CLEAR_WHATS = new Set(['cleared_by_player', 'clearedByPlayer', 'cleared'])
 const TIMED_WHATS = new Set(['spawned', 'pickedUp', 'unloaded', 'delivered'])
 /** Hops the card leaves out: the spec example lists none of them. */
 const SKIP_WHATS = new Set(['loaded', 'returned', 'held', 'tossed'])
+/**
+ * M6: the sorter's `looks clean` tag (spec-build2 §2.6) — its stored line
+ * (`Pat: looks clean (85%)`) is shown untimed, never skipped.
+ */
+const SORTED_WHATS = new Set(['sorted'])
 
 /** `slot3` → 3. */
 export function slotNumber(nodeId: string): number | null {
@@ -302,6 +325,10 @@ export function routeItems(
     }
     closeOpen()
     if (SKIP_WHATS.has(w)) continue
+    if (SORTED_WHATS.has(w)) {
+      if (e.text) items.push({ kind: 'text', text: e.text })
+      continue
+    }
     if (e.text) {
       const timed = TIMED_WHATS.has(w) || CLEAR_WHATS.has(w)
       items.push({ kind: 'text', text: timed ? `${e.text} ${t}` : e.text })
@@ -385,36 +412,59 @@ export function rateLine(strain: StrainId | null, laneRate: number): string {
   return `Your lane's catch rate vs ${strain ?? 'malware'} was ${ratePct(laneRate)}%`
 }
 
+/** The counter fields the card reads (inspectorRate: M6, absent = none). */
+export type CounterFields = Pick<
+  LifeLostPayload,
+  | 'counterMachineId'
+  | 'counterOwned'
+  | 'counterRate'
+  | 'laneRate'
+  | 'clearedByPlayerAt'
+> &
+  Partial<Pick<LifeLostPayload, 'inspectorRate'>>
+
+/** Which counter suggestion the card shows (null: none, or cleared by you). */
+export function counterPick(p: CounterFields): 'machine' | 'inspector' | null {
+  if (p.clearedByPlayerAt !== null && p.clearedByPlayerAt !== undefined)
+    return null
+  return counterChoice({
+    inspectorRate: p.inspectorRate ?? null,
+    counterRate: p.counterMachineId ? p.counterRate : null,
+  })
+}
+
 /**
  * The counter (city-view §9.3): `Cleared by you at 11:58` when the player
  * cleared it; else `A Shaky shaker would make it 83%`; or, when the lane
  * already holds that machine, the dice line + `Another Shaky shaker would
- * make it 97%`. No line when the strain has no counter.
+ * make it 97%`. M6 (spec-build2 §2.3): when a better inspector at the desk
+ * that missed beats the machine (detection.ts counterChoice, machine first
+ * on ties) the suggestion reads `A 5-eye inspector at this desk would make
+ * it 99%` (5 = the top eye pip of employees.json). No line when neither
+ * applies.
  */
-export function counterLines(
-  p: Pick<
-    LifeLostPayload,
-    | 'counterMachineId'
-    | 'counterOwned'
-    | 'counterRate'
-    | 'laneRate'
-    | 'clearedByPlayerAt'
-  >,
-  data: GameData,
-): string[] {
+export function counterLines(p: CounterFields, data: GameData): string[] {
   if (p.clearedByPlayerAt !== null && p.clearedByPlayerAt !== undefined)
     return [`Cleared by you at ${simClock(p.clearedByPlayerAt)}`]
+  const pick = counterPick(p)
+  if (pick === null) return []
+  // The rate line above already reads "Your lane's catch rate vs metal was
+  // 97%"; the spec's "Your lane was at 97% — …" restated it word for word
+  // on the next line (UX M2 review), so only the dice half is kept.
+  const dice = p.counterOwned
+    ? [`This one got through on the ${missPct(p.laneRate)}%`]
+    : []
+  const inspectorRate = p.inspectorRate ?? null
+  if (pick === 'inspector' && inspectorRate !== null) {
+    const top = data.employees.roles.inspector.p.length
+    const to = ratePct(inspectorRate)
+    return [...dice, `A ${top}-eye inspector at this desk would make it ${to}%`]
+  }
   if (!p.counterMachineId || p.counterRate === null) return []
   const name = checkerRow(data, p.counterMachineId)?.name ?? p.counterMachineId
   const to = ratePct(p.counterRate)
   if (!p.counterOwned) return [`${withArticle(name)} would make it ${to}%`]
-  // The rate line above already reads "Your lane's catch rate vs metal was
-  // 97%"; the spec's "Your lane was at 97% — …" restated it word for word
-  // on the next line (UX M2 review), so only the dice half is kept.
-  return [
-    `This one got through on the ${missPct(p.laneRate)}%`,
-    `${withArticle(name, true)} would make it ${to}%`,
-  ]
+  return [...dice, `${withArticle(name, true)} would make it ${to}%`]
 }
 
 const PARCEL_MAL: Record<Size, FrameName> = {
@@ -441,7 +491,10 @@ export interface LostLifeModel {
   counter: string[]
   /** Lives left (the card's LivesRow). */
   lives: number
-  /** Open warehouse highlights this machine (counterMachineId). */
+  /**
+   * Open warehouse highlights this machine (counterMachineId); null when
+   * the 5-eye inspector line is the suggestion (M6).
+   */
   highlight: string | null
 }
 
@@ -460,7 +513,8 @@ export function lostLifeModel(
     rate: rateLine(p.strain, p.laneRate),
     counter: counterLines(p, deps.data),
     lives: deps.lives,
-    highlight: p.counterMachineId ?? null,
+    highlight:
+      counterPick(p) === 'inspector' ? null : (p.counterMachineId ?? null),
   }
 }
 

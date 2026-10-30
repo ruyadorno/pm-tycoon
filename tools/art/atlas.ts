@@ -115,6 +115,7 @@ const ID_PLACEMENT: Readonly<Record<string, AtlasPlacement>> = {
   ext_outline: 'world',
   slot_empty_outline: 'world',
   slot_locked_outline: 'world',
+  station_outline: 'world',
   lamp: 'world',
 }
 

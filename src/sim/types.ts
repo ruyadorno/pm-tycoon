@@ -5,7 +5,14 @@
 // Iteration order rules: arrays sorted by id, string-keyed records in
 // data-file order, numeric keys ascending; never iterate a Set/Map.
 
-import type { BuildingId, DistrictId, GameData } from '../data/types.ts'
+import type {
+  AffinityId,
+  BuildingId,
+  DistrictId,
+  GameData,
+  PipsDef,
+  RoleId,
+} from '../data/types.ts'
 
 export type { BuildingId, DistrictId } from '../data/types.ts'
 
@@ -45,9 +52,10 @@ export interface TilePos {
 /**
  * The state / snapshot / save version (plan.md R9, spec-build2 §8): a
  * state-shape change bumps it; Sim.load and the Title refuse any other value
- * (no migrations). 2 = build 2 (`pm.save.v2`).
+ * (no migrations). 2 = build 2 (`pm.save.v2`); 3 = M6 people (applicants,
+ * roles with pips, the Hold Bay station, the wanted list; same save key).
  */
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 
 export interface SimState {
   version: typeof STATE_VERSION
@@ -68,12 +76,27 @@ export interface SimState {
   vehicles: Vehicle[]
   /** Ascending id, never reordered (payroll order = hire order, §7.4). */
   employees: Employee[]
+  /** M6 (spec-build2 §2.7): today's applicants per role, on their own rng stream. */
+  applicants: ApplicantPools
+  /**
+   * M6 (spec-build2 §2.8): malware labels revealed so far (a malware Toss by
+   * anyone, a lost life), in reveal order, deduped. The poster and the
+   * sorter's certainty list.
+   */
+  wanted: string[]
   /** Key String(id); terminal parcels are removed at the end of the tick (gc). */
   parcels: Record<string, Parcel>
   lane: Lane
   stats: RunStats
   lastLostLife: LostLifeReport | null
-  nextId: { parcel: number; vehicle: number; employee: number; checker: number }
+  nextId: {
+    parcel: number
+    vehicle: number
+    employee: number
+    checker: number
+    /** M6: applicant ids (own id space; never an Employee id). */
+    applicant: number
+  }
 }
 
 export interface District {
@@ -124,8 +147,23 @@ export interface Vehicle {
   type: VehicleType
   /** "Bike 1" (type name + the smallest number unused by the current fleet). */
   name: string
-  /** The implicit driver's Employee id (that employee's `active` is false after a walkout, §7.4). */
+  /**
+   * The driver's Employee id (that employee's `active` is false after a
+   * walkout, §7.4); null = no driver (bought with "Hire later" or fired —
+   * the vehicle parks `inactive`, spec-build2 §2.5).
+   */
   driverId: number | null
+  /**
+   * M6 Replace (spec-build2 §2.5): the hired driver who takes over after the
+   * current trip's unload (people.ts swapPendingDriver); null otherwise.
+   */
+  nextDriverId: number | null
+  /**
+   * M6: a driver fired mid-trip with no successor leaves their speedMult /
+   * stopMult here so the vehicle finishes the trip at their pace (as after a
+   * walkout); removed when it parks `inactive` or a driver is hired into it.
+   */
+  tripMults?: { speedMult: number; stopMult: number }
   state: VehicleState
   zone: Zone
   pos: TilePos
@@ -211,6 +249,9 @@ export interface TraceEntry {
    */
   chk?: string
   p?: number
+  /** M6: on a desk slot result, the inspector's Employee id and name. */
+  by?: number
+  who?: string
 }
 
 export interface Parcel {
@@ -256,6 +297,13 @@ export interface Parcel {
    * them the lowest bays left free).
    */
   bay?: number
+  /**
+   * M6 (spec-build2 §2.6): the sorter judged it clean and left it — its
+   * Employee id, name at call time and round(100 × correct). Absent otherwise.
+   */
+  sorted?: { by: number; name: string; pct: number }
+  /** M6: the last player touch while held (the sorter's player grace). */
+  touchedTick?: Tick
 }
 
 export type LaneNodeKind =
@@ -293,19 +341,44 @@ export interface LaneNode {
   /** Slot only. */
   fixture: Fixture | null
   /** Slot processing stations: 1 per machine, 1 per active inspector. */
-  stations: { parcelId: number | null; doneTick: Tick | null }[]
+  stations: Station[]
   /** The LoadingDock id this dock / conveyor node belongs to. */
   dockId: string | null
+}
+
+/** A slot processing station (one per machine, one per seated inspector). */
+export interface Station {
+  parcelId: number | null
+  doneTick: Tick | null
+  /**
+   * M6, desk stations only (absent on machines): the seated inspector and
+   * its effective numbers, recomputed by people.ts syncDesk on every crew
+   * change — p = own p + same-desk colleagues' charisma, ≤ pCap, 4 dp.
+   */
+  employeeId?: number
+  p?: number
+  decoyFlag?: number
+  processTicks?: number
 }
 
 export type Fixture =
   | { kind: 'machine'; checker: Checker }
   | {
       kind: 'desk'
+      /** employees.json desks.rows index (1 = the start desk). */
+      index: number
       checker: Checker
       inspectorIds: number[]
       walkedOutIds: number[]
     }
+
+/** M6 (spec-build2 §2.6): the Hold Bay station — a sorter, the Sorter Arm, or empty. */
+export interface HoldStation {
+  /** The seated sorter's Employee id (active, or walked out and holding the seat), the Sorter Arm, or empty. */
+  fixture: number | 'sorter_arm' | null
+  /** Sorter: the tick its current call lands; null while idle (no unjudged parcel waiting). */
+  nextDecisionTick: Tick | null
+}
 
 export interface Checker {
   /** 'chk<n>' from nextId.checker. */
@@ -371,7 +444,8 @@ export interface Lane {
   /** Stalled sim seconds this day (+0.1 per stalled tick); reset on the day boundary. */
   stallSecondsToday: number
   quarantine: { count: number; malware: number; clean: number }
-  sorterArm: boolean
+  /** M6: the station next to the Hold Bay rack (replaces `sorterArm`). */
+  holdStation: HoldStation
   /** ADDITION to §6.4: the FIFO dock queue on the lot (vehicle ids, index 0 docks next, §4.3). */
   dockQueue: number[]
   /**
@@ -382,18 +456,66 @@ export interface Lane {
   debugForceFlag?: Strain
 }
 
+export type Role = RoleId
+export type Pips = PipsDef
+export type Affinity = AffinityId
+/** Where a hire seats: a desk's slot node, the Hold Bay station, or a vehicle. */
+export type HireTarget =
+  | { nodeId: string }
+  | { station: 'hold' }
+  | { vehicleId: number }
+
 export interface Employee {
   id: number
-  kind: 'inspector' | 'driver'
+  role: Role
   name: string
   hiredTick: Tick
+  /** Fixed at hire (a driver: for its vehicle's class). */
   salaryPerDay: number
   unpaidPaydays: number
+  /** false = walked out (keeps its seat until re-hired / fired). */
   active: boolean
-  /** Driver only: the vehicle driven. */
+  /** Driver: the vehicle driven, or the one it takes over (Vehicle.nextDriverId). */
   vehicleId: number | null
-  /** Inspector only: the desk's slot node id. */
+  /** Inspector: its desk's slot node id; sorter: lane.holdBayNodeId. */
   nodeId: string | null
+  /** Exactly the role's stats (employees.json roles[role].stats). */
+  pips: Pips
+  /** 'none' for inspectors / sorters. */
+  affinity: Affinity
+  /** Face index 0..FACE_LOOKS-1 (face_00..face_11). */
+  look: number
+  star: boolean
+}
+
+export interface Applicant {
+  /** nextId.applicant (own id space; never an Employee id). */
+  id: number
+  role: Role
+  name: string
+  pips: Pips
+  affinity: Affinity
+  look: number
+  star: boolean
+  /**
+   * ★ only: the `state.day` value whose day boundary removes them (people.ts
+   * starLeavesOnDay: ≥ starExpiryDays after arrival); null for regulars.
+   */
+  leavesOnDay: number | null
+  /**
+   * ★ only: the StarApplicantDef name it was added under — the same ★ again
+   * refreshes its expiry even after a rename ("Vera 2", a clash with staff).
+   */
+  starKey?: string
+}
+
+export interface ApplicantPools {
+  /** mulberry32 word of the APPLICANT stream (rng.ts RngCell) — never state.rng. */
+  rng: number
+  /** Stars first, then regulars; length ≤ applicants.poolSize. */
+  inspector: Applicant[]
+  sorter: Applicant[]
+  driver: Applicant[]
 }
 
 export interface Economy {
@@ -522,6 +644,17 @@ export interface LostLifeReport {
   livesLeft: number
   /** Lost at an overseas clearance rather than a local delivery. */
   viaClearance: boolean
+  /** M6: the inspector whose desk roll missed it last (the card names the person). */
+  missedBy: {
+    employeeId: number
+    name: string
+    nodeId: string
+    p: number
+  } | null
+  /** M6: the faced rate with that inspector at 5 eye (null when not applicable). */
+  inspectorRate: number | null
+  /** M6: the sorter's `looks clean` call on it, if any. */
+  sorterCall: { name: string; pct: number } | null
 }
 
 // Pure state accessors (no runtime imports, so every sim module can use them) -----

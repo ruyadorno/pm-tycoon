@@ -48,6 +48,25 @@ export const T2_SWAP: ReadonlyMap<string, string> = new Map([
   ['grey3', 'blue2'],
 ])
 
+/**
+ * build 2 M6 (B2 §6.7): the sorter is the inspector in an orange vest — a
+ * palette swap of every `worker` frame (yellow ramp -> orange ramp, step
+ * for step). The `worker_sorter` entry (class worker, procedural) is drawn
+ * from the `worker` finals through this map (warehouse.ts), so the two stay
+ * pixel-aligned frame for frame; lint A14 re-draws it, which also catches
+ * a `worker` final that changed without a rebuild.
+ */
+export const SORTER_SWAP: ReadonlyMap<string, string> = new Map([
+  ['yellow0', 'orange0'],
+  ['yellow1', 'orange1'],
+  ['yellow2', 'orange2'],
+  ['yellow3', 'orange3'],
+])
+
+export function sorterImg(img: Img): Img {
+  return remap(img, SORTER_SWAP)
+}
+
 export function fogImg(img: Img): Img {
   return remap(img, FOG_IDS)
 }

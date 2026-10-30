@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "buildStamp": "9c32062 2026-10-30",
+  "buildStamp": "67fd97a 2026-10-30",
   "seed": 7,
-  "startedAt": "2026-10-30T02:31:11Z",
+  "startedAt": "2026-10-30T05:15:31Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -11,47 +11,47 @@
     "zoom": 1,
     "maxTexture": 8192
   },
-  "elapsedS": 184,
-  "simS": 720,
+  "elapsedS": 183.8,
+  "simS": 720.1,
   "pausedS": 0.9,
-  "firstDeliveryS": 33.3,
+  "firstDeliveryS": 31.5,
   "firstMalware": {
-    "spawnedS": 140.8,
-    "caughtS": 191,
+    "spawnedS": 138.4,
+    "caughtS": 180.1,
     "by": "inspector",
-    "tossedS": 191
+    "tossedS": 180.1
   },
   "level2AtS": null,
   "truckBoughtS": null,
   "deliveries": {
-    "total": 73,
-    "onTime": 46,
-    "late": 27,
+    "total": 78,
+    "onTime": 50,
+    "late": 28,
     "byType": {
-      "bike": 73,
+      "bike": 78,
       "van": 0,
       "truck": 0
     }
   },
   "moneyPerMin": [
-    20,
-    65,
-    35,
-    138,
-    83,
-    144,
-    213,
+    40,
+    45,
+    54,
+    122,
+    72,
+    163,
     172,
-    248,
-    108,
-    281,
-    220
+    178,
+    284,
+    242,
+    260,
+    321
   ],
-  "lifetimeEarned": 1727,
-  "balanceEnd": 729,
+  "lifetimeEarned": 1953,
+  "balanceEnd": 925,
   "malware": {
-    "spawned": 5,
-    "caught": 3,
+    "spawned": 4,
+    "caught": 4,
     "missed": 0,
     "tossedClean": 4,
     "cleared": 0
@@ -64,11 +64,11 @@
     },
     {
       "type": "bike",
-      "atS": 273.9
+      "atS": 268.6
     },
     {
       "type": "bike",
-      "atS": 403.7
+      "atS": 416
     }
   ],
   "inspectorsHired": 0,
@@ -79,22 +79,22 @@
     },
     {
       "id": "metal_detector",
-      "atS": 446.3
+      "atS": 473.4
     }
   ],
   "taps": 3,
   "tapsPerMin": 1,
   "rushTaps": 0,
   "viewSwitches": 2,
-  "warehouseS": 59.3,
+  "warehouseS": 59.4,
   "fps": {
     "p50": 61,
     "p5": 60,
-    "min": 56,
+    "min": 55,
     "samples": 183
   },
-  "holdBayEvents": 7,
-  "holdBayEventsPer10Min": 5.8,
+  "holdBayEvents": 8,
+  "holdBayEventsPer10Min": 6.7,
   "stalls": {
     "count": 0,
     "totalS": 0
@@ -105,7 +105,7 @@
     "walkouts": 0
   },
   "satisfactionEnd": {
-    "highres": 36,
-    "downtown": 15
+    "highres": 40,
+    "downtown": 29
   }
 }

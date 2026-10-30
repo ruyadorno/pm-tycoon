@@ -209,7 +209,7 @@ describe('buy / sell (spec §4.1)', () => {
     expect([b.pos.tx, b.pos.ty]).toEqual(parking[1])
     const driver = sim.state.employees.find((e) => e.vehicleId === a.id)
     expect(driver).toMatchObject({
-      kind: 'driver',
+      role: 'driver',
       salaryPerDay: 8,
       active: true,
     })

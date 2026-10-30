@@ -1,6 +1,7 @@
 // Warehouse BuySheet (warehouse-view.md §2.1, §2.5, §6; plan.md §8; spec
-// §6.2-§6.3, §6.7) plus the shared base of the three warehouse sheets
-// (`WarehouseSheet`, also used by SlotCard and HoldBayCard).
+// §6.2-§6.3, §6.7; spec-build2 §2.4, design-m6 §6.2) plus the shared base of
+// the warehouse sheets (`WarehouseSheet`, also used by SlotCard, HoldBayCard
+// and StationCard).
 //
 // Shared base (warehouse-view.md §2 preamble): a kit `Sheet` (composition,
 // like DistrictPanel) inside the Warehouse scene: full width, its bottom
@@ -18,43 +19,52 @@
 // row/button 2 px, emits `ui:sfx {name: 'deny'}` and a `pm:tooltip` with
 // the failure text above it. `ui:tap` comes from the Button kit; the `buy`
 // SFX is the director's (money:changed purchase), never emitted here.
+// People (M6): a card that hires (SlotCard's desk, StationCard) asks the
+// scene for the shared HireSheet through `openHire(req)` (an option, so the
+// cards never import the sheet); it closes itself first and `req.onDone` /
+// `req.onCancel` reopen it. The base also draws a person's 16×16 face
+// (`face_NN`, the sim's `look`) and compact pips (`ic_pip_on/off` at a 7-px
+// pitch, 4 px between stats).
 //
 // Construction (the WarehouseScene owns the instances):
-//   new BuySheet(scene, L, viewSim, {labelFor?})  L = computeLayout(...)
+//   new BuySheet(scene, L, viewSim, {labelFor?, openHire?})  L = computeLayout(...)
 //   open(nodeId, highlight?) · close(instant?) · isOpen() · relayout(L)
 // `labelFor` is the room layout's `labelFor(nodeId)` ('Slot 2'); it can also
 // ride on L (`{...L, labelFor}`) or be set later with setLabelFor(). Without
 // it the node id is title-cased ('slot2' → 'Slot 2').
 //
 // BuySheet.open(nodeId, highlight?) on an empty live slot: height
-// 40 + 56 × rows; rows from machines.json + employees.json, unlocked first —
-// the unlocked checkers, the desk row, then the locked checkers (dimmed,
-// `Unlocks at Lv N` + ` · coming soon` past economy.playtestMaxLevel). A row:
-// icon, name, price (red and dimmed when unaffordable), `catch 80% metal ·
-// 15% other · false-flag 50%`, `60/min`. The desk row places the desk while
-// no desk exists (`maxDesks`), else reads `Move desk here` and moves it.
-// Tap → lane.buyMachine / placeDesk / moveFixture; success closes the sheet
-// (the scene animates the fixture from lane:fixturePlaced/Moved).
-// `highlight` (a machines.json id, pm:goto's highlight) pulses that row.
+// 40 + 56 × rows; rows from machines.json + employees.json desks.rows,
+// unlocked first — the unlocked checkers, the desk rows (an unplaced, open
+// desk: `Inspection desk` free / `Second desk $400`; a placed desk: `Move
+// desk here`, numbered `Move desk N here` once two are placed), then the
+// locked rows by unlock level (checkers and desk 2, dimmed, `Unlocks at
+// Lv N` + ` · coming soon` past economy.playtestMaxLevel). A row: icon, name,
+// price (red and dimmed when unaffordable), two detail lines (`catch 80%
+// metal · 15% other · false-flag 50%`, `60/min`; a desk: `seats 1–3 · hire
+// from 3 applicants`, `catch 75–94% by eye · $12–36/day each`).
+// Tap → lane.buyMachine / placeDesk(node, index) / moveFixture; success
+// closes the sheet (the scene animates the fixture from
+// lane:fixturePlaced/Moved). `highlight` (a machines.json id, pm:goto's
+// highlight) pulses that row.
 import type Phaser from 'phaser'
 import {
   bindSim,
-  getSim,
   type SimBinding,
   type SimHandlers,
 } from '../../boot/simBinding.ts'
-import type { CheckerDef, GameData } from '../../data/types.ts'
+import type { CheckerDef, GameData, StatId } from '../../data/types.ts'
 import { UI_ATLAS } from '../../render/atlases.ts'
 import { frameOrNull, type FrameName } from '../../render/frames.ts'
 import type { CommandResult } from '../../sim/commands.ts'
-import type { Sim } from '../../sim/sim.ts'
-import type { Employee, LaneNode } from '../../sim/types.ts'
+import { salaryOf } from '../../sim/systems/people.ts'
+import type { HireTarget, LaneNode, Pips, Role } from '../../sim/types.ts'
 import type { ViewSim } from '../../sim/view-api.ts'
 import { Button } from '../Button.ts'
 import { HUD_BOTTOM_H } from '../layout.ts'
 import type { PanelFrame } from '../Panel.ts'
 import { Sheet } from '../Sheet.ts'
-import { addText, formatMoney, formatPct, textTop } from '../text.ts'
+import { addText, ellipsize, formatMoney, formatPct, textTop } from '../text.ts'
 import { PALETTE, THEME } from '../theme.ts'
 import { EV_UI_SFX, failText } from '../ZonePicker.ts'
 
@@ -81,6 +91,11 @@ export const DIM_ALPHA = 0.45
 export const MUTED = PALETTE.grey1
 /** Red text on light panels. */
 export const RED_TEXT = PALETTE.red0
+/** A ★ hire's name on light panels (gold, legible on the grey5 panel). */
+export const STAR_TINT = PALETTE.gold0
+/** `ic_star` (16 × 16) after a ★ name: the width it takes and its y offset from the text top. */
+export const STAR_W = 15
+export const STAR_DY = -1
 
 // ---- BuySheet geometry -------------------------------------------------------
 
@@ -137,26 +152,85 @@ export function priceText(price: number): string {
 /** Display name of the desk fixture (warehouse-view.md §2.1). */
 export const DESK_NAME = 'Inspection desk'
 
-/** The desk row's two detail lines (§2.1: seats, catch, speed, salary). */
+/** Card header of desk `index`: `Inspection desk` (1), `Inspection desk 2`. */
+export function deskTitle(index: number): string {
+  return index <= 1 ? DESK_NAME : `${DESK_NAME} ${index}`
+}
+
+const ORDINALS = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth']
+
+/** BuySheet name of an unplaced desk: `Inspection desk` (1), `Second desk` (2). */
+export function deskRowName(index: number): string {
+  if (index <= 1) return DESK_NAME
+  const o = ORDINALS[index]
+  return o ? `${o} desk` : `Desk ${index}`
+}
+
+/**
+ * `catch 88% avg` with ≥ 2 seated inspectors (the desk readout is their
+ * mean, spec-build2 §2.3), `catch 85%` with one, null with nobody seated.
+ */
+export function deskCatchText(meanP: number, seated: number): string | null {
+  if (seated <= 0) return null
+  return `catch ${pctOf(meanP)}${seated >= 2 ? ' avg' : ''}`
+}
+
+/** Highest pip of `stat` (charisma 0..2, the others 1..5; employees.json tables). */
+export function pipMax(data: GameData, stat: StatId): number {
+  const ap = data.employees.applicants
+  if (stat === 'charisma') return Math.max(0, ap.charismaWeights.length - 1)
+  return ap.pipWeights['1']?.length ?? 5
+}
+
+/** The lowest (1s, charisma 0) or highest pips of a role (salary ranges). */
+export function cornerPips(data: GameData, role: Role, top: boolean): Pips {
+  const pips: Pips = {}
+  for (const stat of data.employees.roles[role].stats)
+    pips[stat] = top ? pipMax(data, stat) : stat === 'charisma' ? 0 : 1
+  return pips
+}
+
+/** An inspector's catch and salary ranges over every pip (employees.json roles). */
+export function inspectorRanges(data: GameData): {
+  pMin: number
+  pMax: number
+  salaryMin: number
+  salaryMax: number
+} {
+  const p = data.employees.roles.inspector.p
+  return {
+    pMin: Math.min(...p),
+    pMax: Math.max(...p),
+    salaryMin: salaryOf(
+      data,
+      'inspector',
+      cornerPips(data, 'inspector', false),
+    ),
+    salaryMax: salaryOf(data, 'inspector', cornerPips(data, 'inspector', true)),
+  }
+}
+
+/**
+ * The detail lines of an unplaced desk row (design-m6 §6.2): `seats 1–3 ·
+ * hire from 3 applicants`, `catch 75–94% by eye · $12–36/day each`.
+ */
 export function deskRowLines(data: GameData): [string, string] {
-  const i = data.employees.inspector
+  const e = data.employees
+  const r = inspectorRanges(data)
   return [
-    `seats 1–${i.maxPerDesk} inspectors · ${pctOf(i.pMatch)} any strain`,
-    `${perMinText(i.processS)} each · ${formatMoney(i.salaryPerDay)}/day each`,
+    `seats 1–${e.desks.maxPerDesk} · hire from ${e.applicants.poolSize} applicants`,
+    `catch ${Math.round(r.pMin * 100)}–${pctOf(r.pMax)} by eye · ${formatMoney(r.salaryMin)}–${r.salaryMax}/day each`,
   ]
 }
 
-/** `Move desk here` detail lines: where it is now and its crew. */
-export function moveDeskLines(
-  data: GameData,
-  fromLabel: string,
-  inspectors: number,
-): [string, string] {
-  const i = data.employees.inspector
-  const crew = `${inspectors} inspector${inspectors === 1 ? '' : 's'}`
+/** `Move desk here` detail lines: where it is now, its crew and its mean catch. */
+export function moveDeskLines(desk: DeskInfo): [string, string] {
+  const n = desk.inspectors
+  const crew = `${n} inspector${n === 1 ? '' : 's'}`
+  const avg = deskCatchText(desk.meanP, n) ?? 'no inspectors'
   return [
-    `${DESK_NAME} from ${fromLabel} · ${crew}`,
-    `${pctOf(i.pMatch)} any strain · ${perMinText(i.processS)} each · moves are free`,
+    `${deskTitle(desk.index)} from ${desk.label} · ${crew}`,
+    `${avg} · moves are free`,
   ]
 }
 
@@ -164,12 +238,26 @@ const WH_FAIL: Partial<Record<string, string>> = {
   'slot-occupied': 'Slot already taken',
   'slot-locked': 'Slot not open yet',
   'desk-full': 'Desk is full',
-  'desk-exists': 'Only one desk',
+  'desk-exists': 'That desk is already placed',
+  'desk-locked': 'That desk is not open yet',
   'shelf-full': 'Shelf full',
+  'no-applicant': 'That applicant took another job',
+  'station-locked': 'Not open yet',
+  'station-occupied': 'The station is taken',
 }
 
-/** Tooltip text for a refused warehouse command (plan.md §5 reason strings). */
-export function warehouseFailText(reason: string): string {
+/**
+ * Tooltip text for a refused warehouse command (plan.md §5 reason strings;
+ * design-m6 §6.2-§6.3). With `data`, the level-gated reasons name their
+ * level from employees.json: `Second desk opens at Lv 3`, `Opens at Lv 2`.
+ */
+export function warehouseFailText(reason: string, data?: GameData): string {
+  if (data && reason === 'desk-locked') {
+    const row = data.employees.desks.rows.find((r) => r.unlockLevel > 1)
+    if (row) return `${deskRowName(row.index)} opens at Lv ${row.unlockLevel}`
+  }
+  if (data && reason === 'station-locked')
+    return `Opens at Lv ${data.employees.holdStation.unlockLevel}`
   return WH_FAIL[reason] ?? failText(reason)
 }
 
@@ -191,13 +279,51 @@ export function machineFrame(defId: string): FrameName {
   )
 }
 
+/** The `face_NN` portrait of a person's `look` (null while the art lacks it). */
+export function faceFrame(look: number): FrameName | null {
+  return frameOrNull(`face_${String(Math.max(0, look)).padStart(2, '0')}`)
+}
+
+/** `n` of `max` pips as on/off dots (●●●○○); n is clamped to 0..max. */
+export function pipDots(n: number, max: number): boolean[] {
+  const on = Math.min(max, Math.max(0, Math.round(n)))
+  return Array.from({ length: Math.max(0, max) }, (_, i) => i < on)
+}
+
+/**
+ * Compact pips of a person in the role's `stats` order (design-m6 §6.2:
+ * inspector `●●●○○ ●●●○○ ●○` = eye, pace, charisma; sorter judgement, pace).
+ */
+export function pipGroups(data: GameData, role: Role, pips: Pips): boolean[][] {
+  return data.employees.roles[role].stats.map((stat) =>
+    pipDots(pips[stat] ?? 0, pipMax(data, stat)),
+  )
+}
+
+/** Pip pitch and the gap between two stats (35 + 4 + 35 + 4 + 14 px). */
+export const PIP_PITCH = 7
+export const PIP_GROUP_GAP = 4
+/** The pip frame canvas (ui class, 8 × 8). */
+export const PIP_SIZE = 8
+
+/** Width of compact pips: 7 px per pip, 4 px between stats. */
+export function pipGroupsWidth(
+  groups: readonly (readonly boolean[])[],
+): number {
+  let w = 0
+  groups.forEach((g, i) => {
+    w += g.length * PIP_PITCH + (i > 0 ? PIP_GROUP_GAP : 0)
+  })
+  return w
+}
+
 // ---- BuySheet row model ----------------------------------------------------------
 
 export type BuyRowKind = 'machine' | 'desk' | 'moveDesk'
 
 export interface BuyRow {
   kind: BuyRowKind
-  /** machines.json checker id, or 'desk'. */
+  /** machines.json checker id; 'desk' (desks.rows index 1) or `desk<N>`. */
   id: string
   name: string
   price: number
@@ -206,25 +332,37 @@ export interface BuyRow {
   lines: [string, string]
   unlockLevel: number
   locked: boolean
+  /** Desk rows: the employees.json desks.rows index. */
+  index?: number
 }
 
-/** Where the existing desk is (for `Move desk here`), or null if none exists. */
+/** A placed desk (for its `Move desk here` row). */
 export interface DeskInfo {
+  /** employees.json desks.rows index. */
+  index: number
   nodeId: string
   label: string
+  /** Seated (active) inspectors. */
   inspectors: number
+  /** The desk readout p (the mean of its seated inspectors' effective p). */
+  meanP: number
+}
+
+/** BuyRow id of desk `index` ('desk' for the start desk, e2e `buy:desk`). */
+export function deskRowId(index: number): string {
+  return index <= 1 ? 'desk' : `desk${index}`
 }
 
 /**
- * The BuySheet rows (warehouse-view.md §2.1, §6): unlocked checkers in
- * machines.json order, the desk row (place while fewer than maxDesks desks
- * exist, else `Move desk here`), then the locked checkers.
+ * The BuySheet rows (warehouse-view.md §2.1, §6; design-m6 §6.2): unlocked
+ * checkers in machines.json order; one row per open desks.rows entry — place
+ * it (unplaced) or `Move desk here` (placed; numbered once two are placed);
+ * then the locked checkers and desks by unlock level (stable).
  */
 export function buyRows(
   data: GameData,
   level: number,
-  desk: DeskInfo | null,
-  deskCount = desk ? 1 : 0,
+  placed: readonly DeskInfo[],
 ): BuyRow[] {
   const machines: BuyRow[] = data.machines.checkers.map((def) => {
     const locked = def.unlockLevel > level
@@ -243,32 +381,47 @@ export function buyRows(
       locked,
     }
   })
-  const rows = machines.filter((r) => !r.locked)
-  const emp = data.employees
-  if (deskCount < emp.maxDesks) {
-    rows.push({
+  const desks: BuyRow[] = []
+  const lockedDesks: BuyRow[] = []
+  const numbered = placed.length >= 2
+  const [seats, catchSalary] = deskRowLines(data)
+  for (const row of data.employees.desks.rows) {
+    const id = deskRowId(row.index)
+    const here = placed.find((d) => d.index === row.index)
+    if (here) {
+      desks.push({
+        kind: 'moveDesk',
+        id,
+        index: row.index,
+        name: numbered ? `Move desk ${row.index} here` : 'Move desk here',
+        price: 0,
+        priceText: priceText(0),
+        lines: moveDeskLines(here),
+        unlockLevel: row.unlockLevel,
+        locked: false,
+      })
+      continue
+    }
+    const locked = row.unlockLevel > level
+    const r: BuyRow = {
       kind: 'desk',
-      id: 'desk',
-      name: DESK_NAME,
-      price: emp.deskPrice,
-      priceText: priceText(emp.deskPrice),
-      lines: deskRowLines(data),
-      unlockLevel: 1,
-      locked: false,
-    })
-  } else if (desk) {
-    rows.push({
-      kind: 'moveDesk',
-      id: 'desk',
-      name: 'Move desk here',
-      price: 0,
-      priceText: priceText(0),
-      lines: moveDeskLines(data, desk.label, desk.inspectors),
-      unlockLevel: 1,
-      locked: false,
-    })
+      id,
+      index: row.index,
+      name: deskRowName(row.index),
+      price: row.price,
+      priceText: priceText(row.price),
+      lines: [seats, locked ? unlockText(data, row.unlockLevel) : catchSalary],
+      unlockLevel: row.unlockLevel,
+      locked,
+    }
+    if (locked) lockedDesks.push(r)
+    else desks.push(r)
   }
-  return rows.concat(machines.filter((r) => r.locked))
+  const locked = machines
+    .filter((r) => r.locked)
+    .concat(lockedDesks)
+    .toSorted((a, b) => a.unlockLevel - b.unlockLevel)
+  return machines.filter((r) => !r.locked).concat(desks, locked)
 }
 
 export type RowState = 'ok' | 'locked' | 'poor'
@@ -289,24 +442,40 @@ export function isEmptyLiveSlot(node: LaneNode | null): boolean {
   return !!node && node.kind === 'slot' && !node.locked && !node.fixture
 }
 
-/** The slot holding the desk, or null. */
+/** The first slot holding a desk, or null. */
 export function deskNode(nodes: readonly LaneNode[]): LaneNode | null {
   return nodes.find((n) => n.fixture?.kind === 'desk') ?? null
 }
 
+/** The slot holding desk `index` (desks.rows), or null. */
+export function deskNodeByIndex(
+  nodes: readonly LaneNode[],
+  index: number,
+): LaneNode | null {
+  return (
+    nodes.find(
+      (n) => n.fixture?.kind === 'desk' && n.fixture.index === index,
+    ) ?? null
+  )
+}
+
+/** The Hold Bay node's id (lane.holdBayNodeId; 'hold' in the shipped lane). */
+export function holdNodeId(vs: ViewSim): string {
+  return vs.lane.nodes().find((n) => n.kind === 'holdBay')?.id ?? 'hold'
+}
+
 /**
- * Inspector names, unpaid marks and walkouts (read-only). The desk fixture
- * only holds employee ids and the facade has no employee list yet, so this
- * prefers a facade `employees` field when one exists and otherwise reads
- * the registry Sim's state (never mutated here).
+ * What a card asks the scene to open (design-m6 §6.1-§6.2): the shared
+ * HireSheet for `role` seating `target`. The card has closed itself;
+ * onDone / onCancel run after the HireSheet closed (to reopen the card).
  */
-export function employeesOf(
-  vs: ViewSim,
-  scene: Phaser.Scene,
-): readonly Employee[] {
-  const ext = vs as ViewSim & { readonly employees?: readonly Employee[] }
-  if (ext.employees) return ext.employees
-  return (getSim(scene) as Sim | undefined)?.state.employees ?? []
+export interface HireRequest {
+  role: Role
+  target: HireTarget
+  /** 'Hire an inspector' | 'Hire a sorter' | 'Replace Pat'. */
+  title: string
+  onDone?: (res: CommandResult) => void
+  onCancel?: () => void
 }
 
 // ---- shared base -------------------------------------------------------------------
@@ -329,6 +498,11 @@ export interface WarehouseSheetOptions {
   labelFor?: (nodeId: string) => string
   /** Chrome depth (scrim at depth − 1); default the Sheet's 5000. */
   depth?: number
+  /**
+   * M6: open the shared HireSheet (the scene owns it, design-m6 §6.1). The
+   * card closes itself before calling it; without it a Hire is refused.
+   */
+  openHire?: (req: HireRequest) => void
 }
 
 /** Screen y of the sheet's bottom edge: the top of the HUD bottom band. */
@@ -347,7 +521,7 @@ interface BaseConfig extends WarehouseSheetOptions {
   frame?: PanelFrame
 }
 
-/** Base of BuySheet, SlotCard and HoldBayCard (see the header comment). */
+/** Base of BuySheet, SlotCard, HoldBayCard and StationCard (see the header comment). */
 export abstract class WarehouseSheet {
   readonly scene: Phaser.Scene
   readonly sheet: Sheet
@@ -362,6 +536,7 @@ export abstract class WarehouseSheet {
   private dirty = false
   private binding: SimBinding | null = null
   private destroyed = false
+  private hireOpener: ((req: HireRequest) => void) | null
 
   constructor(
     scene: Phaser.Scene,
@@ -374,6 +549,7 @@ export abstract class WarehouseSheet {
     this.vs = viewSim
     this.optsLabel = !!cfg.labelFor
     this.labelLookup = cfg.labelFor ?? L.labelFor ?? null
+    this.hireOpener = cfg.openHire ?? null
     this.sheet = new Sheet(scene, {
       height: cfg.height,
       W: L.W,
@@ -417,6 +593,11 @@ export abstract class WarehouseSheet {
     if (this.isOpen()) this.dirty = true
   }
 
+  /** Wire the scene's HireSheet opener (WarehouseSheetOptions.openHire). */
+  setHireOpener(fn: ((req: HireRequest) => void) | null): void {
+    this.hireOpener = fn
+  }
+
   /** Re-fit to a new canvas (pass the new computeLayout result). */
   relayout(L: WarehouseSheetLayout): void {
     this.L = L
@@ -446,6 +627,8 @@ export abstract class WarehouseSheet {
   protected abstract valid(): boolean
   /** Every REFRESH_MS while open: clock-driven text. */
   protected refresh(): void {}
+  /** Every frame while open (after a pending rebuild): sim-tick-driven work. */
+  protected frame(): void {}
   /** close() started. */
   protected closed(): void {}
 
@@ -585,7 +768,75 @@ export abstract class WarehouseSheet {
 
   /** deny() with the failure reason of a command result. */
   protected denyResult(target: Button | null, res: CommandResult): void {
-    if (!res.ok) this.deny(target, warehouseFailText(res.reason))
+    if (!res.ok) this.deny(target, warehouseFailText(res.reason, this.vs.data))
+  }
+
+  /**
+   * Hand a hire to the scene's HireSheet: this card closes at once and
+   * `req.onDone` / `req.onCancel` reopen it. Refused (deny on `btn`) when no
+   * opener is wired.
+   */
+  protected requestHire(req: HireRequest, btn: Button | null): void {
+    const open = this.hireOpener
+    if (!open) {
+      this.deny(btn, warehouseFailText('invalid'))
+      return
+    }
+    this.close(true)
+    open(req)
+  }
+
+  /** A person's 16×16 face (`face_NN`), or null while the art lacks it. */
+  protected face(
+    x: number,
+    y: number,
+    look: number,
+  ): Phaser.GameObjects.Image | null {
+    const f = faceFrame(look)
+    return f ? this.image(x, y, f) : null
+  }
+
+  /** Compact pips (`ic_pip_on/off`, 7-px pitch, 4 px between stats); returns the end x. */
+  protected pips(
+    x: number,
+    y: number,
+    groups: readonly (readonly boolean[])[],
+    alpha = 1,
+  ): number {
+    const on = frameOrNull('ic_pip_on')
+    const off = frameOrNull('ic_pip_off')
+    let px = x
+    groups.forEach((g, i) => {
+      if (i > 0) px += PIP_GROUP_GAP
+      for (const lit of g) {
+        const f = lit ? on : off
+        if (f) this.image(px, y, f).setAlpha(alpha)
+        px += PIP_PITCH
+      }
+    })
+    return px
+  }
+
+  /**
+   * A person's name at (x, y), ellipsized to `maxW`; a ★ applicant-hire is
+   * gold with `ic_star` after it (the star counts against `maxW`).
+   */
+  protected personName(
+    x: number,
+    y: number,
+    name: string,
+    star: boolean,
+    maxW: number,
+    tint: number = THEME.textDark,
+  ): Phaser.GameObjects.BitmapText {
+    const starFrame = star ? frameOrNull('ic_star') : null
+    const room = starFrame ? maxW - STAR_W : maxW
+    const t = this.text(x, y, name, star ? STAR_TINT : tint)
+    const fit = ellipsize(name, room, (s) => t.setText(s).width)
+    t.setText(fit)
+    if (starFrame)
+      this.image(x + Math.round(t.width) + 1, y + STAR_DY, starFrame)
+    return t
   }
 
   // ---- internals ---------------------------------------------------------
@@ -630,6 +881,7 @@ export abstract class WarehouseSheet {
     if (!this.isOpen()) return
     if (this.dirty) this.rebuild()
     if (!this.isOpen()) return
+    this.frame()
     this.sinceRefresh += delta
     if (this.sinceRefresh < REFRESH_MS) return
     this.sinceRefresh = 0
@@ -664,7 +916,7 @@ export class BuySheet extends WarehouseSheet {
     super(scene, L, viewSim, {
       ...opts,
       id: BUY_SHEET_ID,
-      height: buySheetHeight(buyRows(viewSim.data, viewSim.level, null).length),
+      height: buySheetHeight(buyRows(viewSim.data, viewSim.level, []).length),
     })
     const dirty = (): void => this.markDirty()
     this.bind({
@@ -676,6 +928,7 @@ export class BuySheet extends WarehouseSheet {
       'worker:hired': dirty,
       'worker:fired': dirty,
       'worker:walkedOut': dirty,
+      'desk:placed': dirty,
     })
   }
 
@@ -697,18 +950,19 @@ export class BuySheet extends WarehouseSheet {
 
   /** The current rows (e2e / tests). */
   models(): BuyRow[] {
-    const nodes = this.vs.lane.nodes()
-    const d = deskNode(nodes)
-    const deskCount = nodes.filter((n) => n.fixture?.kind === 'desk').length
-    const info: DeskInfo | null =
-      d?.fixture?.kind === 'desk'
-        ? {
-            nodeId: d.id,
-            label: this.label(d.id),
-            inspectors: d.fixture.inspectorIds.length,
-          }
-        : null
-    return buyRows(this.vs.data, this.vs.level, info, deskCount)
+    const placed: DeskInfo[] = []
+    for (const n of this.vs.lane.nodes()) {
+      const f = n.fixture
+      if (f?.kind !== 'desk') continue
+      placed.push({
+        index: f.index,
+        nodeId: n.id,
+        label: this.label(n.id),
+        inspectors: f.inspectorIds.length,
+        meanP: f.checker.pMatch,
+      })
+    }
+    return buyRows(this.vs.data, this.vs.level, placed)
   }
 
   /** Screen rect of row `i` while open (e2e taps). */
@@ -793,9 +1047,9 @@ export class BuySheet extends WarehouseSheet {
     const lane = this.vs.lane
     let res: CommandResult
     if (m.kind === 'machine') res = lane.buyMachine(m.id, node)
-    else if (m.kind === 'desk') res = lane.placeDesk(node)
+    else if (m.kind === 'desk') res = lane.placeDesk(node, m.index ?? 1)
     else {
-      const from = deskNode(lane.nodes())
+      const from = deskNodeByIndex(lane.nodes(), m.index ?? 1)
       if (!from) {
         this.deny(btn, warehouseFailText('invalid'))
         return

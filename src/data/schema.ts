@@ -280,24 +280,73 @@ const machines = obj({
   removalRefund: prob,
 })
 
+const ROLES = ['inspector', 'sorter', 'driver'] as const
+const salary = obj({ base: nonNeg, perPip: nonNeg, perCharisma: nonNeg })
+const statList = arr(
+  oneOf(['eye', 'pace', 'charisma', 'judgement', 'speed', 'energy']),
+  1,
+)
+
 const employees = obj({
-  inspector: obj({
-    name: str,
-    salaryPerDay: money,
-    hireFee: money,
-    processS: pos,
-    strain: oneOf(['any']),
-    pMatch: prob,
-    pOther: prob,
-    decoyFlag: prob,
-    maxPerDesk: int(1),
-    startCount: int(0),
-    startSlot: int(1),
+  roles: obj({
+    inspector: obj({
+      stats: statList,
+      p: arr(prob, 5, 5),
+      decoyFlag: arr(prob, 5, 5),
+      processS: arr(pos, 5, 5),
+      charismaBonus: arr(prob, 3, 3),
+      pCap: prob,
+      strain: oneOf(['any']),
+      salary,
+      hireFeeDays: nonNeg,
+    }),
+    sorter: obj({
+      stats: statList,
+      correct: arr(prob, 5, 5),
+      decisionS: arr(pos, 5, 5),
+      playerGraceS: nonNeg,
+      usesWantedList: bool,
+      // Q-B2-3 (author, 2026-10-30): the sorter is Toss-only — never Clears.
+      canClear: oneOf([false]),
+      tagsClean: bool,
+      salary,
+      hireFeeDays: nonNeg,
+    }),
+    driver: obj({
+      stats: statList,
+      speedMult: arr(pos, 5, 5),
+      stopMult: arr(pos, 5, 5),
+      charismaDelivery: arr(int(0), 3, 3),
+      charismaPickup: arr(int(0), 3, 3),
+      affinityPips: int(0, 4),
+      salary,
+      hireFeeDays: nonNeg,
+    }),
   }),
-  maxDesks: int(1),
-  deskPrice: money,
+  applicants: obj({
+    // ≤ 3: the HireSheet lays out three cards.
+    poolSize: int(1, 3),
+    refreshEveryDays: int(1),
+    adPrice: money,
+    starExpiryDays: int(1),
+    pipWeights: rec(null, arr(nonNeg, 5, 5)),
+    charismaWeights: arr(nonNeg, 3, 3),
+    affinityWeights: rec(['none', ...VEHICLES], nonNeg),
+  }),
+  start: obj({
+    inspector: obj({
+      name: str,
+      pips: rec(['eye', 'pace', 'charisma'], int(0, 5)),
+      slot: int(1),
+    }),
+  }),
+  desks: obj({
+    maxPerDesk: int(1),
+    rows: arr(obj({ index: int(1), unlockLevel: lvl, price: money }), 1),
+  }),
+  holdStation: obj({ unlockLevel: lvl }),
   payrollIntervalS: pos,
-  payOrder: arr(oneOf(['inspectors', 'drivers']), 1),
+  payOrder: arr(oneOf(['inspectors', 'sorters', 'drivers']), 3, 3),
   walkoutAfterUnpaidPaydays: int(1),
   rehireFeeDays: nonNeg,
 })
@@ -391,6 +440,12 @@ const economy = obj({
     level3Min: range(0),
     level4Min: range(0),
     level5Min: range(0),
+    firstOverseasClearedAfterLevel3MaxMin: nonNeg,
+    questsOfferedBy30MinMin: int(0),
+    questsCompletedBy30MinMin: int(0),
+    payrollShareOfGrossMax: prob,
+    goldenReleaseOfferedMaxMin: nonNeg,
+    victoryMaxMin: nonNeg,
   }),
 })
 
@@ -429,8 +484,7 @@ const puns = obj({
   decoyLabels: rec(STRAINS, arr(str)),
   streets: arr(str, 1),
   tracks: arr(str, 1),
-  inspectorNames: arr(str, 1),
-  driverNames: arr(str, 1),
+  peopleNames: arr(str, 1),
   companyName: str,
   tossHint: str,
   wantedTitle: str,
@@ -859,18 +913,7 @@ function crossCheck(d: Tables, out: Problems): void {
     )
 
   // employees, economy
-  const insp = d.employees.inspector
-  const l1 = d.levels[0]
-  if (l1 && insp.startSlot > l1.slots)
-    bad(
-      'employees.inspector.startSlot',
-      `${insp.startSlot} exceeds levels[0].slots ${l1.slots}`,
-    )
-  if (insp.startCount > insp.maxPerDesk)
-    bad(
-      'employees.inspector.startCount',
-      `exceeds maxPerDesk ${insp.maxPerDesk}`,
-    )
+  checkEmployees(d, nLevels, out)
   const eco = d.economy
   if (eco.playtestMaxLevel > nLevels)
     bad(
@@ -909,6 +952,99 @@ function crossCheck(d: Tables, out: Problems): void {
   }
 
   checkMap(d, districtIds, buildingIds, out)
+}
+
+/** employees.json relations (spec-build2 §2, §9) and puns.peopleNames. */
+function checkEmployees(d: Tables, nLevels: number, out: Problems): void {
+  const bad = (path: string, msg: string): void => {
+    out.push(`${path}: ${msg}`)
+  }
+  const emp = d.employees
+  const roles = emp.roles
+  const expected: Record<(typeof ROLES)[number], string[]> = {
+    inspector: ['eye', 'pace', 'charisma'],
+    sorter: ['judgement', 'pace'],
+    driver: ['speed', 'energy', 'charisma'],
+  }
+  for (const r of ROLES) {
+    const got = roles[r].stats
+    const want = expected[r]
+    if (got.length !== want.length || got.some((x, i) => x !== want[i]))
+      bad(
+        `employees.roles.${r}.stats`,
+        `expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`,
+      )
+  }
+  const insp = roles.inspector
+  const pMax = Math.max(...insp.p)
+  if (insp.pCap < pMax)
+    bad(
+      'employees.roles.inspector.pCap',
+      `${insp.pCap} is below max(p) ${pMax}`,
+    )
+
+  const ap = emp.applicants
+  const keys = Object.keys(ap.pipWeights)
+  if (!keys.includes('1'))
+    bad('employees.applicants.pipWeights', 'missing the band "1"')
+  for (const k of keys) {
+    const n = Number(k)
+    if (!Number.isInteger(n) || n < 1 || n > nLevels)
+      bad(`employees.applicants.pipWeights.${k}`, `not a level 1..${nLevels}`)
+    const row = ap.pipWeights[k] ?? []
+    if (!(row.reduce((sum, w) => sum + w, 0) > 0))
+      bad(`employees.applicants.pipWeights.${k}`, 'weights sum to 0')
+  }
+  if (!(ap.charismaWeights.reduce((sum, w) => sum + w, 0) > 0))
+    bad('employees.applicants.charismaWeights', 'weights sum to 0')
+  if (!(Object.values(ap.affinityWeights).reduce((sum, w) => sum + w, 0) > 0))
+    bad('employees.applicants.affinityWeights', 'weights sum to 0')
+
+  const start = emp.start.inspector
+  for (const [k, v] of Object.entries(start.pips)) {
+    const [lo, hi] = k === 'charisma' ? [0, 2] : [1, 5]
+    if (v < lo || v > hi)
+      bad(`employees.start.inspector.pips.${k}`, `${v} is outside ${lo}..${hi}`)
+  }
+  const l1 = d.levels[0]
+  if (l1 && start.slot > l1.slots)
+    bad(
+      'employees.start.inspector.slot',
+      `${start.slot} exceeds levels[0].slots ${l1.slots}`,
+    )
+
+  const rows = emp.desks.rows
+  rows.forEach((r, i) => {
+    if (r.index !== i + 1)
+      bad(
+        `employees.desks.rows[${i}].index`,
+        `expected ${i + 1} (ascending from 1, unique), got ${r.index}`,
+      )
+    if (r.unlockLevel > nLevels)
+      bad(
+        `employees.desks.rows[${i}].unlockLevel`,
+        `level ${r.unlockLevel} does not exist`,
+      )
+  })
+  if (rows[0] && rows[0].unlockLevel !== 1)
+    bad('employees.desks.rows[0].unlockLevel', 'the first desk must open at L1')
+  if (emp.holdStation.unlockLevel > nLevels)
+    bad(
+      'employees.holdStation.unlockLevel',
+      `level ${emp.holdStation.unlockLevel} does not exist`,
+    )
+  for (const g of ['inspectors', 'sorters', 'drivers'] as const) {
+    const n = emp.payOrder.filter((x) => x === g).length
+    if (n !== 1) bad('employees.payOrder', `lists "${g}" ${n} times`)
+  }
+  const names = d.puns.peopleNames
+  const need = 3 * ap.poolSize + 1
+  if (names.length < need)
+    bad('puns.peopleNames', `${names.length} names, need ≥ ${need}`)
+  names.forEach((n, i) => {
+    if (names.indexOf(n) !== i)
+      bad(`puns.peopleNames[${i}]`, `duplicate name "${n}"`)
+  })
 }
 
 function checkMap(

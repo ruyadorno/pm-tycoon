@@ -139,7 +139,11 @@ describe('atlas assignment (who binds what)', () => {
 
   it('room art the room draws in a front layer (badges) is in world', () => {
     for (const n of names) {
-      if (/^(ext_outline|slot_(empty|locked)_outline|lamp_)/.test(n)) {
+      if (
+        /^(ext_outline|slot_(empty|locked)_outline|station_outline|lamp_)/.test(
+          n,
+        )
+      ) {
         expect(inAtlas(n, 'world'), n).toBe(true)
         expect(atlasOf(n), n).toBe('world')
       }

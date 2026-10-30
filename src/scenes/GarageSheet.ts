@@ -8,20 +8,36 @@
 //   header (56)  `Garage · Fleet 3` / `Payday in 0:23`, then
 //                `Payroll $44/day` (red after a short payday) ·
 //                `Lane 15/min · Detection 97%` (the % in the §6.3 colours)
-//   fleet list   clipped by the Sheet's list camera, 56-px rows: type icon,
-//                `Bike 1` over `Dee · $8/day` (`! unpaid` in red, red `Dee
-//                left` after a walkout), the §4.6 state text + units
-//                `3/4`, the zone chip `Any ▾` (→ ZonePicker), `Sell $100`
-//                (→ Dialog; disabled on the last vehicle with the tip `Keep
-//                at least one vehicle`) or `Re-hire $8` once the driver has
-//                walked out (→ rehireDriver, toast `Dee is back — Bike 2 on
-//                the road`);
+//   fleet list   clipped by the Sheet's list camera, 56-px rows of three
+//                14-px lines (M6, spec-build2 §2.5, design-m6 §6.3): type
+//                icon; `Bike 1` | the §4.6 state text; the driver's name
+//                (gold + ic_star for a ★; red `Dee left` after a walkout,
+//                red `No driver` while a driverless vehicle still finishes
+//                its trip) | units `3/4`; then the compact pips (speed,
+//                energy, charisma — ic_pip_on/off, 7-px pitch), the
+//                affinity's ic_<type> and `$8/day` (red `! unpaid` after a
+//                short payday, `→ Rae after this trip` while a Replace
+//                waits); the zone chip `Any ▾` (→ ZonePicker); the action
+//                slot: the `···` button (44×44, at the row's right edge) on
+//                every row, opening a popover that lists the row's primary
+//                action first — `Hire driver` (no driver → HireSheet) /
+//                Sell; `Re-hire $8` (walked out → rehireDriver, toast `Dee is
+//                back — Bike 2 on the road`; not offered while a Replace
+//                waits, the swap lets that driver go) / Fire / Sell; else
+//                `Replace driver` (→ HireSheet; the swap waits for the trip)
+//                / `Fire driver` (→ Dialog) / `Sell $100` (→ Dialog;
+//                disabled on the last vehicle with the tip `Keep at least
+//                one vehicle`) — so Sell stays reachable on a driverless
+//                row (D16, M6 integration);
 //                row tap → pm:panTo {vehicleId}, double-tap → pm:follow +
 //                close; empty state `Buy your first vehicle below`
 //   buy cards    one per vehicles.json type: sprite, name, price (red when
 //                unaffordable), `4 units · S M`, `$8/day`, speed pips;
-//                locked types greyed `Unlocks at Lv 2`; tap → buyVehicle →
-//                toast `Bike 2 bought — Dee hired` + ui:sfx buy
+//                locked types greyed `Unlocks at Lv 2`; tap → the HireSheet
+//                `Who drives the Bike?` (three driver applicants priced for
+//                that class + `Hire later`) → buyVehicle(type, id | null)
+//                → toast `Bike 2 bought — Dee hired` / `Bike 2 bought — no
+//                driver yet` + ui:sfx buy
 //   footer       `Sold vehicles refund 50%. Drivers are paid every day (60 s).`
 // Every number comes from the data tables or the ViewSim. Sim events only
 // mark the view dirty (bindSim: attached while awake); the header and row
@@ -29,19 +45,34 @@
 // `toggleGarage(from)` is the one entry point (HUD button, G key, the
 // district panel's `Garage ▸`).
 import Phaser from 'phaser'
-import { bindSim, getSim, getViewSim, REG } from '../boot/simBinding.ts'
+import { EV_GARAGE_OPENING } from '../boot/nav.ts'
+import { bindSim, getViewSim, REG } from '../boot/simBinding.ts'
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import { DOUBLE_TAP_MS, DOUBLE_TAP_PX } from '../input/GestureClassifier.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { frameOrNull, type FrameName } from '../render/frames.ts'
+import type { CommandResult } from '../sim/commands.ts'
 import { SIM_FEATURES } from '../sim/features.ts'
 import type { Size, VehicleType } from '../sim/types.ts'
-import type { VehicleSnapshot, ViewSim } from '../sim/view-api.ts'
+import type { PersonView, VehicleSnapshot, ViewSim } from '../sim/view-api.ts'
 import { Button, TAP_PX } from '../ui/Button.ts'
 import { Dialog } from '../ui/Dialog.ts'
-import { minHitFor } from '../ui/layout.ts'
+import {
+  buyNote,
+  buyTitle,
+  HireSheet,
+  PIP_PITCH,
+  PIP_SIZE,
+  pipFrame,
+  pipRows,
+  pipsWidth,
+  STAR_TINT,
+  type HireSheetTarget,
+  type PipRowModel,
+} from '../ui/HireSheet.ts'
+import { minHitFor, type Rect } from '../ui/layout.ts'
 import { addBar, addPanel, BAR_H } from '../ui/Panel.ts'
-import { claimKey, Sheet } from '../ui/Sheet.ts'
+import { claimKey, popModal, pushModal, Sheet } from '../ui/Sheet.ts'
 import { detectionTone, laneRateText, TONE_TEXT } from '../ui/ShieldPopover.ts'
 import {
   addText,
@@ -57,6 +88,8 @@ import {
   EV_UI_SFX,
   EV_UI_TAP,
   failText,
+  placePopover,
+  PopoverLayer,
   zoneChipText,
   ZonePicker,
 } from '../ui/ZonePicker.ts'
@@ -151,10 +184,17 @@ export function sellRefund(data: GameData, type: VehicleType): number {
   return def ? Math.round(def.price * data.economy.sellRefund) : 0
 }
 
-/** Re-hire fee: one day's salary × employees.rehireFeeDays (spec §7.4). */
-export function rehireCost(data: GameData, type: VehicleType): number {
-  const def = typeDef(data, type)
-  return def ? def.driverSalaryPerDay * data.employees.rehireFeeDays : 0
+/**
+ * Re-hire fee: one day's salary × employees.rehireFeeDays (spec §7.4) — the
+ * walked-out driver's own salary (M6: pips set it), else the class base.
+ */
+export function rehireCost(
+  data: GameData,
+  type: VehicleType,
+  salaryPerDay: number | null = null,
+): number {
+  const day = salaryPerDay ?? typeDef(data, type)?.driverSalaryPerDay ?? 0
+  return day * data.employees.rehireFeeDays
 }
 
 /** §4.6 state text (the follow strip's words, without the stops count). */
@@ -222,61 +262,242 @@ export function statusLines(
 }
 
 /**
- * Driver line: `Dee · $8/day`, red `Dee · ! unpaid` after a short payday, red
- * `Dee left` after a walkout (the row's alert state, like the `!` badge;
- * `No driver` when the name is unknown). The status column already reads
- * `No driver` for a parked inactive vehicle, so naming who left says who
- * the `Re-hire` button brings back instead of repeating it (UX M3 review;
- * `Dee walked out` is 79 px, wider than the 74-px name column).
+ * Driver name line (the row's second line, name column): the active
+ * driver's name; red `Dee left` after a walkout (the row's alert state, like
+ * the `!` badge — naming who left says who the `Re-hire` button brings
+ * back; UX M3 review); red `No driver` with none (M6: a Hire later, a
+ * fired driver). The pay, `! unpaid` and a waiting Replace moved to the
+ * third line (driverRow).
  */
 export function driverLine(
-  v: Pick<VehicleSnapshot, 'driverName' | 'unpaid' | 'type'>,
-  data: GameData,
+  v: Pick<VehicleSnapshot, 'driverName'>,
+  _data: GameData,
   walkedOut: string | null = null,
 ): { text: string; red: boolean } {
   if (v.driverName === null)
     return { text: walkedOut ? `${walkedOut} left` : 'No driver', red: true }
-  if (v.unpaid) return { text: `${v.driverName} · ! unpaid`, red: true }
-  const pay = typeDef(data, v.type)?.driverSalaryPerDay ?? 0
-  return { text: `${v.driverName} · ${formatMoney(pay)}/day`, red: false }
+  return { text: v.driverName, red: false }
+}
+
+/** The row's driver block (lines 2-3) for the M6 Garage row. */
+export interface DriverRowModel {
+  /** Line 2, name column: driverLine (empty for a parked driverless vehicle). */
+  name: string
+  nameRed: boolean
+  /** ★ applicant hired: gold name + ic_star after it. */
+  star: boolean
+  /** Line 3: speed / energy / charisma pips; null without a driver. */
+  pips: PipRowModel[] | null
+  /** The pips of a walked-out driver read dimmed. */
+  dim: boolean
+  /** Driver affinity shown as ic_<type> after the pips; null for none. */
+  affinity: VehicleType | null
+  /** Line 3 tail, longest first: the first that fits is shown (fitTail). */
+  tail: string[]
+  tailRed: boolean
+}
+
+type DriverRowVehicle = Pick<
+  VehicleSnapshot,
+  | 'type'
+  | 'state'
+  | 'driverName'
+  | 'driverId'
+  | 'driverPips'
+  | 'driverStar'
+  | 'driverAffinity'
+  | 'nextDriverName'
+  | 'unpaid'
+>
+
+/**
+ * Lines 2-3 of a fleet row (spec-build2 §2.5, design-m6 §6.3: `Dee ★ ●●●●○
+ * ●●●○○ ●○` + ic_<affinity> + `· $8/day`, `→ Rae after this trip` while a
+ * Replace waits). `driver` = the vehicle's driver (active or walked out),
+ * for its name and salary; the class base pays when it is unknown.
+ */
+export function driverRow(
+  v: DriverRowVehicle,
+  driver: Pick<PersonView, 'name' | 'salaryPerDay'> | null,
+  data: GameData,
+): DriverRowModel {
+  const none = v.driverId === null || (!driver && v.driverName === null)
+  if (none) {
+    // The status column already reads `No driver` for a parked vehicle.
+    const parked = v.state === 'inactive'
+    return {
+      name: parked ? '' : 'No driver',
+      nameRed: true,
+      star: false,
+      pips: null,
+      dim: false,
+      affinity: null,
+      tail: [],
+      tailRed: false,
+    }
+  }
+  const walkedOut = v.driverName === null
+  const line = driverLine(v, data, driver?.name ?? null)
+  const pay =
+    driver?.salaryPerDay ?? typeDef(data, v.type)?.driverSalaryPerDay ?? 0
+  let tail = [`${formatMoney(pay)}/day`, formatMoney(pay)]
+  let tailRed = false
+  if (v.unpaid && !walkedOut) {
+    tail = ['! unpaid', '!']
+    tailRed = true
+  } else if (v.nextDriverName !== null) {
+    const n = v.nextDriverName
+    tail = [`→ ${n} after this trip`, `→ ${n} next trip`, `→ ${n}`]
+  }
+  return {
+    name: line.text,
+    nameRed: line.red,
+    star: v.driverStar,
+    pips: v.driverPips ? pipRows('driver', v.driverPips) : null,
+    dim: walkedOut,
+    affinity:
+      v.driverAffinity && v.driverAffinity !== 'none' ? v.driverAffinity : null,
+    tail,
+    tailRed,
+  }
+}
+
+/** The first candidate that fits `maxW`, else the last one ellipsized ('' if none). */
+export function fitTail(
+  tail: readonly string[],
+  maxW: number,
+  measure: (s: string) => number,
+): string {
+  for (const s of tail) if (measure(s) <= maxW) return s
+  const last = tail[tail.length - 1]
+  return last === undefined || maxW <= 0 ? '' : ellipsize(last, maxW, measure)
+}
+
+/** Line 3 geometry (row-local x): pips per stat, the affinity icon, the tail. */
+export function driverLineLayout(
+  rows: readonly Pick<PipRowModel, 'on'>[],
+  affinity: boolean,
+  endX: number,
+): { pipX: number[]; iconX: number | null; tailX: number; tailW: number } {
+  const pipX: number[] = []
+  let x = NAME_X
+  for (const r of rows) {
+    pipX.push(x)
+    x += pipsWidth(r.on.length) + PIP_GROUP_GAP
+  }
+  let iconX: number | null = null
+  if (affinity) {
+    iconX = x
+    x += 16 + PIP_GROUP_GAP
+  }
+  return { pipX, iconX, tailX: x, tailW: Math.max(0, endX - x) }
 }
 
 export interface RowAction {
-  kind: 'sell' | 'rehire'
+  /**
+   * The row's primary action — hire: `Hire driver`; rehire: `Re-hire $8`;
+   * more: none (Replace / Fire / Sell). The slot always shows the `···`
+   * popover; a hire / rehire row lists its primary action first there.
+   */
+  kind: 'hire' | 'rehire' | 'more'
   label: string
   enabled: boolean
   /** Tooltip shown on a tap while disabled. */
   tip: string | null
 }
 
+/** The `···` button's (screen-reader / e2e) label; the face draws three dots. */
+export const MORE_LABEL = '···'
+
 /**
- * The row's button: `Re-hire $8` on a vehicle without a driver — inactive on
- * the lot, or walked out and still finishing its trip (spec §7.4: re-hire is
- * immediate) — enabled once the payroll system ships; else `Sell $100`,
- * disabled on the last vehicle while vehicles.json lastVehicleUnsellable.
+ * The row's primary action (design-m6 §6.3): `Hire driver` on a vehicle with
+ * no driver at all (Hire later, a fired driver); `Re-hire $8` once the driver
+ * has walked out — parked inactive or still finishing its trip (spec §7.4:
+ * re-hire is immediate; the fee is that driver's own day of pay) — enabled
+ * once the payroll system ships; else `more` (Replace / Fire / Sell). A
+ * walked-out driver whose Replace already waits (`nextDriverName`) gets no
+ * Re-hire: the swap lets them go anyway, so the fee would be wasted (the
+ * sim refuses it too, payroll.ts rehire). The slot is the `···` popover on
+ * every row (menuItems puts a hire / rehire first), so Sell — and Fire for
+ * a walked-out driver — stay reachable on a driverless row (M6
+ * integration). A snapshot without `driverId` (pre-M6 callers) reads as
+ * walked out.
  */
 export function rowAction(
   v: Pick<VehicleSnapshot, 'state' | 'type'> &
-    Partial<Pick<VehicleSnapshot, 'driverName'>>,
+    Partial<
+      Pick<VehicleSnapshot, 'driverName' | 'driverId' | 'nextDriverName'>
+    >,
   data: GameData,
-  fleetSize: number,
+  _fleetSize: number,
   rehireEnabled: boolean,
+  driverSalary: number | null = null,
 ): RowAction {
-  if (v.state === 'inactive' || v.driverName === null) {
+  const replacing = v.nextDriverName != null
+  if (!replacing && (v.driverName === null || v.state === 'inactive')) {
+    if (v.driverId === null)
+      return { kind: 'hire', label: 'Hire driver', enabled: true, tip: null }
     return {
       kind: 'rehire',
-      label: `Re-hire ${formatMoney(rehireCost(data, v.type))}`,
+      label: `Re-hire ${formatMoney(rehireCost(data, v.type, driverSalary))}`,
       enabled: rehireEnabled,
       tip: rehireEnabled ? null : 'Not available yet',
     }
   }
+  return { kind: 'more', label: MORE_LABEL, enabled: true, tip: null }
+}
+
+/**
+ * `Sell $100`, disabled on the last vehicle while vehicles.json
+ * lastVehicleUnsellable (tip `Keep at least one vehicle`).
+ */
+export function sellAction(
+  v: Pick<VehicleSnapshot, 'type'>,
+  data: GameData,
+  fleetSize: number,
+): { label: string; enabled: boolean; tip: string | null } {
   const last = data.vehicles.lastVehicleUnsellable && fleetSize <= 1
   return {
-    kind: 'sell',
     label: `Sell ${formatMoney(sellRefund(data, v.type))}`,
     enabled: !last,
     tip: last ? 'Keep at least one vehicle' : null,
   }
+}
+
+export interface MenuItem {
+  kind: 'hire' | 'rehire' | 'replace' | 'fire' | 'sell'
+  label: string
+  enabled: boolean
+  tip: string | null
+}
+
+/**
+ * The `···` popover (design-m6 §6.3, D16) for the row's primary action
+ * (rowAction): a driven row → Replace driver / Fire driver / Sell; a
+ * walked-out driver → Re-hire $N / Fire driver / Sell; no driver at all
+ * (Hire later, a fire) → Hire driver / Sell.
+ */
+export function menuItems(
+  v: Pick<VehicleSnapshot, 'type'>,
+  data: GameData,
+  fleetSize: number,
+  primary: RowAction | null = null,
+): MenuItem[] {
+  const sell: MenuItem = { kind: 'sell', ...sellAction(v, data, fleetSize) }
+  const fire: MenuItem = {
+    kind: 'fire',
+    label: 'Fire driver',
+    enabled: true,
+    tip: null,
+  }
+  if (primary?.kind === 'hire') return [{ ...primary, kind: 'hire' }, sell]
+  if (primary?.kind === 'rehire')
+    return [{ ...primary, kind: 'rehire' }, fire, sell]
+  return [
+    { kind: 'replace', label: 'Replace driver', enabled: true, tip: null },
+    fire,
+    sell,
+  ]
 }
 
 /** `Garage · Fleet 3` */
@@ -375,9 +596,60 @@ export function buyCards(
   })
 }
 
-/** `Bike 2 bought — Dee hired` */
+/** `Bike 2 bought — Dee hired` / `Bike 2 bought — no driver yet` (Hire later). */
 export function boughtToast(name: string, driverName: string | null): string {
-  return driverName ? `${name} bought — ${driverName} hired` : `${name} bought`
+  return driverName
+    ? `${name} bought — ${driverName} hired`
+    : `${name} bought — no driver yet`
+}
+
+/** After a Replace / Hire driver: `Rae takes over Bike 2 after this trip` or `Rae now drives Bike 2`. */
+export function driveToast(
+  driverName: string,
+  vehicleName: string,
+  pending: boolean,
+): string {
+  return pending
+    ? `${driverName} takes over ${vehicleName} after this trip`
+    : `${driverName} now drives ${vehicleName}`
+}
+
+/** HireSheet title for a Replace: `Replace Dee · Bike 2`. */
+export function replaceTitle(driverName: string, vehicleName: string): string {
+  return `Replace ${driverName} · ${vehicleName}`
+}
+
+/** HireSheet title for a driverless vehicle: `Driver for Bike 2`. */
+export function driverForTitle(vehicleName: string): string {
+  return `Driver for ${vehicleName}`
+}
+
+/**
+ * The Fire dialog's line (design-m6 §4.5): a waiting Replace takes over at
+ * once; a moving vehicle finishes its trip, then parks `No driver`.
+ */
+export function firePrompt(
+  driverName: string,
+  v: Pick<VehicleSnapshot, 'name' | 'state' | 'nextDriverName'>,
+): string {
+  if (v.nextDriverName)
+    return `Fire ${driverName}? ${v.nextDriverName} takes over ${v.name} now.`
+  if (v.state === 'idle_lot' || v.state === 'inactive')
+    return `Fire ${driverName}? ${v.name} parks with no driver.`
+  return `Fire ${driverName}? ${v.name} finishes its trip, then parks.`
+}
+
+/** After a Fire, from the vehicle as it is now. */
+export function firedToast(
+  driverName: string,
+  v: Pick<VehicleSnapshot, 'name' | 'state' | 'driverName'> | null,
+): string {
+  if (!v) return `${driverName} fired`
+  if (v.driverName)
+    return `${driverName} fired — ${v.driverName} now drives ${v.name}`
+  if (v.state === 'inactive')
+    return `${driverName} fired — ${v.name} has no driver`
+  return `${driverName} fired — ${v.name} parks after this trip`
 }
 
 /** `Dee is back — Bike 2 on the road` after a re-hire (spec §7.4). */
@@ -412,20 +684,23 @@ export function cardWidth(W: number, n = 3): number {
   )
 }
 
-/** Row geometry (list-local x) for a canvas W px wide. */
+/**
+ * Row geometry (list-local x) for a canvas W px wide: the 44-px `···` action
+ * slot at the right edge, the zone chip 4 px left of it.
+ */
 export function rowColumns(W: number): {
-  sellX: number
+  actionX: number
   zoneX: number
   statusX: number
   statusW: number
   nameX: number
   nameW: number
 } {
-  const sellX = W - MARGIN - ROW_PAD_R - SELL_W
-  const zoneX = sellX - 4 - ZONE_W
+  const actionX = W - MARGIN - ROW_PAD_R - MORE_W
+  const zoneX = actionX - 4 - ZONE_W
   const statusX = STATUS_X
   return {
-    sellX,
+    actionX,
     zoneX,
     statusX,
     statusW: zoneX - 4 - statusX,
@@ -446,9 +721,11 @@ export function toggleGarage(from: Phaser.Scene): void {
   if (!g) return
   if (g.pending) return
   if (sp.isActive(GARAGE_KEY)) {
+    if (!g.garageSheet?.isOpen()) from.game.events.emit(EV_GARAGE_OPENING)
     g.toggleSheet()
     return
   }
+  from.game.events.emit(EV_GARAGE_OPENING)
   g.pending = true
   if (sp.isSleeping(GARAGE_KEY)) sp.wake(GARAGE_KEY)
   else sp.launch(GARAGE_KEY)
@@ -461,22 +738,36 @@ const ROW_PAD_R = 6
 const NAME_X = 42
 const STATUS_X = 120
 /**
- * Row button widths: the longest labels (`Re-hire $25`, 61 px in m5x7;
- * `Downtown ▾`, 60 px) need Button.CONTENT_PAD (5) of air on each side —
- * at 64 px `Re-hire $25` touched both edges of its face (UX M3 review).
+ * The zone chip's width: the longest label (`Downtown ▾`, 60 px in m5x7)
+ * needs Button.CONTENT_PAD (5) of air on each side (UX M3 review).
  */
-export const SELL_W = 72
 export const ZONE_W = 70
+/** The `···` button (design-m6 §6.3: 44×44), right-aligned in the action slot. */
+export const MORE_W = 44
 const ZONE_H = 28
-const LINE1 = 9
-const LINE2 = 29
+/** Header text bands (16 px). */
 const LINE_BAND = 16
+/** Row text bands (row-local tops, 14 px each, inside the 52-px row panel). */
+export const ROW_LINE_Y = [5, 20, 35] as const
+const ROW_BAND = 14
+/** Gap between pip groups, the affinity icon and the tail on line 3. */
+const PIP_GROUP_GAP = 4
 const REFRESH_MS = 250
 const TIP_MS = 2000
 const MUTED = PALETTE.grey1
 const RED = PALETTE.red0
 const PIP_W = 8
 const PIP_GAP = 2
+/** The popover's rows (44-px buttons, 2-px gaps, 4-px padding). */
+export const MENU_W = 148
+const MENU_PAD = 4
+const MENU_ROW_H = 44
+const MENU_GAP = 2
+
+/** The `···` popover height for `n` items. */
+export function menuHeight(n: number): number {
+  return 2 * MENU_PAD + n * MENU_ROW_H + Math.max(0, n - 1) * MENU_GAP
+}
 
 interface RowView {
   id: number
@@ -484,11 +775,18 @@ interface RowView {
   icon: Phaser.GameObjects.Image
   name: Phaser.GameObjects.BitmapText
   driver: Phaser.GameObjects.BitmapText
+  star: Phaser.GameObjects.Image | null
   status1: Phaser.GameObjects.BitmapText
   status2: Phaser.GameObjects.BitmapText
+  /** Line 3: speed / energy / charisma pip images (5 + 5 + 2). */
+  pips: Phaser.GameObjects.GameObject[][]
+  affinity: Phaser.GameObjects.Image
+  tail: Phaser.GameObjects.BitmapText
   zone: Button
   action: Button
-  actionKind: 'sell' | 'rehire'
+  /** The three dots drawn on the `···` face. */
+  dots: Phaser.GameObjects.Rectangle[]
+  actionKind: RowAction['kind']
   tip: string | null
   tipBox: Phaser.GameObjects.Container | null
   tipTimer: Phaser.Time.TimerEvent | null
@@ -523,6 +821,8 @@ export class GarageSheet extends Phaser.Scene {
   private empty: Phaser.GameObjects.Container | null = null
   private picker: ZonePicker | null = null
   private dialog: Dialog | null = null
+  private hire: HireSheet | null = null
+  private menu: RowMenu | null = null
   private measurer: Phaser.GameObjects.BitmapText | null = null
   private title: Phaser.GameObjects.BitmapText | null = null
   private payday: Phaser.GameObjects.BitmapText | null = null
@@ -548,6 +848,8 @@ export class GarageSheet extends Phaser.Scene {
     this.empty = null
     this.picker = null
     this.dialog = null
+    this.hire = null
+    this.menu = null
     this.measurer = null
     this.foot = null
     this.listH = 0
@@ -618,6 +920,16 @@ export class GarageSheet extends Phaser.Scene {
     return this.sheet
   }
 
+  /** The open driver HireSheet (buy flow, Replace, Hire driver), else null (e2e). */
+  get hireSheet(): HireSheet | null {
+    return this.hire?.isOpen() ? this.hire : null
+  }
+
+  /** The open `···` popover, else null (e2e). */
+  get rowMenu(): RowMenu | null {
+    return this.menu?.isOpen() ? this.menu : null
+  }
+
   override update(_t: number, delta: number): void {
     if (this.layoutDirty) {
       this.layoutDirty = false
@@ -653,7 +965,11 @@ export class GarageSheet extends Phaser.Scene {
       H: this.H,
       id: GARAGE_SHEET_ID,
       list: { top: HEADER_H, height: listH },
-      onClose: () => this.picker?.close(),
+      onClose: () => {
+        this.picker?.close()
+        this.menu?.close()
+        this.hire?.close()
+      },
       onClosed: () => this.scene.sleep(),
     })
     this.sheet = sheet
@@ -679,6 +995,12 @@ export class GarageSheet extends Phaser.Scene {
     this.dialog = null
     this.picker?.destroy()
     this.picker = null
+    // The new Sheet's list camera would draw over them: close (a re-tap
+    // brings them back at the new size).
+    this.hire?.close()
+    this.hire = null
+    this.menu?.close()
+    this.menu = null
     for (const r of this.rows) r.tipTimer?.remove(false)
     this.sheet?.destroy()
     this.cards = []
@@ -892,25 +1214,46 @@ export class GarageSheet extends Phaser.Scene {
     const icon = this.add.image(0, 0, UI_ATLAS, `ic_${v.type}`).setOrigin(0, 0)
     const iconAt = rowIconPos(icon.width, icon.height)
     icon.setPosition(iconAt.x, iconAt.y)
-    const name = addText(this, col.nameX, textTop(LINE1, LINE_BAND), '')
-    const driver = addText(this, col.nameX, textTop(LINE2, LINE_BAND), '', {
+    const [ya, yb, yc] = ROW_LINE_Y
+    const name = addText(this, col.nameX, textTop(ya, ROW_BAND), '')
+    const driver = addText(this, col.nameX, textTop(yb, ROW_BAND), '')
+    const status1 = addText(this, col.statusX, textTop(ya, ROW_BAND), '')
+    const status2 = addText(this, col.statusX, textTop(yb, ROW_BAND), '', {
       tint: MUTED,
     })
-    const status1 = addText(this, col.statusX, textTop(LINE1, LINE_BAND), '')
-    const status2 = addText(this, col.statusX, textTop(LINE2, LINE_BAND), '', {
-      tint: MUTED,
-    })
+    const starFrame = frameOrNull('ic_star')
+    const star = starFrame
+      ? this.add
+          .image(col.nameX, yb - 1, UI_ATLAS, starFrame)
+          .setOrigin(0, 0)
+          .setVisible(false)
+      : null
+    // Line 3: speed / energy / charisma pips (positions set in updateRow).
+    const pipY = yc + Math.floor((ROW_BAND - PIP_SIZE) / 2)
+    const pips = pipRows('driver', {}).map((r) =>
+      r.on.map((_, k) => this.pipObject(k * PIP_PITCH, pipY)),
+    )
+    const affinity = this.add
+      .image(0, yc - 1, UI_ATLAS, `ic_${v.type}`)
+      .setOrigin(0, 0)
+      .setVisible(false)
+    const tail = addText(this, 0, textTop(yc, ROW_BAND), '', { tint: MUTED })
     const row: RowView = {
       id: v.id,
       c: this.add.container(0, y),
       icon,
       name,
       driver,
+      star,
       status1,
       status2,
+      pips,
+      affinity,
+      tail,
       zone: null as unknown as Button,
       action: null as unknown as Button,
-      actionKind: 'sell',
+      dots: [],
+      actionKind: 'more',
       tip: null,
       tipBox: null,
       tipTimer: null,
@@ -929,18 +1272,27 @@ export class GarageSheet extends Phaser.Scene {
       onClick: () => this.openPicker(row),
     })
     row.action = new Button(this, {
-      x: col.sellX,
+      x: col.actionX,
       y: Math.floor((ROW_PITCH - 44) / 2),
-      w: SELL_W,
+      w: MORE_W,
       h: 44,
       label: '',
       minHit,
-      id: `garage:sell:${v.id}`,
+      id: `garage:action:${v.id}`,
       onClick: () => this.onAction(row),
       onDisabledTap: () => {
         if (row.tip) this.showTip(row, row.tip)
       },
     })
+    // The `···` face: three 3×3 dots (m5x7 has no ⋯; its · is one pixel).
+    for (let k = 0; k < 3; k++) {
+      const d = this.add
+        .rectangle(0, 0, 3, 3, THEME.textDark)
+        .setOrigin(0, 0)
+        .setVisible(false)
+      row.dots.push(d)
+      row.action.add(d)
+    }
     panel.on('pointerdown', () => {
       row.down = true
     })
@@ -955,6 +1307,10 @@ export class GarageSheet extends Phaser.Scene {
       driver,
       status1,
       status2,
+      ...(star ? [star] : []),
+      ...pips.flat(),
+      affinity,
+      tail,
       row.zone,
       row.action,
     ])
@@ -962,35 +1318,109 @@ export class GarageSheet extends Phaser.Scene {
     return row
   }
 
+  /** One pip: an ic_pip image, or a 6×6 square without the frames. */
+  private pipObject(x: number, y: number): Phaser.GameObjects.GameObject {
+    const f = pipFrame(false)
+    if (f) return this.add.image(x, y, UI_ATLAS, f).setOrigin(0, 0)
+    return this.add.rectangle(x + 1, y + 1, 6, 6, PALETTE.grey3).setOrigin(0, 0)
+  }
+
   private updateRow(row: RowView, v: VehicleSnapshot): void {
     const data = this.vs.data
     const col = rowColumns(this.W)
     const m = this.measure()
     setTextIf(row.name, ellipsize(v.name, col.nameW, m))
-    const d = driverLine(v, data, this.walkedOutName(v))
-    setTextIf(row.driver, ellipsize(d.text, col.nameW, m))
-    row.driver.setTint(d.red ? RED : MUTED)
+    const person = this.driverOf(v)
+    const d = driverRow(v, person, data)
+    // Line 2: the name (+ ic_star after it for a ★).
+    const starW = d.star && row.star ? 18 : 0
+    setTextIf(row.driver, ellipsize(d.name, col.nameW - starW, m))
+    row.driver.setTint(d.nameRed ? RED : d.star ? STAR_TINT : THEME.textDark)
+    if (row.star) {
+      row.star.setVisible(d.star && d.name !== '')
+      row.star.setX(col.nameX + Math.round(row.driver.width) + 2)
+    }
     const [l1, l2] = statusLines(v, col.statusW, m)
     setTextIf(row.status1, l1)
     setTextIf(row.status2, l2)
+    // Line 3: pips, affinity icon, tail (across the name + status columns).
+    const endX = col.zoneX - 4
+    const lay = driverLineLayout(d.pips ?? [], d.affinity !== null, endX)
+    row.pips.forEach((group, g) => {
+      const model = d.pips?.[g]
+      const x0 = lay.pipX[g] ?? 0
+      group.forEach((obj, k) => {
+        const lit = model?.on[k] ?? false
+        const f = pipFrame(lit)
+        if (f) {
+          const o = obj as Phaser.GameObjects.Image
+          o.setVisible(model !== undefined)
+          if (!model) return
+          o.setX(x0 + k * PIP_PITCH).setAlpha(d.dim ? 0.5 : 1)
+          if (o.frame.name !== f) o.setFrame(f)
+        } else {
+          const o = obj as Phaser.GameObjects.Rectangle
+          o.setVisible(model !== undefined)
+          if (!model) return
+          o.setX(x0 + k * PIP_PITCH + 1).setAlpha(d.dim ? 0.5 : 1)
+          o.setFillStyle(lit ? PALETTE.yellow2 : PALETTE.grey3)
+        }
+      })
+    })
+    const affFrame = d.affinity ? frameOrNull(`ic_${d.affinity}`) : null
+    row.affinity.setVisible(affFrame !== null && lay.iconX !== null)
+    if (affFrame && lay.iconX !== null) {
+      if (row.affinity.frame.name !== affFrame) row.affinity.setFrame(affFrame)
+      row.affinity.setX(lay.iconX).setAlpha(d.dim ? 0.5 : 1)
+    }
+    const tailX = d.pips ? lay.tailX : col.nameX
+    row.tail.setX(tailX)
+    setTextIf(row.tail, fitTail(d.tail, endX - tailX, m))
+    row.tail.setTint(d.tailRed ? RED : MUTED)
+    // Zone chip and the action slot.
     const zoneText = zoneChipText(data, this.vs.map, v.zone)
     if (row.zone.getData('label') !== zoneText) row.zone.setLabel(zoneText)
-    const a = rowAction(v, data, this.vs.vehicles.length, SIM_FEATURES.payroll)
-    row.actionKind = a.kind
-    row.tip = a.tip
-    if (row.action.getData('label') !== a.label) row.action.setLabel(a.label)
-    row.action.setEnabled(a.enabled)
+    const a = rowAction(
+      v,
+      data,
+      this.vs.vehicles.length,
+      SIM_FEATURES.payroll,
+      person?.salaryPerDay ?? null,
+    )
+    this.setAction(row, a, col.actionX)
     row.icon.setAlpha(v.state === 'inactive' ? 0.5 : 1)
   }
 
-  /** The walked-out driver's name (the facade only reports active ones). */
-  private walkedOutName(v: VehicleSnapshot): string | null {
-    if (v.driverName !== null) return null
-    const st = getSim(this)?.state
-    const e = st?.employees.findLast(
-      (x) => x.kind === 'driver' && x.vehicleId === v.id && !x.active,
+  /**
+   * The action slot's face: the 44×44 `···` on every row (D16); its popover
+   * lists the row's primary action first (menuItems), so a disabled Re-hire
+   * shows its tip from there.
+   */
+  private setAction(row: RowView, a: RowAction, slotX: number): void {
+    const btn = row.action
+    const x = slotX
+    if (btn.btnWidth !== MORE_W || btn.x !== x)
+      btn.setRect({
+        x,
+        y: Math.floor((ROW_PITCH - 44) / 2),
+        w: MORE_W,
+        h: 44,
+      })
+    row.actionKind = a.kind
+    row.tip = null
+    if (btn.getData('label') !== '') btn.setLabel('')
+    btn.setData('action', a.label)
+    btn.setEnabled(true)
+    const x0 = Math.round((MORE_W - 15) / 2)
+    row.dots.forEach((d, k) =>
+      d.setVisible(true).setPosition(x0 + k * 6, Math.floor((44 - 3) / 2)),
     )
-    return e?.name ?? null
+  }
+
+  /** The vehicle's driver (active or walked out), from ViewSim.people(). */
+  private driverOf(v: VehicleSnapshot): PersonView | null {
+    if (v.driverId === null) return null
+    return this.vs.people().find((x) => x.id === v.driverId) ?? null
   }
 
   private measure(): (s: string) => number {
@@ -1051,21 +1481,197 @@ export class GarageSheet extends Phaser.Scene {
     this.picker = picker
   }
 
+  /** The `···` button: the popover (with the row's primary action first). */
   private onAction(row: RowView): void {
     const v = this.vs.vehicles.find((x) => x.id === row.id)
     if (!v) return
-    const data = this.vs.data
-    if (row.actionKind === 'rehire') {
-      const res = this.vs.rehireDriver(v.id)
-      if (!res.ok) this.deny(failText(res.reason))
-      else {
-        const now = this.vs.vehicles.find((x) => x.id === v.id)
-        this.toast(rehiredToast(v.name, now?.driverName ?? null))
-      }
-      this.dirty = true
-      return
+    this.openMenu(row, v)
+  }
+
+  /** Popover `Re-hire $N` (a walked-out driver; spec §7.4, immediate). */
+  private rehire(v: VehicleSnapshot): void {
+    const res = this.vs.rehireDriver(v.id)
+    if (!res.ok) this.deny(failText(res.reason, this.vs.data))
+    else {
+      const now = this.vs.vehicles.find((x) => x.id === v.id)
+      this.toast(rehiredToast(v.name, now?.driverName ?? null))
     }
-    const refund = sellRefund(data, v.type)
+    this.dirty = true
+  }
+
+  /** The `···` popover under / over the row's action button. */
+  private openMenu(row: RowView, v: VehicleSnapshot): void {
+    const s = this.sheet
+    if (!s) return
+    this.menu?.close()
+    this.picker?.close()
+    const vp = s.listViewport()
+    if (!vp) return
+    const anchor = {
+      x: vp.x + row.action.x,
+      y: vp.y + row.c.y + row.action.y - s.scrollY,
+      w: row.action.btnWidth,
+      h: row.action.btnHeight,
+    }
+    const primary = rowAction(
+      v,
+      this.vs.data,
+      this.vs.vehicles.length,
+      SIM_FEATURES.payroll,
+      this.driverOf(v)?.salaryPerDay ?? null,
+    )
+    const menu = new RowMenu(this, {
+      vehicleId: v.id,
+      items: menuItems(v, this.vs.data, this.vs.vehicles.length, primary),
+      anchor,
+      W: this.W,
+      H: this.H,
+      minHit: minHitFor(this.scale.zoom),
+      onPick: (item) => {
+        const now = this.vs.vehicles.find((x) => x.id === v.id)
+        if (!now) return
+        if (item.kind === 'hire') this.hireDriver(now)
+        else if (item.kind === 'rehire') this.rehire(now)
+        else if (item.kind === 'replace') this.replaceDriver(now)
+        else if (item.kind === 'fire') this.fireDriver(now)
+        else this.sell(now)
+      },
+      onDisabled: (item) => {
+        if (item.tip) this.showTip(row, item.tip)
+      },
+      onClose: () => {
+        if (this.menu === menu) this.menu = null
+      },
+    })
+    this.menu = menu
+  }
+
+  /** Open the driver HireSheet over the Garage (one at a time). */
+  private openHire(o: {
+    target: HireSheetTarget
+    title: string
+    note?: string
+    allowLater?: boolean
+    onDone: (res: CommandResult) => void
+  }): void {
+    this.hire?.close()
+    this.menu?.close()
+    this.picker?.close()
+    const hs: HireSheet = new HireSheet(this, {
+      vs: this.vs,
+      role: 'driver',
+      target: o.target,
+      title: o.title,
+      note: o.note,
+      allowLater: o.allowLater,
+      W: this.W,
+      H: this.H,
+      minHit: minHitFor(this.scale.zoom),
+      safeBottom: this.sb,
+      id: 'garage:hire',
+      onDone: (res) => {
+        if (this.hire === hs) this.hire = null
+        o.onDone(res)
+      },
+      onCancel: () => {
+        if (this.hire === hs) this.hire = null
+      },
+    })
+    this.hire = hs
+  }
+
+  /** Buy card tap → `Who drives the Bike?` (design-m6 §6.3). */
+  private buy(type: VehicleType): void {
+    const def = typeDef(this.vs.data, type)
+    if (!def) return
+    this.openHire({
+      target: { buyType: type },
+      title: buyTitle(def.name),
+      note: buyNote(def),
+      allowLater: true,
+      onDone: (res) => this.bought(res),
+    })
+  }
+
+  /** After the buy flow: toast, SFX, the new row scrolled into view. */
+  private bought(res: CommandResult): void {
+    if (!res.ok) return
+    const list = this.vs.vehicles
+    const v =
+      (res.vehicleId !== undefined
+        ? list.find((x) => x.id === res.vehicleId)
+        : undefined) ??
+      list.reduce<VehicleSnapshot | undefined>(
+        (a, b) => (!a || b.id > a.id ? b : a),
+        undefined,
+      )
+    const hired =
+      res.employeeId !== undefined ? this.personOf(res.employeeId) : null
+    if (v) this.toast(boughtToast(v.name, hired?.name ?? v.driverName))
+    this.game.events.emit(EV_UI_SFX, { name: 'buy' })
+    this.sync()
+    const i = v ? this.rows.findIndex((r) => r.id === v.id) : -1
+    if (i >= 0) this.sheet?.scrollIntoView(i * ROW_PITCH, ROW_PITCH)
+  }
+
+  /** `Hire driver` on a driverless vehicle (Hire later, after a Fire). */
+  private hireDriver(v: VehicleSnapshot): void {
+    this.openHire({
+      target: { vehicleId: v.id },
+      title: driverForTitle(v.name),
+      onDone: (res) => this.drove(v.id, res),
+    })
+  }
+
+  /** `Replace driver`: the new driver takes over on the lot, or after this trip. */
+  private replaceDriver(v: VehicleSnapshot): void {
+    const d = this.driverOf(v)
+    this.openHire({
+      target: { vehicleId: v.id },
+      title: d ? replaceTitle(d.name, v.name) : driverForTitle(v.name),
+      onDone: (res) => this.drove(v.id, res),
+    })
+  }
+
+  private drove(vehicleId: number, res: CommandResult): void {
+    this.dirty = true
+    if (!res.ok || res.employeeId === undefined) return
+    const p = this.personOf(res.employeeId)
+    const v = this.vs.vehicles.find((x) => x.id === vehicleId)
+    if (p && v) this.toast(driveToast(p.name, v.name, p.pending))
+  }
+
+  /** `Fire driver` → Dialog → ViewSim.fire (no refund; design-m6 §4.5). */
+  private fireDriver(v: VehicleSnapshot): void {
+    const d = this.driverOf(v)
+    if (!d) return
+    this.dialog?.destroy()
+    this.dialog = new Dialog(this, {
+      title: 'Fire driver',
+      text: firePrompt(d.name, v),
+      action: 'Fire',
+      destructive: true,
+      W: this.W,
+      H: this.H,
+      minHit: minHitFor(this.scale.zoom),
+      id: 'garage:fireDialog',
+      onConfirm: () => {
+        const res = this.vs.fire(d.id)
+        if (!res.ok) this.deny(failText(res.reason, this.vs.data))
+        else
+          this.toast(
+            firedToast(
+              d.name,
+              this.vs.vehicles.find((x) => x.id === v.id) ?? null,
+            ),
+          )
+        this.dirty = true
+      },
+    })
+  }
+
+  private sell(v: VehicleSnapshot): void {
+    const refund = sellRefund(this.vs.data, v.type)
     this.dialog?.destroy()
     this.dialog = new Dialog(this, {
       title: 'Sell vehicle',
@@ -1078,32 +1684,14 @@ export class GarageSheet extends Phaser.Scene {
       id: 'garage:sellDialog',
       onConfirm: () => {
         const res = this.vs.sellVehicle(v.id)
-        if (!res.ok) this.deny(failText(res.reason))
+        if (!res.ok) this.deny(failText(res.reason, this.vs.data))
         this.dirty = true
       },
     })
   }
 
-  private buy(type: VehicleType): void {
-    const res = this.vs.buyVehicle(type)
-    if (!res.ok) {
-      this.deny(failText(res.reason))
-      return
-    }
-    const list = this.vs.vehicles
-    const v =
-      (res.vehicleId !== undefined
-        ? list.find((x) => x.id === res.vehicleId)
-        : undefined) ??
-      list.reduce<VehicleSnapshot | undefined>(
-        (a, b) => (!a || b.id > a.id ? b : a),
-        undefined,
-      )
-    if (v) this.toast(boughtToast(v.name, v.driverName))
-    this.game.events.emit(EV_UI_SFX, { name: 'buy' })
-    this.sync()
-    const i = v ? this.rows.findIndex((r) => r.id === v.id) : -1
-    if (i >= 0) this.sheet?.scrollIntoView(i * ROW_PITCH, ROW_PITCH)
+  private personOf(id: number): PersonView | null {
+    return this.vs.people().find((x) => x.id === id) ?? null
   }
 
   private buyDenied(type: VehicleType): void {
@@ -1121,7 +1709,7 @@ export class GarageSheet extends Phaser.Scene {
     const col = rowColumns(this.W)
     const bg = addPanel(this, 0, 0, w, h, 'ui_tooltip')
     row.tipBox = this.add.container(
-      Math.max(MARGIN, col.sellX - 4 - w),
+      Math.max(MARGIN, col.actionX - 4 - w),
       Math.floor((ROW_PITCH - h) / 2),
       [bg, t],
     )
@@ -1172,6 +1760,10 @@ export class GarageSheet extends Phaser.Scene {
     this.input.keyboard?.off('keydown', this.onKey, this)
     this.picker?.destroy()
     this.picker = null
+    this.menu?.destroy()
+    this.menu = null
+    this.hire?.close()
+    this.hire = null
     for (const r of this.rows) r.tipTimer?.remove(false)
     this.rows = []
     this.cards = []
@@ -1183,4 +1775,109 @@ export class GarageSheet extends Phaser.Scene {
 
 function setTextIf(t: Phaser.GameObjects.BitmapText | null, s: string): void {
   if (t && t.text !== s) t.setText(s)
+}
+
+// ---- the row's `···` popover ---------------------------------------------------
+
+export interface RowMenuOptions {
+  vehicleId: number
+  items: readonly MenuItem[]
+  /** Screen rect of the `···` button. */
+  anchor: Rect
+  W: number
+  H: number
+  minHit: number
+  /** An enabled item was tapped (the menu has closed). */
+  onPick: (item: MenuItem) => void
+  /** A disabled item was tapped (the menu has closed): show its tip. */
+  onDisabled?: (item: MenuItem) => void
+  /** Called once when the menu closes (pick, outside tap, Esc, sleep). */
+  onClose?: () => void
+}
+
+/**
+ * Replace driver / Fire driver / Sell $100, or a driverless row's Hire
+ * driver / Re-hire $N first (menuItems; design-m6 §6.3, D16): 44-px
+ * rows on a ui_panel in a PopoverLayer (drawn over the Sheet's list camera,
+ * a tap outside closes it), placed above the button when it fits, else
+ * below. Esc closes it (top modal); the scene going to sleep closes it.
+ */
+export class RowMenu {
+  readonly scene: Phaser.Scene
+  readonly vehicleId: number
+  private opts: RowMenuOptions
+  private layer: PopoverLayer
+  private open = true
+
+  constructor(scene: Phaser.Scene, opts: RowMenuOptions) {
+    this.scene = scene
+    this.opts = opts
+    this.vehicleId = opts.vehicleId
+    this.layer = new PopoverLayer(scene, {
+      W: opts.W,
+      H: opts.H,
+      onOutside: () => this.close(),
+    })
+    const h = menuHeight(opts.items.length)
+    const at = placePopover(opts.anchor, MENU_W, h, opts.W, opts.H)
+    const panel = addPanel(scene, at.x, at.y, MENU_W, h, 'ui_panel')
+    panel.setInteractive() // a tap between rows stays in the popover
+    this.layer.add(panel)
+    opts.items.forEach((item, i) => {
+      const btn = new Button(scene, {
+        x: at.x + MENU_PAD,
+        y: at.y + MENU_PAD + i * (MENU_ROW_H + MENU_GAP),
+        w: MENU_W - 2 * MENU_PAD,
+        h: MENU_ROW_H,
+        label: item.label,
+        face:
+          item.kind === 'fire'
+            ? 'red'
+            : item.kind === 'hire' || item.kind === 'rehire'
+              ? 'primary'
+              : 'secondary',
+        minHit: opts.minHit,
+        id: `garage:menu:${item.kind}`,
+        onClick: () => {
+          this.close()
+          opts.onPick(item)
+        },
+        onDisabledTap: () => {
+          this.close()
+          opts.onDisabled?.(item)
+        },
+      })
+      btn.setEnabled(item.enabled)
+      this.layer.add(btn)
+    })
+    pushModal(this)
+    scene.input.keyboard?.on('keydown', this.onKey, this)
+    scene.events.once('shutdown', this.destroy, this)
+    scene.events.once('sleep', this.close, this)
+  }
+
+  isOpen(): boolean {
+    return this.open
+  }
+
+  close(): void {
+    if (!this.open) return
+    this.destroy()
+    this.opts.onClose?.()
+  }
+
+  /** Tear down without callbacks (scene shutdown). */
+  destroy(): void {
+    if (!this.open) return
+    this.open = false
+    popModal(this)
+    this.scene.input?.keyboard?.off('keydown', this.onKey, this)
+    this.scene.events.off('shutdown', this.destroy, this)
+    this.scene.events.off('sleep', this.close, this)
+    this.layer.destroy()
+  }
+
+  private onKey(ev: KeyboardEvent): void {
+    if (ev.key === 'Escape' && claimKey(ev, this)) this.close()
+  }
 }

@@ -16,12 +16,18 @@ import {
 import type { SimEmitter, StallReason } from './events.ts'
 import type { Sim } from './sim.ts'
 import type {
+  Affinity,
+  Applicant,
   Building,
   BuildingId,
   DistrictId,
+  Employee,
+  HireTarget,
   LaneNode,
   LoadingDock,
   Parcel,
+  Pips,
+  Role,
   Size,
   Strain,
   Tick,
@@ -38,6 +44,16 @@ import {
 } from './types.ts'
 import { holdBays } from './systems/lane.ts'
 import { ticksToPayday } from './systems/payroll.ts'
+import {
+  deskNodeOf,
+  driverNumbers,
+  effectiveP,
+  hireFeeOf,
+  inspectorNumbers,
+  salaryOf,
+  sorterNumbers,
+  starDaysLeft,
+} from './systems/people.ts'
 import { paidValue } from './value.ts'
 
 export {
@@ -53,7 +69,15 @@ export interface VehicleSnapshot {
   id: number
   type: VehicleType
   name: string
+  /** The active driver's name, else null (walked out, fired, none: `No driver`). */
   driverName: string | null
+  /** M6: the driver's Employee id (active or walked out), null with none. */
+  driverId: number | null
+  driverPips: Pips | null
+  driverStar: boolean
+  driverAffinity: Affinity | null
+  /** M6: the Replace driver taking over after this trip, else null. */
+  nextDriverName: string | null
   state: VehicleState
   /** Tile position at the start / end of the last tick; lerp by the stepper alpha. */
   prev: TilePos
@@ -146,7 +170,75 @@ export interface PayrollView {
   /** The last payday left someone unpaid. */
   short: boolean
   inspectors: number
+  /** M6: active sorters (0 or 1). */
+  sorters: number
   drivers: number
+}
+
+/** M6: role-specific numbers of a person (absent keys do not apply). */
+export interface StatNumbers {
+  /** Inspector: own p, effective p at its desk now (pEff), false-flag rate, process seconds. */
+  p?: number
+  pEff?: number
+  decoyFlag?: number
+  processS?: number
+  /** Sorter: correct-call chance, seconds per call. */
+  correct?: number
+  decisionS?: number
+  /** Driver (for a vehicle type): × speed, × stop time, + satisfaction per delivery / pickup. */
+  speedMult?: number
+  stopMult?: number
+  deliveryBonus?: number
+  pickupBonus?: number
+}
+
+/** M6: one HireSheet card. */
+export interface ApplicantView {
+  id: number
+  role: Role
+  name: string
+  look: number
+  star: boolean
+  pips: Pips
+  affinity: Affinity
+  /** A driver's: for the vehicleType passed to applicants() (default 'bike'). */
+  salaryPerDay: number
+  /** 0 for ★. */
+  hireFee: number
+  numbers: StatNumbers
+  /** ★: days until they leave (≥ 0); regulars null. */
+  leavesInDays: number | null
+}
+
+/** M6: one employee (SlotCard rows, StationCard, Garage rows). */
+export interface PersonView {
+  id: number
+  role: Role
+  name: string
+  look: number
+  star: boolean
+  pips: Pips
+  affinity: Affinity
+  active: boolean
+  unpaid: boolean
+  salaryPerDay: number
+  hiredTick: Tick
+  nodeId: string | null
+  vehicleId: number | null
+  /** Driver queued to take over vehicleId after its trip (a Replace). */
+  pending: boolean
+  numbers: StatNumbers
+}
+
+/** M6: the Hold Bay station (sorter / Sorter Arm). */
+export interface HoldStationView {
+  readonly unlockLevel: number
+  readonly unlocked: boolean
+  readonly kind: 'sorter' | 'sorter_arm' | null
+  /** The seated sorter, active or walked out. */
+  readonly sorter: PersonView | null
+  /** A sorter call is running (nextDecisionTick set): the scan animation. */
+  readonly working: boolean
 }
 
 /**
@@ -166,6 +258,10 @@ export interface HoldBayItem {
    */
   checkerName: string | null
   nodeId: string | null
+  /** M6: the inspector who flagged it (the flag entry's `who`), else null. */
+  inspectorName: string | null
+  /** M6: the sorter's `looks clean` tag, else null. */
+  sorted: { name: string; pct: number } | null
 }
 
 export interface HoldBayView {
@@ -175,6 +271,8 @@ export interface HoldBayView {
   readonly count: number
   toss(parcelId: number): CommandResult
   clear(parcelId: number): CommandResult
+  /** M6: the player looked at it (the HoldBayCard opened): the sorter waits (design D3). */
+  touch(parcelId: number): CommandResult
 }
 
 export interface LaneView {
@@ -184,12 +282,12 @@ export interface LaneView {
   rate(): number
   detection(): StrainDetection[]
   readonly stalled: { reason: StallReason; nodeId: string } | null
+  /** A checker into a slot, or (M6) 'sorter_arm' into the Hold Bay node ('hold'). */
   buyMachine(defId: string, nodeId: string): CommandResult
-  placeDesk(nodeId: string): CommandResult
+  /** M6: index = employees.json desks.rows index (1 = the start desk). */
+  placeDesk(nodeId: string, index: number): CommandResult
   moveFixture(from: string, to: string): CommandResult
   removeFixture(nodeId: string): CommandResult
-  hireInspector(): CommandResult
-  fireInspector(employeeId: number): CommandResult
   rehire(employeeId: number): CommandResult
 }
 
@@ -204,6 +302,8 @@ export interface ViewSimDebug {
   forceFlagNext(strain: Strain): CommandResult
   fillHoldBay(): CommandResult
   forceMalwareDelivery(): CommandResult
+  /** M6: level up to `level` now (past the playtest cap; shots and tests). */
+  forceLevel(level: number): CommandResult
 }
 
 export interface ViewSim {
@@ -248,8 +348,19 @@ export interface ViewSim {
   meanSatisfaction(): number
   laneStats(): LaneStats
   payroll(): PayrollView
+  /** M6: today's applicants of a role (a driver's salary / numbers for `vehicleType`, default bike). */
+  applicants(role: Role, vehicleType?: VehicleType): readonly ApplicantView[]
+  /** M6: every employee, in state order. */
+  people(): readonly PersonView[]
+  /** M6: malware labels revealed so far (the poster). */
+  readonly wanted: readonly string[]
+  readonly holdStation: HoldStationView
+  hire(role: Role, applicantId: number, target: HireTarget): CommandResult
+  fire(employeeId: number): CommandResult
+  postAd(role: Role): CommandResult
   rush(buildingId: BuildingId): CommandResult
-  buyVehicle(type: VehicleType): CommandResult
+  /** M6: applicantId = the picked driver, null = "Hire later" (parks `No driver`). */
+  buyVehicle(type: VehicleType, applicantId: number | null): CommandResult
   sellVehicle(id: number): CommandResult
   setHomeZone(id: number, zone: Zone): CommandResult
   /** Re-hire the walked-out driver of vehicle `id` ('no-vehicle' if none). */
@@ -274,6 +385,7 @@ function snapshotVehicles(sim: Sim): VehicleSnapshot[] {
   const s = sim.state
   return s.vehicles.map((v) => {
     const driver = s.employees.find((e) => e.id === v.driverId) ?? null
+    const next = s.employees.find((e) => e.id === v.nextDriverId) ?? null
     const stopped =
       v.waitUntilTick !== null &&
       (v.state === 'delivering' || v.state === 'collecting')
@@ -283,6 +395,11 @@ function snapshotVehicles(sim: Sim): VehicleSnapshot[] {
       type: v.type,
       name: v.name,
       driverName: driver && driver.active ? driver.name : null,
+      driverId: driver ? driver.id : null,
+      driverPips: driver ? { ...driver.pips } : null,
+      driverStar: driver?.star ?? false,
+      driverAffinity: driver ? driver.affinity : null,
+      nextDriverName: next ? next.name : null,
       state: v.state,
       prev: { ...v.prev },
       cur: { ...v.pos },
@@ -310,6 +427,87 @@ function snapshotVehicles(sim: Sim): VehicleSnapshot[] {
   })
 }
 
+/** Role-specific numbers of a pips set (people.ts tables). */
+function numbersOf(
+  data: GameData,
+  role: Role,
+  pips: Pips,
+  affinity: Affinity,
+  type: VehicleType,
+): StatNumbers {
+  if (role === 'inspector') {
+    const n = inspectorNumbers(data, pips)
+    return {
+      p: n.p,
+      pEff: n.p,
+      decoyFlag: n.decoyFlag,
+      processS: n.processTicks / TICKS_PER_S,
+    }
+  }
+  if (role === 'sorter') {
+    const n = sorterNumbers(data, pips)
+    return { correct: n.correct, decisionS: n.decisionTicks / TICKS_PER_S }
+  }
+  return driverNumbers(data, pips, affinity, type)
+}
+
+function applicantView(
+  sim: Sim,
+  a: Applicant,
+  type: VehicleType,
+): ApplicantView {
+  const data = sim.data
+  const t = a.role === 'driver' ? type : undefined
+  return {
+    id: a.id,
+    role: a.role,
+    name: a.name,
+    look: a.look,
+    star: a.star,
+    pips: { ...a.pips },
+    affinity: a.affinity,
+    salaryPerDay: salaryOf(data, a.role, a.pips, t),
+    hireFee: hireFeeOf(data, a, t),
+    numbers: numbersOf(data, a.role, a.pips, a.affinity, type),
+    leavesInDays:
+      a.leavesOnDay === null
+        ? null
+        : starDaysLeft(a.leavesOnDay, sim.state.tick),
+  }
+}
+
+function personView(sim: Sim, e: Employee): PersonView {
+  const s = sim.state
+  const data = sim.data
+  const v =
+    e.vehicleId === null
+      ? null
+      : (s.vehicles.find((x) => x.id === e.vehicleId) ?? null)
+  const numbers = numbersOf(data, e.role, e.pips, e.affinity, v?.type ?? 'bike')
+  if (e.role === 'inspector') {
+    const desk = deskNodeOf(s, e.id)
+    const st = desk?.stations.find((x) => x.employeeId === e.id)
+    numbers.pEff = st?.p ?? effectiveP(data, e.pips, [])
+  }
+  return {
+    id: e.id,
+    role: e.role,
+    name: e.name,
+    look: e.look,
+    star: e.star,
+    pips: { ...e.pips },
+    affinity: e.affinity,
+    active: e.active,
+    unpaid: e.unpaidPaydays > 0,
+    salaryPerDay: e.salaryPerDay,
+    hiredTick: e.hiredTick,
+    nodeId: e.nodeId,
+    vehicleId: e.vehicleId,
+    pending: v !== null && v.nextDriverId === e.id,
+    numbers,
+  }
+}
+
 /**
  * Build the facade over a sim, or over a getter (so scenes keep one facade
  * across Sim.load / New game; event subscriptions are re-bound by
@@ -324,6 +522,22 @@ export function createViewSim(
   const run = (cmd: Parameters<Sim['dispatch']>[0]) => get().dispatch(cmd)
 
   let vCache: { sim: Sim; rev: number; list: VehicleSnapshot[] } | null = null
+  let pCache: { sim: Sim; rev: number; list: PersonView[] } | null = null
+  const aCache: Record<
+    string,
+    { sim: Sim; rev: number; list: ApplicantView[] }
+  > = {}
+  const people = (): PersonView[] => {
+    const sim = get()
+    if (!pCache || pCache.sim !== sim || pCache.rev !== sim.revision) {
+      pCache = {
+        sim,
+        rev: sim.revision,
+        list: sim.state.employees.map((e) => personView(sim, e)),
+      }
+    }
+    return pCache.list
+  }
   let tileIndex: { data: GameData; idx: Int32Array; w: number } | null = null
 
   const node = (id: string): LaneNode | null => laneNode(st().lane, id)
@@ -356,12 +570,18 @@ export function createViewSim(
         const flagged = p?.trace.findLast((t) => t.what === 'flagged')
         // "Slot 1 Metal detector: flagged (metal)" → "Metal detector"
         const m = /^Slot \d+ (.+): flagged/.exec(flagged?.text ?? '')
+        const who = flagged?.who ?? null
         return {
           parcelId,
           bay,
           strain: p?.flaggedStrain ?? null,
-          checkerName: m?.[1] ?? null,
+          checkerName: who !== null ? 'Inspection desk' : (m?.[1] ?? null),
           nodeId: flagged?.ref ?? null,
+          inspectorName: who,
+          sorted:
+            p?.sorted && get().data.employees.roles.sorter.tagsClean
+              ? { name: p.sorted.name, pct: p.sorted.pct }
+              : null,
         }
       })
     },
@@ -373,6 +593,7 @@ export function createViewSim(
     },
     toss: (parcelId) => run({ kind: 'toss', parcelId }),
     clear: (parcelId) => run({ kind: 'clear', parcelId }),
+    touch: (parcelId) => run({ kind: 'touchHeld', parcelId }),
   }
 
   const lane: LaneView = {
@@ -383,11 +604,9 @@ export function createViewSim(
       return stalled()
     },
     buyMachine: (defId, nodeId) => run({ kind: 'buyMachine', defId, nodeId }),
-    placeDesk: (nodeId) => run({ kind: 'placeDesk', nodeId }),
+    placeDesk: (nodeId, index) => run({ kind: 'placeDesk', nodeId, index }),
     moveFixture: (from, to) => run({ kind: 'moveFixture', from, to }),
     removeFixture: (nodeId) => run({ kind: 'removeFixture', nodeId }),
-    hireInspector: () => run({ kind: 'hireInspector' }),
-    fireInspector: (employeeId) => run({ kind: 'fireInspector', employeeId }),
     rehire: (employeeId) => run({ kind: 'rehire', employeeId }),
   }
 
@@ -396,6 +615,7 @@ export function createViewSim(
         forceFlagNext: (strain) => run({ kind: 'debugForceFlag', strain }),
         fillHoldBay: () => run({ kind: 'debugFillHoldBay' }),
         forceMalwareDelivery: () => run({ kind: 'debugMalwareDelivery' }),
+        forceLevel: (level) => run({ kind: 'debugForceLevel', level }),
       }
     : null
 
@@ -621,19 +841,63 @@ export function createViewSim(
         short: (s.economy.lastPayroll?.shortEmployeeIds ?? []).some((id) =>
           active.some((e) => e.id === id && e.unpaidPaydays > 0),
         ),
-        inspectors: active.filter((e) => e.kind === 'inspector').length,
-        drivers: active.filter((e) => e.kind === 'driver').length,
+        inspectors: active.filter((e) => e.role === 'inspector').length,
+        sorters: active.filter((e) => e.role === 'sorter').length,
+        drivers: active.filter((e) => e.role === 'driver').length,
       }
     },
+    applicants(role, vehicleType = 'bike') {
+      const sim = get()
+      const key = `${role}:${vehicleType}`
+      const c = aCache[key]
+      if (c && c.sim === sim && c.rev === sim.revision) return c.list
+      const list = (sim.state.applicants[role] ?? []).map((a) =>
+        applicantView(sim, a, vehicleType),
+      )
+      aCache[key] = { sim, rev: sim.revision, list }
+      return list
+    },
+    people,
+    get wanted() {
+      return st().wanted
+    },
+    get holdStation(): HoldStationView {
+      const sim = get()
+      const s = sim.state
+      const hs = s.lane.holdStation
+      const unlockLevel = sim.data.employees.holdStation.unlockLevel
+      const seated =
+        typeof hs.fixture === 'number'
+          ? (people().find((x) => x.id === hs.fixture) ?? null)
+          : null
+      return {
+        unlockLevel,
+        unlocked: s.level.level >= unlockLevel,
+        kind:
+          hs.fixture === null
+            ? null
+            : hs.fixture === 'sorter_arm'
+              ? ('sorter_arm' as const)
+              : ('sorter' as const),
+        sorter: seated,
+        working: hs.nextDecisionTick !== null,
+      }
+    },
+    hire: (role, applicantId, target) =>
+      run({ kind: 'hire', role, applicantId, target }),
+    fire: (employeeId) => run({ kind: 'fire', employeeId }),
+    postAd: (role) => run({ kind: 'postAd', role }),
 
     rush: (buildingId) => run({ kind: 'rush', buildingId }),
-    buyVehicle: (type) => run({ kind: 'buyVehicle', type }),
+    buyVehicle: (type, applicantId) =>
+      run({ kind: 'buyVehicle', type, applicantId }),
     sellVehicle: (id) => run({ kind: 'sellVehicle', id }),
     setHomeZone: (id, zone) => run({ kind: 'setZone', id, zone }),
     rehireDriver(id) {
       const s = st()
-      const e = s.employees.findLast(
-        (x) => x.kind === 'driver' && x.vehicleId === id && !x.active,
+      const v = s.vehicles.find((x) => x.id === id)
+      const e = s.employees.find(
+        (x) => x.role === 'driver' && x.id === v?.driverId && !x.active,
       )
       if (!e) return { ok: false, reason: 'no-vehicle' }
       return run({ kind: 'rehire', employeeId: e.id })

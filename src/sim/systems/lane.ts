@@ -38,9 +38,13 @@
 // root appears or changes, `lane:resumed` when it clears, +0.1 s of
 // stallSecondsToday per stalled tick.
 //
+// Desks (M6, spec-build2 §2.3): each station is one seated inspector with its
+// own p / decoyFlag / process time (people.ts syncDesk keeps them in step
+// with the crew); a parcel at a desk rolls the processing inspector's p.
+//
 // Fixtures (§6.2, warehouse-view.md §2.3 / Q31): parcels belong to the node,
 // not the fixture. When a slot's fixture changes (bought, moved, swapped,
-// removed, an inspector hired or fired) `reseat` re-seats the station parcels
+// removed) `reseat` re-seats the station parcels
 // under the new fixture: a parcel mid-process restarts its process time, a
 // finished one keeps its roll; with no station left (or more parcels than
 // stations) they go back to the front of the buffer, which may then sit
@@ -53,6 +57,7 @@ import {
   rolledBy,
   slotLabel,
   slotResultEntry,
+  stationChecker,
 } from '../detection.ts'
 import type { StallReason } from '../events.ts'
 import type { Sim } from '../sim.ts'
@@ -63,9 +68,11 @@ import type {
   LaneNode,
   Parcel,
   SimState,
+  Station,
   Strain,
 } from '../types.ts'
 import { laneNode, liveSlotIds, nextLiveNodeId } from '../types.ts'
+import { employeeById, fireEmployee, syncDesk } from './people.ts'
 
 export function shelfNode(lane: Lane): LaneNode {
   const n = laneNode(lane, lane.shelfNodeId)
@@ -274,8 +281,6 @@ export function takeFrom(node: LaneNode, id: number): void {
 
 // Processing ------------------------------------------------------------------------
 
-type Station = LaneNode['stations'][number]
-
 const parcelOf = (sim: Sim, id: number | null): Parcel | null =>
   id === null ? null : (sim.state.parcels[String(id)] ?? null)
 
@@ -311,7 +316,7 @@ function seat(sim: Sim, node: LaneNode, st: Station, id: number): void {
     })
     return
   }
-  st.doneTick = tick + c.processTicks
+  st.doneTick = tick + (st.processTicks ?? c.processTicks)
   sim.emit('parcel:processing', { id, nodeId: node.id })
 }
 
@@ -349,14 +354,27 @@ function flag(
   })
 }
 
-/** A station's process time is up: the one roll on exit (detection.ts). */
-function finishProcessing(sim: Sim, node: LaneNode, p: Parcel): void {
+/**
+ * A station's process time is up: the one roll on exit (detection.ts) — at a
+ * desk with the processing inspector's own p / decoyFlag (same checker id,
+ * so still one roll per parcel per desk), and the result names them.
+ */
+function finishProcessing(
+  sim: Sim,
+  node: LaneNode,
+  st: Station,
+  p: Parcel,
+): void {
   const c = node.fixture?.checker
   if (!c) return
   const tick = sim.state.tick
   p.nodeDoneTick = tick
-  const strain = p.magic ? null : rollChecker(sim, c, p)
-  p.trace.push(slotResultEntry(sim.data, tick, node, c, p, strain))
+  const sc = stationChecker(c, st)
+  const strain = p.magic ? null : rollChecker(sim, sc, p)
+  const e =
+    st.employeeId === undefined ? null : employeeById(sim.state, st.employeeId)
+  const who = e ? { id: e.id, name: e.name } : undefined
+  p.trace.push(slotResultEntry(sim.data, tick, node, sc, p, strain, who))
   if (strain !== null) flag(sim, node, c, p, strain)
 }
 
@@ -435,7 +453,7 @@ export function laneStep(sim: Sim): void {
     for (const st of node.stations) {
       if (st.doneTick === null || s.tick < st.doneTick) continue
       const p = parcelOf(sim, st.parcelId)
-      if (p && p.nodeDoneTick === null) finishProcessing(sim, node, p)
+      if (p && p.nodeDoneTick === null) finishProcessing(sim, node, st, p)
     }
   }
 
@@ -551,19 +569,25 @@ function setStall(
 
 /**
  * Re-seat a slot's station parcels under its current fixture (Q31): as many
- * stations as the fixture has; parcels mid-process restart their process
- * time, finished ones stay finished; the rest go back to the front of the
- * buffer (and pass through if the slot is now empty).
+ * stations as the fixture has (a desk: one per seated inspector, rebuilt by
+ * people.ts syncDesk); parcels mid-process restart their process time,
+ * finished ones stay finished; the rest go back to the front of the buffer
+ * (and pass through if the slot is now empty).
  */
 export function reseat(sim: Sim, node: LaneNode): void {
   const ids = node.stations.flatMap((st) =>
     st.parcelId === null ? [] : [st.parcelId],
   )
-  const n = node.fixture ? node.fixture.checker.stations : 0
-  node.stations = Array.from({ length: n }, () => ({
-    parcelId: null,
-    doneTick: null,
-  }))
+  if (node.fixture?.kind === 'desk') {
+    node.stations = []
+    syncDesk(sim, node)
+  } else {
+    const n = node.fixture ? node.fixture.checker.stations : 0
+    node.stations = Array.from({ length: n }, () => ({
+      parcelId: null,
+      doneTick: null,
+    }))
+  }
   const back: number[] = []
   for (const id of ids) {
     const st = node.stations.find((x) => x.parcelId === null)
@@ -609,64 +633,21 @@ export function moveFixture(sim: Sim, from: LaneNode, to: LaneNode): boolean {
 }
 
 /**
- * Take the fixture out of a slot: the desk's inspectors (and any walked-out
- * ones) leave for good — `worker:fired` each, no refund; the station
- * parcels pass through (Q31). Returns the removed fixture.
+ * Take the fixture out of a slot: the desk's inspectors (active and walked
+ * out) leave for good — `worker:fired {reason: 'deskRemoved'}` each, no
+ * refund; the station parcels pass through (Q31). Returns the removed
+ * fixture.
  */
 export function removeFixture(sim: Sim, node: LaneNode): Fixture | null {
   const f = node.fixture
   if (!f) return null
   node.fixture = null
+  reseat(sim, node)
   if (f.kind === 'desk') {
-    const gone = [...f.inspectorIds, ...f.walkedOutIds]
-    sim.state.employees = sim.state.employees.filter(
-      (e) => !gone.includes(e.id),
-    )
-    for (const id of f.inspectorIds) {
-      sim.emit('worker:fired', {
-        employeeId: id,
-        kind: 'inspector',
-        nodeId: node.id,
-      })
+    for (const id of [...f.inspectorIds, ...f.walkedOutIds]) {
+      const e = employeeById(sim.state, id)
+      if (e) fireEmployee(sim, e, 'deskRemoved')
     }
   }
-  reseat(sim, node)
   return f
-}
-
-/**
- * A desk loses one station (an inspector fired or walked out, §6.7 / §7.4):
- * a free one when there is one, else the last, whose parcel goes back to the
- * front of the buffer (it restarts when re-seated).
- */
-export function removeDeskStation(node: LaneNode): void {
-  const f = node.fixture
-  if (f?.kind !== 'desk') return
-  f.checker.stations = Math.max(0, f.checker.stations - 1)
-  let i = node.stations.findLastIndex((st) => st.parcelId === null)
-  if (i < 0) i = node.stations.length - 1
-  const st = i >= 0 ? node.stations.splice(i, 1)[0] : undefined
-  if (st && st.parcelId !== null) node.queue.unshift(st.parcelId)
-}
-
-/**
- * §6.7 Fire: the inspector leaves at once (no refund) and the desk loses a
- * station — a free one when there is one, else the last, whose parcel goes
- * back to the front of the buffer (it restarts when re-seated).
- */
-export function fireInspector(
-  sim: Sim,
-  node: LaneNode,
-  employeeId: number,
-): void {
-  const f = node.fixture
-  if (f?.kind !== 'desk') return
-  f.inspectorIds = f.inspectorIds.filter((id) => id !== employeeId)
-  removeDeskStation(node)
-  sim.state.employees = sim.state.employees.filter((e) => e.id !== employeeId)
-  sim.emit('worker:fired', {
-    employeeId,
-    kind: 'inspector',
-    nodeId: node.id,
-  })
 }

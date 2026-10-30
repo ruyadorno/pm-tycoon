@@ -3,8 +3,8 @@
 // cross-references and conservation identity (sim.ts). A save with the
 // running data hash can still be damaged (a flipped digit that stays valid
 // JSON, a hand-edited payload, a build that changed the state shape without
-// bumping `version` — types.ts STATE_VERSION, 2 since build 2, the only
-// value accepted); every field the tick and the command handlers read must
+// bumping `version` — types.ts STATE_VERSION, 3 since M6, the only value
+// accepted); every field the tick and the command handlers read must
 // then have its type, its enum value or a data id, or tick() throws on the
 // first frame after Continue. Problems here make the Title discard the
 // save with "Save from an older build was reset" (autosave.ts checkSave)
@@ -14,6 +14,7 @@
 
 import type { GameData } from '../data/types.ts'
 import { roadGraph } from './roads.ts'
+import { FACE_LOOKS, ROLES } from './systems/people.ts'
 import { STATE_VERSION, type SimState } from './types.ts'
 
 type Add = (m: string) => void
@@ -223,11 +224,33 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     }
     if (v.kind === 'machine') return obj({ checker })(v, path, a)
     if (v.kind === 'desk') {
-      return obj({ checker, inspectorIds: ids, walkedOutIds: ids })(v, path, a)
+      return obj({
+        index: int(1, 99),
+        checker,
+        inspectorIds: ids,
+        walkedOutIds: ids,
+      })(v, path, a)
     }
     a(`${path}.kind: ${JSON.stringify(v.kind)} is not machine|desk`)
     return false
   }
+  // M6 people (design §2.4).
+  const affinity = oneOf(['none', ...data.vehicles.types.map((t) => t.id)])
+  const pips = rec(int(0, 5))
+  const look = int(0, FACE_LOOKS - 1)
+  const applicant = obj({
+    id,
+    role: oneOf(ROLES),
+    name: str,
+    pips,
+    affinity,
+    look,
+    star: bool,
+    leavesOnDay: nullable(count),
+    'starKey?': str,
+  })
+  const stationFixture: Check = (v, path, a) =>
+    v === null || v === 'sorter_arm' || id(v, path, a)
 
   const shape = obj({
     // Build 2 only (plan.md R9): a version-1 state never loads.
@@ -283,6 +306,8 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
         type: oneOf(data.vehicles.types.map((t) => t.id)),
         name: str,
         driverId: nullable(id),
+        nextDriverId: nullable(id),
+        'tripMults?': obj({ speedMult: num(0, 10), stopMult: num(0, 10) }),
         state: oneOf(VEHICLE_STATES),
         zone: oneOf(['any', ...districtIds]),
         pos: tilePos,
@@ -315,7 +340,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     employees: arr(
       obj({
         id,
-        kind: oneOf(['inspector', 'driver']),
+        role: oneOf(ROLES),
         name: str,
         hiredTick: tick,
         salaryPerDay: price,
@@ -323,8 +348,19 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
         active: bool,
         vehicleId: nullable(id),
         nodeId: nullable(str),
+        pips,
+        affinity,
+        look,
+        star: bool,
       }),
     ),
+    applicants: obj({
+      rng: int(0, 0xffffffff),
+      inspector: arr(applicant),
+      sorter: arr(applicant),
+      driver: arr(applicant),
+    }),
+    wanted: arr(str),
     parcels: rec(
       obj({
         id,
@@ -359,9 +395,13 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
             'text?': str,
             'chk?': str,
             'p?': num(0, 1),
+            'by?': id,
+            'who?': str,
           }),
         ),
         'bay?': int(0, 1000),
+        'sorted?': obj({ by: id, name: str, pct: int(0, 100) }),
+        'touchedTick?': tick,
       }),
     ),
     lane: obj({
@@ -376,7 +416,14 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
           queue: ids,
           fixture: nullable(fixture),
           stations: arr(
-            obj({ parcelId: nullable(id), doneTick: nullable(tick) }),
+            obj({
+              parcelId: nullable(id),
+              doneTick: nullable(tick),
+              'employeeId?': id,
+              'p?': num(0, 1),
+              'decoyFlag?': num(0, 1),
+              'processTicks?': count,
+            }),
           ),
           dockId: nullable(str),
         }),
@@ -403,7 +450,10 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       stallSinceTick: nullable(tick),
       stallSecondsToday: num(0, MAX_COUNT),
       quarantine: obj({ count, malware: count, clean: count }),
-      sorterArm: bool,
+      holdStation: obj({
+        fixture: stationFixture,
+        nextDecisionTick: nullable(tick),
+      }),
       dockQueue: ids,
       'debugForceFlag?': strain,
     }),
@@ -427,7 +477,13 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     lastLostLife: nullable(
       obj({ tick, parcelId: id, label: str, path: arr(obj({ tick })) }),
     ),
-    nextId: obj({ parcel: id, vehicle: id, employee: id, checker: id }),
+    nextId: obj({
+      parcel: id,
+      vehicle: id,
+      employee: id,
+      checker: id,
+      applicant: id,
+    }),
   })
   if (!shape(state, 'state', add) || out.length > 0) return out
 
@@ -483,5 +539,10 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
   )
   if (n.checker <= checkerMax)
     add(`state.nextId.checker: ${n.checker} ≤ chk${checkerMax}`)
+  const applicantMax = maxId(
+    ROLES.flatMap((r) => s.applicants[r].map((a) => a.id)),
+  )
+  if (n.applicant <= applicantMax)
+    add(`state.nextId.applicant: ${n.applicant} ≤ applicant ${applicantMax}`)
   return out
 }

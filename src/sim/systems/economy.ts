@@ -18,14 +18,17 @@ import { laneNode, liveSlotIds, TICKS_PER_S } from '../types.ts'
 import { ageS, isOnTime, paidValue } from '../value.ts'
 import { debugParcel } from './holdbay.ts'
 import { isActiveSlot } from './lane.ts'
+import { addWanted, driverNumbers, driverOf } from './people.ts'
 import { changeSatisfaction } from './satisfaction.ts'
 
 /**
  * Deliver one parcel at its destination stop (§4.5 step 3, §7.3, §9.1):
  * parcel:delivered {paid, onTime, malware}, then the payout and the
  * satisfaction delta (on time: +onTime, +favouredBonus by the district's
- * favoured vehicle; late: −late; malware: −malwareDelivered, paid 0, and a
- * life). `v` is the delivering vehicle (null for a debug delivery).
+ * favoured vehicle, + the driver's charisma deliveryBonus (M6, spec-build2
+ * §2.5) — one positive delta inside positiveCapPerDay; late: −late; malware:
+ * −malwareDelivered, paid 0, and a life). `v` is the delivering vehicle
+ * (null for a debug delivery).
  */
 export function deliverParcel(sim: Sim, v: Vehicle | null, p: Parcel): void {
   const s = sim.state
@@ -62,10 +65,16 @@ export function deliverParcel(sim: Sim, v: Vehicle | null, p: Parcel): void {
   if (onTime) {
     const favoured =
       v !== null && districtDef(data, district).favoured.includes(v.type)
+    const driver = v === null ? null : driverOf(sim, v)
+    const charisma =
+      v === null || driver === null
+        ? 0
+        : driverNumbers(data, driver.pips, driver.affinity, v.type)
+            .deliveryBonus
     changeSatisfaction(
       sim,
       district,
-      sat.onTime + (favoured ? sat.favouredBonus : 0),
+      sat.onTime + (favoured ? sat.favouredBonus : 0) + charisma,
       'positive',
     )
   } else {
@@ -86,6 +95,7 @@ export function loseLife(sim: Sim, p: Parcel, viaClearance: boolean): void {
   const wasOver = eco.gameOver
   eco.lives = Math.max(0, eco.lives - 1)
   eco.daysSinceIncident = 0
+  addWanted(s, p.label)
   const report = lostLifeReport(sim, p, viaClearance)
   s.lastLostLife = report
   const card = structuredClone(report)
@@ -100,6 +110,9 @@ export function loseLife(sim: Sim, p: Parcel, viaClearance: boolean): void {
     counterOwned: card.counterOwned,
     counterRate: card.counterRate,
     clearedByPlayerAt: card.clearedByPlayerAt,
+    missedBy: structuredClone(card.missedBy),
+    inspectorRate: card.inspectorRate,
+    sorterCall: structuredClone(card.sorterCall),
     report: card,
   })
   if (eco.lives === 0 && !wasOver) {

@@ -85,18 +85,43 @@
 //   docks-locked    a new game panned to the fogged Docks (pm:panTo): the
 //                   modern port sprites as `_locked` scenery (B2 §6.4)
 //   warehouse-l1    (kept; regenerated with the interior atlas)
+//
+// M6 (plan-build2 §8.3 task 12; design-m6 §6, §7 "Shots (G)"):
+//   hire-sheet            a new game in the room: the desk card's [Hire
+//                         inspector] by real taps → the HireSheet with three
+//                         inspector cards (+ `-360x604`: every card inside
+//                         the canvas)
+//   garage-driver-picker  a new game: the Garage's Bike buy card → `Who
+//                         drives the Bike?` (three driver cards, Post an ad,
+//                         Hire later)
+//   warehouse-two-desks   people-l3.json, no policy (L3 by debug.forceLevel,
+//                         desk 2 in slot 3 with a charisma-2 inspector):
+//                         both desks staffed, both in the readout; then
+//                         warehouse-desk2-card (desk 2's card, its rows)
+//   station-sorter        sorter-duty.json, no policy: the sorter on duty at
+//                         the Hold Bay station, the rack lamp's S badge; then
+//                         station-card (the StationCard on duty)
+//   holdcard-sorter-hint  sorter-duty.json: the tagged parcel's bay tapped →
+//                         the Hold Bay card with the record's `holdCardLine`
+//                         (`Mo: looks clean (90%)` — the fixture's sorter,
+//                         not the plan's Pat 85 %) (+ `-360x604`)
+// tools/fixtures/people.ts writes both fixtures (same staleness rule).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, test, titleUp, type PmHelpers } from './fixtures.ts'
 import {
   bayRect,
+  hireSheet,
   openSheet,
   policyOff,
   roomLayout,
   sceneTarget,
+  sceneTexts,
   settleUntil,
+  SORTER_STAND,
   tapRoomRect,
+  tapStation,
   tapTarget,
 } from './warehouse.ts'
 
@@ -553,7 +578,8 @@ test.describe('M1 shots', () => {
   test('garage', async ({ page, pm, consoleErrors }) => {
     phoneAndColumn()
     await pm.open(POLICY)
-    // ~4 min: the policy owns three bikes (spec §7: a bike at price + $50).
+    // ~4 min: the opening bike, a day of payroll paid, its driver row (the
+    // second bike comes at ~4.5 min, price + $50 — the same at M5).
     await runFor(page, pm, 240_000)
     await openGarage(page, pm)
     await pm.shot(shotName('garage'))
@@ -1630,6 +1656,295 @@ test.describe('M5 shots', () => {
     console.log(`shots: docks-locked frames ${frames.join(' ')}`)
     expect(frames.length).toBeGreaterThan(0)
     await pm.shot('docks-locked', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M6 ------------------------------------------------------------------
+
+/** A new game at seed 7 in the room, no policy (Audrey alone at desk 1). */
+const WH_NEW = `${CITY}&view=warehouse`
+
+/** The room's people as WorkerSprites places them (tests / e2e hooks). */
+function workerAt(
+  page: Page,
+  id: number,
+): Promise<{ walking: boolean; at: Pt | null; count: number }> {
+  return page.evaluate((eid) => {
+    const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+      workers: {
+        isWalking(id: number): boolean
+        positionOf(id: number): Pt | null
+        count: number
+      }
+    }
+    return {
+      walking: wh.workers.isWalking(eid),
+      at: wh.workers.positionOf(eid),
+      count: wh.workers.count,
+    }
+  }, id)
+}
+
+/** The rack lamp's `S` badge as LaneRenderer draws it. */
+function sBadge(page: Page): Promise<{ visible: boolean; text: string }> {
+  return page.evaluate(() => {
+    const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+      lane: { sBadge: { visible: boolean; text: string } }
+    }
+    const b = wh.lane.sBadge
+    return { visible: b.visible, text: b.text }
+  })
+}
+
+/** Open a fleet-less Garage, tap the Bike buy card: the driver picker. */
+async function openDriverPicker(page: Page, pm: PmHelpers): Promise<void> {
+  await openGarage(page, pm)
+  await tapTarget(page, pm, 'Garage', 'garage:buy:bike')
+  expect(
+    await settleUntil(
+      page,
+      pm,
+      async () => (await hireSheet(page, 'Garage')) !== null,
+    ),
+    'the Bike buy card opens the driver HireSheet',
+  ).toBe(true)
+  await pm.settle(16) // the slide-in
+}
+
+test.describe('M6 shots', () => {
+  test('hire-sheet', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(WH_NEW)
+    await pm.freeze()
+    await pm.settle(30)
+    // Real taps: the desk in slot 1 → its card → [Hire inspector].
+    await tapRoomRect(page, pm, roomLayout.rectFor('slot1')!)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'slot',
+      ),
+      'the desk card opens',
+    ).toBe(true)
+    await pm.settle(16) // the 150 ms tap guard + the slide-in
+    await tapTarget(page, pm, 'Warehouse', 'slot:hire')
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'hire',
+      ),
+      '[Hire inspector] opens the HireSheet',
+    ).toBe(true)
+    // New buttons join the input list on the next update; the slide-in.
+    await pm.settle(16)
+    const hs = await hireSheet(page, 'Warehouse')
+    console.log(`shots: hire-sheet ${JSON.stringify(hs)}`)
+    expect(hs).toMatchObject({ id: 'wh:hire', role: 'inspector' })
+    expect(hs!.ids).toHaveLength(3)
+    const pool = await page.evaluate(() =>
+      window.__pm!.sim.applicants('inspector').map((a) => a.id),
+    )
+    expect(hs!.ids).toEqual(pool)
+    for (let i = 0; i < 3; i++)
+      expect(
+        await sceneTarget(page, 'Warehouse', `wh:hire:card:${i}`),
+        `card ${i}'s Hire is live`,
+      ).not.toBeNull()
+    await pm.shot(shotName('hire-sheet'), 30)
+    // Every card inside the canvas (110 px wide at 360, B2 §2.7 / design §6.1).
+    const W = await page.evaluate(() => window.__pm!.game.scale.width)
+    for (let i = 0; i < 3; i++) {
+      const r = (await sceneTarget(page, 'Warehouse', `wh:hire:card:${i}`))!
+      expect(r.x, `card ${i} left`).toBeGreaterThanOrEqual(0)
+      expect(r.x + r.w, `card ${i} right`).toBeLessThanOrEqual(W)
+    }
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('garage-driver-picker', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(CITY)
+    await pm.freeze()
+    await pm.settle(10)
+    await openDriverPicker(page, pm)
+    const hs = await hireSheet(page, 'Garage')
+    console.log(`shots: garage-driver-picker ${JSON.stringify(hs)}`)
+    expect(hs).toMatchObject({ id: 'garage:hire', role: 'driver' })
+    expect(hs!.ids).toHaveLength(3)
+    expect(await sceneTexts(page, 'Garage')).toContain('Who drives the Bike?')
+    for (const id of [
+      'garage:hire:card:0',
+      'garage:hire:card:1',
+      'garage:hire:card:2',
+      'garage:hire:ad',
+      'garage:hire:later',
+    ])
+      expect(
+        await sceneTarget(page, 'Garage', id),
+        `${id} is live`,
+      ).not.toBeNull()
+    await pm.shot('garage-driver-picker', 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-two-desks', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // people-l3.json (tools/fixtures/people.ts): L3 by debug.forceLevel,
+    // desk 2 in slot 3 with a charisma-2 inspector and a colleague. Loaded
+    // without the policy: its dock-blocked rule could seat a new inspector
+    // at desk 1 during the settle.
+    await pm.open(WH_NEW)
+    const { fixture } = await loadFixture(page, pm, 'people-l3')
+    await pm.settle(64)
+    const desks = fixture.desks as {
+      index: number
+      nodeId: string
+      inspectorIds: number[]
+      p: number[]
+    }[]
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      return {
+        warehouse: api.game.scene.isActive('Warehouse'),
+        level: api.sim.level,
+        desks: api.core.state.lane.nodes.flatMap((n) =>
+          n.fixture?.kind === 'desk'
+            ? [
+                {
+                  index: n.fixture.index,
+                  nodeId: n.id,
+                  inspectorIds: [...n.fixture.inspectorIds],
+                  p: n.stations.map((s) => s.p ?? null),
+                },
+              ]
+            : [],
+        ),
+      }
+    })
+    console.log(`shots: warehouse-two-desks ${JSON.stringify(st)}`)
+    expect(st.warehouse).toBe(true)
+    expect(st.level).toBe(fixture.level)
+    expect(st.desks).toEqual(
+      desks.map((d) => ({
+        index: d.index,
+        nodeId: d.nodeId,
+        inspectorIds: d.inspectorIds,
+        p: d.p,
+      })),
+    )
+    const crew = desks.flatMap((d) => d.inspectorIds)
+    for (const id of crew) {
+      const w = await workerAt(page, id)
+      expect(w.at, `inspector ${id} has a sprite`).not.toBeNull()
+    }
+    await pm.shot('warehouse-two-desks')
+    // Desk 2's card: one row per inspector, the charisma lift per row.
+    const desk2 = desks.find((d) => d.index === 2)!
+    await tapRoomRect(page, pm, roomLayout.rectFor(desk2.nodeId)!)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'slot',
+      ),
+      'desk 2 opens its card',
+    ).toBe(true)
+    const texts = await sceneTexts(page, 'Warehouse')
+    expect(texts).toContain('Inspection desk 2')
+    await pm.shot('warehouse-desk2-card', 30)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('station-sorter', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // sorter-duty.json (no policy): a sorter on duty at L2 who has just
+    // tagged a parcel `looks clean`.
+    await pm.open(WH_NEW)
+    const { fixture } = await loadFixture(page, pm, 'sorter-duty')
+    await pm.settle(64)
+    const sorter = fixture.sorter as { id: number; name: string }
+    const st = await page.evaluate(() => {
+      const hs = window.__pm!.sim.holdStation
+      return {
+        kind: hs.kind,
+        unlocked: hs.unlocked,
+        id: hs.sorter?.id ?? null,
+        name: hs.sorter?.name ?? null,
+        active: hs.sorter?.active ?? null,
+      }
+    })
+    console.log(`shots: station-sorter ${JSON.stringify(st)}`)
+    expect(st).toEqual({
+      kind: 'sorter',
+      unlocked: true,
+      id: sorter.id,
+      name: sorter.name,
+      active: true,
+    })
+    const w = await workerAt(page, sorter.id)
+    expect(w.walking, 'the loaded sorter is placed, not walking in').toBe(false)
+    expect(w.at).toEqual({ x: SORTER_STAND.x, y: SORTER_STAND.y })
+    expect(await sBadge(page)).toEqual({ visible: true, text: 'S' })
+    await pm.shot('station-sorter')
+    // The StationCard on duty (tap on the station).
+    await tapStation(page, pm)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'station',
+      ),
+      'the station opens the StationCard',
+    ).toBe(true)
+    expect(await sceneTexts(page, 'Warehouse')).toContain(sorter.name)
+    await pm.shot('station-card', 30)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('holdcard-sorter-hint', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(WH_NEW)
+    const { fixture } = await loadFixture(page, pm, 'sorter-duty')
+    await pm.settle(64)
+    const bay = await page.evaluate(
+      (id) =>
+        window.__pm!.sim.holdBay.items.find((it) => it.parcelId === id)?.bay ??
+        null,
+      fixture.parcelId as number,
+    )
+    expect(bay, 'the tagged parcel waits in a bay').not.toBeNull()
+    await tapRoomRect(page, pm, bayRect(bay!))
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'hold',
+      ),
+      'the Hold Bay card opens',
+    ).toBe(true)
+    await pm.settle(16)
+    const card = await page.evaluate(() => {
+      const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+        holdCard: { parcelId: number | null }
+      }
+      return wh.holdCard.parcelId
+    })
+    expect(card).toBe(fixture.parcelId)
+    const texts = await sceneTexts(page, 'Warehouse')
+    console.log(
+      `shots: holdcard-sorter-hint ${JSON.stringify(texts.filter((t) => /looks clean|Inspector/.test(t)))}`,
+    )
+    expect(texts).toContain(fixture.holdCardLine as string)
+    // Opening the card is the player's touch (design D3): replay-logged.
+    const touched = await page.evaluate(() => {
+      const log = window.__pm!.core.commandLog
+      return log[log.length - 1]?.cmd.kind ?? null
+    })
+    expect(touched).toBe('touchHeld')
+    await pm.shot(shotName('holdcard-sorter-hint'), 30)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

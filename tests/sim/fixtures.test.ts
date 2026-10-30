@@ -4,8 +4,9 @@
 // is free and its inspectors leave without refund; moves are free and an
 // occupied target swaps; a parcel mid-process under a moved fixture restarts
 // its process time (passes through when the slot is now empty); one desk
-// only; hire up to maxPerDesk for hireFee with names from puns.json; fire is
-// instant, no refund, one station fewer; the lane:fixture* / worker:* events.
+// per desks.rows index (M6: desk 2 at L3 — people.test.ts); hire up to
+// maxPerDesk for one day's salary; fire is instant, no refund, one station
+// fewer; the lane:fixture* / worker:* events.
 
 import { describe, expect, it } from 'vitest'
 import { auditState, conservation } from '../../src/sim/sim.ts'
@@ -15,6 +16,7 @@ import {
   collect,
   dataFixture,
   eventLog,
+  hireInspector,
   laneParcel,
   noCheckers,
   quietSim,
@@ -23,7 +25,7 @@ import {
 
 const data = dataFixture()
 const md = data.machines.checkers.find((c) => c.id === 'metal_detector')!
-const insp = data.employees.inspector
+const maxPerDesk = data.employees.desks.maxPerDesk
 
 describe('buy / remove (spec §6.2, §7.2)', () => {
   it('buyMachine: refused below the price, above the level, on a locked or occupied slot; places + charges + lane:fixturePlaced', () => {
@@ -85,15 +87,17 @@ describe('buy / remove (spec §6.2, §7.2)', () => {
     })
   })
 
-  it('removing the desk is free; its inspectors leave (worker:fired, no refund); a second desk is refused', () => {
+  it('removing the desk is free; its inspectors leave (worker:fired, no refund); desk 1 cannot be placed twice', () => {
     const sim = quietSim(1)
     sim.state.economy.balance = 500
-    sim.dispatch({ kind: 'hireInspector' })
+    hireInspector(sim)
     const ids = sim.state.employees
-      .filter((e) => e.kind === 'inspector')
+      .filter((e) => e.role === 'inspector')
       .map((e) => e.id)
     expect(ids).toHaveLength(2)
-    expect(sim.dispatch({ kind: 'placeDesk', nodeId: 'slot2' })).toEqual({
+    expect(
+      sim.dispatch({ kind: 'placeDesk', nodeId: 'slot2', index: 1 }),
+    ).toEqual({
       ok: false,
       reason: 'desk-exists',
     })
@@ -104,14 +108,18 @@ describe('buy / remove (spec §6.2, §7.2)', () => {
     expect(fired).toEqual(
       ids.map((employeeId) => ({
         employeeId,
-        kind: 'inspector',
+        role: 'inspector',
         nodeId: 'slot1',
+        vehicleId: null,
+        reason: 'deskRemoved',
       })),
     )
     expect(removed).toEqual([{ nodeId: 'slot1', refund: 0 }])
     expect(sim.state.economy.balance).toBe(balance)
-    expect(sim.state.employees.some((e) => e.kind === 'inspector')).toBe(false)
-    expect(sim.dispatch({ kind: 'placeDesk', nodeId: 'slot3' })).toEqual({
+    expect(sim.state.employees.some((e) => e.role === 'inspector')).toBe(false)
+    expect(
+      sim.dispatch({ kind: 'placeDesk', nodeId: 'slot3', index: 1 }),
+    ).toEqual({
       ok: true,
     })
     expect(laneNode(sim.state.lane, 'slot3')?.fixture?.kind).toBe('desk')
@@ -143,7 +151,7 @@ describe('move / swap (spec §6.2, Q30, Q31)', () => {
     expect(laneNode(sim.state.lane, 'slot2')?.fixture?.kind).toBe('desk')
     expect(laneNode(sim.state.lane, 'slot1')?.fixture).toBeNull()
     expect(
-      sim.state.employees.filter((e) => e.kind === 'inspector')[0]?.nodeId,
+      sim.state.employees.filter((e) => e.role === 'inspector')[0]?.nodeId,
     ).toBe('slot2')
     sim.dispatch({ kind: 'moveFixture', from: 'slot2', to: 'slot3' })
     expect(moved).toEqual([
@@ -230,7 +238,7 @@ describe('move / swap (spec §6.2, Q30, Q31)', () => {
     expect(after.state).toBe('on_shelf')
     expect(after.trace.filter((t) => t.chk === deskId)).toHaveLength(1)
     expect(after.trace.map((t) => t.text)).toEqual([
-      'Slot 1 Inspection desk: missed (85% vs metal)',
+      'Slot 1 desk — Audrey: missed (85% vs metal)',
       'Slot 2: empty',
       'Slot 3 Inspection desk: already checked',
       undefined, // shelved
@@ -240,8 +248,8 @@ describe('move / swap (spec §6.2, Q30, Q31)', () => {
   it('more busy stations than the new fixture has: the extra parcels go back to the front of the buffer (above its cap until it drains); nothing lost', () => {
     const sim = quietSim(1)
     sim.state.economy.balance = 1000
-    sim.dispatch({ kind: 'hireInspector' })
-    sim.dispatch({ kind: 'hireInspector' })
+    hireInspector(sim)
+    hireInspector(sim)
     sim.dispatch({ kind: 'buyMachine', defId: md.id, nodeId: 'slot2' })
     for (let i = 0; i < 5; i++) laneParcel(sim, 'slot1')
     const slot1 = laneNode(sim.state.lane, 'slot1')!
@@ -260,42 +268,52 @@ describe('move / swap (spec §6.2, Q30, Q31)', () => {
 })
 
 describe('inspectors (spec §6.7)', () => {
-  it('hire: hireFee each, up to maxPerDesk stations, names from puns.json; worker:hired', () => {
+  it('hire: one day’s salary as the fee ($20 for a 3/3/0), up to maxPerDesk seats, names from puns.peopleNames; worker:hired', () => {
     const sim = quietSim(1)
     sim.state.economy.balance = 1000
     const hired = collect(sim, 'worker:hired')
-    for (let i = 1; i < insp.maxPerDesk; i++) {
-      expect(sim.dispatch({ kind: 'hireInspector' })).toEqual({ ok: true })
+    for (let i = 1; i < maxPerDesk; i++) {
+      expect(hireInspector(sim)).toMatchObject({ ok: true })
     }
-    expect(sim.dispatch({ kind: 'hireInspector' })).toEqual({
-      ok: false,
-      reason: 'desk-full',
-    })
-    expect(sim.state.economy.balance).toBe(
-      1000 - (insp.maxPerDesk - 1) * insp.hireFee,
-    )
+    expect(hireInspector(sim)).toEqual({ ok: false, reason: 'desk-full' })
+    expect(sim.state.economy.balance).toBe(1000 - (maxPerDesk - 1) * 20)
     const names = sim.state.employees
-      .filter((e) => e.kind === 'inspector')
+      .filter((e) => e.role === 'inspector')
       .map((e) => e.name)
-    expect(names).toEqual(data.puns.inspectorNames.slice(0, insp.maxPerDesk))
-    expect(hired).toHaveLength(insp.maxPerDesk - 1)
-    expect(laneNode(sim.state.lane, 'slot1')?.stations).toHaveLength(
-      insp.maxPerDesk,
-    )
+    expect(names[0]).toBe('Audrey')
+    for (const n of names) expect(data.puns.peopleNames).toContain(n)
+    expect(new Set(names).size).toBe(names.length)
+    expect(hired).toHaveLength(maxPerDesk - 1)
+    expect(hired[0]).toMatchObject({
+      role: 'inspector',
+      nodeId: 'slot1',
+      vehicleId: null,
+      pips: { eye: 3, pace: 3, charisma: 0 },
+      star: false,
+      rehire: false,
+    })
+    expect(laneNode(sim.state.lane, 'slot1')?.stations).toHaveLength(maxPerDesk)
+    expect(auditState(sim.state, data)).toEqual([])
   })
 
   it('fire: instant, no refund, one station fewer (worker:fired); the last one leaves an empty desk that passes parcels through', () => {
     const sim = quietSim(1)
-    const e = sim.state.employees.find((x) => x.kind === 'inspector')!
+    const e = sim.state.employees.find((x) => x.role === 'inspector')!
     const p = laneParcel(sim, 'slot1')
     runTicks(sim, 10) // mid-process
     const balance = sim.state.economy.balance
     const fired = collect(sim, 'worker:fired')
-    expect(sim.dispatch({ kind: 'fireInspector', employeeId: e.id })).toEqual({
+    expect(sim.dispatch({ kind: 'fire', employeeId: e.id })).toEqual({
       ok: true,
     })
     expect(fired).toEqual([
-      { employeeId: e.id, kind: 'inspector', nodeId: 'slot1' },
+      {
+        employeeId: e.id,
+        role: 'inspector',
+        nodeId: 'slot1',
+        vehicleId: null,
+        reason: 'fired',
+      },
     ])
     expect(sim.state.economy.balance).toBe(balance)
     const desk = laneNode(sim.state.lane, 'slot1')!
@@ -304,7 +322,7 @@ describe('inspectors (spec §6.7)', () => {
     expect(desk.queue[0]).toBe(p.id)
     runTicks(sim, 5)
     expect(sim.state.parcels[String(p.id)]?.state).toBe('on_shelf')
-    expect(sim.dispatch({ kind: 'fireInspector', employeeId: e.id })).toEqual({
+    expect(sim.dispatch({ kind: 'fire', employeeId: e.id })).toEqual({
       ok: false,
       reason: 'invalid',
     })

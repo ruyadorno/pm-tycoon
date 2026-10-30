@@ -1,18 +1,32 @@
 // Warehouse HoldBayCard (warehouse-view.md §3.1, §3.5; plan.md §8; spec
-// §5.3, §5.4, §6.6): the card of a held parcel, a WarehouseSheet
-// (BuySheet.ts) opened with `open(parcelId)`, height 248, drawn on the
+// §5.3, §5.4, §6.6; spec-build2 §2.6; design-m6 §6.2): the card of a held
+// parcel, a WarehouseSheet (BuySheet.ts) opened with `open(parcelId)`,
+// height 248 (268 with the sorter's hint line), drawn on the
 // `ui_card_held` nine-slice (its border is the reserved malware colour
 // mal1 — every held parcel gets the same dark card).
 //
+// Opening it dispatches `holdBay.touch(parcelId)` (design D3: the sorter
+// keeps its hands off a parcel the player is looking at for playerGraceS
+// and its clock restarts — the player's tap always wins). While it stays
+// open with someone at the Hold Bay station (a sorter or the Sorter Arm) it
+// renews the touch every half grace of SIM time (sorter.ts touchRenewDue),
+// so neither
+// decides on the parcel under the player's finger; the renewals only extend
+// the grace (commands.ts touchHeld), the sorter keeps working the others.
+//
 //   header  the dark held-parcel sprite, trait icon + the label
 //           (`cookie-tin@3.2.1`), size icon + `S · $20 base`, `Bay 1`
+//   hint    `Pat: looks clean (85%)` — only when the sorter tagged it (its
+//           face first while that sorter still works here); every line
+//           below moves down 20 px and the card grows to 268
 //   line 3  `From Cache Cafe (Registry Row) → Node Heights Towers A
 //           (Node Heights)` (building names + district flavour names; wraps)
 //   line 4  `Flagged by: Metal detector (metal)`
 //   line 5  decay ring + `Value now $38 · falling` (re-read every 500 ms,
 //           spec §5.3: the value keeps decaying while held; `drops in 0:42`
 //           inside the grace window, `floor` at the floor)
-//   line 6  `Inspector Audrey` (desk flags only)
+//   line 6  `Inspector Lin` (desk flags: the inspector whose roll flagged
+//           it, from the flag's trace entry)
 //   TOSS (left, red, 160×48) / CLEAR (right, green `ui_btn_green` face,
 //           160×48) → holdBay.toss / clear; CLEAR is disabled with the
 //           caption `Shelf full` while the shelf is at cap (Q35); TOSS is
@@ -24,29 +38,31 @@
 // pOther catch away); generalists (desk, X-ray) show no trait — their decoy
 // flags carry traits of strains not yet announced, which would mark them
 // clean. Odds are never shown.
-// It closes on `parcel:tossed` / `parcel:cleared_by_player` for its parcel,
-// when the parcel leaves the Hold Bay any other way, and on `game:over`.
+// It closes on `parcel:tossed` / `parcel:cleared_by_player` for its parcel
+// (the sorter's Toss included), when the parcel leaves the Hold Bay any
+// other way, and on `game:over`; `sorter:decided` for its parcel rebuilds it
+// (the hint appears).
 import type Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import { frameOrNull } from '../../render/frames.ts'
 import type {
   Checker,
-  Employee,
   LaneNode,
   Parcel,
   Strain,
   Tick,
 } from '../../sim/types.ts'
+import { playerGraceTicks, touchRenewDue } from '../../sim/systems/sorter.ts'
 import { ageS, paidValue, valueAt } from '../../sim/value.ts'
-import type { ViewSim } from '../../sim/view-api.ts'
+import type { HoldBayItem, ViewSim } from '../../sim/view-api.ts'
 import type { Button, ButtonVisual } from '../Button.ts'
 import { addPanel } from '../Panel.ts'
 import { formatClock, formatMoney, textTop } from '../text.ts'
 import { PALETTE, THEME } from '../theme.ts'
 import {
-  employeesOf,
   MUTED,
   PAD,
+  pctOf,
   RED_TEXT,
   WarehouseSheet,
   type WarehouseSheetLayout,
@@ -57,16 +73,23 @@ import { fixtureName, joinNames } from './SlotCard.ts'
 export const HOLD_CARD_ID = 'wh:hold'
 /** warehouse-view.md §3.1 */
 export const HOLD_CARD_H = 248
+/** design-m6 §6.2: one 20-px line more while the sorter's hint shows. */
+export const HINT_LINE_H = 20
+export const HOLD_CARD_HINT_H = HOLD_CARD_H + HINT_LINE_H
 export const ACTION_W = 160
 export const ACTION_H = 48
 export const ACTION_GAP = 8
-/** Line tops (sheet-local). */
+/** Line tops (sheet-local) without the hint line. */
 export const ROUTE_Y = 60
 export const FLAG_Y = 92
 export const VALUE_Y = 114
 export const CREW_Y = 136
 export const ACTIONS_Y = 172
 export const CAPTION_Y = 224
+/** The hint band's top (under the size line; the route moves below it). */
+export const HINT_Y = 56
+/** The sorter's hint tint (a dark green, legible on the card). */
+export const HINT_TINT = PALETTE.leaf0
 /** Value line tint per phase (the city's decay colours: amber falling, red floor). */
 export const VALUE_TINT: Record<ValuePhase, number> = {
   grace: THEME.textDark,
@@ -115,6 +138,43 @@ export function flaggedByLine(name: string, trait: string | null): string {
 export function crewLine(names: readonly string[]): string | null {
   if (names.length === 0) return null
   return `${names.length === 1 ? 'Inspector' : 'Inspectors'} ${joinNames(names)}`
+}
+
+/** Line 6 (design-m6 §6.2): the inspector who flagged it — `Inspector Lin`. */
+export function inspectorLine(name: string | null): string | null {
+  return name ? crewLine([name]) : null
+}
+
+/** The sorter's tag (spec-build2 §2.6): `Pat: looks clean (85%)`. */
+export function sorterHintLine(sorted: { name: string; pct: number }): string {
+  return `${sorted.name}: looks clean (${pctOf(sorted.pct / 100)})`
+}
+
+/** Line tops and the card height, with or without the hint line. */
+export interface HoldCardLayout {
+  h: number
+  hintY: number | null
+  routeY: number
+  flagY: number
+  valueY: number
+  crewY: number
+  actionsY: number
+  captionY: number
+}
+
+/** The card's geometry: the hint pushes every line below it down 20 px (248 → 268). */
+export function holdCardLayout(hint: boolean): HoldCardLayout {
+  const d = hint ? HINT_LINE_H : 0
+  return {
+    h: HOLD_CARD_H + d,
+    hintY: hint ? HINT_Y : null,
+    routeY: ROUTE_Y + d,
+    flagY: FLAG_Y + d,
+    valueY: VALUE_Y + d,
+    crewY: CREW_Y + d,
+    actionsY: ACTIONS_Y + d,
+    captionY: CAPTION_Y + d,
+  }
 }
 
 export type ValuePhase = 'grace' | 'falling' | 'floor' | 'locked'
@@ -232,6 +292,8 @@ export function shownTrait(
 
 export class HoldBayCard extends WarehouseSheet {
   private pid: number | null = null
+  /** Sim tick of the last holdBay.touch for `pid`. */
+  private touchedAt = 0
   private valueText: Phaser.GameObjects.BitmapText | null = null
   private ring: Phaser.GameObjects.Image | null = null
   private clearBtn: Button | null = null
@@ -262,6 +324,9 @@ export class HoldBayCard extends WarehouseSheet {
       'parcel:loaded': shelf,
       'parcel:returned': shelf,
       'parcel:held': () => this.updateBay(),
+      'sorter:decided': (p) => {
+        if (p.parcelId === this.pid) this.markDirty()
+      },
       'level:up': shelf,
     })
   }
@@ -271,17 +336,35 @@ export class HoldBayCard extends WarehouseSheet {
     return this.isOpen() ? this.pid : null
   }
 
-  /** Open on a held parcel (ignored when it is not in the Hold Bay). */
+  /**
+   * Open on a held parcel (ignored when it is not in the Hold Bay). The
+   * player is looking at it: `holdBay.touch` (design D3) keeps the sorter
+   * off it for playerGraceS and restarts the sorter's clock.
+   */
   open(parcelId: number): void {
     if (!this.held(parcelId)) return
     this.pid = parcelId
+    this.vs.holdBay.touch(parcelId)
+    this.touchedAt = this.vs.tick
     this.show()
   }
 
   // ---- WarehouseSheet hooks ------------------------------------------------
 
+  /** Keep the player's grace alive while the card is open (see the header). */
+  protected frame(): void {
+    const id = this.pid
+    if (id === null || this.vs.gameOver) return
+    const now = this.vs.tick
+    if (!touchRenewDue(now, this.touchedAt, playerGraceTicks(this.vs.data)))
+      return
+    this.touchedAt = now
+    if (this.vs.holdStation.kind === null) return
+    this.vs.holdBay.touch(id)
+  }
+
   protected contentHeight(): number {
-    return HOLD_CARD_H
+    return holdCardLayout(this.item()?.sorted != null).h
   }
 
   protected valid(): boolean {
@@ -309,6 +392,8 @@ export class HoldBayCard extends WarehouseSheet {
     const size = p.size.toLowerCase()
     const flag = flaggerOf(this.vs.lane.nodes(), p.flaggedBy)
     const trait = shownTrait(flag?.checker ?? null)
+    const item = this.item()
+    const lay = holdCardLayout(item?.sorted != null)
 
     // header: dark parcel, trait + label, size + base, bay number
     const parcel =
@@ -327,32 +412,43 @@ export class HoldBayCard extends WarehouseSheet {
     this.bayText = this.text(0, textTop(16, 16), '', MUTED)
     this.updateBay()
 
-    // route, flagger, value, crew
+    // the sorter's hint (design-m6 §6.2), its face first while that sorter
+    // still works here
+    if (item?.sorted && lay.hintY !== null) {
+      let hx = PAD + 4
+      const by = p.sorted?.by
+      const sorter =
+        by === undefined
+          ? undefined
+          : this.vs.people().find((e) => e.id === by && e.role === 'sorter')
+      if (sorter && this.face(hx, lay.hintY + 2, sorter.look)) hx += 20
+      this.text(
+        hx,
+        textTop(lay.hintY, HINT_LINE_H),
+        sorterHintLine(item.sorted),
+        HINT_TINT,
+      )
+    }
+
+    // route, flagger, value, the flagging inspector
     this.text(
       PAD + 4,
-      ROUTE_Y,
+      lay.routeY,
       routeLine(data, p.origin, p.dest),
       THEME.textDark,
       W - 2 * PAD - 8,
     )
     const name = flag ? fixtureName(data, flag.checker) : 'a removed checker'
-    this.text(PAD + 4, textTop(FLAG_Y, 20), flaggedByLine(name, trait))
-    this.ring = this.image(PAD + 4, VALUE_Y + 2, 'ring_0')
-    this.valueText = this.text(PAD + 24, textTop(VALUE_Y, 20), '')
+    this.text(PAD + 4, textTop(lay.flagY, 20), flaggedByLine(name, trait))
+    this.ring = this.image(PAD + 4, lay.valueY + 2, 'ring_0')
+    this.valueText = this.text(PAD + 24, textTop(lay.valueY, 20), '')
     this.updateValue()
-    if (flag?.checker.kind === 'desk' && flag.node.fixture?.kind === 'desk') {
-      const ids = flag.node.fixture.inspectorIds
-      const emps = employeesOf(this.vs, this.scene)
-      const names = ids
-        .map((eid) => emps.find((e: Employee) => e.id === eid)?.name)
-        .filter((s): s is string => !!s)
-      const crew = crewLine(names)
-      if (crew) this.text(PAD + 4, textTop(CREW_Y, 20), crew, MUTED)
-    }
+    const who = inspectorLine(item?.inspectorName ?? null)
+    if (who) this.text(PAD + 4, textTop(lay.crewY, 20), who, MUTED)
 
     // TOSS / CLEAR
     const x0 = Math.round((W - (2 * ACTION_W + ACTION_GAP)) / 2)
-    const toss: Button = this.button(x0, ACTIONS_Y, ACTION_W, ACTION_H, {
+    const toss: Button = this.button(x0, lay.actionsY, ACTION_W, ACTION_H, {
       id: 'hold:toss',
       label: 'TOSS',
       face: 'red',
@@ -364,7 +460,7 @@ export class HoldBayCard extends WarehouseSheet {
       },
     })
     const cx = x0 + ACTION_W + ACTION_GAP
-    const clear: Button = this.button(cx, ACTIONS_Y, ACTION_W, ACTION_H, {
+    const clear: Button = this.button(cx, lay.actionsY, ACTION_W, ACTION_H, {
       id: 'hold:clear',
       label: 'CLEAR',
       face: 'primary',
@@ -378,7 +474,7 @@ export class HoldBayCard extends WarehouseSheet {
     })
     this.clearBtn = clear
     this.clearFace = useGreenFace(clear)
-    this.caption = this.text(0, CAPTION_Y, '', RED_TEXT)
+    this.caption = this.text(0, lay.captionY, '', RED_TEXT)
     this.updateActions()
   }
 
@@ -386,6 +482,13 @@ export class HoldBayCard extends WarehouseSheet {
 
   private held(parcelId: number): boolean {
     return this.vs.holdBay.items.some((it) => it.parcelId === parcelId)
+  }
+
+  /** The shown parcel's Hold Bay item (bay, flagging inspector, sorter tag). */
+  private item(): HoldBayItem | null {
+    const id = this.pid
+    if (id === null) return null
+    return this.vs.holdBay.items.find((i) => i.parcelId === id) ?? null
   }
 
   private clearReason(): string | null {

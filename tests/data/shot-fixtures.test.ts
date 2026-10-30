@@ -8,11 +8,16 @@
 // (`vlr fixtures:attract`; regenerated with every data or state-version
 // change, R19), load with ignoreDataHash like the Title does, show the M5 L2
 // city and keep delivering under the competent policy.
+// Build 2, M6 (plan-build2 §8.3 task 12; design-m6 §8 B): people-l3.json
+// (two desks at a forced L3, the per-desk charisma bonus) and
+// sorter-duty.json (a sorter on duty, a held parcel it tagged `looks clean`)
+// from `node tools/fixtures/people.ts` — plain runs like the M2/M3 ones.
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
-import { replay, Sim, stateHash } from '../../src/sim/sim.ts'
+import { auditState, replay, Sim, stateHash } from '../../src/sim/sim.ts'
+import { effectiveP, sorterNumbers } from '../../src/sim/systems/people.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import { collect, dataFixture } from '../sim/helpers.ts'
 import {
@@ -66,6 +71,8 @@ describe('shot fixtures load under the shipped data hash', () => {
     'level-up',
     'payroll-short',
     'l2-lane',
+    'people-l3',
+    'sorter-duty',
   ]) {
     it(`${name}.json is current (else: its fixture.regenerate)`, () => {
       const { fx } = read(name)
@@ -75,13 +82,15 @@ describe('shot fixtures load under the shipped data hash', () => {
   }
 })
 
-describe('the M2/M3 fixtures are plain runs (seed + command log, no state patching)', () => {
+describe('the M2/M3/M6 fixtures are plain runs (seed + command log, no state patching)', () => {
   for (const name of [
     'holdbay-full',
     'malware-cleared',
     'one-life',
     'level-up',
     'l2-lane',
+    'people-l3',
+    'sorter-duty',
   ]) {
     it(`${name}.json replays to the same state hash`, () => {
       const { sim } = load(name)
@@ -258,6 +267,114 @@ describe('l2-lane: L2 with four live slots and the Shaky shaker (warehouse-view 
     withPolicy(sim, 30)
     expect(ups).toEqual([])
     expect(lost).toEqual([])
+  })
+})
+
+interface DeskRecord {
+  index: number
+  nodeId: string
+  inspectorIds: number[]
+  p: number[]
+  readoutP: number
+}
+
+describe('people-l3: two desks at a forced L3, the charisma bonus per desk (B2 §2.3-§2.4)', () => {
+  it('is at L3 with desk 1 and desk 2 placed, desk 2 seating two inspectors (one of charisma 2) with their effective p and the mean readout', () => {
+    const { sim, fx } = load('people-l3')
+    const st = sim.state
+    const data = sim.data
+    expect(st.level.level).toBe(fx.fixture.level)
+    expect(st.economy.gameOver).toBe(false)
+    const desks = fx.fixture.desks as DeskRecord[]
+    expect(desks.map((d) => d.index)).toEqual([1, 2])
+    const removed = fx.fixture.removed as { nodeId: string; defId: string }
+    expect(desks[1]!.nodeId).toBe(removed.nodeId)
+    for (const d of desks) {
+      const node = laneNode(st.lane, d.nodeId)!
+      const f = node.fixture
+      expect(f?.kind === 'desk' ? f.index : null).toBe(d.index)
+      if (f?.kind !== 'desk') continue
+      expect(f.inspectorIds).toEqual(d.inspectorIds)
+      expect(f.walkedOutIds).toEqual([])
+      // Each station: own p + the charisma bonus of the other inspectors at
+      // THIS desk (≤ pCap); the readout holds the mean (B2 §2.3, Q-B2-5).
+      const crew = f.inspectorIds.map((id) =>
+        st.employees.find((e) => e.id === id)!,
+      )
+      const ps = crew.map((e) =>
+        effectiveP(
+          data,
+          e.pips,
+          crew.filter((c) => c !== e).map((c) => c.pips),
+        ),
+      )
+      expect(node.stations.map((x) => x.p)).toEqual(ps)
+      expect(ps).toEqual(d.p)
+      const mean = ps.reduce((a, b) => a + b, 0) / ps.length
+      expect(f.checker.pMatch).toBeCloseTo(mean, 4)
+      expect(f.checker.pMatch).toBe(d.readoutP)
+    }
+    const d2 = desks[1]!
+    expect(d2.inspectorIds).toHaveLength(2)
+    const ch = fx.fixture.charismaInspector as { id: number; name: string }
+    const star = st.employees.find((e) => e.id === ch.id)!
+    expect(star.name).toBe(ch.name)
+    expect(star.pips.charisma).toBe(2)
+    expect(d2.inspectorIds).toContain(ch.id)
+    // The colleague gains charismaBonus[2] (capped); desk 1 gains nothing.
+    const mate = st.employees.find(
+      (e) => d2.inspectorIds.includes(e.id) && e.id !== ch.id,
+    )!
+    const r = data.employees.roles.inspector
+    const own = r.p[(mate.pips.eye ?? 3) - 1]!
+    const bonus = r.charismaBonus[2]!
+    expect(d2.p[d2.inspectorIds.indexOf(mate.id)]).toBe(
+      Math.min(r.pCap, Math.round((own + bonus) * 1e4) / 1e4),
+    )
+    expect(auditState(st, data)).toEqual([])
+  })
+
+  it('keeps running under ?policy=1 for 30 s with both desks crewed and the state sound', () => {
+    const { sim, fx } = load('people-l3')
+    withPolicy(sim, 30)
+    const desks = fx.fixture.desks as DeskRecord[]
+    const f = laneNode(sim.state.lane, desks[1]!.nodeId)!.fixture
+    expect(f?.kind === 'desk' ? f.inspectorIds : null).toEqual(
+      desks[1]!.inspectorIds,
+    )
+    expect(auditState(sim.state, sim.data)).toEqual([])
+  })
+})
+
+describe('sorter-duty: a sorter on duty and a parcel it tagged looks clean (B2 §2.6)', () => {
+  it('has an active sorter on the station and the tagged parcel held, its hint line the last trace entry', () => {
+    const { sim, fx } = load('sorter-duty')
+    const st = sim.state
+    expect(st.level.level).toBe(fx.fixture.level)
+    const rec = fx.fixture.sorter as { id: number; name: string }
+    expect(st.lane.holdStation.fixture).toBe(rec.id)
+    const sorter = st.employees.find((e) => e.id === rec.id)!
+    expect(sorter.role).toBe('sorter')
+    expect(sorter.active).toBe(true)
+    expect(sorter.name).toBe(rec.name)
+    const p = st.parcels[String(fx.fixture.parcelId)]!
+    expect(p.state).toBe('held')
+    expect(p.label).toBe(fx.fixture.label)
+    const pct = Math.round(100 * sorterNumbers(sim.data, sorter.pips).correct)
+    expect(p.sorted).toEqual({ by: sorter.id, name: sorter.name, pct })
+    expect(fx.fixture.pct).toBe(pct)
+    expect(p.trace.at(-1)?.text).toBe(fx.fixture.holdCardLine)
+    expect(fx.fixture.holdCardLine).toBe(
+      `${sorter.name}: looks clean (${pct}%)`,
+    )
+  })
+
+  it('without the policy the sorter never Clears it: still held 20 s later (only the player Clears)', () => {
+    const { sim, fx } = load('sorter-duty')
+    const cleared = collect(sim, 'parcel:cleared_by_player')
+    for (let i = 0; i < 20 * TICKS_PER_S; i++) sim.tick()
+    expect(cleared).toEqual([])
+    expect(sim.state.parcels[String(fx.fixture.parcelId)]!.state).toBe('held')
   })
 })
 

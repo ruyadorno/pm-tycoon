@@ -316,3 +316,94 @@ plan-build2.md §11 question with what is coded and where; the author overrules 
   opens the run summary (nothing without one). The district sheet grows but never shrinks while open; the Garage list
   is sized to its rows, capped at the old height. The Paused card is on the modal stack: W, G and Esc-to-City wait,
   Space/1/2/4 still resume. The Title's Credits card is modal.
+
+## Run decisions and deviations (M6 — people)
+
+The M6 contract (design defaults D1–D20, reconciled across M6–M9 by a critic pass) is summarised here; each line names
+the spec section it settles.
+
+- **D1 — applicant RNG stream** (B2 §2.7 "rolled from the sim RNG"): pools draw from their own seeded mulberry32 word
+  (`state.applicants.rng`, saved with the state), so opening sheets, ads and picks never shift a spawn or a checker roll;
+  same determinism, and the gate's main stream keeps its draw count.
+- **D2 — Replace swaps after the trip** (B2 §2.5): `Vehicle.nextDriverId`; immediate on the lot; the old driver keeps
+  driving (and is paid) until the trip is over ON THE LOT — the unload, or, for a trip that ends in the city with nothing
+  aboard, the arrival at the lot entrance (it drives home first; M6 review); a pending driver who walks out cancels the
+  Replace at once (they leave, `worker:fired {replaced}`; the current driver stays); a driver whose Replace waits cannot
+  be re-hired (the swap lets them go; the Garage offers no Re-hire then); a vehicle with a pending Replace or no driver
+  counts as driverless.
+- **D3 — the player's tap** (B2 §2.6): the sim cannot see UI taps, so the HoldBayCard dispatches `touchHeld {parcelId}`
+  when it opens and, while it stays open with a sorter or the Sorter Arm at the station, renews it every half grace of
+  SIM time (logged, replay-exact; `sorter.ts touchRenewDue`) — one touch on open let a pace-5 sorter or the Arm toss the
+  parcel under the player's finger (M6 review). A touch inside the grace only extends it (the sorter keeps calling the
+  other parcels); player Toss / Clear / a fresh touch restart the sorter's clock.
+- **D4 — sorter cadence**: its clock starts when an unjudged parcel waits; it decides on the oldest one `decisionS`
+  later, so nothing vanishes on arrival. Trace text `Tossed by <name>` / `Tossed by the Sorter Arm`.
+- **D5/D6 — stars** (B2 §2.7): a ★ applicant takes the front of its pool of three (the last regular leaves; refresh
+  keeps stars; with an all-star pool the oldest star leaves); it leaves with "<name> took another job" at the first day
+  boundary at least `starExpiryDays` after it arrived (2–3 days, never less — `leavesOnDay = day + 2` gave a ★ arriving
+  on a day's last tick one day; M6 review); the card reads `leaves in 2d`, `1d`, `today`. The same ★ again — matched by
+  `Applicant.starKey`, its def name, so a ★ renamed `Audrey 2` still matches — only refreshes its expiry.
+- **D7 — atlas for people art** (B2 §6.8 lists faces under interior): faces, `ic_star`, `worker_sorter_*` and the new
+  machines pack into both atlases, `ic_pip_on/off` into world (the HireSheet, the Garage and the follow strip bind world
+  only), `hold_station` into interior; `sorter_arm_f0–f2` into both.
+- **D8 — delegating policy at L1**: tosses by hand until an active sorter is seated (no station before L2), then never;
+  Clears every `looks clean` parcel; a walkout returns it to hand tossing.
+- **D9 — driver hire fee on purchase** (B2 §7.1 "any role"): one day's salary; the policy's vehicle triggers stay
+  `price + purchaseBuffer` (B2 §7.2), the fee comes out of the $50 buffer; the opening bike needs price + its fee.
+- **D10/D11** — a walked-out worker can be fired (frees the seat at once); hiring into an occupied station replaces the
+  sorter; `station-occupied` only refuses a sorter while the Sorter Arm stands there (B2 §2.6 "never both").
+- **D12** — the readout, shield and ShieldPopover show a desk's mean effective `p`; SlotCard rows show each inspector's
+  (B2 §2.3); "avg" shows with two or more seated.
+- **D14 — the 5-eye line** on the lost-life card: computed on the parcel's faced rolls, only for a desk miss by an
+  inspector with eye < 5; the machine line wins ties; none for a parcel the player Cleared.
+- **D15 — the Hold Bay station, poster and props move now** (B2 §4.4): `HOLD_STATION {264,300,48,48}`, the poster at
+  (272,120), `PROPS_T1` to (264,164)/(264,236), `PROPS_T2` to (264,196); the sorter walks in along row y 352 (above the
+  rack it would pass behind the dock panel).
+- **D16** — Garage rows put Replace / Fire / Sell behind a 44-px `···` menu (three 64-px buttons do not fit at 360).
+  Every row's slot is the `···` (M6 integration): a Hire-later or fired-driver row lists `Hire driver` / `Sell`, a
+  walked-out driver's row `Re-hire $N` / `Fire driver` / `Sell`, so a driverless vehicle can still be sold — two taps
+  instead of the playtest-1 one-tap Re-hire. The trade-off is keeping Sell reachable on a driverless row, not width (a
+  labelled `Re-hire $13` would fit the old 72-px slot on its own). The `···` sits at the row's right edge and the zone
+  chip 4 px left of it (M6 review: the chip was placed from the old 72-px slot, so at 360 the driver line's tail had
+  31 px — `$6/day` read `$6`; now 59 px fits `$13/day`, `! unpaid` and `→ Audrey`).
+- **D17/D18** — all six B2 §9 pacing keys landed in `economy.json` at M6; `STATE_VERSION` 3 (key stays `pm.save.v2`).
+- **D19 — the wanted list**: any malware Toss (player, sorter, Arm) and every lost life append to `state.wanted`; the
+  UI-side `onboarding.wanted` is gone.
+- **D20** — the policy's "highest speed" is the effective pip for the bought type (affinity counted); ties → lowest
+  salary → lowest applicant id.
+- **The Sorter Arm rule is built in M6** (plan-build2 §8.3 task 5): `buyMachine sorter_arm` into the `hold` station at
+  L4 ($600), every due parcel auto-Tossed `autoTossDelayS` after `max(nodeEnterTick, touchedTick)`; removal refunds 50 %.
+  Its idle/reach/toss frames are scripted from one generated image (no extra generations).
+- **The station's dashed outline is an atlas frame** (`station_outline`, interior-prop 48×48 packed into world like
+  `slot_empty_outline` / `ext_outline`): a Graphics in the room's badges layer broke its image batch (Warehouse + HUD 8
+  draw calls > 7); with the frame it is 6.
+- **Removing a desk** re-seats its parcels first, then fires every inspector there (walked-out ones too), reason
+  `deskRemoved`; the card's line and confirm name the walked-out ones too (`Remove desk — 2 inspectors let go, no
+  refund`, `Lin (walked out) is let go, no refund.`).
+- **M6 review fixes** (no balance value changed):
+  - A driver fired mid-trip leaves their speed / stop multipliers on the vehicle (`Vehicle.tripMults`) until it parks
+    `inactive`, as a walkout already did — firing a slow driver no longer made the rest of the trip faster and unpaid.
+  - `employees.roles.sorter.tagsClean` is honoured: `false` = the sorter still judges each parcel once
+    (`Parcel.sorted`), but no `looks clean` tag (HoldBayItem), trace line or lost-life `sorterCall` shows.
+  - B2 §2.6's station tooltip `Pat · judgement 85 % · one call / 6 s · $28/day` is the StationCard's on-duty rows (the
+    name row + the stats line): a station tap opens the card, so the unused `stationTooltip` helper was removed.
+  - Onboarding step 1 (`Buy a bike in the Garage and pick its driver`) clears on the first driver hire, not on the
+    purchase; after `Hire later` it reads `Bike 1 has no driver yet: hire one in the Garage` (step 2 waits for it).
+  - The Garage opening drops an open Warehouse HireSheet (`pm:garageOpening`), so two applicant pickers never stack.
+  - A HireSheet without a caller note shows the pool-refresh countdown `New faces in 0:23` in its title band (the
+    day's re-roll under an open sheet is expected); the buy flow keeps its `Bike $200 + fee` note.
+  - Worker name tags sit above the head, so a card covering a person's feet (the SlotCard at 360 × 604) still shows
+    the name of someone in view.
+- **Gate drift accepted (plan-build2 §8.3 task 11, ±5 %)**: with the people layer on, `level2Min` moved 13.05 → 12.28
+  (−5.9 %) and `truckAfterLevel2MaxMin` 2.10 → 1.93 (−8.1 %); every other playtest-1 row stays within ±5 % and every
+  window passes. Cause, isolated with `--config` runs: the policy hires the fastest of three drivers (speed pips ×1.08 /
+  ×1.15), so trips are shorter; with neutral driver multipliers the rows match the baseline exactly. The R16 lever
+  (`pipWeights` band 1) moved L2 further (−8.8 %) and broke the lives median, so it was not applied; no balance value
+  changed. The delegating policy's lives median is 1 (≤ 1 per B2 §7.3).
+- **UI notes**: m5x7 has no ★ ● ○ ⋯ glyphs, so stars, pips and the row menu are images/rectangles; the HireSheet draws its
+  own refusal bubble (the HUD's tooltip layer sits under the Garage); a closed or slept HireSheet runs no callback
+  (`cancel()` runs `onCancel`); ViewSim lists are cached per `sim.revision`, so HUD event handlers read sim state directly;
+  `?level=N` forces a level only on a fresh game (debug), `?policy=delegating` attaches the delegating policy.
+- **Art (M6)**: 207 PixelLab generations (machines `battery_checker`, `xray`, `sorter_arm`; the ten Low-density uniques,
+  fogged until M9); the four old Low-density scenery rows retired with `decide.ts --retire`; `lr_exact_pin`'s finial is
+  orange (red is reserved for danger, STYLE.md).

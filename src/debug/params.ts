@@ -1,6 +1,11 @@
 // URL params (plan.md §5 "URL params", §6.8). parseParams is pure; params()
 // reads location.search once and resolves the seed (default: a time-based
 // seed chosen in the game layer — the sim itself never reads the clock).
+// M6 (design-m6 §8 G): ?policy=delegating picks the delegating policy kind
+// (any other truthy ?policy= stays competent), and ?level=N (debug only)
+// forces level N on every fresh player's game — Boot's own new sim and each
+// New game — through debug.forceLevel (src/scenes/BootScene.ts).
+import type { PolicyKind } from '../sim/sim.ts'
 
 export type ViewName = 'city' | 'warehouse' | 'gallery'
 
@@ -17,8 +22,17 @@ export interface Params {
   page: number
   /** Sim seconds to run before the first render (cap 1800). */
   fastForward: number
-  /** Drive the sim with the scripted competent policy (src/sim/policy.ts). */
+  /** Drive the sim with the scripted policy (src/sim/policy.ts). */
   policy: boolean
+  /** Which policy ?policy= asks for: 'delegating' for ?policy=delegating, else 'competent'. */
+  policyKind: PolicyKind
+  /**
+   * ?level=N (debug builds): level N forced on a fresh game (sim command
+   * debugForceLevel, so replays stay exact), truncated to an integer; null
+   * when absent, not a number, or below 2. The sim refuses a level past
+   * the last levels.json row (Boot warns).
+   */
+  level: number | null
   /** Install window.__pm, the overlay and 4x speed in a production build. */
   debug: boolean
   mute: boolean
@@ -40,6 +54,9 @@ export const FAST_FORWARD_CAP_S = 1800
 export const GALLERY_PAGES = 4
 
 const VIEWS: readonly ViewName[] = ['city', 'warehouse', 'gallery']
+
+/** The lowest ?level= worth forcing (every game starts at level 1). */
+export const MIN_FORCED_LEVEL = 2
 
 function flag(q: URLSearchParams, name: string): boolean {
   const v = q.get(name)
@@ -71,6 +88,8 @@ export function parseParams(search: string, fallbackSeed: number): Params {
   const audioArg = q.get('audio')
   const attractArg = q.get('attract')
   const config = q.get('config')
+  const levelArg = int(q, 'level')
+  const policyArg = q.get('policy')?.trim().toLowerCase() ?? null
   return {
     seed,
     seedFromUrl,
@@ -79,6 +98,8 @@ export function parseParams(search: string, fallbackSeed: number): Params {
     page,
     fastForward: ff,
     policy: flag(q, 'policy'),
+    policyKind: policyArg === 'delegating' ? 'delegating' : 'competent',
+    level: levelArg !== null && levelArg >= MIN_FORCED_LEVEL ? levelArg : null,
     debug: flag(q, 'debug'),
     mute: flag(q, 'mute'),
     audio: !(audioArg === '0' || audioArg === 'false'),

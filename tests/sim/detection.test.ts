@@ -1,15 +1,21 @@
 // spec §6.3 checkers + §5.4 scripted malware + §5.5 magic (plan.md §12.5
 // task 2): the series compounding examples (inspector + Metal detector =
 // 0.97; metal + shaker + battery machines vs metal = 0.856; + X-ray = 0.957),
-// the desk's parallel stations sharing ONE roll (a 3-inspector desk is still
-// 0.85), pMatch / pOther, decoy flags only on matching checkers (generalists:
+// the desk's parallel stations rolling once per parcel (a desk of three
+// 3-eye inspectors is still 0.85; M6: each with its own p — the charisma
+// bonus per desk), pMatch / pOther, decoy flags only on matching checkers (generalists:
 // any trait), clean parcels without a trait never flagged, a flag diverting at
 // once and skipping downstream checkers, the scripted forced catch and its
 // deferUntilCheckerS rule, magic parcels skipped, debug forceFlagNext.
 
 import { describe, expect, it, vi } from 'vitest'
-import { flagChance, laneCatchRate } from '../../src/sim/detection.ts'
-import type { Checker } from '../../src/sim/types.ts'
+import {
+  flagChance,
+  laneCatchRate,
+  laneRatePerMin,
+} from '../../src/sim/detection.ts'
+import { auditState } from '../../src/sim/sim.ts'
+import type { Checker, Pips } from '../../src/sim/types.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
@@ -18,6 +24,7 @@ import {
   dataFixture,
   eventLog,
   feeder,
+  hireInspector,
   laneParcel,
   makeSim,
   noCheckers,
@@ -30,7 +37,7 @@ import {
 } from './helpers.ts'
 
 const data = dataFixture()
-const deskP = data.employees.inspector.pMatch
+const deskP = data.employees.roles.inspector.p[2] as number
 
 /** A malware parcel's roll inputs. */
 const m = (strain: 'metal' | 'rattle') => ({
@@ -100,8 +107,8 @@ describe('§6.3 series compounding', () => {
   it('a 3-inspector desk is still 0.85: stations buy throughput, never detection', () => {
     const sim = quietSim(1)
     sim.state.economy.balance = 1000
-    sim.dispatch({ kind: 'hireInspector' })
-    sim.dispatch({ kind: 'hireInspector' })
+    hireInspector(sim)
+    hireInspector(sim)
     expect(laneNode(sim.state.lane, 'slot1')?.stations).toHaveLength(3)
     expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(deskP, 10)
   })
@@ -109,8 +116,8 @@ describe('§6.3 series compounding', () => {
   it('desk stations share one roll: 400 metal malware through a 3-inspector desk → one draw each, ~85 % flagged (not 1 − 0.15³)', () => {
     const sim = quietSim(5)
     sim.state.economy.balance = 1000
-    sim.dispatch({ kind: 'hireInspector' })
-    sim.dispatch({ kind: 'hireInspector' })
+    hireInspector(sim)
+    hireInspector(sim)
     const n = 400
     const { flagged, draws } = runParcels(sim, n, {
       malware: true,
@@ -145,7 +152,7 @@ describe('§6.3 the roll', () => {
     expect(flagChance(md, clean('rattle'))).toBeNull()
     expect(flagChance(md, clean(null))).toBeNull()
     expect(flagChance(desk, clean('rattle'))).toEqual({
-      p: data.employees.inspector.decoyFlag,
+      p: data.employees.roles.inspector.decoyFlag[2],
       strain: 'rattle',
     })
     expect(flagChance(desk, clean(null))).toBeNull()
@@ -194,7 +201,7 @@ describe('§6.3 the roll', () => {
     const parcel = sim.state.parcels[String(p.id)]!
     expect(parcel.state).toBe('held')
     expect(parcel.trace.map((t) => t.text ?? t.what)).toEqual([
-      'Slot 1 Inspection desk: flagged (metal)',
+      'Slot 1 desk — Audrey: flagged (metal)',
       'held',
     ])
     expect(sim.state.stats.malwareCaught).toBe(1)
@@ -350,5 +357,101 @@ describe('§5.4 the scripted first malware', () => {
       strain: fs.strain,
       size: fs.size,
     })
+  })
+})
+
+/** The desk in slot 1 with Audrey + two hires of these pips. */
+function crew(pipsA: Pips, pipsB: Pips) {
+  const sim = quietSim(1)
+  sim.state.economy.balance = 10_000
+  expect(hireInspector(sim, pipsA).ok).toBe(true)
+  expect(hireInspector(sim, pipsB).ok).toBe(true)
+  const desk = laneNode(sim.state.lane, 'slot1')!
+  return { sim, desk }
+}
+
+describe('M6 per-inspector detection and charisma (spec-build2 §2.3, Q-B2-5)', () => {
+  it('charisma: two 3-eye inspectors + a charisma-2 colleague → 0.89 each, the leader stays 0.85; the readout is the mean 0.8767', () => {
+    const { sim, desk } = crew(
+      { eye: 3, pace: 3, charisma: 0 },
+      { eye: 3, pace: 3, charisma: 2 },
+    )
+    expect(desk.stations.map((st) => st.p)).toEqual([0.89, 0.89, 0.85])
+    const c = desk.fixture!.checker
+    expect(c.stations).toBe(3)
+    expect(c.pMatch).toBe(0.8767)
+    expect(c.pOther).toBe(0.8767)
+    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(0.8767, 10)
+    expect(createViewSim(sim).laneStats().detectionPct).toBe(88)
+    const people = createViewSim(sim).people()
+    expect(people.map((x) => x.numbers.pEff)).toEqual([0.89, 0.89, 0.85])
+    expect(auditState(sim.state, sim.data)).toEqual([])
+  })
+
+  it('charisma is per desk and only from active colleagues: the leader firing drops the others back to 0.85', () => {
+    const { sim, desk } = crew(
+      { eye: 3, pace: 3, charisma: 0 },
+      { eye: 3, pace: 3, charisma: 2 },
+    )
+    const leader = sim.state.employees.at(-1)!
+    expect(sim.dispatch({ kind: 'fire', employeeId: leader.id }).ok).toBe(true)
+    expect(desk.stations.map((st) => st.p)).toEqual([0.85, 0.85])
+    expect(desk.fixture!.checker.pMatch).toBe(0.85)
+  })
+
+  it('charisma: the cap pCap holds (a 5-eye next to two charisma-2 leaders = 0.96)', () => {
+    const { desk } = crew(
+      { eye: 5, pace: 3, charisma: 2 },
+      { eye: 5, pace: 3, charisma: 2 },
+    )
+    // Audrey 0.85 + 0.08 = 0.93; each 5-eye 0.94 + 0.04 (other leader) = 0.98 → cap 0.96.
+    expect(desk.stations.map((st) => st.p)).toEqual([0.93, 0.96, 0.96])
+  })
+
+  it('charisma: each parcel rolls the processing inspector’s own p (one draw per parcel), and the trace names them', () => {
+    const { sim, desk } = crew(
+      { eye: 1, pace: 3, charisma: 0 },
+      { eye: 3, pace: 3, charisma: 2 },
+    )
+    // Audrey 0.85 + 0.04 = 0.89, the 1-eye 0.75 + 0.04 = 0.79, the leader 0.85.
+    const ps = desk.stations.map((st) => st.p)
+    expect(ps).toEqual([0.89, 0.79, 0.85])
+    const spy = vi.spyOn(sim.rng, 'chance')
+    laneNode(sim.state.lane, 'hold')!.cap = null
+    const parcels = [0, 1, 2].map(() =>
+      laneParcel(sim, 'slot1', { malware: true, strain: 'metal' }),
+    )
+    runTicks(sim, 60)
+    expect(spy.mock.calls.map((c) => c[0]).toSorted()).toEqual(
+      [0.79, 0.85, 0.89].toSorted(),
+    )
+    spy.mockRestore()
+    for (const p of parcels) {
+      const t = p.trace.find((x) => x.chk !== undefined)!
+      const st = desk.stations.find((x) => x.employeeId === t.by)!
+      expect(t.p).toBe(st.p)
+      const name = sim.state.employees.find((e) => e.id === t.by)!.name
+      expect(t.who).toBe(name)
+      expect(t.text).toMatch(new RegExp(`^Slot 1 desk — ${name}: `))
+    }
+  })
+
+  it('lane rate = Σ stations 1 / process time: 3 × 4 s = 45/min; a 5-pace + a 1-pace inspector = 20 + 12 = 32/min', () => {
+    const { sim } = crew(
+      { eye: 3, pace: 3, charisma: 0 },
+      { eye: 3, pace: 3, charisma: 0 },
+    )
+    expect(laneRatePerMin(sim.state.lane, sim.data)).toBeCloseTo(45, 10)
+    const b = quietSim(1)
+    b.state.economy.balance = 1000
+    expect(
+      b.dispatch({ kind: 'fire', employeeId: b.state.employees[0]!.id }).ok,
+    ).toBe(true)
+    hireInspector(b, { eye: 3, pace: 5, charisma: 0 })
+    hireInspector(b, { eye: 3, pace: 1, charisma: 0 })
+    expect(
+      laneNode(b.state.lane, 'slot1')!.stations.map((st) => st.processTicks),
+    ).toEqual([30, 50])
+    expect(laneRatePerMin(b.state.lane, b.data)).toBeCloseTo(32, 10)
   })
 })

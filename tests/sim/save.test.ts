@@ -1,7 +1,7 @@
 // plan.md §6.4 "Save and load" + §6.9.1 save.test: snapshot → JSON → load →
 // deep-equal; 600 ticks after a load = the uninterrupted run; no non-JSON
 // values; version + dataHash gate (no migrations, R9; build 2 = version 2,
-// `pm.save.v2`, spec-build2 §8). Also pins the M0 sim
+// M6 = version 3 under the same `pm.save.v2` key, spec-build2 §8). Also pins the M0 sim
 // skeleton the save format rests on: the spec §7.1 start state, the tick
 // clock + day boundary, and the "handlers never dispatch" rule.
 
@@ -39,7 +39,7 @@ import {
 /** A game a little past its first day boundary, with commands in the log. */
 function playedSim(seed = 7): Sim {
   const sim = makeSim(seed)
-  openingA(sim)
+  openingA(sim, 'pool') // replay-safe: the driver comes from the rolled pool
   runSeconds(sim, 75)
   return sim
 }
@@ -80,16 +80,15 @@ describe('save round trip (plan.md §6.4)', () => {
       skipped: false,
       sawFirstFlag: true,
       sawTossHint: false,
-      wanted: ['evil-lodash'],
     }
     const text = serialise(sim, { savedAt: 1234, build: 'test', onboarding })
     const payload = deserialise(text)
     expect(SAVE_KEY).toBe('pm.save.v2')
-    expect(SAVE_VERSION).toBe(2)
-    expect(STATE_VERSION).toBe(2)
-    expect(payload.version).toBe(2)
-    expect(payload.state.version).toBe(2)
-    expect(sim.snapshot().version).toBe(2)
+    expect(SAVE_VERSION).toBe(3)
+    expect(STATE_VERSION).toBe(3)
+    expect(payload.version).toBe(3)
+    expect(payload.state.version).toBe(3)
+    expect(sim.snapshot().version).toBe(3)
     expect(payload.dataHash).toBe(sim.data.hash)
     expect(payload.onboarding).toEqual(onboarding)
     expect(isCompatible(payload, dataFixture())).toBe(true)
@@ -104,7 +103,8 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(retuned.hash).not.toBe(payload.dataHash)
     expect(isCompatible(payload, retuned)).toBe(false)
     expect(isCompatible({ ...payload, version: 1 }, dataFixture())).toBe(false)
-    expect(isCompatible({ ...payload, version: 3 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 2 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 4 }, dataFixture())).toBe(false)
     expect(() => Sim.load(retuned, payload)).toThrow(SimLoadError)
     expect(
       Sim.load(retuned, payload, { ignoreDataHash: true }).state.tick,
@@ -113,7 +113,7 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(() => deserialise('{"version":2}')).toThrow(SaveError)
   })
 
-  it('save v2 rejects a v1 snapshot (plan.md R9: no migrations)', () => {
+  it('save v3 rejects a v1 snapshot (plan.md R9: no migrations) — and an M5 v2 one', () => {
     const sim = playedSim()
     // A build-1 save: the same shape, version 1 on the payload and the state.
     const v1 = structuredClone(sim.snapshot()) as unknown as {
@@ -130,17 +130,19 @@ describe('save round trip (plan.md §6.4)', () => {
     }
     expect(err).toBeInstanceOf(SimLoadError)
     const problems = (err as SimLoadError).problems
-    expect(problems).toContain('version: 1 ≠ 2')
-    expect(problems).toContain('state.version: 1 ≠ 2')
-    // validate.ts accepts version 2 only: a v1 state inside a v2 envelope
-    // is still refused, and so is a v2 state inside a v1 envelope.
+    expect(problems).toContain('version: 1 ≠ 3')
+    expect(problems).toContain('state.version: 1 ≠ 3')
+    // validate.ts accepts version 3 only: a v1 state inside a v3 envelope
+    // is still refused, and so is a v3 state inside a v1 envelope.
     const innerV1 = structuredClone(sim.snapshot()) as unknown as {
       state: { version: number }
     }
     innerV1.state.version = 1
     expect(() => Sim.load(dataFixture(), innerV1)).toThrow(/state.version/)
     const outerV1 = { ...sim.snapshot(), version: 1 }
-    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 2/)
+    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 3/)
+    const m5 = { ...sim.snapshot(), version: 2 }
+    expect(() => Sim.load(dataFixture(), m5)).toThrow(/version: 2 ≠ 3/)
     // The payload layer refuses it before Sim.load: deserialise throws.
     const text = serialise(sim, { savedAt: 0, build: 'build-1' })
     const p = JSON.parse(text) as {
@@ -151,7 +153,7 @@ describe('save round trip (plan.md §6.4)', () => {
     p.state.version = 1
     expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
     expect(isCompatible(p, dataFixture())).toBe(false)
-    // A v2 snapshot of the same run loads.
+    // A v3 snapshot of the same run loads.
     expect(Sim.load(dataFixture(), sim.snapshot()).state.tick).toBe(
       sim.state.tick,
     )
@@ -211,7 +213,11 @@ describe('save round trip (plan.md §6.4)', () => {
   it('mid-lane M2 save (stations mid-process, a full Hold Bay and a stalled flag, a lost-life report, a pending debug flag) → JSON → load → 600 ticks = the uninterrupted run', () => {
     const live = makeSim(6)
     openingA(live)
-    live.dispatch({ kind: 'buyVehicle', type: 'bike' })
+    live.dispatch({
+      kind: 'buyVehicle',
+      type: 'bike',
+      applicantId: live.state.applicants.driver[0]!.id,
+    })
     const vs = createViewSim(live, { debug: true })
     expect(vs.debug?.forceMalwareDelivery()).toEqual({ ok: true })
     runSeconds(live, 150)
@@ -274,16 +280,33 @@ describe('save round trip (plan.md §6.4)', () => {
             defId: 'metal_detector',
             nodeId: pick(slots)!,
           }
-        if (k < 0.54) return { kind: 'placeDesk', nodeId: pick(slots)! }
-        if (k < 0.62) return { kind: 'hireInspector' }
+        if (k < 0.54)
+          return {
+            kind: 'placeDesk',
+            nodeId: pick(slots)!,
+            index: pick([1, 1, 2])!,
+          }
+        if (k < 0.62) {
+          // M6: the pool's first inspector applicant (replay-safe).
+          const hiree = s.applicants.inspector[0]
+          return hiree
+            ? {
+                kind: 'hire',
+                role: 'inspector',
+                applicantId: hiree.id,
+                target: { nodeId: pick(slots)! },
+              }
+            : null
+        }
         if (k < 0.66) {
-          const e = pick(s.employees.filter((x) => x.kind === 'inspector'))
-          return e ? { kind: 'fireInspector', employeeId: e.id } : null
+          const e = pick(s.employees.filter((x) => x.role === 'inspector'))
+          return e ? { kind: 'fire', employeeId: e.id } : null
         }
         if (k < 0.74)
           return {
             kind: 'buyVehicle',
             type: pick(['bike', 'bike', 'van'] as const)!,
+            applicantId: pick([...s.applicants.driver.map((x) => x.id), null])!,
           }
         if (k < 0.78) {
           const v = pick(s.vehicles)
@@ -415,14 +438,18 @@ describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {
     expect(node('hold')?.next).toEqual(['shelf', 'bin'])
     const desk = node('slot1')?.fixture
     expect(desk?.kind).toBe('desk')
-    expect(desk?.checker.processTicks).toBe(d.employees.inspector.processS * 10)
+    expect(desk?.checker.processTicks).toBe(
+      d.employees.roles.inspector.processS[2]! * 10,
+    )
     expect(node('slot1')?.stations).toHaveLength(1)
     expect(s.employees).toMatchObject([
       {
         id: 1,
-        kind: 'inspector',
-        name: d.puns.inspectorNames[0],
+        role: 'inspector',
+        name: d.employees.start.inspector.name,
         nodeId: 'slot1',
+        pips: { eye: 3, pace: 3, charisma: 0 },
+        salaryPerDay: 20,
       },
     ])
     expect(s.lane.docks).toMatchObject([
@@ -445,29 +472,32 @@ describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {
     expect(sim.state.stats.minutes[0]).toMatchObject({
       min: 1,
       tick: 600,
-      money:
-        sim.data.economy.startMoney - sim.data.employees.inspector.salaryPerDay,
+      money: sim.data.economy.startMoney - sim.state.employees[0]!.salaryPerDay,
       lvl: 1,
       lives: 3,
     })
   })
 
-  it('opening A: bike + Metal detector → $100 left, Bike 1, D(metal) = 97% (§6.3)', () => {
+  it('opening A: bike + its driver’s fee + Metal detector → $92 left, Bike 1, D(metal) = 97% (§6.3)', () => {
     const sim = makeSim(1)
     const money = collect(sim, 'money:changed')
     openingA(sim)
-    expect(sim.state.economy.balance).toBe(100)
-    expect(money.map((m) => m.reason)).toEqual(['purchase', 'purchase'])
+    // M6 (design D9): the standard bike driver's hire fee is one day's $8.
+    expect(sim.state.economy.balance).toBe(92)
+    expect(money.map((m) => m.reason)).toEqual(['purchase', 'hire', 'purchase'])
     expect(sim.state.vehicles[0]).toMatchObject({
       name: 'Bike 1',
       state: 'idle_lot',
       zone: 'any',
     })
     const view = createViewSim(sim)
-    expect(view.vehicles[0]?.driverName).toBe(sim.data.puns.driverNames[0])
+    expect(view.vehicles[0]?.driverName).toBe(sim.state.employees[1]!.name)
     expect(view.laneStats().detectionPct).toBe(97)
     expect(view.laneStats().ratePerMin).toBe(15)
-    expect(view.buyVehicle('truck')).toEqual({ ok: false, reason: 'locked' })
+    expect(view.buyVehicle('truck', null)).toEqual({
+      ok: false,
+      reason: 'locked',
+    })
     expect(view.lane.buyMachine('metal_detector', 'slot4')).toEqual({
       ok: false,
       reason: 'slot-locked',
@@ -478,10 +508,10 @@ describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {
   it('handlers never call dispatch (asserted in dev)', () => {
     const sim = makeSim(1)
     sim.events.on('vehicle:bought', () => {
-      sim.dispatch({ kind: 'buyVehicle', type: 'bike' })
+      sim.dispatch({ kind: 'buyVehicle', type: 'bike', applicantId: null })
     })
-    expect(() => sim.dispatch({ kind: 'buyVehicle', type: 'bike' })).toThrow(
-      /handler/,
-    )
+    expect(() =>
+      sim.dispatch({ kind: 'buyVehicle', type: 'bike', applicantId: null }),
+    ).toThrow(/handler/)
   })
 })

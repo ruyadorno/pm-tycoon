@@ -943,10 +943,49 @@ export function processVehicle(
 export const OPENINGS: Record<string, [number, number, number]> = {
   metal_detector: [12, 35, 16],
   shaky_shaker: [12, 35, 16],
+  // build 2 (plan-build2 §6 Machines): the L3/L4 slot checkers straddle the
+  // belt like the detector (warehouse-view §1.3 / §2.3)
+  battery_checker: [12, 35, 16],
+  xray: [12, 35, 16],
 }
 
 /** machines whose extra frames shake the sprite ±1 px (placeholder rule) */
 export const SHAKE_IDS = new Set(['shaky_shaker'])
+
+/**
+ * fixtures whose extra frames swing the upper part (build 2: the Sorter Arm,
+ * B2 §2.6): _f0 rest = the generated image, _f1 leans its upper ~60 %
+ * toward -x (reach for the rack), _f2 toward +x (toss to the bin) — a row
+ * shear growing to SWING_PX at the top, 0 at the pivot row, so the
+ * pedestal stays put; no extra generation (scripted like the worker's scan
+ * pose).
+ */
+export const SWING_IDS = new Set(['sorter_arm'])
+export const SWING_PX = 3
+
+/**
+ * Shear the rows above `pivot` by up to `d` px at the sprite's top row
+ * (linear, 0 at the pivot): a cheap swing that keeps the base fixed.
+ * Pixels pushed off the canvas are dropped.
+ */
+export function lean(img: Img, pivot: number, d: number): Img {
+  const b = bbox(img)
+  const out = newImg(img.w, img.h)
+  if (!b) return out
+  const span = Math.max(1, pivot - b.y0)
+  for (let y = 0; y < img.h; y++) {
+    const s = y >= pivot ? 0 : Math.round((d * (pivot - y)) / span)
+    for (let x = 0; x < img.w; x++) {
+      const i = img.px[y * img.w + x] as number
+      if (i < 0) continue
+      const tx = x + s
+      if (tx < 0 || tx >= img.w) continue
+      out.px[y * img.w + tx] = i
+      out.depth[y * img.w + tx] = 0
+    }
+  }
+  return out
+}
 
 /** light-strip colours: idle (f0) = blue, scanning (f1) = yellow */
 const STRIP_RAMPS = new Set(['blue', 'yellow', 'grass', 'leaf', 'orange'])
@@ -1117,7 +1156,18 @@ export function processMachine(e: ManifestEntry, src: Img): Processed {
   const top = open ? open[2] : Math.floor(H / 3)
   const f0 = finishImg(e, base)
   const frames = new Map<string, Img>()
-  if (SHAKE_IDS.has(e.id)) {
+  if (SWING_IDS.has(e.id)) {
+    // _f0 rest, _f1 lean -x, _f2 lean +x (re-outlined: the shear exposes
+    // inner pixels on the silhouette's steps)
+    const bb = bbox(f0)
+    const pivot = bb ? bb.y0 + Math.round(0.6 * (bb.y1 - bb.y0)) : H
+    const room = bb ? Math.min(SWING_PX, bb.x0, W - 1 - bb.x1) : 0
+    e.frames.forEach((s, i) => {
+      const d = [0, -room, room][i] ?? 0
+      frames.set(s, d === 0 ? f0 : finishImg(e, lean(f0, pivot, d)))
+    })
+    notes.push(`swing: pivot row ${pivot}, f1 -${room} px, f2 +${room} px`)
+  } else if (SHAKE_IDS.has(e.id)) {
     // _f0 idle, _f1 shake left, _f2 shake right (whole sprite, 1 px)
     const shake = [0, -1, 1]
     e.frames.forEach((s, i) => {

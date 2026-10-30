@@ -6,12 +6,7 @@
 import { canonicalJson, fnv1a32 } from '../data/index.ts'
 import type { GameData, LevelDef } from '../data/types.ts'
 import type { Command, CommandLogEntry, CommandResult } from './commands.ts'
-import {
-  applyCommand,
-  deskChecker,
-  hireEmployee,
-  isCommand,
-} from './commands.ts'
+import { applyCommand, deskChecker, isCommand } from './commands.ts'
 import { createSimEmitter } from './events.ts'
 import type {
   MoneyReason,
@@ -24,11 +19,21 @@ import { pathfinder, type Pathfinder } from './astar.ts'
 import { Rng, seedWord } from './rng.ts'
 import { roadGraph, type RoadGraph } from './roads.ts'
 import { isSoldInbound } from './systems/lane.ts'
+import {
+  effectiveP,
+  inspectorNumbers,
+  PEOPLE_RNG_SALT,
+  ROLES,
+  salaryOf,
+  startApplicants,
+  syncDesk,
+} from './systems/people.ts'
 import { runTick } from './tick.ts'
 import { stateShapeProblems } from './validate.ts'
 import type {
   District,
   Building,
+  Employee,
   Lane,
   LaneNode,
   SimState,
@@ -75,7 +80,8 @@ export interface Policy {
   step(): void
   dispose?(): void
 }
-export type PolicyKind = 'competent'
+/** 'delegating' (M6, spec-build2 §7.2): hires a sorter at L2 and Clears what it tags clean. */
+export type PolicyKind = 'competent' | 'delegating'
 /** The export src/sim/policy.ts must provide as `createPolicy`. */
 export type PolicyFactory = (sim: Sim, kind: PolicyKind) => Policy
 
@@ -84,6 +90,8 @@ export class Sim {
   readonly events: SimEmitter = createSimEmitter()
   state: SimState
   readonly rng: Rng
+  /** M6: the applicant stream (state.applicants.rng; people.ts, design D1). */
+  readonly peopleRng: Rng
   readonly commandLog: CommandLogEntry[] = []
   /** Bumped by every tick, successful dispatch and load (view caches key on it). */
   revision = 0
@@ -101,6 +109,7 @@ export class Sim {
     this.paths = pathfinder(data)
     this.state = createStartState(data, seed)
     this.rng = new Rng(() => this.state)
+    this.peopleRng = new Rng(() => this.state.applicants)
   }
 
   /** Resume a snapshot (validated: version, data hash, ids, locations). */
@@ -231,7 +240,10 @@ function wholeDollars(amount: number, reason: MoneyReason): number {
 /**
  * The §7.1 start: startMoney, 3 lives, the L1 level row, L1 districts live
  * (satisfaction start, first spawn after firstSpawnDelayS), every building,
- * the generic lane with the pre-hired inspector desk, no vehicles.
+ * the generic lane with the pre-hired inspector desk (desk 1 with the start
+ * inspector, spec-build2 §2.1: Audrey 3/3/0 = playtest 1's 0.85, 4 s, $20),
+ * no vehicles, and the three applicant pools (their own rng stream, rolled
+ * after Audrey so her name never appears in one).
  */
 export function createStartState(data: GameData, seed: number): SimState {
   const L1 = data.levels[0]
@@ -298,6 +310,13 @@ export function createStartState(data: GameData, seed: number): SimState {
     buildings,
     vehicles: [],
     employees: [],
+    applicants: {
+      rng: (seedWord(seed) ^ PEOPLE_RNG_SALT) >>> 0,
+      inspector: [],
+      sorter: [],
+      driver: [],
+    },
+    wanted: [],
     parcels: {},
     lane: buildStartLane(data, L1),
     stats: {
@@ -318,31 +337,48 @@ export function createStartState(data: GameData, seed: number): SimState {
       minutes: [],
     },
     lastLostLife: null,
-    nextId: { parcel: 1, vehicle: 1, employee: 1, checker: 1 },
+    nextId: { parcel: 1, vehicle: 1, employee: 1, checker: 1, applicant: 1 },
   }
 
-  // The pre-hired inspector desk (spec §6.2: slot startSlot, startCount inspectors).
-  const insp = data.employees.inspector
-  const deskId = state.lane.slotNodeIds[insp.startSlot - 1]
+  // The pre-hired inspector desk (desks.rows index 1 in start.inspector.slot)
+  // with the fixed start inspector, hired without an applicant.
+  const start = data.employees.start.inspector
+  const deskId = state.lane.slotNodeIds[start.slot - 1]
   const desk = deskId ? laneNode(state.lane, deskId) : null
   if (!desk || desk.locked) {
     throw new Error(
-      `employees.inspector.startSlot ${insp.startSlot}: no live slot`,
+      `employees.start.inspector.slot ${start.slot}: no live slot`,
     )
   }
-  const fixture = {
-    kind: 'desk' as const,
-    checker: deskChecker(state, data, 0),
-    inspectorIds: [] as number[],
-    walkedOutIds: [] as number[],
+  const firstDesk = data.employees.desks.rows[0]?.index ?? 1
+  desk.fixture = {
+    kind: 'desk',
+    index: firstDesk,
+    checker: deskChecker(state, data, firstDesk),
+    inspectorIds: [],
+    walkedOutIds: [],
   }
-  desk.fixture = fixture
-  for (let i = 0; i < insp.startCount; i++) {
-    const e = hireEmployee(state, data, 'inspector', { nodeId: desk.id })
-    fixture.inspectorIds.push(e.id)
-    fixture.checker.stations += 1
-    desk.stations.push({ parcelId: null, doneTick: null })
+  const pips = { ...start.pips }
+  const audrey: Employee = {
+    id: state.nextId.employee,
+    role: 'inspector',
+    name: start.name,
+    hiredTick: 0,
+    salaryPerDay: salaryOf(data, 'inspector', pips),
+    unpaidPaydays: 0,
+    active: true,
+    vehicleId: null,
+    nodeId: desk.id,
+    pips,
+    affinity: 'none',
+    look: 0,
+    star: false,
   }
+  state.nextId.employee += 1
+  state.employees.push(audrey)
+  desk.fixture.inspectorIds.push(audrey.id)
+  syncDesk({ state, data }, desk)
+  startApplicants(state, data)
   return state
 }
 
@@ -417,7 +453,7 @@ function buildStartLane(data: GameData, L1: LevelDef): Lane {
     stallSinceTick: null,
     stallSecondsToday: 0,
     quarantine: { count: 0, malware: 0, clean: 0 },
-    sorterArm: false,
+    holdStation: { fixture: null, nextDecisionTick: null },
     dockQueue: [],
   }
 }
@@ -552,7 +588,7 @@ export function auditState(state: SimState, data: GameData): string[] {
     // — a dock unload needs room, so the rest never exceed the cap.
     const slack =
       n.kind === 'slot'
-        ? data.employees.inspector.maxPerDesk
+        ? data.employees.desks.maxPerDesk
         : n.kind === 'conveyor'
           ? n.queue.filter((id) => {
               const p = state.parcels[String(id)]
@@ -613,6 +649,7 @@ export function auditState(state: SimState, data: GameData): string[] {
       add(`employees.${e.id}.nodeId: unknown node ${e.nodeId}`)
     }
   }
+  auditPeople(state, data, add)
 
   // Every live parcel in exactly one place; no dangling ids.
   const seen: Record<string, number> = {}
@@ -658,6 +695,144 @@ export function auditState(state: SimState, data: GameData): string[] {
   const c = conservation(state)
   if (!c.ok) add(`conservation: ${formatConservation(c)}`)
   return out
+}
+
+/** A station number that differs from a fresh computation (± 1e-9). */
+const differs = (a: number | undefined, b: number): boolean =>
+  a === undefined || Math.abs(a - b) > 1e-9
+
+/**
+ * The M6 people relations (design §2.4): desk crews ↔ stations (numbers
+ * equal to a fresh syncDesk), every inspector on exactly one desk, the Hold
+ * Bay station ↔ its sorter, every driver at the wheel or pending, the
+ * applicant pools.
+ */
+function auditPeople(
+  state: SimState,
+  data: GameData,
+  add: (m: string) => void,
+): void {
+  const lane = state.lane
+  const byId = (id: number): Employee | null =>
+    state.employees.find((e) => e.id === id) ?? null
+  const seated: Record<string, number> = {}
+  const deskIndexes: number[] = []
+  const rows = data.employees.desks.rows.map((r) => r.index)
+  for (const n of lane.nodes) {
+    const f = n.fixture
+    if (f?.kind === 'machine') {
+      n.stations.forEach((st, i) => {
+        if (st.employeeId !== undefined) {
+          add(
+            `lane.${n.id}.stations[${i}]: a machine station names an inspector`,
+          )
+        }
+      })
+      continue
+    }
+    if (f?.kind !== 'desk') continue
+    if (deskIndexes.includes(f.index)) {
+      add(`lane.${n.id}: desk index ${f.index} placed twice`)
+    }
+    deskIndexes.push(f.index)
+    if (!rows.includes(f.index)) {
+      add(`lane.${n.id}: desk index ${f.index} is not a desks.rows index`)
+    }
+    if (n.stations.length !== f.inspectorIds.length) {
+      add(
+        `lane.${n.id}: ${n.stations.length} stations ≠ ${f.inspectorIds.length} inspectors`,
+      )
+    }
+    const crew = f.inspectorIds.map(byId)
+    f.inspectorIds.forEach((id, i) => {
+      const e = crew[i] ?? null
+      seated[String(id)] = (seated[String(id)] ?? 0) + 1
+      if (!e || e.role !== 'inspector' || !e.active) {
+        add(`lane.${n.id}.inspectorIds: ${id} is not an active inspector`)
+        return
+      }
+      const st = n.stations[i]
+      if (!st || st.employeeId !== id) {
+        add(`lane.${n.id}.stations[${i}]: not inspector ${id}'s station`)
+        return
+      }
+      const colleagues = crew.flatMap((c, j) =>
+        j !== i && c !== null && c.active ? [c.pips] : [],
+      )
+      const own = inspectorNumbers(data, e.pips)
+      const want = effectiveP(data, e.pips, colleagues)
+      if (
+        differs(st.p, want) ||
+        differs(st.decoyFlag, own.decoyFlag) ||
+        differs(st.processTicks, own.processTicks)
+      ) {
+        add(
+          `lane.${n.id}.stations[${i}]: numbers differ from inspector ${id}'s`,
+        )
+      }
+    })
+    for (const id of f.walkedOutIds) {
+      seated[String(id)] = (seated[String(id)] ?? 0) + 1
+      const e = byId(id)
+      if (!e || e.role !== 'inspector' || e.active) {
+        add(`lane.${n.id}.walkedOutIds: ${id} is not a walked-out inspector`)
+      }
+    }
+  }
+  if (deskIndexes.length > rows.length) {
+    add(`lane: ${deskIndexes.length} desks > ${rows.length} desks.rows`)
+  }
+  const hs = lane.holdStation
+  if (typeof hs.fixture === 'number') {
+    const e = byId(hs.fixture)
+    if (!e || e.role !== 'sorter') {
+      add(`lane.holdStation.fixture: ${hs.fixture} is not a sorter`)
+    }
+  }
+  for (const e of state.employees) {
+    if (e.role === 'inspector' && seated[String(e.id)] !== 1) {
+      add(`employees.${e.id}: inspector on ${seated[String(e.id)] ?? 0} desks`)
+    }
+    if (e.role === 'sorter' && hs.fixture !== e.id) {
+      add(`employees.${e.id}: sorter not on the Hold Bay station`)
+    }
+    if (e.role === 'driver') {
+      const v = state.vehicles.find((x) => x.id === e.vehicleId)
+      if (!v || (v.driverId !== e.id && v.nextDriverId !== e.id)) {
+        add(
+          `employees.${e.id}: driver neither drives nor takes over vehicle ${e.vehicleId}`,
+        )
+      }
+    }
+  }
+  for (const v of state.vehicles) {
+    for (const id of [v.driverId, v.nextDriverId]) {
+      if (id === null) continue
+      const e = byId(id)
+      if (!e || e.role !== 'driver' || e.vehicleId !== v.id) {
+        add(`vehicles.${v.id}: ${id} is not this vehicle's driver`)
+      }
+    }
+    if (v.nextDriverId !== null && v.nextDriverId === v.driverId) {
+      add(`vehicles.${v.id}.nextDriverId: equals driverId`)
+    }
+  }
+  const pools = state.applicants
+  const seen: number[] = []
+  for (const role of ROLES) {
+    const pool = pools[role]
+    if (pool.length > data.employees.applicants.poolSize) {
+      add(`applicants.${role}: ${pool.length} > poolSize`)
+    }
+    for (const a of pool) {
+      if (a.role !== role) add(`applicants.${role}: ${a.id} has role ${a.role}`)
+      if (seen.includes(a.id)) add(`applicants: duplicate id ${a.id}`)
+      seen.push(a.id)
+      if (a.id >= state.nextId.applicant) {
+        add(`applicants.${role}: id ${a.id} ≥ nextId.applicant`)
+      }
+    }
+  }
 }
 
 /** Where every spawned parcel is (plan.md §6.9.2 conservation identity). */

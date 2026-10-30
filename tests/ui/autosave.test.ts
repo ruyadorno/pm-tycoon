@@ -1,9 +1,10 @@
 // Autosave and the localStorage keys (plan.md §5 "localStorage keys", §6.4
 // "Save and load"; spec §2 "autosave every 10 s and on hide"; city-view.md
-// §9.5; spec-build2 §8): the payload shape {version: 2, savedAt, build,
-// dataHash, seed, state, onboarding} under pm.save.v2 (pm.save.v2:cfg:<name>
-// in a ?config= session, report-playtest1 §6.13), the Title header `Day 7 ·
-// $1,240 · Lv 2`, Continue only for version 2 + same dataHash (else "Save
+// §9.5; spec-build2 §8): the payload shape {version: SAVE_VERSION (3 since
+// M6), savedAt, build, dataHash, seed, state, onboarding} under pm.save.v2
+// (pm.save.v2:cfg:<name> in a ?config= session, report-playtest1 §6.13), the
+// Title header `Day 7 · $1,240 · Lv 2`, Continue only for the current
+// version + same dataHash (an M5 version-2 payload included; else "Save
 // from an older build was reset", a build-1 pm.save.v1 included), Reset
 // clears every pm.save / pm.playtest key and the settings, settings {muted,
 // speed} merge, and a failed write reports once and retries next cycle.
@@ -37,7 +38,7 @@ import {
   writeSettings,
   type KeyValueStore,
 } from '../../src/boot/autosave.ts'
-import { serialise } from '../../src/sim/save.ts'
+import { SAVE_VERSION, serialise } from '../../src/sim/save.ts'
 import { Sim, stateHash } from '../../src/sim/sim.ts'
 import { freshOnboarding } from '../../src/ui/Onboarding.ts'
 import { dataFixture, makeSim, runSeconds } from '../sim/helpers.ts'
@@ -192,13 +193,18 @@ describe('spec §2: autosave every 10 s of real time and on hide', () => {
         'version',
       ].toSorted(),
     )
-    expect(p.version).toBe(2)
-    expect(p.state.version).toBe(2)
+    // M6 bumped the state shape (design-m6 D18); the key stays pm.save.v2.
+    expect(SAVE_VERSION).toBe(3)
+    expect(p.version).toBe(SAVE_VERSION)
+    expect(p.state.version).toBe(SAVE_VERSION)
     expect(p.build).toBe('test-build')
     expect(p.dataHash).toBe(data.hash)
     expect(p.seed).toBe(sim.state.seed)
     expect(typeof p.savedAt).toBe('number')
     expect(p.onboarding).toEqual({ ...freshOnboarding(), step: 1 })
+    // spec-build2 §2.8: the wanted list rides in the state, not the onboarding.
+    expect(p.onboarding).not.toHaveProperty('wanted')
+    expect(p.state.wanted).toEqual([])
   })
 
   it('the timer saves once 10 s have accumulated, then restarts', () => {
@@ -274,6 +280,14 @@ describe('city-view §9.5 / plan.md §6.4: Title Continue', () => {
     expect(checkSave(JSON.stringify({ ...p, version: 1 }), data).kind).toBe(
       'stale',
     )
+    // An M5 (version 2) save is stale under M6 (design-m6 D18).
+    expect(
+      checkSave(
+        JSON.stringify({ ...p, version: 2, state: { ...p.state, version: 2 } }),
+        data,
+      ).kind,
+    ).toBe('stale')
+    expect(checkSave(JSON.stringify(p), data).kind).toBe('ok')
     expect(STALE_SAVE_TEXT).toBe('Save from an older build was reset')
   })
 
@@ -340,6 +354,22 @@ describe('city-view §9.5 / plan.md §6.4: Title Continue', () => {
     expect(game.sim.state.tick).toBe(sim.state.tick)
     expect(stateHash(game.sim.state)).toBe(stateHash(sim.state))
     expect(game.onboarding.step).toBe(1)
+  })
+
+  it("M6: the run's wanted list comes back with the state; a stored onboarding `wanted` is dropped", () => {
+    const store = new MemoryStore()
+    const sim = makeSim(5)
+    sim.state.wanted.push('evil-lodash')
+    const { saver, ob } = saverFor(store, sim)
+    // An M5-era registry object still carrying the UI-side list.
+    Object.assign(ob, { wanted: ['stale-label'] })
+    expect(saver.save('manual')).toBe(true)
+    const check = readSave(data, store)
+    expect(check.kind).toBe('ok')
+    if (check.kind !== 'ok') return
+    const game = loadGame(data, check.payload)
+    expect(game.sim.state.wanted).toEqual(['evil-lodash'])
+    expect(game.onboarding).not.toHaveProperty('wanted')
   })
 
   it('New game starts the §7.1 state with a fresh tour', () => {

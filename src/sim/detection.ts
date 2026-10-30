@@ -12,14 +12,17 @@
 //   - the scripted first malware (§5.4 forcedCatch): the first checker it
 //     reaches flags it with certainty (no draw);
 //   - a pending debug forceFlagNext flags whatever finishes next (no draw).
-// The desk's 1-3 inspectors are parallel stations; each parcel is still
-// rolled once with the desk's p, so a 3-inspector desk catches 85 % like one
-// (§6.3 "one shared roll"): stations buy throughput, never detection.
+// The desk's 1-3 inspectors are parallel stations; since M6 (spec-build2
+// §2.3) each parcel is rolled once by the inspector who processes it, with
+// that inspector's own p (eye + the same-desk charisma bonus) and decoyFlag
+// (stationChecker) — still one roll per parcel per desk.
 //
 // Readouts (also re-exported by view-api.ts with their M0 signatures):
-// D(s) = 1 − Π(1 − p_i(s)) over the live slots with ≥ 1 station, the lane
-// rate = min over those slots of stations / processTime capped by the docks,
-// and the lost-life report (§10) with its counter-machine "what if".
+// D(s) = 1 − Π(1 − p_i(s)) over the live slots with ≥ 1 station (a desk
+// counts its readout p = the mean of its inspectors' effective p), the lane
+// rate = min over those slots of Σ stations 1 / processTime capped by the
+// docks, and the lost-life report (§10) with its counter-machine "what if" —
+// and (M6) the inspector who missed it and the 5-eye "what if".
 
 import type { CheckerDef, GameData, StrainId } from '../data/types.ts'
 import type { Sim } from './sim.ts'
@@ -30,6 +33,7 @@ import type {
   LostLifeReport,
   Parcel,
   SimState,
+  Station,
   Strain,
   TraceEntry,
 } from './types.ts'
@@ -92,16 +96,35 @@ export function announcedStrains(state: SimState, data: GameData): Strain[] {
 
 /**
  * Lane rate in parcels/min (spec §6.3): min over active checkers of
- * stations / processS, capped by the loading docks (dockUnloadPerS each).
+ * Σ stations 1 / processS (each inspector at its own pace, spec-build2 §2.3),
+ * capped by the loading docks (dockUnloadPerS each).
  */
 export function laneRatePerMin(lane: Lane, data: GameData): number {
   const dockCap = lane.docks.length * data.vehicles.dockUnloadPerS * 60
   let rate = dockCap
   for (const { node, c } of activeCheckers(lane)) {
-    const perMin = (node.stations.length * 60 * TICKS_PER_S) / c.processTicks
+    let perMin = 0
+    for (const st of node.stations) {
+      perMin += (60 * TICKS_PER_S) / (st.processTicks ?? c.processTicks)
+    }
     rate = Math.min(rate, perMin)
   }
   return rate
+}
+
+/**
+ * The checker one station rolls with: a machine's own; at a desk the same
+ * Checker (same id: one roll per parcel per desk) with the processing
+ * inspector's effective p and decoyFlag (people.ts syncDesk).
+ */
+export function stationChecker(c: Checker, st: Station): Checker {
+  if (c.kind !== 'desk' || st.p === undefined) return c
+  return {
+    ...c,
+    pMatch: st.p,
+    pOther: st.p,
+    decoyFlag: st.decoyFlag ?? c.decoyFlag,
+  }
 }
 
 /** A Checker built from a machines.json row (bought now, or a "what if"). */
@@ -181,7 +204,9 @@ export function checkerName(data: GameData, c: Checker): string {
 /**
  * The trace entry of a parcel leaving a slot (one per slot, ref = node id):
  * 'empty' (no station), 'skipped' (magic), 'flagged', 'missed' (malware not
- * flagged — with the checker's p vs its strain) or 'passed' (clean).
+ * flagged — with the checker's p vs its strain) or 'passed' (clean). At a
+ * desk (M6) `who` names the inspector: "Slot 1 desk — Lin: missed (80% vs
+ * metal)", with `by` / `who` on the entry.
  */
 export function slotResultEntry(
   data: GameData,
@@ -190,21 +215,33 @@ export function slotResultEntry(
   c: Checker | null,
   p: Parcel,
   flagged: Strain | null,
+  who?: { id: number; name: string },
 ): TraceEntry {
   const where = slotLabel(node.id)
   if (c === null) {
     return { tick, what: 'empty', ref: node.id, text: `${where}: empty` }
   }
-  const name = `${where} ${checkerName(data, c)}`
+  const name = who
+    ? `${where} desk — ${who.name}`
+    : `${where} ${checkerName(data, c)}`
+  const person: Pick<TraceEntry, 'by' | 'who'> = who
+    ? { by: who.id, who: who.name }
+    : {}
   if (p.magic) {
-    return { tick, what: 'skipped', ref: node.id, text: `${name}: skipped` }
+    return {
+      tick,
+      what: 'skipped',
+      ref: node.id,
+      text: `${name}: skipped`,
+      ...person,
+    }
   }
   // The checker that rolled, and (malware) its p vs the strain — §10's
   // "your lane's catch rate was N %" is the D this parcel actually faced.
-  const rolled: Pick<TraceEntry, 'chk' | 'p'> =
+  const rolled: Pick<TraceEntry, 'chk' | 'p' | 'by' | 'who'> =
     p.malware && p.strain !== null
-      ? { chk: c.id, p: checkerP(c, p.strain) }
-      : { chk: c.id }
+      ? { chk: c.id, p: checkerP(c, p.strain), ...person }
+      : { chk: c.id, ...person }
   if (flagged !== null) {
     return {
       tick,
@@ -357,6 +394,36 @@ export function lostLifeReport(
         ? null
         : laneCatchRate(lane, strain, [counter])
   }
+  // M6 (spec-build2 §2.3): the inspector whose desk roll missed it, and the
+  // faced rate with a 5-eye inspector in that seat instead (design D14).
+  const missed = p.trace.findLast(
+    (t) => t.what === 'missed' && t.who !== undefined,
+  )
+  const missedBy =
+    missed !== undefined &&
+    missed.by !== undefined &&
+    missed.who !== undefined &&
+    missed.ref !== null &&
+    missed.p !== undefined
+      ? {
+          employeeId: missed.by,
+          name: missed.who,
+          nodeId: missed.ref,
+          p: missed.p,
+        }
+      : null
+  let inspectorRate: number | null = null
+  if (faced !== null && strain !== null && missed && missedBy) {
+    const p5 = fiveEyeP(s, data, missedBy.employeeId, missedBy.nodeId)
+    const e = s.employees.find((x) => x.id === missedBy.employeeId)
+    const eye = e?.pips.eye
+    const better = eye !== undefined ? eye < 5 : missedBy.p < p5
+    if (better) {
+      inspectorRate = compound(
+        faced.map((x) => (x.chk === missed.chk ? p5 : x.p)),
+      )
+    }
+  }
   return {
     tick: s.tick,
     parcelId: p.id,
@@ -378,7 +445,63 @@ export function lostLifeReport(
     clearedByPlayerAt: cleared ? cleared.tick : null,
     livesLeft: s.economy.lives,
     viaClearance,
+    missedBy,
+    inspectorRate,
+    // The sorter's `looks clean` call, when the player could see it
+    // (employees.json roles.sorter.tagsClean).
+    sorterCall:
+      p.sorted && data.employees.roles.sorter.tagsClean
+        ? { name: p.sorted.name, pct: p.sorted.pct }
+        : null,
   }
+}
+
+/**
+ * A 5-eye inspector's effective p in `employeeId`'s seat now: p[eye 5] + the
+ * charisma bonus of the other active inspectors at that desk (the desk that
+ * seats them, else the one at `nodeId`), ≤ pCap, 4 dp (people.ts effectiveP).
+ */
+function fiveEyeP(
+  s: SimState,
+  data: GameData,
+  employeeId: number,
+  nodeId: string,
+): number {
+  const r = data.employees.roles.inspector
+  const desk =
+    s.lane.nodes.find(
+      (n) =>
+        n.fixture?.kind === 'desk' &&
+        (n.fixture.inspectorIds.includes(employeeId) ||
+          n.fixture.walkedOutIds.includes(employeeId)),
+    ) ?? laneNode(s.lane, nodeId)
+  let p = r.p[4] ?? 0
+  if (desk?.fixture?.kind === 'desk') {
+    for (const id of desk.fixture.inspectorIds) {
+      if (id === employeeId) continue
+      const c = s.employees.find((x) => x.id === id)
+      if (c?.active) p += r.charismaBonus[c.pips.charisma ?? 0] ?? 0
+    }
+  }
+  return Math.round(Math.min(r.pCap, p) * 1e4) / 1e4
+}
+
+/**
+ * Which "what if" the lost-life card shows (spec-build2 §2.3, design D14):
+ * the 5-eye inspector line only when it strictly beats the counter machine
+ * (by the shown %; machine first on ties), else the machine when there is
+ * one, else none.
+ */
+export function counterChoice(
+  r: Pick<LostLifeReport, 'inspectorRate' | 'counterRate'>,
+): 'machine' | 'inspector' | null {
+  if (
+    r.inspectorRate !== null &&
+    (r.counterRate === null || pct(r.inspectorRate) > pct(r.counterRate))
+  ) {
+    return 'inspector'
+  }
+  return r.counterRate !== null ? 'machine' : null
 }
 
 /**

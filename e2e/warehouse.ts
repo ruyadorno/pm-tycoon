@@ -2,19 +2,24 @@
 // §6.9.3, warehouse-view.md §1.1 / §7.5). Room geometry comes from the
 // pure layout module (src/render/warehouse/RoomLayout.ts), so the specs tap
 // the same rects the scene hit-tests; scene / HUD internals are read through
-// casts like the M1 specs do.
+// casts like the M1 specs do. M6 (design-m6 §6.1-§6.2): the Hold Bay station
+// (HOLD_STATION_HIT, the sorter's SORTER_STAND, the rack lamp's S badge),
+// the StationCard and the HireSheet (Warehouse id `wh:hire`, Garage id
+// `garage:hire`; its cards are `<id>:card:<i>`) join openSheet / hireSheet.
 import type { Page } from '@playwright/test'
 import {
   bayRect,
   FixedLaneLayout,
+  HOLD_STATION_HIT,
   ROOM_H,
   ROOM_W,
+  SORTER_STAND,
   type Rect,
 } from '../src/render/warehouse/RoomLayout.ts'
 import { expect, type PmHelpers } from './fixtures.ts'
 
 export const roomLayout = new FixedLaneLayout()
-export { bayRect, ROOM_H, ROOM_W }
+export { bayRect, HOLD_STATION_HIT, ROOM_H, ROOM_W, SORTER_STAND }
 
 /** Where the room sits on screen and the HUD bands around it (logical px). */
 export interface RoomFit {
@@ -196,19 +201,99 @@ export function policyOff(page: Page): Promise<void> {
   })
 }
 
-/** Which warehouse sheet is open ('buy' | 'slot' | 'hold' | null). */
-export function openSheet(page: Page): Promise<'buy' | 'slot' | 'hold' | null> {
+export type WarehouseSheet = 'buy' | 'slot' | 'hold' | 'station' | 'hire'
+
+/**
+ * Which warehouse sheet is open: the HireSheet first (the card that opened
+ * it closed itself), then the BuySheet, a slot's card, the Hold Bay card and
+ * the StationCard; null when none.
+ */
+export function openSheet(page: Page): Promise<WarehouseSheet | null> {
   return page.evaluate(() => {
     const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
       buy: { isOpen(): boolean } | null
       slotCard: { isOpen(): boolean } | null
       holdCard: { isOpen(): boolean } | null
+      stationCard: { isOpen(): boolean } | null
+      hireSheet: { isOpen(): boolean } | null
     }
+    if (wh.hireSheet?.isOpen()) return 'hire'
     if (wh.buy?.isOpen()) return 'buy'
     if (wh.slotCard?.isOpen()) return 'slot'
     if (wh.holdCard?.isOpen()) return 'hold'
+    if (wh.stationCard?.isOpen()) return 'station'
     return null
   })
+}
+
+/** What an open HireSheet shows (null when the scene has none open). */
+export interface HireSheetInfo {
+  id: string
+  role: string
+  /** Applicant ids, card order. */
+  ids: number[]
+  names: string[]
+}
+
+/**
+ * The open HireSheet of scene `key` ('Warehouse': its private `hireSheet`;
+ * 'Garage': the `hireSheet` getter), read through casts.
+ */
+export function hireSheet(
+  page: Page,
+  key: 'Warehouse' | 'Garage',
+): Promise<HireSheetInfo | null> {
+  return page.evaluate((k) => {
+    const sc = window.__pm!.game.scene.getScene(k) as unknown as {
+      hireSheet: {
+        isOpen(): boolean
+        id: string
+        opts: { role: string }
+        cardModels: readonly { id: number; name: string }[]
+      } | null
+    }
+    const hs = sc.hireSheet
+    if (!hs?.isOpen()) return null
+    const cards = hs.cardModels
+    return {
+      id: hs.id,
+      role: hs.opts.role,
+      ids: cards.map((c) => c.id),
+      names: cards.map((c) => c.name),
+    }
+  }, key)
+}
+
+/** A real tap on the Hold Bay station (the StationCard, or the locked tooltip). */
+export function tapStation(page: Page, pm: PmHelpers): Promise<void> {
+  return tapRoomRect(page, pm, HOLD_STATION_HIT)
+}
+
+/**
+ * Visible text of scene `key` (BitmapText / Text, containers walked, the
+ * parents' visibility counted), in display order — card lines for asserts.
+ */
+export function sceneTexts(page: Page, key: string): Promise<string[]> {
+  return page.evaluate((k) => {
+    type Obj = {
+      visible: boolean
+      text?: unknown
+      list?: Obj[]
+    }
+    const scene = window.__pm!.game.scene.getScene(k) as unknown as {
+      children: { list: Obj[] }
+    }
+    const out: string[] = []
+    const walk = (list: readonly Obj[]): void => {
+      for (const o of list) {
+        if (!o.visible) continue
+        if (typeof o.text === 'string' && o.text !== '') out.push(o.text)
+        if (Array.isArray(o.list)) walk(o.list)
+      }
+    }
+    walk(scene.children.list)
+    return out
+  }, key)
 }
 
 /** The world scenes' state as the scene manager reports it. */

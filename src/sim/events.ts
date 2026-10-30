@@ -10,6 +10,8 @@ import type {
   DistrictId,
   Fixture,
   LostLifeReport,
+  Pips,
+  Role,
   Size,
   Strain,
   Tick,
@@ -61,8 +63,21 @@ export interface LifeLostPayload {
   counterOwned: boolean
   counterRate: number | null
   clearedByPlayerAt: Tick | null
+  /** M6 (flat copies of the report's). */
+  missedBy: LostLifeReport['missedBy']
+  inspectorRate: number | null
+  sorterCall: LostLifeReport['sorterCall']
   report: LostLifeReport
 }
+
+/** Who tossed a parcel (M6): the player, the seated sorter, or the Sorter Arm. */
+export type TossSource = 'player' | 'sorter' | 'arm'
+
+/** Why an employee left for good (M6). */
+export type FireReason = 'fired' | 'replaced' | 'deskRemoved'
+
+/** Why an applicant pool changed (M6). */
+export type ApplicantsReason = 'day' | 'ad' | 'hire' | 'star' | 'starLeft'
 
 /** Event name → payload. */
 export interface SimEventPayloads {
@@ -87,8 +102,17 @@ export interface SimEventPayloads {
     scripted: boolean
   }
   'parcel:held': { id: number }
-  /** bounty = $ paid (0 on a wrong Toss). */
-  'parcel:tossed': { id: number; wasMalware: boolean; bounty: number }
+  /**
+   * bounty = $ paid (0 on a wrong Toss); source = who tossed (M6), with the
+   * sorter's Employee id (null for the player and the Arm).
+   */
+  'parcel:tossed': {
+    id: number
+    wasMalware: boolean
+    bounty: number
+    source: TossSource
+    employeeId: number | null
+  }
   'parcel:shelved': { id: number }
   'parcel:cleared_by_player': { id: number }
   'parcel:returned': { id: number }
@@ -125,19 +149,42 @@ export interface SimEventPayloads {
   'payroll:short': { employeeIds: number[] }
   'worker:hired': {
     employeeId: number
-    kind: 'inspector' | 'driver'
+    role: Role
     nodeId: string | null
+    vehicleId: number | null
+    pips: Pips
+    star: boolean
+    /** A walked-out worker back (payroll.ts rehire). */
+    rehire: boolean
   }
   'worker:walkedOut': {
     employeeId: number
-    kind: 'inspector' | 'driver'
+    role: Role
     nodeId: string | null
+    vehicleId: number | null
   }
   'worker:fired': {
     employeeId: number
-    kind: 'inspector' | 'driver'
+    role: Role
     nodeId: string | null
+    vehicleId: number | null
+    reason: FireReason
   }
+  /** M6: an applicant pool changed (re-render the HireSheet). */
+  'applicants:refreshed': { role: Role; reason: ApplicantsReason }
+  /**
+   * M6: the seated sorter made a call. `correct` is for the report / tests
+   * only — the UI never shows it.
+   */
+  'sorter:decided': {
+    parcelId: number
+    employeeId: number
+    call: 'toss' | 'leave'
+    correct: boolean
+    viaWanted: boolean
+  }
+  /** M6: a desk (employees.json desks.rows index) was placed. */
+  'desk:placed': { index: number; nodeId: string }
   // progress
   'level:up': { level: number }
   'region:unlocked': { district: DistrictId }
@@ -252,6 +299,9 @@ export const SIM_EVENT_NAMES = [
   'worker:hired',
   'worker:walkedOut',
   'worker:fired',
+  'applicants:refreshed',
+  'sorter:decided',
+  'desk:placed',
   'level:up',
   'region:unlocked',
   'life:lost',

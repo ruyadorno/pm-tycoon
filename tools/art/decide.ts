@@ -32,7 +32,10 @@
 // retired[] (its gen[] / rejects[] kept for provenance, the reason = its
 // last reject) and deletes its finals (base + variants). Run after
 // `vlr art:reject -- <id> "<reason>"` and with the replacement rows added,
-// so every building stays covered (A13).
+// so every building stays covered (A13). `--reason "<text>"` (build 2 M6)
+// retires a superseded entry that nobody rejected — the shared Low-density
+// scenery replaced by one unique sprite per building (B2 §6.5) — with that
+// reason and no reject record (its candidate was never judged wrong).
 
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -196,36 +199,45 @@ function intoManifest(decisions: Record<string, Decision>): void {
   writeFileSync(SCORES, `${JSON.stringify(scores, null, 1)}\n`)
 }
 
-function retireIds(specs: string[]): void {
+function retireIds(specs: string[], why: string | null = null): void {
   const m = loadManifest()
   for (const spec of specs) {
     const [id, repl] = spec.split('=') as [string, string | undefined]
     const e = getEntry(m, id)
-    const last = e.rejects.at(-1)
-    if (!last) throw new Error(`decide: --retire ${id}: reject it first`)
+    const reason = why ?? e.rejects.at(-1)?.reason
+    if (!reason) {
+      throw new Error(`decide: --retire ${id}: reject it first (or --reason)`)
+    }
     const files = retiredFinals(e)
-    retire(m, id, last.reason, repl ? repl.split(',') : [])
+    retire(m, id, reason, repl ? repl.split(',') : [])
     let n = 0
     for (const f of files) {
       if (!existsSync(f)) continue
       rmSync(f)
       n++
     }
-    console.log(`decide: retired ${id} (${last.reason}); ${n} finals deleted`)
+    console.log(`decide: retired ${id} (${reason}); ${n} finals deleted`)
   }
   saveManifest(m)
 }
 
 const args = process.argv.slice(2)
 if (args[0] === '--retire' && args.length > 1) {
-  retireIds(args.slice(1))
+  const rest = args.slice(1)
+  const r = rest.indexOf('--reason')
+  const why = r >= 0 ? (rest[r + 1] ?? null) : null
+  if (r >= 0 && !why) {
+    console.error('decide: --reason needs a text')
+    process.exit(1)
+  }
+  retireIds(r >= 0 ? rest.filter((_, i) => i !== r && i !== r + 1) : rest, why)
 } else {
   const manifest = args[0] === '--manifest'
   const file = manifest ? args[1] : args[0]
   if (!file) {
     console.error(
       'usage: node tools/art/decide.ts [--manifest] <decisions.json> | ' +
-        '--retire <id>[=<new>,…] …',
+        '--retire <id>[=<new>,…] … [--reason "<text>"]',
     )
     process.exit(1)
   }

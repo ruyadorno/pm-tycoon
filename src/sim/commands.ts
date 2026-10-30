@@ -2,20 +2,27 @@
 // validates the shape (isCommand), runs the handler — which validates the
 // rules and applies the change immediately, or returns a stable failure
 // reason without touching state or the rng — and logs successful commands.
-// Build-2 commands (buyDock, acceptQuest) return 'locked'. A handler that changes
-// state while reporting a failure marks it `applied` (logged for replay).
-// The three `debug*` kinds back ViewSim.debug (debug builds only; logged
-// like any command, so __pm.replay stays exact).
+// Build-2 commands not built yet (buyDock, acceptQuest) return 'locked'. A
+// handler that changes state while reporting a failure marks it `applied`
+// (logged for replay). The `debug*` kinds back ViewSim.debug (debug builds
+// only; logged like any command, so __pm.replay stays exact).
+// M6 people (spec-build2 §2, §8; design-m6 §3.1): hire / fire / postAd,
+// buyVehicle with the picked driver (or null = "Hire later"), placeDesk with
+// a desks.rows index, touchHeld (the sorter's player grace), the Sorter Arm
+// in the Hold Bay station (buyMachine / removeFixture on the Hold Bay node)
+// and debugForceLevel. Commands draw only on the applicant stream.
 
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import { machineChecker } from './detection.ts'
 import type { Sim } from './sim.ts'
 import type {
+  Applicant,
   BuildingId,
   Checker,
-  Employee,
   Fixture,
+  HireTarget,
   LaneNode,
+  Role,
   SimState,
   Strain,
   Tick,
@@ -23,7 +30,7 @@ import type {
   VehicleType,
   Zone,
 } from './types.ts'
-import { laneNode, ticksFromS } from './types.ts'
+import { laneNode } from './types.ts'
 import { applyRush } from './systems/dispatch.ts'
 import { debugMalwareDelivery } from './systems/economy.ts'
 import {
@@ -32,29 +39,44 @@ import {
   isHeld,
   tossParcel,
 } from './systems/holdbay.ts'
-import {
-  fireInspector,
-  moveFixture,
-  placeFixture,
-  removeFixture,
-} from './systems/lane.ts'
+import { moveFixture, placeFixture, removeFixture } from './systems/lane.ts'
+import { forceLevel } from './systems/levels.ts'
 import { rehire, rehireFee } from './systems/payroll.ts'
+import {
+  fireEmployee,
+  hireApplicant,
+  hireFeeOf,
+  inspectorNumbers,
+  refreshPool,
+  restartSorterClock,
+  ROLES,
+} from './systems/people.ts'
+import { playerGraceTicks, SORTER_ARM_ID } from './systems/sorter.ts'
 import { parkingTile, sellVehicle } from './systems/vehicles.ts'
 
 export type Command =
-  | { kind: 'buyVehicle'; type: VehicleType }
+  /** M6: applicantId = the picked driver applicant, null = "Hire later" (no driver, `inactive`). */
+  | { kind: 'buyVehicle'; type: VehicleType; applicantId: number | null }
   | { kind: 'sellVehicle'; id: number }
   | { kind: 'setZone'; id: number; zone: Zone }
   | { kind: 'rush'; buildingId: BuildingId }
+  /** A machines.json checker into a slot, or (M6) the Sorter Arm upgrade into the Hold Bay node. */
   | { kind: 'buyMachine'; defId: string; nodeId: string }
-  | { kind: 'placeDesk'; nodeId: string }
+  /** M6: index = employees.json desks.rows index. */
+  | { kind: 'placeDesk'; nodeId: string; index: number }
   | { kind: 'moveFixture'; from: string; to: string }
   | { kind: 'removeFixture'; nodeId: string }
-  | { kind: 'hireInspector' }
-  | { kind: 'fireInspector'; employeeId: number }
+  /** M6: hire an applicant of `role` into a desk / the Hold Bay station / a vehicle. */
+  | { kind: 'hire'; role: Role; applicantId: number; target: HireTarget }
+  /** M6: any role, active or walked out (frees the seat at once, no refund). */
+  | { kind: 'fire'; employeeId: number }
+  /** M6: reroll one pool now (applicants.adPrice). */
+  | { kind: 'postAd'; role: Role }
   | { kind: 'rehire'; employeeId: number }
   | { kind: 'toss'; parcelId: number }
   | { kind: 'clear'; parcelId: number }
+  /** M6: the player looked at a held parcel (the sorter's player grace, design D3). */
+  | { kind: 'touchHeld'; parcelId: number }
   /** build 2 */
   | { kind: 'buyDock'; index: number }
   | { kind: 'continueWithOneLife' }
@@ -66,6 +88,8 @@ export type Command =
   | { kind: 'debugFillHoldBay' }
   /** Debug builds (ViewSim.debug.forceMalwareDelivery): deliver a malware parcel now (a life). */
   | { kind: 'debugMalwareDelivery' }
+  /** Debug builds (ViewSim.debug.forceLevel): level up to `level` now, past the playtest cap. */
+  | { kind: 'debugForceLevel'; level: number }
 
 export type CommandKind = Command['kind']
 export type CommandOf<K extends CommandKind> = Extract<Command, { kind: K }>
@@ -88,18 +112,24 @@ export const FAIL_REASONS = [
   'desk-exists',
   'shelf-full',
   'locked',
+  'no-applicant',
+  'station-locked',
+  'station-occupied',
+  'desk-locked',
   'invalid',
 ] as const
 export type FailReason = (typeof FAIL_REASONS)[number]
 
 /**
  * A command's result. Additive fields: `vehicleId` on a successful rush (the
- * retargeted vehicle); `applied` on a failure that still changed the state
- * and is logged for replay — a rush with no eligible vehicle keeps its flag
- * (spec §4.1) and reports why ('trucks-only' / 'needs-van' / 'no-vehicle').
+ * retargeted vehicle), buyVehicle (the new vehicle) and a driver hire;
+ * `employeeId` on a hire and on buyVehicle with a driver (M6); `applied` on
+ * a failure that still changed the state and is logged for replay — a rush
+ * with no eligible vehicle keeps its flag (spec §4.1) and reports why
+ * ('trucks-only' / 'needs-van' / 'no-vehicle').
  */
 export type CommandResult =
-  | { ok: true; vehicleId?: number }
+  | { ok: true; vehicleId?: number; employeeId?: number }
   | { ok: false; reason: FailReason; applied?: true }
 
 /** One replayable entry: `cmd` was dispatched while state.tick === tick. */
@@ -113,27 +143,42 @@ const fail = (reason: FailReason): CommandResult => ({ ok: false, reason })
 
 // Shape validation ---------------------------------------------------------------
 
-type FieldType = 'string' | 'int'
+type FieldType = 'string' | 'int' | 'intOrNull' | 'hireTarget'
 const FIELDS: { [K in CommandKind]: Record<string, FieldType> } = {
-  buyVehicle: { type: 'string' },
+  buyVehicle: { type: 'string', applicantId: 'intOrNull' },
   sellVehicle: { id: 'int' },
   setZone: { id: 'int', zone: 'string' },
   rush: { buildingId: 'string' },
   buyMachine: { defId: 'string', nodeId: 'string' },
-  placeDesk: { nodeId: 'string' },
+  placeDesk: { nodeId: 'string', index: 'int' },
   moveFixture: { from: 'string', to: 'string' },
   removeFixture: { nodeId: 'string' },
-  hireInspector: {},
-  fireInspector: { employeeId: 'int' },
+  hire: { role: 'string', applicantId: 'int', target: 'hireTarget' },
+  fire: { employeeId: 'int' },
+  postAd: { role: 'string' },
   rehire: { employeeId: 'int' },
   toss: { parcelId: 'int' },
   clear: { parcelId: 'int' },
+  touchHeld: { parcelId: 'int' },
   buyDock: { index: 'int' },
   continueWithOneLife: {},
   acceptQuest: { questId: 'string' },
   debugForceFlag: { strain: 'string' },
   debugFillHoldBay: {},
   debugMalwareDelivery: {},
+  debugForceLevel: { level: 'int' },
+}
+
+/** Exactly one of {nodeId: string}, {station: 'hold'}, {vehicleId: safe int}. */
+function isHireTarget(v: unknown): v is HireTarget {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false
+  const keys = Object.keys(v)
+  if (keys.length !== 1) return false
+  const t = v as Record<string, unknown>
+  if (keys[0] === 'nodeId') return typeof t.nodeId === 'string'
+  if (keys[0] === 'station') return t.station === 'hold'
+  if (keys[0] === 'vehicleId') return Number.isSafeInteger(t.vehicleId)
+  return false
 }
 
 /** Structural check for commands arriving from outside TS (__pm.dispatch, replays). */
@@ -147,6 +192,9 @@ export function isCommand(x: unknown): x is Command {
     const v = rec[key]
     if (type === 'string' && typeof v !== 'string') return false
     if (type === 'int' && !Number.isSafeInteger(v)) return false
+    if (type === 'intOrNull' && v !== null && !Number.isSafeInteger(v))
+      return false
+    if (type === 'hireTarget' && !isHireTarget(v)) return false
   }
   return true
 }
@@ -170,16 +218,29 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     const def = sim.data.vehicles.types.find((t) => t.id === cmd.type)
     if (!def) return fail('invalid')
     if (def.unlockLevel > sim.state.level.level) return fail('locked')
-    if (sim.state.economy.balance < def.price) {
+    let a: Applicant | null = null
+    if (cmd.applicantId !== null) {
+      a = applicantOf(sim, 'driver', cmd.applicantId)
+      if (!a) return fail('no-applicant')
+    }
+    const fee = a ? hireFeeOf(sim.data, a, def.id) : 0
+    if (sim.state.economy.balance < def.price + fee) {
       return fail('insufficient-funds')
     }
-    const v = createVehicle(sim, def)
+    // Spec-build2 §2.5: the picked driver drives it; "Hire later" parks it
+    // `inactive` (No driver) until one is hired from the Garage row.
+    const v = createVehicle(sim, def, a !== null)
     sim.debit(def.price, 'purchase')
     if (def.id === 'truck' && sim.state.stats.truckTick === null) {
       sim.state.stats.truckTick = sim.state.tick
     }
     sim.emit('vehicle:bought', { id: v.id })
-    return OK
+    if (a) {
+      const e = hireApplicant(sim, a, { vehicleId: v.id }, v)
+      return { ok: true, vehicleId: v.id, employeeId: e.id }
+    }
+    sim.emit('vehicle:inactive', { id: v.id })
+    return { ok: true, vehicleId: v.id }
   },
 
   sellVehicle(sim, cmd) {
@@ -215,6 +276,20 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   },
 
   buyMachine(sim, cmd) {
+    const up = sim.data.machines.upgrades.find((u) => u.id === cmd.defId)
+    if (up) {
+      // The Sorter Arm (design §4.3): into the Hold Bay station only.
+      const s = sim.state
+      if (up.id !== SORTER_ARM_ID || cmd.nodeId !== s.lane.holdBayNodeId) {
+        return fail('invalid')
+      }
+      if (up.unlockLevel > s.level.level) return fail('locked')
+      if (s.lane.holdStation.fixture !== null) return fail('station-occupied')
+      if (s.economy.balance < up.price) return fail('insufficient-funds')
+      s.lane.holdStation = { fixture: SORTER_ARM_ID, nextDecisionTick: null }
+      sim.debit(up.price, 'purchase')
+      return OK
+    }
     const def = sim.data.machines.checkers.find((c) => c.id === cmd.defId)
     if (!def) return fail('invalid')
     if (def.unlockLevel > sim.state.level.level) return fail('locked')
@@ -238,23 +313,31 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   },
 
   placeDesk(sim, cmd) {
-    const desks = sim.state.lane.nodes.filter((n) => n.fixture?.kind === 'desk')
-    if (desks.length >= sim.data.employees.maxDesks) return fail('desk-exists')
+    // employees.json desks.rows (spec-build2 §2.4; desk 2 at L3 for $400,
+    // Q-B2-4): placed empty — it passes parcels through until someone is hired.
+    const row = sim.data.employees.desks.rows.find((r) => r.index === cmd.index)
+    if (!row) return fail('invalid')
+    if (sim.state.level.level < row.unlockLevel) return fail('desk-locked')
+    const placed = sim.state.lane.nodes.some(
+      (n) => n.fixture?.kind === 'desk' && n.fixture.index === row.index,
+    )
+    if (placed) return fail('desk-exists')
     const node = slotTarget(sim, cmd.nodeId)
     if (typeof node === 'string') return fail(node)
-    const price = sim.data.employees.deskPrice
-    if (sim.state.economy.balance < price) return fail('insufficient-funds')
+    if (sim.state.economy.balance < row.price) return fail('insufficient-funds')
     placeFixture(sim, node, {
       kind: 'desk',
-      checker: deskChecker(sim.state, sim.data, 0),
+      index: row.index,
+      checker: deskChecker(sim.state, sim.data, row.index),
       inspectorIds: [],
       walkedOutIds: [],
     })
-    if (price > 0) sim.debit(price, 'purchase')
+    if (row.price > 0) sim.debit(row.price, 'purchase')
     sim.emit('lane:fixturePlaced', {
       nodeId: node.id,
       fixture: structuredClone(node.fixture as Fixture),
     })
+    sim.emit('desk:placed', { index: row.index, nodeId: node.id })
     return OK
   },
 
@@ -273,6 +356,19 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   },
 
   removeFixture(sim, cmd) {
+    const s = sim.state
+    if (cmd.nodeId === s.lane.holdBayNodeId) {
+      // The Sorter Arm leaves the station: removalRefund × its price.
+      if (s.lane.holdStation.fixture !== SORTER_ARM_ID) return fail('invalid')
+      const up = sim.data.machines.upgrades.find((u) => u.id === SORTER_ARM_ID)
+      s.lane.holdStation = { fixture: null, nextDecisionTick: null }
+      const refund = Math.round(
+        (up?.price ?? 0) * sim.data.machines.removalRefund,
+      )
+      if (refund > 0) sim.credit(refund, 'refund', false)
+      sim.emit('lane:fixtureRemoved', { nodeId: cmd.nodeId, refund })
+      return OK
+    }
     const node = laneNode(sim.state.lane, cmd.nodeId)
     if (!node || node.kind !== 'slot' || !node.fixture) return fail('invalid')
     // A machine refunds removalRefund × its price (§7.2, Q11); a desk is
@@ -287,43 +383,62 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     return OK
   },
 
-  hireInspector(sim) {
-    const node = sim.state.lane.nodes.find((n) => n.fixture?.kind === 'desk')
-    if (!node || node.fixture?.kind !== 'desk') return fail('invalid')
-    const def = sim.data.employees.inspector
-    // Walked-out inspectors keep their seat for a re-hire (§7.4): they count
-    // against maxPerDesk until re-hired or the desk is removed.
-    const seats =
-      node.fixture.inspectorIds.length + node.fixture.walkedOutIds.length
-    if (seats >= def.maxPerDesk) return fail('desk-full')
-    if (sim.state.economy.balance < def.hireFee) {
+  hire(sim, cmd) {
+    const s = sim.state
+    const data = sim.data
+    if (!ROLES.includes(cmd.role)) return fail('invalid')
+    const a = applicantOf(sim, cmd.role, cmd.applicantId)
+    if (!a) return fail('no-applicant')
+    const t = cmd.target
+    let v: Vehicle | undefined
+    if (cmd.role === 'inspector') {
+      if (!('nodeId' in t)) return fail('invalid')
+      const node = laneNode(s.lane, t.nodeId)
+      if (!node || node.kind !== 'slot') return fail('invalid')
+      if (node.locked) return fail('slot-locked')
+      if (node.fixture?.kind !== 'desk') return fail('invalid')
+      // Walked-out inspectors keep their seat for a re-hire (§7.4).
+      const f = node.fixture
+      const seats = f.inspectorIds.length + f.walkedOutIds.length
+      if (seats >= data.employees.desks.maxPerDesk) return fail('desk-full')
+    } else if (cmd.role === 'sorter') {
+      if (!('station' in t)) return fail('invalid')
+      if (s.level.level < data.employees.holdStation.unlockLevel) {
+        return fail('station-locked')
+      }
+      // A seated sorter (active or not) is replaced (design D11); the Arm
+      // and a sorter never share the station.
+      if (s.lane.holdStation.fixture === SORTER_ARM_ID) {
+        return fail('station-occupied')
+      }
+    } else {
+      if (!('vehicleId' in t)) return fail('invalid')
+      v = s.vehicles.find((x) => x.id === t.vehicleId)
+      if (!v) return fail('no-vehicle')
+    }
+    if (s.economy.balance < hireFeeOf(data, a, v?.type)) {
       return fail('insufficient-funds')
     }
-    const e = hireEmployee(sim.state, sim.data, 'inspector', {
-      nodeId: node.id,
-    })
-    node.fixture.inspectorIds.push(e.id)
-    node.fixture.checker.stations += 1
-    node.stations.push({ parcelId: null, doneTick: null })
-    sim.debit(def.hireFee, 'hire')
-    sim.emit('worker:hired', {
-      employeeId: e.id,
-      kind: 'inspector',
-      nodeId: node.id,
-    })
+    const e = hireApplicant(sim, a, t, v)
+    return v
+      ? { ok: true, employeeId: e.id, vehicleId: v.id }
+      : { ok: true, employeeId: e.id }
+  },
+
+  fire(sim, cmd) {
+    const e = sim.state.employees.find((x) => x.id === cmd.employeeId)
+    if (!e) return fail('invalid')
+    // §6.7 / spec-build2 §2.2: instant, no refund, the seat frees at once.
+    fireEmployee(sim, e, 'fired')
     return OK
   },
 
-  fireInspector(sim, cmd) {
-    const e = sim.state.employees.find((x) => x.id === cmd.employeeId)
-    if (!e || e.kind !== 'inspector' || !e.active) return fail('invalid')
-    const node = sim.state.lane.nodes.find(
-      (n) =>
-        n.fixture?.kind === 'desk' && n.fixture.inspectorIds.includes(e.id),
-    )
-    if (!node) return fail('invalid')
-    // §6.7: instant, no refund; the desk loses a station.
-    fireInspector(sim, node, e.id)
+  postAd(sim, cmd) {
+    if (!ROLES.includes(cmd.role)) return fail('invalid')
+    const price = sim.data.employees.applicants.adPrice
+    if (sim.state.economy.balance < price) return fail('insufficient-funds')
+    if (price > 0) sim.debit(price, 'hire')
+    refreshPool(sim, cmd.role, 'ad')
     return OK
   },
 
@@ -341,7 +456,9 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   toss(sim, cmd) {
     const p = sim.state.parcels[String(cmd.parcelId)]
     if (!p || !isHeld(sim, cmd.parcelId)) return fail('invalid')
-    tossParcel(sim, p) // §6.6: bounty, or the fee + satisfaction
+    // §6.6: bounty, or the fee + satisfaction.
+    tossParcel(sim, p, { source: 'player', employeeId: null })
+    restartSorterClock(sim)
     return OK
   },
 
@@ -349,7 +466,25 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     const p = sim.state.parcels[String(cmd.parcelId)]
     if (!p || !isHeld(sim, cmd.parcelId)) return fail('invalid')
     const refused = clearParcel(sim, p) // §6.6: → shelf; Q35 'shelf-full'
-    return refused === null ? OK : fail(refused)
+    if (refused !== null) return fail(refused)
+    restartSorterClock(sim)
+    return OK
+  },
+
+  touchHeld(sim, cmd) {
+    const p = sim.state.parcels[String(cmd.parcelId)]
+    if (!p || !isHeld(sim, cmd.parcelId)) return fail('invalid')
+    // Design D3: the player's tap wins — the sorter (and the Sorter Arm)
+    // skip it for playerGraceS and a running sorter clock starts over. A
+    // touch inside the grace (the open HoldBayCard renews it while the
+    // player reads, B2 §2.6) only extends the grace: the sorter keeps
+    // working the other parcels.
+    const grace = playerGraceTicks(sim.data)
+    const fresh =
+      p.touchedTick === undefined || sim.state.tick - p.touchedTick >= grace
+    p.touchedTick = sim.state.tick
+    if (fresh) restartSorterClock(sim)
+    return OK
   },
 
   buyDock() {
@@ -388,6 +523,15 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     debugMalwareDelivery(sim)
     return OK
   },
+
+  debugForceLevel(sim, cmd) {
+    const last = sim.data.levels.reduce((m, l) => Math.max(m, l.level), 0)
+    if (cmd.level <= sim.state.level.level || cmd.level > last) {
+      return fail('invalid')
+    }
+    forceLevel(sim, cmd.level)
+    return OK
+  },
 }
 
 // Helpers --------------------------------------------------------------------------
@@ -417,91 +561,63 @@ export function nextCheckerId(state: SimState): string {
   return id
 }
 
-/** The inspection desk's checker (employees.json inspector row). */
+/** An applicant waiting in `role`'s pool, or null. */
+function applicantOf(sim: Sim, role: Role, id: number): Applicant | null {
+  return sim.state.applicants[role].find((a) => a.id === id) ?? null
+}
+
+/**
+ * An inspection desk's checker (employees.json desks.rows[index]): a
+ * generalist whose numbers are the crew's readout (people.ts syncDesk), the
+ * start inspector's pips until someone sits there.
+ */
 export function deskChecker(
   state: SimState,
   data: GameData,
-  stations: number,
+  index: number,
 ): Checker {
-  const def = data.employees.inspector
+  const start = inspectorNumbers(data, data.employees.start.inspector.pips)
+  const row = data.employees.desks.rows.find((r) => r.index === index)
   return {
     id: nextCheckerId(state),
     kind: 'desk',
     defId: 'inspector',
-    strain: def.strain,
-    pMatch: def.pMatch,
-    pOther: def.pOther,
-    decoyFlag: def.decoyFlag,
-    processTicks: ticksFromS(def.processS),
-    stations,
-    price: data.employees.deskPrice,
+    strain: data.employees.roles.inspector.strain,
+    pMatch: start.p,
+    pOther: start.p,
+    decoyFlag: start.decoyFlag,
+    processTicks: start.processTicks,
+    stations: 0,
+    price: row?.price ?? 0,
     boughtTick: state.tick,
   }
 }
 
-/** First pool name unused by `used`; then "Name 2", "Name 3"… (deterministic, no rng). */
-export function freshName(pool: readonly string[], used: readonly string[]) {
-  for (let round = 1; ; round++) {
-    for (const name of pool) {
-      const candidate = round === 1 ? name : `${name} ${round}`
-      if (!used.includes(candidate)) return candidate
-    }
-    if (pool.length === 0) return `Worker ${used.length + 1}`
-  }
-}
-
 /**
- * Append an employee (ids ascending; payroll order = hire order, §7.4).
- * Inspectors earn employees.json salaryPerDay; a driver earns its vehicle
- * type's driverSalaryPerDay (pass `salaryPerDay`).
+ * §4.1 Buy: pops in on the lot, home zone 'any' — `idle_lot` when a driver
+ * is about to be seated (people.ts hireApplicant), else `inactive` with no
+ * driver ("Hire later", spec-build2 §2.5).
  */
-export function hireEmployee(
-  s: SimState,
-  data: GameData,
-  kind: Employee['kind'],
-  at: { nodeId?: string; vehicleId?: number; salaryPerDay?: number },
-): Employee {
-  const pool =
-    kind === 'inspector' ? data.puns.inspectorNames : data.puns.driverNames
-  const used = s.employees.filter((e) => e.kind === kind).map((e) => e.name)
-  const e: Employee = {
-    id: s.nextId.employee,
-    kind,
-    name: freshName(pool, used),
-    hiredTick: s.tick,
-    salaryPerDay:
-      at.salaryPerDay ??
-      (kind === 'inspector' ? data.employees.inspector.salaryPerDay : 0),
-    unpaidPaydays: 0,
-    active: true,
-    vehicleId: at.vehicleId ?? null,
-    nodeId: at.nodeId ?? null,
-  }
-  s.nextId.employee += 1
-  s.employees.push(e)
-  return e
-}
-
-/** §4.1 Buy: pops in on the lot, idle, home zone 'any', driver hired. */
-function createVehicle(sim: Sim, def: VehicleTypeDef): Vehicle {
+function createVehicle(
+  sim: Sim,
+  def: VehicleTypeDef,
+  withDriver: boolean,
+): Vehicle {
   const s = sim.state
   const usedNames = s.vehicles.map((v) => v.name)
   let n = 1
   while (usedNames.includes(`${def.name} ${n}`)) n += 1
   const id = s.nextId.vehicle
   s.nextId.vehicle += 1
-  const driver = hireEmployee(s, sim.data, 'driver', {
-    vehicleId: id,
-    salaryPerDay: def.driverSalaryPerDay,
-  })
   const tile = parkingTile(sim, id)
   const pos = { tx: tile.x, ty: tile.y }
   const v: Vehicle = {
     id,
     type: def.id,
     name: `${def.name} ${n}`,
-    driverId: driver.id,
-    state: 'idle_lot',
+    driverId: null,
+    nextDriverId: null,
+    state: withDriver ? 'idle_lot' : 'inactive',
     zone: 'any',
     pos,
     prev: { ...pos },

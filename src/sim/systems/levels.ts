@@ -67,6 +67,29 @@ export function levelsStep(sim: Sim): void {
   announceStrains(sim)
 }
 
+/**
+ * Debug (ViewSim debug.forceLevel, the `debugForceLevel` command — design
+ * §4.6): level up row by row to `level`, ignoring the thresholds and
+ * economy.playtestMaxLevel, then raise lifetime earned to the last applied
+ * row's threshold so the level bar reads sensibly. The caller checked
+ * current < level ≤ the last row.
+ */
+export function forceLevel(sim: Sim, level: number): void {
+  const s = sim.state
+  let last: LevelDef | null = null
+  for (const row of rows(sim)) {
+    if (row.level <= s.level.level || row.level > level) continue
+    levelUp(sim, row)
+    last = row
+  }
+  if (last) {
+    s.economy.lifetimeEarned = Math.max(
+      s.economy.lifetimeEarned,
+      last.threshold,
+    )
+  }
+}
+
 /** Apply a levels.json row now (the threshold was crossed this tick). */
 export function levelUp(sim: Sim, row: LevelDef): void {
   const s = sim.state

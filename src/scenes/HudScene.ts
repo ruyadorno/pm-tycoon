@@ -20,9 +20,10 @@
 //
 // M2 (city-view §3.3, §4.1, §4.3, §9.2-§9.4): life:lost fuses the rightmost
 // lit bomb slot, flashes the screen red (200 ms), shakes the top bar 2 px,
-// tickers the incident, appends the label to onboarding.wanted and opens
-// the lost-life card LOST_LIFE_DELAY_MS later; game:over opens the game-over
-// screen instead (a life:lost while it is open is dropped). Modal cards hold
+// tickers the incident and opens the lost-life card LOST_LIFE_DELAY_MS
+// later (the revealed label joins the sim's wanted list, M6); game:over
+// opens the game-over screen instead (a life:lost while it is open is
+// dropped). Modal cards hold
 // the sim through `holds` (stepper.paused = any hold: lostLife, gameOver,
 // hidden, rotate) so one card closing never resumes under another. The
 // Warehouse button's badge / pulse / red are derived from sim state on every
@@ -44,6 +45,20 @@
 // toasts; the Garage `!` also covers a short payday; the sax mute button
 // drives the AudioDirector (registry 'audio') and shows `Tap for sound`
 // while the audio waits for its first gesture (?skipTitle=1).
+//
+// M6 people (plan-build2 §8.3 task 10, design-m6 §6.3): `Lin hired —
+// $24/day` / `Lin let go` toast a new / fired inspector or sorter (drivers
+// toast from the Garage flow), a ★ hire runs a `hired` paper, the walkout
+// line names the sorter's station, a sorter's / the Sorter Arm's Toss
+// tickers `Pat tossed evil-lodash — DEFUSED` (the flag funnel and tossHint
+// follow player tosses only), a fired driver re-reads the Garage `!`, and
+// the wanted list is the sim's (`state.wanted`): the HUD no longer writes
+// one. The money tap's `Payroll $N/day` is payroll().perDay over every
+// active employee, sorters included. Event handlers read people and
+// vehicles from the sim state (a fired employee is already gone from it:
+// staffNames remembers the names): the ViewSim's people() / vehicles caches
+// follow sim.revision, which a command or tick bumps only after its events —
+// so the Garage badge is also re-read on the next frame (garageDirty).
 //
 // M4 (plan.md §12.7 tasks 1-2, §12.9): the PlaytestRecorder
 // (src/metrics/playtest.ts) follows the sim from create (resumed from
@@ -109,7 +124,7 @@ import type {
 } from '../sim/events.ts'
 import type { OnboardingSave } from '../sim/save.ts'
 import type { Sim } from '../sim/sim.ts'
-import type { VehicleType } from '../sim/types.ts'
+import type { Role, VehicleType } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
 import { Button } from '../ui/Button.ts'
 import { Dialog } from '../ui/Dialog.ts'
@@ -118,9 +133,14 @@ import { FollowStrip } from '../ui/FollowStrip.ts'
 import {
   addTapZone,
   chipEntries,
+  delegateDefusedLine,
   detectionColour,
+  firedToast,
+  firedToastsFor,
   floatsGold,
   garageAlert,
+  hiredToast,
+  hiredToastsFor,
   isEarned,
   levelLabel,
   levelProgress,
@@ -159,6 +179,7 @@ import {
   newsPicture,
   PAPER_DEPTH,
   PAPER_SFX,
+  starHireHeadline,
   type NewsItem,
   type NewsKind,
 } from '../ui/Newspaper.ts'
@@ -168,7 +189,6 @@ import {
   lostLifeModel,
 } from '../ui/LostLifeCard.ts'
 import {
-  addWanted,
   FIRST_FLAG_CITY_TEXT,
   FIRST_FLAG_ROOM_TEXT,
   FLAG_FOLLOW_TEXT,
@@ -177,6 +197,8 @@ import {
   normaliseOnboarding,
   Onboarding,
   STEP2_DELAY_MS,
+  step1Done,
+  step1Text,
   step2Model,
   step2Text,
 } from '../ui/Onboarding.ts'
@@ -252,6 +274,8 @@ interface PendingPaper {
   headline: string
   level: number
   district?: string
+  /** M6 `hired`: the role, for its picture. */
+  role?: Role
 }
 
 export const MONEY_TWEEN_MS = 300
@@ -414,6 +438,10 @@ export class HudScene extends Phaser.Scene {
   private muted = false
   private lastRunSpeed: 1 | 2 | 4 = 1
   private plusPending = false
+  /** Re-read the Garage badge next frame (after the event's revision bump). */
+  private garageDirty = false
+  /** Employee id → name (worker:fired arrives after the sim dropped them). */
+  private staffNames = new Map<number, string>()
   private seenTypes = new Set<VehicleType>()
 
   // popovers
@@ -567,6 +595,8 @@ export class HudScene extends Phaser.Scene {
     this.pauseMenu = false
     this.pauseHinted = false
     this.newGameDialog = null
+    this.garageDirty = false
+    this.staffNames = new Map()
   }
 
   create(): void {
@@ -710,6 +740,10 @@ export class HudScene extends Phaser.Scene {
     this.ticker.setProgress(vs.dayProgress)
     this.ticker.update(time, delta)
 
+    if (this.garageDirty) {
+      this.garageDirty = false
+      this.applyGarageBadge()
+    }
     if (time >= this.pollAt) {
       this.pollAt = time + POLL_MS
       this.refreshShield()
@@ -875,9 +909,8 @@ export class HudScene extends Phaser.Scene {
       }
     const headline = incidentLine(this.buildingName(p.destBuildingId), left)
     this.queueLine(headline, 'incident')
-    addWanted(getOnboarding(this.registry), p.label)
-    // Persist the loss and the revealed label right after this tick (a
-    // reload must not replay the delivery or forget the label).
+    // Persist the loss right after this tick (a reload must not replay the
+    // delivery); the revealed label is in the sim's wanted list (M6).
     if (this.saveSoon !== 'final') this.saveSoon = 'save'
     if (left <= 0 || this.vs.gameOver) return // game:over takes over
     // The day's paper for the incident comes once the card closes (§8.2).
@@ -1202,18 +1235,28 @@ export class HudScene extends Phaser.Scene {
     this.flagFollow = null
   }
 
-  /** parcel:tossed: DEFUSED ticker + wanted label; the one-time tossHint. */
+  /**
+   * parcel:tossed: the DEFUSED ticker (the sim appends the label to its
+   * wanted list); a player Toss also ends the flag funnel and shows the
+   * one-time tossHint. A sorter's / the Sorter Arm's Toss (M6 `source`)
+   * tickers `Pat tossed evil-lodash — DEFUSED` and leaves the tour alone.
+   */
   private onTossed(p: SimEventPayloads['parcel:tossed']): void {
     this.refreshWarehouseBtn()
-    const ob = getOnboarding(this.registry)
     const label = this.vs.parcel(p.id)?.label ?? this.heldLabels.get(p.id)
     this.heldLabels.delete(p.id)
-    if (p.wasMalware) {
-      if (label) {
-        this.queueLine(defusedLine(label), 'defused')
-        addWanted(ob, label)
+    if (p.source === 'sorter' || p.source === 'arm') {
+      if (p.wasMalware && label) {
+        const who =
+          p.source === 'sorter' && p.employeeId !== null
+            ? (this.employeeNames([p.employeeId])[0] ?? null)
+            : null
+        this.queueLine(delegateDefusedLine(who, label), 'defused')
       }
+      return
     }
+    const ob = getOnboarding(this.registry)
+    if (p.wasMalware && label) this.queueLine(defusedLine(label), 'defused')
     if (this.flagHint) this.endFlagHint(true)
     if (!ob.sawTossHint) {
       ob.sawTossHint = true
@@ -1324,6 +1367,7 @@ export class HudScene extends Phaser.Scene {
         picture: newsPicture(p.kind, this.gd, {
           level: p.level,
           ...(p.district ? { district: p.district } : {}),
+          ...(p.role ? { role: p.role } : {}),
         }),
       }
       if (this.paperHoldMs > 0) this.heldPapers.push(item)
@@ -1466,6 +1510,45 @@ export class HudScene extends Phaser.Scene {
     })
   }
 
+  /**
+   * worker:hired (M6): `Lin hired — $24/day` for a new inspector or sorter
+   * (a driver's hire toasts from the Garage buy / Replace flow; a re-hire
+   * from its card) and a `hired` paper for a ★ applicant (spec-build2 §2.5).
+   */
+  private onHired(p: SimEventPayloads['worker:hired']): void {
+    this.refreshGarageBadge()
+    this.refreshShield()
+    // Onboarding step 1 is "buy a bike AND pick its driver": the first driver
+    // hire (the buy flow's pick, or Hire driver after a `Hire later`).
+    if (p.role === 'driver') this.completeStep1()
+    if (p.rehire) return
+    // From the state: the ViewSim's people() cache is a revision behind here.
+    const e = getSim(this).state.employees.find((x) => x.id === p.employeeId)
+    if (!e) return
+    this.staffNames.set(e.id, e.name)
+    if (hiredToastsFor(p)) this.toast.show(hiredToast(e.name, e.salaryPerDay))
+    if (p.star)
+      this.queuePaper({
+        kind: 'hired',
+        headline: starHireHeadline(e.name, p.role),
+        level: this.vs.level,
+        role: p.role,
+      })
+  }
+
+  /**
+   * worker:fired (M6): `Lin let go` for an inspector or sorter the player
+   * fired; a fired driver leaves `No driver` (the Garage `!`). The employee
+   * is gone from the state by now: the name comes from staffNames.
+   */
+  private onFired(p: SimEventPayloads['worker:fired']): void {
+    this.refreshShield()
+    this.refreshGarageBadge()
+    const name = this.staffNames.get(p.employeeId)
+    this.staffNames.delete(p.employeeId)
+    if (name && firedToastsFor(p)) this.toast.show(firedToast(name))
+  }
+
   private onPayrollPaid(p: SimEventPayloads['payroll:paid']): void {
     this.dayPayroll += p.amount
     if (p.amount > 0) {
@@ -1485,10 +1568,10 @@ export class HudScene extends Phaser.Scene {
   private onWalkedOut(p: SimEventPayloads['worker:walkedOut']): void {
     const [name = `#${p.employeeId}`] = this.employeeNames([p.employeeId])
     const v =
-      p.kind === 'driver'
-        ? getSim(this).state.vehicles.find((x) => x.driverId === p.employeeId)
+      p.role === 'driver' && p.vehicleId !== null
+        ? getSim(this).state.vehicles.find((x) => x.id === p.vehicleId)
         : undefined
-    const text = walkoutLine(name, p.kind, v?.name ?? null)
+    const text = walkoutLine(name, p.role, v?.name ?? null)
     // the ticker line is queued by flushWalkouts (one per payday)
     this.pendingWalkouts.push({ name, text })
     this.refreshGarageBadge()
@@ -2341,8 +2424,18 @@ export class HudScene extends Phaser.Scene {
     this.whBtn.setRed(red)
   }
 
-  /** Garage: `!` (unpaid / inactive) wins over the one-shot `+`. */
+  /**
+   * Garage badge now, and again next frame: an event fires before its
+   * command / tick bumps sim.revision, so the ViewSim's vehicles cache can
+   * still hold the old fleet (a fired driver, a `Hire later` purchase).
+   */
   private refreshGarageBadge(): void {
+    this.garageDirty = true
+    this.applyGarageBadge()
+  }
+
+  /** Garage: `!` (unpaid / inactive / no driver) wins over the one-shot `+`. */
+  private applyGarageBadge(): void {
     const vs = this.vs
     const fresh = newlyAffordableTypes(
       this.gd,
@@ -2451,20 +2544,41 @@ export class HudScene extends Phaser.Scene {
   // ---------------------------------------------------------------- onboarding
 
   private startTour(): void {
-    // A vehicle bought while nothing listened (?fastForward, a policy run)
-    // has already done step 1's job.
-    if (this.vs.vehicles.length > 0 && this.onboarding.eligible(1)) {
-      this.onboarding.complete(1)
-      this.scheduleStep2()
+    // A driven vehicle bought while nothing listened (?fastForward, a policy
+    // run) has already done step 1's job.
+    const fleet = getSim(this).state.vehicles
+    if (step1Done(fleet) && this.onboarding.eligible(1)) {
+      this.completeStep1()
       return
     }
     this.scheduleStep2()
     if (this.onboarding.eligible(1)) {
-      this.onboarding.show(1, () => {
-        const g = this.L.garage.rect
-        return { x: Math.round(g.x + g.w / 2), y: g.y }
-      })
+      this.onboarding.show(
+        1,
+        () => {
+          const g = this.L.garage.rect
+          return { x: Math.round(g.x + g.w / 2), y: g.y }
+        },
+        step1Text(fleet),
+      )
     }
+  }
+
+  /** Step 1 done (a vehicle has its driver): hide it, step 2 follows. */
+  private completeStep1(): void {
+    if (!this.onboarding.eligible(1)) return
+    this.onboarding.complete(1)
+    this.scheduleStep2()
+  }
+
+  /**
+   * Step 1's text follows the fleet (read from the state: the ViewSim's
+   * cache is a revision behind inside an event): `Bike 1 has no driver
+   * yet: hire one in the Garage` after a `Hire later`.
+   */
+  private refreshStep1(): void {
+    if (this.onboarding.activeStep !== 1) return
+    this.onboarding.retext(1, step1Text(getSim(this).state.vehicles))
   }
 
   /**
@@ -2658,7 +2772,7 @@ export class HudScene extends Phaser.Scene {
         'lane:fixturePlaced': () => this.refreshShield(),
         'lane:fixtureMoved': () => this.refreshShield(),
         'lane:fixtureRemoved': () => this.refreshShield(),
-        'worker:fired': () => this.refreshShield(),
+        'worker:fired': (p) => this.onFired(p),
         'parcel:delivered': () => {
           this.dayDelivered++
         },
@@ -2672,13 +2786,11 @@ export class HudScene extends Phaser.Scene {
         'payroll:paid': (p) => this.onPayrollPaid(p),
         'payroll:short': (p) => this.onPayrollShort(p),
         'worker:walkedOut': (p) => this.onWalkedOut(p),
-        'worker:hired': () => {
-          this.refreshGarageBadge()
-          this.refreshShield()
-        },
+        'worker:hired': (p) => this.onHired(p),
         'vehicle:bought': () => {
-          this.onboarding.complete(1)
-          this.scheduleStep2()
+          // Step 1 clears on the driver's worker:hired (onHired), which the
+          // buy flow emits right after this; a `Hire later` purchase
+          // re-words it (vehicle:inactive → refreshStep1).
           this.refreshGarageBadge()
           this.refreshDistrict()
         },
@@ -2687,7 +2799,10 @@ export class HudScene extends Phaser.Scene {
           this.refreshGarageBadge()
           this.refreshDistrict()
         },
-        'vehicle:inactive': () => this.refreshGarageBadge(),
+        'vehicle:inactive': () => {
+          this.refreshGarageBadge()
+          this.refreshStep1()
+        },
         'life:lost': (p) => this.onLifeLost(p),
         'game:over': () => this.onGameOver(),
         // The daily line is built at the flush, after this tick's payday.
@@ -2866,6 +2981,9 @@ export class HudScene extends Phaser.Scene {
   /** Rebuild every readout from sim state (create, WAKE, Sim swap). */
   private syncAll(): void {
     const vs = this.vs
+    this.staffNames = new Map(
+      (getSim(this)?.state.employees ?? []).map((e) => [e.id, e.name]),
+    )
     this.moneyTween?.stop()
     this.moneyTween = null
     this.setMoney(vs.money, false)
@@ -2891,11 +3009,13 @@ export class HudScene extends Phaser.Scene {
       !vs.vehicles.some((v) => v.id === this.follow.vehicleId)
     )
       this.follow.hide()
-    // A swapped-in sim that already owns a vehicle (__pm.load of a fixture or
-    // save) has done step 1's job, as startTour() rules for a policy run.
-    if (vs.vehicles.length > 0 && this.onboarding?.eligible(1))
+    // A swapped-in sim that already owns a driven vehicle (__pm.load of a
+    // fixture or save) has done step 1's job, as startTour() rules for a
+    // policy run; a driverless fleet re-words step 1.
+    if (step1Done(vs.vehicles) && this.onboarding?.eligible(1))
       this.onboarding.complete(1)
-    if (vs.vehicles.length > 0) this.scheduleStep2()
+    if (step1Done(vs.vehicles)) this.scheduleStep2()
+    if (this.onboarding) this.refreshStep1()
     this.heldLabels.clear()
     for (const it of vs.holdBay.items) this.rememberLabel(it.parcelId)
     // Cards follow the sim: a game-over state (a reload, __pm.load of a

@@ -163,7 +163,9 @@ describe('L2 unlocks (spec §8, §3.5, §6.2)', () => {
         nodeId: 'slot4',
       }),
     ).toEqual({ ok: false, reason: 'slot-locked' })
-    expect(sim.dispatch({ kind: 'buyVehicle', type: 'truck' })).toEqual({
+    expect(
+      sim.dispatch({ kind: 'buyVehicle', type: 'truck', applicantId: null }),
+    ).toEqual({
       ok: false,
       reason: 'locked',
     })
@@ -190,7 +192,9 @@ describe('L2 unlocks (spec §8, §3.5, §6.2)', () => {
       warehouseTier: 2,
     })
     expect(createViewSim(sim).shelf.cap).toBe(45)
-    expect(sim.dispatch({ kind: 'buyVehicle', type: 'truck' })).toEqual({
+    expect(
+      sim.dispatch({ kind: 'buyVehicle', type: 'truck', applicantId: null }),
+    ).toMatchObject({
       ok: true,
     })
     expect(

@@ -6,24 +6,35 @@
 // Parts (src/render/warehouse): RoomLayout (FixedLaneLayout, the rect table
 // by node id), LaneRenderer (room, slots, Hold Bay, bin, shelf, parcels,
 // stall visuals, readout), DockView (door, tail, lamp, status panel),
-// WorkerSprites (inspectors), Fx (catch moment, stamps, banner, shake,
-// flashes). The three sheets (src/ui/warehouse: BuySheet, SlotCard,
-// HoldBayCard) are WarehouseSheets owned here; they call the facade
-// themselves and keep one open at a time.
+// WorkerSprites (inspectors of every desk + the sorter), Fx (catch moment,
+// stamps, banner, shake, flashes). The four sheets (src/ui/warehouse:
+// BuySheet, SlotCard, HoldBayCard, StationCard) are WarehouseSheets owned
+// here; they call the facade themselves and keep one open at a time. The
+// shared HireSheet (src/ui/HireSheet.ts, M6 people) is opened here on a
+// card's request (WarehouseSheetOptions.openHire: the desk card's Hire
+// inspector, the StationCard's Hire a sorter / Replace); the card closed
+// itself and reopens from the request's onDone / onCancel. The sheet sits
+// above the HUD bottom band like the cards; a sleep / game over / New game
+// — or the Garage opening over the room (EV_GARAGE_OPENING: its own driver
+// picker must not stack on this one) — closes it without reopening the card.
 //
 // Input (only the primary pointer, §1.14): taps are hit-tested against the
 // layout (no interactive objects in the room, so a sheet's scrim or button
 // always wins). Empty slot → BuySheet, occupied slot / desk strip →
-// SlotCard, held bay → HoldBayCard, everything else → a pm:tooltip (HUD) or
-// a 3-s popover (readout strip: per-strain detection; wanted poster: the
-// malware labels revealed so far). A 450-ms hold on a fixture lifts it
+// SlotCard, held bay → HoldBayCard, the Hold Bay station (RoomLayout
+// HOLD_STATION_HIT, M6) → StationCard (a tooltip while locked), everything
+// else → a pm:tooltip (HUD) or a 3-s popover (readout strip: per-strain
+// detection; wanted poster: the malware labels revealed so far, the sim's
+// `wanted` list). A 450-ms hold on a fixture lifts it
 // (§2.3, own scene-clock timer so the frozen test clock drives it): drop on
 // another live slot = lane.moveFixture (the sim swaps when occupied),
 // anywhere else snaps back 150 ms. SlotCard's Move uses the same targets
 // in tap mode (onMoveRequest).
 //
 // Sim events through bindSim (attached on create / WAKE, detached on SLEEP /
-// SHUTDOWN; syncAll on WAKE and sim swaps). Game events: emits pm:view
+// SHUTDOWN; syncAll on WAKE and sim swaps); M6 adds `sorter:decided` (the
+// sorter's jump), `parcel:tossed {source: 'arm'}` (the Sorter Arm's swing)
+// and `desk:placed` (a hint to staff the new desk). Game events: emits pm:view
 // {name: 'warehouse'} on create / wake, pm:tooltip, ui:tap, ui:sfx (deny);
 // pm:goto {view: 'warehouse', highlight} arrives as run()/wake data and
 // pulses the first empty slot + opens the BuySheet with that row pulsing.
@@ -31,8 +42,8 @@
 // fade (nav.ts); this scene fades in 150 ms while the room drops 16 px, and
 // fades out 120 ms (transitionOut) on the way back.
 import Phaser from 'phaser'
-import { REG_ONBOARDING } from '../boot/autosave.ts'
 import {
+  EV_GARAGE_OPENING,
   EV_GOTO,
   EV_VIEW,
   FADE_IN_MS,
@@ -41,7 +52,7 @@ import {
   type WorldTransition,
   type WorldView,
 } from '../boot/nav.ts'
-import { bindSim, getSim, getViewSim, REG } from '../boot/simBinding.ts'
+import { bindSim, getViewSim, REG } from '../boot/simBinding.ts'
 import type { GameData } from '../data/types.ts'
 import { formatMmSs } from '../render/decayPhase.ts'
 import { atlasOf, frameOrNull } from '../render/frames.ts'
@@ -57,6 +68,7 @@ import {
   BAY_COUNT,
   DOCK_PANEL,
   FixedLaneLayout,
+  HOLD_STATION,
   POSTER,
   POSTER_HIT,
   READOUT_GAP,
@@ -69,18 +81,25 @@ import {
 } from '../render/warehouse/RoomLayout.ts'
 import { WorkerSprites } from '../render/warehouse/WorkerSprites.ts'
 import type { SimEventPayloads } from '../sim/events.ts'
-import type { OnboardingSave } from '../sim/save.ts'
-import type { Employee, LaneNode, Strain } from '../sim/types.ts'
+import type { LaneNode, Strain } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
+import { HireSheet } from '../ui/HireSheet.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
 import { addPanel } from '../ui/Panel.ts'
 import { claimKey } from '../ui/Sheet.ts'
 import { laneReadout, strainRows, TONE_TEXT } from '../ui/ShieldPopover.ts'
 import { addText, textTop } from '../ui/text.ts'
 import { PALETTE, THEME } from '../ui/theme.ts'
-import { BuySheet, warehouseFailText } from '../ui/warehouse/BuySheet.ts'
+import {
+  BuySheet,
+  holdNodeId,
+  sheetBottom,
+  warehouseFailText,
+  type HireRequest,
+} from '../ui/warehouse/BuySheet.ts'
 import { HoldBayCard } from '../ui/warehouse/HoldBayCard.ts'
 import { SlotCard } from '../ui/warehouse/SlotCard.ts'
+import { StationCard, stationLockedLine } from '../ui/warehouse/StationCard.ts'
 
 export const EV_TOOLTIP = 'pm:tooltip'
 export const EV_UI_TAP = 'ui:tap'
@@ -110,6 +129,7 @@ type Pick =
   | { kind: 'lockedDock'; index: number; rect: Rect }
   | { kind: 'ext'; rect: Rect }
   | { kind: 'poster'; rect: Rect }
+  | { kind: 'station'; rect: Rect }
   | { kind: 'sign'; rect: Rect }
   | { kind: 'readout'; rect: Rect }
 
@@ -198,6 +218,10 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   private buy: BuySheet | null = null
   private slotCard: SlotCard | null = null
   private holdCard: HoldBayCard | null = null
+  private stationCard: StationCard | null = null
+  /** The open HireSheet (a card's request) and its token. */
+  private hireSheet: HireSheet | null = null
+  private hireToken: object | null = null
   private press: Press | null = null
   private drag: Drag | null = null
   private moveFrom: string | null = null
@@ -227,6 +251,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.buy = null
     this.slotCard = null
     this.holdCard = null
+    this.stationCard = null
+    this.hireSheet = null
+    this.hireToken = null
   }
 
   create(): void {
@@ -248,13 +275,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       this.fx,
     )
     this.dock = new DockView(this, this.layers, this.vs)
-    this.workers = new WorkerSprites(
-      this,
-      this.layers,
-      this.layout,
-      this.vs,
-      () => this.employees(),
-    )
+    this.workers = new WorkerSprites(this, this.layers, this.layout, this.vs)
     this.buildSheets()
     this.installInput()
     this.installGameEvents()
@@ -263,7 +284,12 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       this,
       {
         'parcel:flagged': (p) => this.onFlagged(p),
-        'parcel:tossed': (p) => this.onTossed(p),
+        'parcel:tossed': (p) => {
+          this.onTossed(p)
+          if (p.source === 'arm') this.lane.onArmToss()
+        },
+        'sorter:decided': (p) => this.workers.onSorterDecided(p),
+        'desk:placed': (p) => this.onDeskPlaced(p),
         'parcel:cleared_by_player': (p) => this.lane.onCleared(p.id),
         'lane:fixturePlaced': (p) => this.lane.onFixturePlaced(p.nodeId),
         'lane:fixtureMoved': () => this.lane.syncSlots(),
@@ -370,11 +396,6 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.workers.syncAll()
   }
 
-  private employees(): readonly Employee[] {
-    const ext = this.vs as ViewSim & { employees?: readonly Employee[] }
-    return ext.employees ?? getSim(this)?.state.employees ?? []
-  }
-
   // ---------------------------------------------------------------- layout
 
   private computeL(): Layout {
@@ -408,6 +429,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.buy?.relayout(sheetL)
     this.slotCard?.relayout(sheetL)
     this.holdCard?.relayout(sheetL)
+    this.stationCard?.relayout(sheetL)
+    if (this.hireSheet?.isOpen()) this.hireSheet.relayout(this.hireLayout())
     this.closePopover()
   }
 
@@ -419,24 +442,80 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   // ---------------------------------------------------------------- sheets
 
   private buildSheets(): void {
-    const opts = { labelFor: (id: string) => this.layout.labelFor(id) }
+    const opts = {
+      labelFor: (id: string) => this.layout.labelFor(id),
+      openHire: (req: HireRequest) => this.openHire(req),
+    }
     this.buy = new BuySheet(this, this.L, this.vs, opts)
     this.slotCard = new SlotCard(this, this.L, this.vs, opts)
     this.holdCard = new HoldBayCard(this, this.L, this.vs, opts)
+    this.stationCard = new StationCard(this, this.L, this.vs, opts)
     this.slotCard.onMoveRequest((nodeId) => this.beginMove(nodeId))
   }
 
   private anySheetOpen(): boolean {
     return Boolean(
-      this.buy?.isOpen() || this.slotCard?.isOpen() || this.holdCard?.isOpen(),
+      this.buy?.isOpen() ||
+      this.slotCard?.isOpen() ||
+      this.holdCard?.isOpen() ||
+      this.stationCard?.isOpen() ||
+      this.hireSheet?.isOpen(),
     )
   }
 
   private closeSheets(instant = false): void {
+    this.dropHire()
     this.buy?.close(instant)
     this.slotCard?.close(instant)
     this.holdCard?.close(instant)
+    this.stationCard?.close(instant)
     this.workers?.showNames(null)
+  }
+
+  // ---------------------------------------------------------------- hire sheet
+
+  /** The HireSheet's frame: full canvas, its panel above the HUD bottom band. */
+  private hireLayout(): { W: number; H: number; safeBottom: number } {
+    const L = this.L
+    return { W: L.W, H: L.H, safeBottom: Math.max(0, L.H - sheetBottom(L)) }
+  }
+
+  /**
+   * A card asked for the HireSheet (it closed itself). onDone / onCancel of
+   * the request run only while this sheet is still the current one — a
+   * sleep, game over or another request drops it silently.
+   */
+  private openHire(req: HireRequest): void {
+    this.dropHire()
+    if (this.transitioning || this.vs.gameOver) return
+    const token = {}
+    this.hireToken = token
+    const settle = (after: () => void): void => {
+      if (this.hireToken !== token) return
+      this.hireToken = null
+      this.hireSheet = null
+      after()
+    }
+    const L = this.L
+    this.hireSheet = new HireSheet(this, {
+      vs: this.vs,
+      role: req.role,
+      target: req.target,
+      title: req.title,
+      ...this.hireLayout(),
+      minHit: L.minHit,
+      id: 'wh:hire',
+      onDone: (res) => settle(() => req.onDone?.(res)),
+      onCancel: () => settle(() => req.onCancel?.()),
+    })
+  }
+
+  /** Close the HireSheet without its callbacks (the card stays closed). */
+  private dropHire(): void {
+    const sheet = this.hireSheet
+    this.hireToken = null
+    this.hireSheet = null
+    if (sheet?.isOpen()) sheet.close()
   }
 
   // ---------------------------------------------------------------- game events
@@ -459,11 +538,15 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.time.delayedCall(SHEET_DELAY_MS, () => this.highlight(id))
   }
 
+  /** The Garage opens over the room: no second applicant picker under it. */
+  private onGarageOpening = (): void => this.dropHire()
+
   private installGameEvents(): void {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize)
     this.registry.events.on('changedata', this.onRegistry)
     this.input.keyboard?.on('keydown', this.onKey, this)
     this.game.events.on(EV_GOTO, this.onGotoAwake)
+    this.game.events.on(EV_GARAGE_OPENING, this.onGarageOpening)
   }
 
   private removeGameEvents(): void {
@@ -471,6 +554,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.registry.events.off('changedata', this.onRegistry)
     this.input.keyboard?.off('keydown', this.onKey, this)
     this.game.events.off(EV_GOTO, this.onGotoAwake)
+    this.game.events.off(EV_GARAGE_OPENING, this.onGarageOpening)
   }
 
   /** Esc / Android back → the city (§1.10), unless a modal owns the key. */
@@ -487,6 +571,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   }
 
   private onGameOver(): void {
+    this.dropHire()
     this.cancelPress()
     this.endMove()
     this.closePopover()
@@ -650,6 +735,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     const readout = { x: rr.x, y: rr.y - 6, w: rr.w, h: rr.h + 12 }
     if (inside(readout, x, y)) return { kind: 'readout', rect: rr }
     if (inside(POSTER_HIT, x, y)) return { kind: 'poster', rect: { ...POSTER } }
+    // The Hold Bay station is not a lane node (layout.stationAt, M6).
+    if (lay.stationAt(x, y))
+      return { kind: 'station', rect: { ...HOLD_STATION } }
     const signR = { ...SIGN }
     if (inside(signR, x, y)) return { kind: 'sign', rect: signR }
     for (let i = 0; i < BAY_COUNT; i++) {
@@ -743,6 +831,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       case 'poster':
         this.openWanted()
         return
+      case 'station':
+        this.tapStation(top)
+        return
       case 'readout':
         this.openStrains()
         return
@@ -767,6 +858,28 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       return
     }
     this.buy?.open(nodeId)
+  }
+
+  /** The Hold Bay station (B2 §2.6): StationCard, or the unlock tooltip while locked. */
+  private tapStation(top: Point): void {
+    const hs = this.vs.holdStation
+    if (!hs.unlocked && hs.kind === null) {
+      this.tooltip(stationLockedLine(this.gd, hs.unlockLevel), top)
+      return
+    }
+    this.stationCard?.open()
+  }
+
+  /** desk:placed — point at the new desk: it checks nothing until staffed. */
+  private onDeskPlaced(p: SimEventPayloads['desk:placed']): void {
+    const n = this.node(p.nodeId)
+    if (n?.fixture?.kind !== 'desk' || n.fixture.inspectorIds.length > 0) return
+    const r = this.layout.rectFor(p.nodeId)
+    if (!r) return
+    this.tooltip(
+      'Desk placed — tap it to hire inspectors',
+      this.toScreen(r.x + r.w / 2, r.y),
+    )
   }
 
   private tapBay(bay: number, top: Point): void {
@@ -998,10 +1111,9 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.showPopover(laneReadout(stats), out, at, w)
   }
 
-  /** Wanted poster tap (§5.1): malware labels revealed so far, by strain. */
+  /** Wanted poster tap (§5.1): malware labels revealed so far (the sim's `wanted`, B2 §2.8), by strain. */
   private openWanted(): void {
-    const ob = this.registry.get(REG_ONBOARDING) as OnboardingSave | undefined
-    const groups = wantedGroups(this.gd, ob?.wanted ?? [])
+    const groups = wantedGroups(this.gd, this.vs.wanted)
     const rows: PopRow[] = groups.map((g) => ({
       icon: g.strain ? `ic_strain_${g.strain}` : null,
       text: g.labels.join(', '),
@@ -1034,13 +1146,24 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.lane.update(time, delta)
     this.dock.update(time, delta)
     this.workers.update(time, delta)
-    if (!this.slotCard?.isOpen()) this.workers.showNames(null)
+    this.workers.showNames(this.namesFor())
     this.readoutAcc += delta
     if (this.readoutAcc >= READOUT_REFRESH_MS) {
       this.readoutAcc = 0
       this.lane.refreshReadout()
       this.lane.refreshSign()
     }
+  }
+
+  /**
+   * Whose name tags show (WorkerSprites.showNames): the crew of the desk
+   * whose SlotCard is open, the sorter while the StationCard is open.
+   */
+  private namesFor(): string | null {
+    const id = this.slotCard?.nodeId ?? null
+    if (id !== null && this.node(id)?.fixture?.kind === 'desk') return id
+    if (this.stationCard?.isOpen()) return holdNodeId(this.vs)
+    return null
   }
 
   /** Debug / e2e: what the room shows right now. */

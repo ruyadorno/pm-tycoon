@@ -4,6 +4,9 @@
 // policy Tosses) and `lives` (malware delivered costs a life) are on since
 // M2, `levels` (level-ups, region unlocks, lane growth) and `payroll`
 // (paydays, walkouts) since M3 — every playtest-1 gate window is active.
+// `people` (build 2, M6: applicants, stats, the Hold Bay sorter, drivers)
+// gates nothing in the sim — the state shape cannot be toggled — but
+// tools/sim/report.ts reads it for the people rows and the delegating policy.
 // tools/sim/report.ts reads the same flags so a gate window whose system is
 // not built yet prints as informational instead of failing.
 
@@ -12,6 +15,7 @@ export const SIM_FEATURES = {
   lives: true,
   levels: true,
   payroll: true,
+  people: true,
 }
 
 export type SimFeature = keyof typeof SIM_FEATURES
@@ -22,4 +26,5 @@ export const FEATURE_MILESTONE: Record<SimFeature, string> = {
   lives: 'M2',
   levels: 'M3',
   payroll: 'M3',
+  people: 'M6',
 }

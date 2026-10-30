@@ -13,7 +13,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 ## Milestone checklist (build 2)
 
 - [x] M5 foundations + the author's fixes: logo + attract title, slab, bike, hop, modern port art, two atlases + hashed URLs, save v2, report §6 rough edges (commit `M5: …`)
-- [ ] M6 people: applicants, pips, charisma, salaries, desk 2, the Hold Bay sorter, drivers, hire sheets, faces, policies (commit `M6: …`)
+- [x] M6 people: applicants, pips, charisma, salaries, desk 2, the Hold Bay sorter, drivers, hire sheets, faces, policies (commit `M6: …`)
 - [ ] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
 - [ ] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
 - [ ] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
@@ -29,7 +29,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 ## Gate results
 
-Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M5 commit (data 2112987b, unchanged since M3); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
+Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M6 commit (data 6225dd3d; the table below is playtest 1's, the M6 medians are in the M6 entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
 
 | Gate                                                          | Window           | Median    | Min / max     | Pass                        |
 | ------------------------------------------------------------- | ---------------- | --------- | ------------- | --------------------------- |
@@ -47,7 +47,40 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M5 — foundations + fixes — 2026-10-30 02:38 UTC — DONE at (this commit; sha recorded in the M6 entry)
+## M6 — people — 2026-10-30 05:21 UTC — DONE at (this commit; sha recorded in the M7 entry)
+
+Built: the people layer of B2 §2 — `employees.json` B2 §9 (roles with pip tables, applicants, desks, hold station),
+`systems/people.ts` (three applicants per role on their own RNG stream, daily refresh, pips → numbers, salaries and
+fees, ★ applicants with expiry, hire/fire/postAd), per-inspector detection with same-desk charisma (pCap 0.96; the desk
+readout is the mean), desk 2 (`placeDesk`, L3, $400), `systems/sorter.ts` (the Toss-only Hold Bay sorter: wanted list
+→ certain Toss, judgement → Toss or a `looks clean` tag, 2-s player grace; the Sorter Arm in the same station),
+`state.wanted` in the sim, drivers (picker on every purchase, `Hire later`, Replace after the trip, speed/stop/
+charisma/affinity), payroll with sorters, `STATE_VERSION` 3; the HireSheet (three cards: face, pips, $/day · fee, ★,
+Post an ad), the Garage driver picker and `···` row menu, the StationCard, the desk card per inspector, the HoldBayCard
+hint, the lost-life card naming the person with the better counter line, procedural faces/pips/★/`worker_sorter`/
+`hold_station`/`station_outline`; the competent policy's applicant rules and the `delegating` policy (`vlr sim:delegating`).
+Gate: PASS on every playtest-1 window (data 6225dd3d): first delivery 43.3 s, scripted catch 178.3 s (10/10), L2 12.28
+min, truck +1.93 min, lives 0, shelf stall 0 s, Hold Bay 6.87/10 min. Δ vs M5: L2 −5.9 % and truck −8.1 % (outside
+±5 %, accepted: the policy hires the fastest of three drivers — decisions.md M6), the rest within ±5 %. People rows:
+payroll share 0.230 (≤ 0.25), 4 hires. Delegating (informational): lives median 1, sorter calls 37.5 / wrong tosses 3
+/ missed 1, payroll share 0.27; seed 10 loses all three lives.
+Tests: 1,344 passing outside the long sweeps (vitest, 77 files + 1 todo; the full check adds the long sweeps); e2e: full
+`vlr e2e` 84 passed / 0 failed; `vlr check` 107 s. Draw calls: city 3, warehouse 6. Dist 5.53 MB (~3.66 MB gzip).
+Shots: `hire-sheet` (+360×604) — three inspector cards with faces, eye/pace/charisma pips, catch % and time,
+false-flag, `$/day · fee`, Hire, Post an ad $30, "New faces in 0:59"; `garage-driver-picker` — "Who drives the Bike?",
+three driver cards, Hire later; `warehouse-two-desks` — desks in slots 1 and 3, desk 2 at 0.87 / 0.96 ("catch 92% avg");
+`station-sorter` — the orange-vest sorter at the podium, the S on the rack lamp; `holdcard-sorter-hint` (+360×604) —
+"Mo: looks clean (90%)" with the sorter's face; `warehouse-l1` — the locked station outline; `garage` /
+`garage-430x932` — driver pips and `···`; `lost-life` — "Slot 1 desk — Audrey: …"; `city-zoom2` — "Bike 1 · Sem" with
+speed pips. All in the STYLE.md look.
+Deviations from spec-core.md / B2: design defaults D1–D20 (decisions.md "Run decisions and deviations (M6 — people)");
+the ±5 % drift above; Re-hire is two taps (`···` → Re-hire) so Sell stays reachable.
+Open for the author: G6 (people part) — `art/contact/people@4x.png` (faces, pips, ★, `worker_sorter`, the station, the
+three machines); G5 (Low-density) — `art/contact/lowres@4x.png` (ten uniques, fogged until M9); the delegating lives row
+(trusting the sorter's "looks clean" costs ~1 life per 30 min).
+Next: M7 quests
+
+## M5 — foundations + fixes — 2026-10-30 02:38 UTC — DONE at 67fd97a
 
 Built: the Title as an overlay over an attract-mode City (`src/assets/attract.json`: seed 7, competent policy, 24 min,
 the L2 city; camera tour `src/render/AttractCamera.ts`, 12-s legs + 1-s holds; Continue/New game swap in the real sim
@@ -148,8 +181,8 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 ## Art approvals pending
 
 - G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
-- G5 region sheets (build 2): pending (M8–M9)
-- G6 tiers 3–5 + machines + people (build 2): pending (M6–M9)
+- G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural, Airport, Park & civic, Docks pending
+- G6 tiers 3–5 + machines + people (build 2): people + machines presented at M6 — `art/contact/people@4x.png` (agent picks `battery_checker`, `xray`, `sorter_arm`; procedural faces, pips, ★, `worker_sorter`, `hold_station`); tiers pending (M8–M9)
 
 - G1 palette + STYLE.md: drawn 2026-10-29 (M0), presented in the end-of-run report — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
 - G2 anchor sheet: <not run | provisional (agent-approved ids: …, scores) | author-confirmed ids: … | rejected ids: …> — `art/contact/anchors@4x.png`
@@ -158,7 +191,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Cost spent
 
-- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173), $0 credits
+- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); run total 333; $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)
 - Retro Diffusion: $0 (expected; only with RD_API_KEY and after the author read its ToS)

@@ -78,6 +78,7 @@ export function loadDrawers(): Promise<void> {
     await import('./warehouse.ts') // §2.7 interior tiles, fixtures, worker
     await import('./parcels.ts') // §2.8 parcels, parcel_mini_*
     await import('./icons.ts') // §2.8 ic_*, arrow, wh_dock_light
+    await import('./faces.ts') // build 2 M6: face_00 … face_11
     await import('./ui.ts') // §2.8 ui_*, badge_new, sign_title
     await import('./fx.ts') // §2.8 fx_*, ring, rush_ring
   })()

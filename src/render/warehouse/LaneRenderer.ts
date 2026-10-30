@@ -31,10 +31,24 @@
 //
 // No slot index is computed here: positions come from FixedLaneLayout by
 // node id, order from `next` edges, caps and locks from the sim / data.
+//
+// M6 (spec-build2 §2.4, §2.6): every desk fixture draws the same `desk`
+// sprite in whichever slot holds it (desk 1 and desk 2 alike); the Hold Bay
+// station (RoomLayout HOLD_STATION) shows a dashed outline + lock + `Lv2`
+// while locked, the `hold_station` podium once live (a dashed outline until
+// that frame is drawn), a "+" while empty, the Sorter Arm (`sorter_arm_f0`,
+// a back-layer fixture; `onArmToss` plays reach → toss → rest) when one sits
+// there and its art is packed, and the rack lamp wears a small yellow `S`
+// while an active sorter is on duty. State-derived each frame from
+// `ViewSim.holdStation` (stationLook).
 import Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type { LaneNode, Parcel, Size, Strain } from '../../sim/types.ts'
-import type { ViewSim } from '../../sim/view-api.ts'
+import type {
+  HoldStationView,
+  PersonView,
+  ViewSim,
+} from '../../sim/view-api.ts'
 import { addPanel } from '../../ui/Panel.ts'
 import { flaggerOf, shownTrait } from '../../ui/warehouse/HoldBayCard.ts'
 import { detectionTone, TONE_LIGHT } from '../../ui/ShieldPopover.ts'
@@ -50,6 +64,7 @@ import {
   bayRect,
   DOOR_POINT,
   FixedLaneLayout,
+  HOLD_STATION,
   POSTER,
   PLATE_H,
   PLATE_PAD,
@@ -57,6 +72,7 @@ import {
   PROPS_T2,
   RACK,
   RACK_LAMP,
+  RACK_S_BADGE,
   READOUT_GAP,
   READOUT_H,
   ROOM_COLS,
@@ -70,6 +86,8 @@ import {
   SIGN,
   SIGN_TEXT,
   SIGNAGE,
+  SORTER_ARM_AT,
+  SORTER_STAND,
   STRIP_LIGHTS,
   TILE,
   type BeltTile,
@@ -180,6 +198,8 @@ const TOSS_MS = 250
 const LOAD_MS = 300
 const SHELF_POP_MS = 200
 const LID_MS = 300
+/** Sorter Arm toss: reach, toss, rest — one frame each (§3.4 pace). */
+const ARM_FRAME_MS = 120
 const OOPS_LINES_MS = 1200
 /** The plated OOPS stamp rises less so it stays clear of the rack. */
 const OOPS_RISE = 12
@@ -261,6 +281,68 @@ export function holdBayPositions(
     used.add(b)
   }
   return out
+}
+
+// ---- M6 people reads (doc §3.4 ViewSim.people / holdStation) -----------------
+
+/** The PersonView fields the room reads (the pure helpers take this subset). */
+export type RoomPerson = Pick<
+  PersonView,
+  'id' | 'role' | 'name' | 'look' | 'active' | 'unpaid' | 'nodeId'
+>
+
+/** The HoldStationView fields the room reads (its sorter narrowed to RoomPerson). */
+export type RoomStation = Omit<HoldStationView, 'sorter'> & {
+  readonly sorter: RoomPerson | null
+}
+
+/** What the Hold Bay station cell shows (B2 §2.6; one state → one look). */
+export interface StationLook {
+  /** Dashed outline: 'locked' (with the lock + level tag), 'empty' (live, no podium art yet), none. */
+  outline: 'locked' | 'empty' | null
+  /** `Lv2` under the lock while locked, else null. */
+  lockText: string | null
+  /** The `hold_station` podium. */
+  podium: boolean
+  /** The "+" over a live, empty station (like an empty slot, §1.6). */
+  plus: boolean
+  /** The Sorter Arm's sprite (only once its art exists, M9). */
+  arm: boolean
+  /** The rack lamp's `S` badge: an active sorter is on duty. */
+  sBadge: boolean
+}
+
+const NO_STATION: StationLook = {
+  outline: null,
+  lockText: null,
+  podium: false,
+  plus: false,
+  arm: false,
+  sBadge: false,
+}
+
+/**
+ * The station's look for a HoldStationView (null = a facade without the
+ * station: nothing drawn). `art` says which frames the atlas holds now
+ * (`hold_station`, `sorter_arm_f0`), so the room works before the art lands.
+ */
+export function stationLook(
+  st: RoomStation | null,
+  art: { podium: boolean; arm: boolean },
+): StationLook {
+  if (!st) return NO_STATION
+  if (!st.unlocked)
+    return { ...NO_STATION, outline: 'locked', lockText: `Lv${st.unlockLevel}` }
+  const arm = st.kind === 'sorter_arm' && art.arm
+  const podium = art.podium && !arm
+  return {
+    outline: podium || arm ? null : 'empty',
+    lockText: null,
+    podium,
+    plus: st.kind === null,
+    arm,
+    sBadge: st.kind === 'sorter' && st.sorter?.active === true,
+  }
 }
 
 /** A flagged-looking parcel: flagged and still in a slot or the Hold Bay. */
@@ -376,6 +458,15 @@ export class LaneRenderer {
   private bays: Img[] = []
   private bayLocks: { icon: Img; text: Txt }[] = []
   private rackLamp!: Img
+  private sBadge!: Txt
+  private stPodium: Img | null = null
+  private stOutline!: Img
+  private stLock!: Img
+  private stLockText!: Txt
+  private stPlus!: Img
+  private stArm: Img | null = null
+  private armTimer: Phaser.Time.TimerEvent | null = null
+  private stationKey = ''
   private bin!: Img
   private binText!: Txt
   private ext!: Img
@@ -573,6 +664,16 @@ export class LaneRenderer {
       RACK_LAMP.y,
       'lamp_off',
     )
+    this.sBadge = this.text(
+      this.L.badges,
+      RACK_S_BADGE.x,
+      RACK_S_BADGE.y,
+      'S',
+      PALETTE.yellow2,
+    )
+    this.sBadge.setDropShadow(1, 1, THEME.shadow, 1)
+    this.sBadge.setVisible(false)
+    this.buildStation()
 
     // Quarantine Bin + counter.
     const binR = lay.rectFor('bin') as Rect
@@ -660,6 +761,118 @@ export class LaneRenderer {
       unrollPending: false,
       unrollTimer: null,
     }
+  }
+
+  // ================================================================ station
+
+  /** The Hold Bay station's parts (B2 §2.6), all hidden until syncStation. */
+  private buildStation(): void {
+    const r = HOLD_STATION
+    // Podium: a back-layer prop (interior); absent until the art lands.
+    const pod = frameOrNull('hold_station')
+    if (pod) {
+      this.stPodium = this.img(this.L.fixtures, r.x, r.y, pod)
+      this.stPodium.setVisible(false)
+    }
+    // An atlas image (like the slots' outlines), never a Graphics: a
+    // Graphics in the badges layer breaks its image batch (+1 draw call).
+    this.stOutline = this.img(this.L.badges, r.x, r.y, 'station_outline')
+    this.stOutline.setVisible(false)
+    this.stLock = this.img(
+      this.L.badges,
+      r.x + r.w / 2,
+      r.y + 8,
+      'ic_lock',
+      0.5,
+    )
+    this.stLock.setVisible(false)
+    this.stLockText = this.text(this.L.badges, 0, r.y + 24, '', PALETTE.grey5)
+    this.stLockText.setDropShadow(1, 1, THEME.shadow, 1)
+    this.stLockText.setVisible(false)
+    // The "+" marks the free stand (the podium's clear east half).
+    this.stPlus = this.img(
+      this.L.badges,
+      SORTER_STAND.x,
+      r.y + r.h / 2,
+      'ic_plus',
+      0.5,
+      0.5,
+    )
+    this.stPlus.setVisible(false)
+    // The Sorter Arm (L4; M6 rule): a 64 × 64 `fixture` (interior, a back
+    // layer like the rack), drawn over the hidden podium; absent until its
+    // frames are packed.
+    const arm = frameOrNull('sorter_arm_f0')
+    if (arm) {
+      this.stArm = this.img(
+        this.L.fixtures,
+        SORTER_ARM_AT.x,
+        SORTER_ARM_AT.y,
+        arm,
+      )
+      this.stArm.setVisible(false)
+    }
+    this.stationKey = ''
+  }
+
+  /**
+   * `parcel:tossed {source: 'arm'}`: the Arm reaches toward the rack (f1),
+   * tosses toward the bin (f2) and rests (f0), ARM_FRAME_MS each; frames
+   * the atlas lacks are skipped. A no-op without the Arm or its art.
+   */
+  onArmToss(): void {
+    const img = this.stationArm()
+    if (!img) return
+    this.armTimer?.remove(false)
+    const seq = ['sorter_arm_f1', 'sorter_arm_f2', 'sorter_arm_f0'].filter(
+      (f) => frameOrNull(f) !== null,
+    )
+    const step = (i: number): void => {
+      this.armTimer = null
+      const f = seq[i]
+      if (!f || !img.active) return
+      img.setFrame(f)
+      if (i + 1 < seq.length)
+        this.armTimer = this.scene.time.delayedCall(ARM_FRAME_MS, () =>
+          step(i + 1),
+        )
+    }
+    step(0)
+  }
+
+  /** Re-read the station (every frame; cheap key compare). */
+  private syncStation(): void {
+    const look = stationLook(this.vs.holdStation, {
+      podium: this.stPodium !== null,
+      arm: this.stArm !== null,
+    })
+    const key = `${look.outline}|${look.lockText}|${look.podium}|${look.plus}|${look.arm}|${look.sBadge}`
+    if (key === this.stationKey) return
+    this.stationKey = key
+    this.stOutline.setVisible(look.outline !== null)
+    this.stOutline.setAlpha(
+      look.outline === 'locked' ? LOCKED_ALPHA : EMPTY_OUTLINE_ALPHA,
+    )
+    const locked = look.lockText !== null
+    this.stLock.setVisible(locked)
+    this.stLockText.setVisible(locked)
+    if (locked) {
+      this.stLockText.setText(look.lockText ?? '')
+      this.stLockText.setX(
+        Math.round(
+          HOLD_STATION.x + (HOLD_STATION.w - this.stLockText.width) / 2,
+        ),
+      )
+    }
+    this.stPodium?.setVisible(look.podium)
+    this.stPlus.setVisible(look.plus)
+    this.stArm?.setVisible(look.arm)
+    this.sBadge.setVisible(look.sBadge)
+  }
+
+  /** The Sorter Arm's image while one sits in the station (pop / tests). */
+  stationArm(): Img | null {
+    return this.stArm?.visible ? this.stArm : null
   }
 
   // ================================================================ readout
@@ -1032,8 +1245,11 @@ export class LaneRenderer {
   /** §2.1: the fixture pops in (alpha 0 → 1, y + 8 → y, 150 ms). */
   onFixturePlaced(nodeId: string): void {
     this.syncSlots()
+    this.syncStation()
     const v = this.slots.get(nodeId)
-    const img = v?.machine ?? v?.desk
+    // The Sorter Arm is bought into the Hold Bay node (`'hold'`, M6 §4.3).
+    const arm = this.isHoldBay(nodeId) ? this.stationArm() : null
+    const img = v?.machine ?? v?.desk ?? arm
     if (!img) return
     const y = img.y
     img.setAlpha(0).setY(y + 8)
@@ -1546,6 +1762,12 @@ export class LaneRenderer {
       .some((n) => n.id === nodeId && n.kind === 'slot')
   }
 
+  private isHoldBay(nodeId: string): boolean {
+    return this.vs.lane
+      .nodes()
+      .some((n) => n.id === nodeId && n.kind === 'holdBay')
+  }
+
   /** A sprite whose parcel left the lane: to the shelf, or gone. */
   private leave(rec: PSprite): void {
     const p = this.vs.parcel(rec.id)
@@ -1732,6 +1954,12 @@ export class LaneRenderer {
       if (n.locked) this.lockedSlots.add(n.id)
     this.syncSlots(false)
     this.syncBays()
+    this.stationKey = ''
+    this.armTimer?.remove(false)
+    this.armTimer = null
+    const rest = frameOrNull('sorter_arm_f0')
+    if (rest) this.stArm?.setFrame(rest)
+    this.syncStation()
     this.refreshBin()
     this.bin.setFrame('bin_closed')
     this.cracked = !this.cracked // force the sign state below
@@ -1771,6 +1999,7 @@ export class LaneRenderer {
       }
     }
     this.animateMachines(delta)
+    this.syncStation()
     this.updateStall(stalled)
     this.updateLamp(delta)
     this.updateRings(delta)
@@ -1898,6 +2127,7 @@ export class LaneRenderer {
     for (const rec of this.sprites.values()) this.release(rec)
     for (const v of this.slots.values()) this.cancelUnroll(v)
     this.lidTimer?.remove(false)
+    this.armTimer?.remove(false)
   }
 }
 

@@ -39,17 +39,32 @@
 //      New game tap swaps the sims (__pm.core !== the attract sim,
 //      __pm.attractSim null), the HUD wakes, the City leaves attract mode.
 //      The fps under SwiftShader is logged, not asserted.
+//   M6 (plan-build2 §8.3 tasks 5-7 + acceptance; design-m6 §6, §8 G) —
+//      people: the Garage buy goes through the driver picker (real taps on
+//      `garage:buy:bike`, then the first applicant's card): the bike is bought
+//      with that driver (fee debited, the log's buyVehicle carries the
+//      applicant id, `Bike 1 bought — <name> hired`) and leaves the lot;
+//      ?level=2 forces L2 on the fresh game (the log's first command, a
+//      replay matches) and the StationCard's [Hire a sorter] seats the first
+//      sorter applicant, who walks in to the stand under the rack lamp's S;
+//      the Title's New game with ?level=3&policy=delegating is a fresh L3
+//      game driven by the delegating policy (the attract sim untouched).
+//      The save is version 3 (types.ts STATE_VERSION since M6).
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, gameUp, test, titleUp, type PmHelpers } from './fixtures.ts'
 import {
   bayRect,
   expectRoomFits,
+  hireSheet,
   openSheet,
   policyOff,
   roomFit,
+  sceneTarget,
   settleUntil,
+  SORTER_STAND,
   tapRoomRect,
+  tapStation,
   tapTarget,
 } from './warehouse.ts'
 
@@ -64,6 +79,10 @@ const LEVEL_UP_FIXTURE = 'tests/fixtures/level-up.json'
 const MAX_DRAW_CALLS = 8
 /** src/sim/save.ts SAVE_KEY (build 2: save v2, plan-build2 §8.2 task 9). */
 const SAVE_KEY = 'pm.save.v2'
+/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (3 since M6, design-m6 §2.1). */
+const SAVE_VERSION = 3
+/** A new game at seed 7 without the policy (the player's own buys). */
+const NEW_URL = '/?seed=7&debug=1&skipTitle=1&audio=0'
 
 interface BootInfo {
   font: boolean
@@ -464,7 +483,7 @@ test.describe('M1 city smoke', () => {
       return { version: s.version, seed: s.seed, tick: s.state?.tick }
     }, SAVE_KEY)
     console.log(`smoke: autosave ${JSON.stringify(save)}`)
-    expect(save.version).toBe(2)
+    expect(save.version).toBe(SAVE_VERSION)
     expect(save.seed).toBe(7)
 
     // HUD hit rects at the profile width.
@@ -1036,5 +1055,394 @@ test.describe('M5 attract title smoke', () => {
       consoleErrors.filter((e) => !/Failed to load resource|policy-/.test(e)),
       consoleErrors.join('\n'),
     ).toEqual([])
+  })
+})
+
+// ---- M6 ------------------------------------------------------------------
+
+/** Real tap on the HUD Garage button; the sheet slides in. */
+async function openGarage(page: Page, pm: PmHelpers): Promise<void> {
+  const r = await page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      L: { garage: { rect: { x: number; y: number; w: number; h: number } } }
+    }
+    return hud.L.garage.rect
+  })
+  await pm.tap(r.x + Math.floor(r.w / 2), r.y + Math.floor(r.h / 2))
+  expect(
+    await settleUntil(page, pm, () =>
+      page.evaluate(() => {
+        const g = window.__pm!.game.scene.getScene('Garage') as unknown as {
+          garageSheet: { isOpen(): boolean } | null
+        }
+        return g.garageSheet?.isOpen() ?? false
+      }),
+    ),
+    'the Garage sheet opens',
+  ).toBe(true)
+  await pm.settle(24)
+}
+
+/** The HUD toast's current text ('' when none). */
+function toastText(page: Page): Promise<string> {
+  return page.evaluate(
+    () =>
+      (
+        window.__pm!.game.scene.getScene('HUD') as unknown as {
+          toast: { currentText(): string | null }
+        }
+      ).toast.currentText() ?? '',
+  )
+}
+
+test.describe('M6 people smoke', () => {
+  test('the Garage buy goes through the driver picker: the first applicant drives the new bike', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(NEW_URL)
+    await pm.freeze()
+    await pm.settle(10)
+    const before = await page.evaluate(() => {
+      const api = window.__pm!
+      const a = api.sim.applicants('driver', 'bike')[0]!
+      return {
+        vehicles: api.sim.vehicles.length,
+        money: api.sim.money,
+        price: api.data.vehicles.types.find((t) => t.id === 'bike')!.price,
+        applicant: { id: a.id, name: a.name, fee: a.hireFee },
+      }
+    })
+    console.log(`smoke: before the buy ${JSON.stringify(before)}`)
+    expect(before.vehicles, 'a new game owns no vehicle').toBe(0)
+
+    await openGarage(page, pm)
+    await tapTarget(page, pm, 'Garage', 'garage:buy:bike')
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await hireSheet(page, 'Garage')) !== null,
+      ),
+      'the Bike buy card opens the driver picker',
+    ).toBe(true)
+    await pm.settle(16) // the slide-in + the tap guard
+    const sheet = await hireSheet(page, 'Garage')
+    console.log(`smoke: driver picker ${JSON.stringify(sheet)}`)
+    expect(sheet).toMatchObject({ id: 'garage:hire', role: 'driver' })
+    expect(sheet!.ids).toHaveLength(3)
+    expect(sheet!.ids[0]).toBe(before.applicant.id)
+
+    await tapTarget(page, pm, 'Garage', 'garage:hire:card:0')
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await hireSheet(page, 'Garage')) === null,
+      ),
+      'Hire closes the picker',
+    ).toBe(true)
+    const after = await page.evaluate(() => {
+      const api = window.__pm!
+      const v = api.sim.vehicles[0] ?? null
+      const d = api.sim.people().find((p) => p.id === v?.driverId) ?? null
+      const buys = api.core.commandLog
+        .map((e) => e.cmd)
+        .filter((c) => c.kind === 'buyVehicle')
+      return {
+        vehicles: api.sim.vehicles.length,
+        type: v?.type ?? null,
+        name: v?.name ?? null,
+        driverName: v?.driverName ?? null,
+        driver: d ? { role: d.role, vehicleId: d.vehicleId } : null,
+        vehicleId: v?.id ?? null,
+        money: api.sim.money,
+        buys,
+      }
+    })
+    console.log(`smoke: after the buy ${JSON.stringify(after)}`)
+    expect(after.vehicles).toBe(1)
+    expect(after.type).toBe('bike')
+    expect(after.driverName, 'the picked applicant drives it').toBe(
+      before.applicant.name,
+    )
+    expect(after.driver).toEqual({ role: 'driver', vehicleId: after.vehicleId })
+    expect(after.money).toBe(before.money - before.price - before.applicant.fee)
+    expect(after.buys).toEqual([
+      { kind: 'buyVehicle', type: 'bike', applicantId: before.applicant.id },
+    ])
+    expect(
+      await settleUntil(page, pm, async () =>
+        (await toastText(page)).startsWith(`${after.name} bought`),
+      ),
+      'the buy toast',
+    ).toBe(true)
+    expect(await toastText(page)).toBe(
+      `${after.name} bought — ${before.applicant.name} hired`,
+    )
+
+    // The driver drives: the bike goes out and picks a parcel up.
+    const pick = await page.evaluate(() =>
+      window.__pm!.waitEvent('parcel:pickedUp'),
+    )
+    console.log(`smoke: first pickup ${JSON.stringify(pick)}`)
+    expect(pick.ok, 'the new bike picks a parcel up within 60 s').toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('a Hire-later bike keeps Sell in its ··· popover (Hire driver first) and sells', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(NEW_URL)
+    await pm.freeze()
+    await pm.settle(10)
+    // Bike 1 with its cheapest applicant (so Sell is open on Bike 2), then
+    // Bike 2 through Hire later: parked, no driver.
+    const ids = await page.evaluate(() => {
+      const vs = window.__pm!.sim
+      const cheap = [...vs.applicants('driver', 'bike')].sort(
+        (a, b) => a.hireFee - b.hireFee,
+      )[0]!
+      const a = vs.buyVehicle('bike', cheap.id)
+      const b = vs.buyVehicle('bike', null)
+      return {
+        a: a.ok ? (a.vehicleId ?? null) : null,
+        b: b.ok ? (b.vehicleId ?? null) : null,
+      }
+    })
+    console.log(`smoke: hire-later fleet ${JSON.stringify(ids)}`)
+    expect(ids.a).not.toBeNull()
+    expect(ids.b).not.toBeNull()
+
+    await openGarage(page, pm)
+    await tapTarget(page, pm, 'Garage', `garage:action:${ids.b}`)
+    const live = (id: string) =>
+      sceneTarget(page, 'Garage', id).then((r) => r !== null)
+    expect(
+      await settleUntil(page, pm, () => live('garage:menu:sell')),
+      'the driverless row opens its ··· popover',
+    ).toBe(true)
+    await pm.settle(8)
+    const menu = {
+      hire: await live('garage:menu:hire'),
+      rehire: await live('garage:menu:rehire'),
+      replace: await live('garage:menu:replace'),
+      fire: await live('garage:menu:fire'),
+      sell: await live('garage:menu:sell'),
+    }
+    console.log(`smoke: driverless popover ${JSON.stringify(menu)}`)
+    expect(menu).toEqual({
+      hire: true,
+      rehire: false,
+      replace: false,
+      fire: false,
+      sell: true,
+    })
+
+    await tapTarget(page, pm, 'Garage', 'garage:menu:sell')
+    expect(
+      await settleUntil(page, pm, () => live('garage:sellDialog:confirm')),
+      'Sell asks first',
+    ).toBe(true)
+    await pm.settle(8)
+    await tapTarget(page, pm, 'Garage', 'garage:sellDialog:confirm')
+    expect(
+      await settleUntil(page, pm, () =>
+        page.evaluate(
+          (id) => !window.__pm!.sim.vehicles.some((v) => v.id === id),
+          ids.b!,
+        ),
+      ),
+      'the Hire-later bike is sold',
+    ).toBe(true)
+    expect(
+      await page.evaluate(() => window.__pm!.sim.vehicles.map((v) => v.id)),
+    ).toEqual([ids.a])
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('?level=2 forces L2 on the fresh game; the StationCard hires a sorter who walks to the stand', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(`${NEW_URL}&view=warehouse&level=2`)
+    const forced = await page.evaluate(() => {
+      const api = window.__pm!
+      const first = api.core.commandLog[0] ?? null
+      const r = api.replay()
+      return {
+        level: api.sim.level,
+        first: first ? { tick: first.tick, cmd: first.cmd } : null,
+        unlocked: api.sim.holdStation.unlocked,
+        kind: api.sim.holdStation.kind,
+        replay: r.matches,
+      }
+    })
+    console.log(`smoke: ?level=2 ${JSON.stringify(forced)}`)
+    expect(forced).toEqual({
+      level: 2,
+      first: { tick: 0, cmd: { kind: 'debugForceLevel', level: 2 } },
+      unlocked: true,
+      kind: null,
+      replay: true,
+    })
+
+    await pm.freeze()
+    await pm.settle(30)
+    await tapStation(page, pm)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'station',
+      ),
+      'a tap on the station opens the StationCard',
+    ).toBe(true)
+    await pm.settle(16)
+    await tapTarget(page, pm, 'Warehouse', 'station:hire')
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'hire',
+      ),
+      '[Hire a sorter] opens the HireSheet',
+    ).toBe(true)
+    await pm.settle(16)
+    const sheet = await hireSheet(page, 'Warehouse')
+    console.log(`smoke: sorter picker ${JSON.stringify(sheet)}`)
+    expect(sheet).toMatchObject({ id: 'wh:hire', role: 'sorter' })
+    expect(sheet!.ids).toHaveLength(3)
+    await tapTarget(page, pm, 'Warehouse', 'wh:hire:card:0')
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) !== 'hire',
+      ),
+      'Hire closes the HireSheet',
+    ).toBe(true)
+    // The tap is handled at once; WorkerSprites reconciles on the next frames.
+    await pm.settle(4)
+    const seated = await page.evaluate(() => {
+      const hs = window.__pm!.sim.holdStation
+      return {
+        kind: hs.kind,
+        id: hs.sorter?.id ?? null,
+        name: hs.sorter?.name ?? null,
+        active: hs.sorter?.active ?? null,
+      }
+    })
+    console.log(`smoke: sorter seated ${JSON.stringify(seated)}`)
+    expect(seated.kind).toBe('sorter')
+    expect(seated.name).toBe(sheet!.names[0])
+    expect(seated.active).toBe(true)
+
+    // The sprite walks in from the dock door (~9 s at 64 px/s, lane F).
+    const walk = (): Promise<{
+      walking: boolean
+      at: { x: number; y: number } | null
+      badge: boolean
+    }> =>
+      page.evaluate((id) => {
+        const wh = window.__pm!.game.scene.getScene('Warehouse') as unknown as {
+          workers: {
+            isWalking(id: number): boolean
+            positionOf(id: number): { x: number; y: number } | null
+          }
+          lane: { sBadge: { visible: boolean } }
+        }
+        return {
+          walking: wh.workers.isWalking(id),
+          at: wh.workers.positionOf(id),
+          badge: wh.lane.sBadge.visible,
+        }
+      }, seated.id!)
+    expect((await walk()).at, 'the sorter has a sprite').not.toBeNull()
+    const frames = await page.evaluate((id) => {
+      const api = window.__pm!
+      const wh = api.game.scene.getScene('Warehouse') as unknown as {
+        workers: { isWalking(id: number): boolean }
+      }
+      let n = 0
+      while (wh.workers.isWalking(id) && n < 1200) {
+        api.step(16)
+        n++
+      }
+      return n
+    }, seated.id!)
+    console.log(`smoke: the sorter walked in for ${frames} frames`)
+    expect(frames, 'the sorter reaches the stand').toBeLessThan(1200)
+    const w = await walk()
+    console.log(`smoke: sorter at ${JSON.stringify(w)}`)
+    expect(w.at).toEqual({ x: SORTER_STAND.x, y: SORTER_STAND.y })
+    expect(w.badge, 'the rack lamp shows S').toBe(true)
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('Title → New game with ?level=3&policy=delegating: a fresh L3 game, the delegating policy, the attract sim untouched', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    const url = '/?seed=7&debug=1&audio=0&level=3&policy=delegating'
+    await page.goto(url)
+    await page.evaluate(() => localStorage.clear())
+    await page.goto(url)
+    await titleUp(page)
+    const attract = await page.evaluate(() => {
+      const s = window.__pm!.attractSim!
+      return {
+        forced: s.commandLog.some((e) => e.cmd.kind === 'debugForceLevel'),
+        params: {
+          level: window.__pm!.params.level,
+          kind: window.__pm!.params.policyKind,
+        },
+      }
+    })
+    console.log(`smoke: attract under ?level=3 ${JSON.stringify(attract)}`)
+    expect(attract).toEqual({
+      forced: false,
+      params: { level: 3, kind: 'delegating' },
+    })
+    await tapTarget(page, pm, 'Title', 'title:new-game')
+    await gameUp(page)
+    const game = await page.evaluate(() => {
+      const api = window.__pm!
+      const first = api.core.commandLog[0] ?? null
+      const pol = (
+        api.stepper as unknown as { policy: { name?: string } | null }
+      ).policy
+      return {
+        level: api.sim.level,
+        first: first ? { tick: first.tick, cmd: first.cmd } : null,
+        policy: pol?.name ?? null,
+        docks: api.sim.regionState('docks'),
+      }
+    })
+    console.log(`smoke: New game under ?level=3 ${JSON.stringify(game)}`)
+    expect(game).toEqual({
+      level: 3,
+      first: { tick: 0, cmd: { kind: 'debugForceLevel', level: 3 } },
+      policy: 'delegating',
+      docks: 'live',
+    })
+    // A minute of the delegating policy at L3: it keeps the game running.
+    await pm.freeze()
+    await pm.advance(60_000)
+    await pm.settle(8)
+    const m = await page.evaluate(() => window.__pm!.metrics())
+    console.log(
+      `smoke: delegating at L3 after 60 s: $${m.money} lv ${m.level} lives ${m.lives} deliveries ${m.deliveries}`,
+    )
+    expect(m.level).toBeGreaterThanOrEqual(3)
+    expect(m.lives, 'still in the game').toBeGreaterThan(0)
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

@@ -4,19 +4,25 @@
 
 import { applyConfig, buildGameData } from '../../src/data/index.ts'
 import type { GameData } from '../../src/data/types.ts'
+import type { CommandResult } from '../../src/sim/commands.ts'
 import { onSimEvent } from '../../src/sim/events.ts'
 import type { SimEventName, SimEventPayloads } from '../../src/sim/events.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import type {
+  Affinity,
+  Applicant,
   BuildingId,
   DistrictId,
   Parcel,
+  Pips,
+  Role,
   Size,
   Vehicle,
   VehicleType,
 } from '../../src/sim/types.ts'
 import { liveSlotIds, laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import { holdBays } from '../../src/sim/systems/lane.ts'
+import { freshName, hireFeeOf } from '../../src/sim/systems/people.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
 
 let shipped: GameData | null = null
@@ -60,9 +66,96 @@ export function collect<K extends SimEventName>(
   return out
 }
 
-/** Spec §7.1 opening A: a bike + a Metal detector in the first empty live slot. */
-export function openingA(sim: Sim): void {
-  const bike = sim.dispatch({ kind: 'buyVehicle', type: 'bike' })
+/** The 3/3(/0) pips of a role: the playtest-1 numbers (speedMult / stopMult 1.0). */
+export function standardPips(role: Role): Pips {
+  if (role === 'inspector') return { eye: 3, pace: 3, charisma: 0 }
+  if (role === 'sorter') return { judgement: 3, pace: 3 }
+  return { speed: 3, energy: 3, charisma: 0 }
+}
+
+/**
+ * Put an applicant with known pips into `role`'s pool (replacing its last
+ * regular, so the pool keeps poolSize) and return it — default the standard
+ * 3/3/0 'none' one, so timing tests keep playtest 1's 1.0 multipliers
+ * (design §7). Draws nothing.
+ */
+export function standardApplicant(
+  sim: Sim,
+  role: Role,
+  pips: Pips = standardPips(role),
+  affinity: Affinity = 'none',
+): Applicant {
+  const s = sim.state
+  const taken = [
+    ...s.employees.map((e) => e.name),
+    ...s.applicants.inspector.map((a) => a.name),
+    ...s.applicants.sorter.map((a) => a.name),
+    ...s.applicants.driver.map((a) => a.name),
+  ]
+  const a: Applicant = {
+    id: s.nextId.applicant,
+    role,
+    name: freshName(sim.data.puns.peopleNames, taken),
+    pips: { ...pips },
+    affinity: role === 'driver' ? affinity : 'none',
+    look: 0,
+    star: false,
+    leavesOnDay: null,
+  }
+  s.nextId.applicant += 1
+  const pool = s.applicants[role]
+  const size = sim.data.employees.applicants.poolSize
+  if (pool.length >= size) {
+    const last = pool.findLastIndex((x) => !x.star)
+    pool.splice(last >= 0 ? last : pool.length - 1, 1)
+  }
+  pool.push(a)
+  return a
+}
+
+/**
+ * The playtest-1 `hireInspector` as a helper: a standard (or `pips`)
+ * inspector into the first desk in lane order. Not replay-safe (the
+ * applicant is injected, not rolled) — replay tests hire from the pool.
+ */
+export function hireInspector(sim: Sim, pips?: Pips): CommandResult {
+  const desk = sim.state.lane.nodes.find((n) => n.fixture?.kind === 'desk')
+  if (!desk) return { ok: false, reason: 'invalid' }
+  const a = standardApplicant(sim, 'inspector', pips)
+  return sim.dispatch({
+    kind: 'hire',
+    role: 'inspector',
+    applicantId: a.id,
+    target: { nodeId: desk.id },
+  })
+}
+
+/** The first applicant waiting in a pool (replay-safe hires and buys). */
+export function firstApplicant(sim: Sim, role: Role): Applicant {
+  const a = sim.state.applicants[role][0]
+  if (!a) throw new Error(`no ${role} applicant`)
+  return a
+}
+
+/**
+ * Spec §7.1 opening A: a bike + a Metal detector in the first empty live
+ * slot. The bike's driver is the injected standard 3/3/0 one (timing tests
+ * keep playtest 1's 1.0 multipliers), or with `driver: 'pool'` the first
+ * applicant of the rolled pool — replay-safe (the log alone rebuilds it).
+ */
+export function openingA(
+  sim: Sim,
+  driver: 'standard' | 'pool' = 'standard',
+): void {
+  const a =
+    driver === 'pool'
+      ? firstApplicant(sim, 'driver')
+      : standardApplicant(sim, 'driver')
+  const bike = sim.dispatch({
+    kind: 'buyVehicle',
+    type: 'bike',
+    applicantId: a.id,
+  })
   if (!bike.ok) throw new Error(`openingA: bike refused (${bike.reason})`)
   const lane = sim.state.lane
   const slot = liveSlotIds(lane).find((id) => !laneNode(lane, id)?.fixture)
@@ -88,17 +181,27 @@ export function quietSim(seed = 1, overrides?: unknown): Sim {
   return quiet(makeSim(seed, overrides))
 }
 
-/** Buy a vehicle (topping the balance up first) and return it. */
-export function buy(sim: Sim, type: VehicleType): Vehicle {
+/**
+ * Buy a vehicle with a driver of `pips` (default the standard 3/3/0, design
+ * §7), topping the balance up to price + fee first, and return it.
+ */
+export function buy(
+  sim: Sim,
+  type: VehicleType,
+  pips?: Pips,
+  affinity: Affinity = 'none',
+): Vehicle {
   const def = sim.data.vehicles.types.find((t) => t.id === type)
   if (!def) throw new Error(`no type ${type}`)
   if (def.unlockLevel > sim.state.level.level) {
     sim.state.level.level = def.unlockLevel
   }
-  if (sim.state.economy.balance < def.price) {
-    sim.state.economy.balance = def.price
+  const a = standardApplicant(sim, 'driver', pips, affinity)
+  const cost = def.price + hireFeeOf(sim.data, a, type)
+  if (sim.state.economy.balance < cost) {
+    sim.state.economy.balance = cost
   }
-  const res = sim.dispatch({ kind: 'buyVehicle', type })
+  const res = sim.dispatch({ kind: 'buyVehicle', type, applicantId: a.id })
   if (!res.ok) throw new Error(`buy ${type}: ${res.reason}`)
   return sim.state.vehicles.at(-1) as Vehicle
 }

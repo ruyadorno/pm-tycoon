@@ -122,6 +122,28 @@ export const SUBJECT_OVERRIDES: Record<string, string> = {
     'above, three long empty light grey boards running left to right, ' +
     'bright blue uprights at both ends and in the middle, tidy, nothing on ' +
     'the boards',
+  // build 2 (plan-build2 §6 Machines): same belt-opening contract as the
+  // metal detector; the header's light strip is the idle/scan frame pair
+  // (candidates.ts recolourStrip), so the colour accents live on the pillars
+  battery_checker:
+    'chunky battery checker gate, two thick boxy light grey pillars as ' +
+    'wide as a hand, each with a tall green battery charge meter of ' +
+    'stacked glowing cells on its front, joined by a heavy crossbar header ' +
+    'with a glowing light strip and a big green battery shape lying on top, ' +
+    'the passage between the pillars is completely empty, nothing inside ' +
+    'the gate',
+  xray:
+    'chunky airport x-ray baggage scanner tunnel, a wide boxy light grey ' +
+    'housing with thick side walls and a deep roof over the passage, a ' +
+    'glowing light strip along the front of the roof, a small dark blue ' +
+    'monitor screen on the right wall, purple trim, the tunnel passage ' +
+    'through the middle is completely empty and open at the bottom, ' +
+    'nothing inside the tunnel',
+  sorter_arm:
+    'chunky industrial robot arm on a round grey pedestal base, an orange ' +
+    'column, two thick yellow arm segments with grey joints raised up and ' +
+    'bent at the elbow, a grey two-finger gripper claw at the end holding ' +
+    'nothing, a small status lamp on the column',
   desk:
     'long wide wooden inspection desk seen from above, its rectangular ' +
     'desk top fills the whole picture, a grey parcel tray, a magnifying ' +
@@ -191,6 +213,9 @@ export const PALETTE_HINTS: Record<string, string[]> = {
   'vehicle-truck': ['outline', 'grey', 'blue', 'orange'],
   machine: ['outline', 'grey', 'blue', 'yellow', 'grass'],
   shaky_shaker: ['outline', 'grey', 'orange', 'yellow', 'blue'],
+  battery_checker: ['outline', 'grey', 'grass', 'yellow', 'blue'],
+  xray: ['outline', 'grey', 'blue', 'purple', 'yellow'],
+  sorter_arm: ['outline', 'grey', 'orange', 'yellow', 'blue'],
   desk: ['outline', 'grey', 'brown', 'blue'],
   shelf_t1: ['outline', 'grey', 'brown'],
   shelf_t2: ['outline', 'grey', 'blue'],

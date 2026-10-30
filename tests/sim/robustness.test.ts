@@ -40,7 +40,7 @@ import {
 } from '../../src/sim/sim.ts'
 import { walkOut } from '../../src/sim/systems/payroll.ts'
 import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
-import type { Strain, Vehicle, VehicleType } from '../../src/sim/types.ts'
+import type { Role, Strain, Vehicle, VehicleType } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   buy,
@@ -145,12 +145,29 @@ describe('ViewSim facade (plan.md §5): every command returns its documented fai
     const vs = createViewSim(sim)
     expectResult(
       sim,
-      () => vs.buyVehicle('boat' as VehicleType),
+      () => vs.buyVehicle('boat' as VehicleType, null),
       fail('invalid'),
     )
-    expectResult(sim, () => vs.buyVehicle('truck'), fail('locked'))
-    expectResult(sim, () => vs.buyVehicle('van'), fail('insufficient-funds'))
-    expectResult(sim, () => vs.buyVehicle('bike'), { ok: true })
+    expectResult(sim, () => vs.buyVehicle('truck', null), fail('locked'))
+    expectResult(
+      sim,
+      () => vs.buyVehicle('van', null),
+      fail('insufficient-funds'),
+    )
+    expectResult(sim, () => vs.buyVehicle('bike', 999), fail('no-applicant'))
+    const dee = sim.state.applicants.driver[0]!
+    sim.state.economy.balance = 200 // the bike, not its driver's fee
+    expectResult(
+      sim,
+      () => vs.buyVehicle('bike', dee.id),
+      fail('insufficient-funds'),
+    )
+    fund(sim)
+    expectResult(sim, () => vs.buyVehicle('bike', dee.id), {
+      ok: true,
+      vehicleId: 1,
+      employeeId: 2,
+    })
     const bike = sim.state.vehicles[0]!
     expectResult(sim, () => vs.sellVehicle(999), fail('no-vehicle'))
     expectResult(sim, () => vs.sellVehicle(bike.id), fail('last-vehicle'))
@@ -185,7 +202,10 @@ describe('ViewSim facade (plan.md §5): every command returns its documented fai
     )
     fund(sim)
     expectResult(sim, () => vs.rehireDriver(bike.id), { ok: true })
-    expectResult(sim, () => vs.buyVehicle('bike'), { ok: true })
+    expectResult(sim, () => vs.buyVehicle('bike', null), {
+      ok: true,
+      vehicleId: 2,
+    })
     expectResult(sim, () => vs.sellVehicle(bike.id), { ok: true })
   })
 
@@ -226,7 +246,7 @@ describe('ViewSim facade (plan.md §5): every command returns its documented fai
     })
   })
 
-  it('lane: buyMachine / placeDesk / moveFixture / removeFixture / hireInspector / fireInspector / rehire', () => {
+  it('lane: buyMachine / placeDesk / moveFixture / removeFixture / hire / fire / rehire', () => {
     const sim = quietSim(3)
     const vs = createViewSim(sim)
     const L = vs.lane
@@ -261,7 +281,9 @@ describe('ViewSim facade (plan.md §5): every command returns its documented fai
     expectResult(sim, () => L.buyMachine('metal_detector', 'slot2'), {
       ok: true,
     })
-    expectResult(sim, () => L.placeDesk('slot3'), fail('desk-exists'))
+    expectResult(sim, () => L.placeDesk('slot3', 1), fail('desk-exists'))
+    expectResult(sim, () => L.placeDesk('slot3', 2), fail('desk-locked'))
+    expectResult(sim, () => L.placeDesk('slot3', 9), fail('invalid'))
     expectResult(sim, () => L.moveFixture('slot1', 'slot1'), fail('invalid'))
     expectResult(sim, () => L.moveFixture('slot3', 'slot1'), fail('invalid'))
     expectResult(sim, () => L.moveFixture('hold', 'slot1'), fail('invalid'))
@@ -274,30 +296,113 @@ describe('ViewSim facade (plan.md §5): every command returns its documented fai
     expectResult(sim, () => L.removeFixture('slot3'), fail('invalid'))
     expectResult(sim, () => L.removeFixture('shelf'), fail('invalid'))
     // The desk (now in slot2): hire up to maxPerDesk, then desk-full.
+    const next = () => sim.state.applicants.inspector[0]!.id
+    const desk2 = { nodeId: 'slot2' }
     sim.state.economy.balance = 0
-    expectResult(sim, () => L.hireInspector(), fail('insufficient-funds'))
+    expectResult(
+      sim,
+      () => vs.hire('inspector', next(), desk2),
+      fail('insufficient-funds'),
+    )
     fund(sim)
-    const per = sim.data.employees.inspector.maxPerDesk
-    for (let i = 1; i < per; i++)
-      expectResult(sim, () => L.hireInspector(), { ok: true })
-    expectResult(sim, () => L.hireInspector(), fail('desk-full'))
-    const insp = sim.state.employees.filter((e) => e.kind === 'inspector')
-    expectResult(sim, () => L.fireInspector(999), fail('invalid'))
-    expectResult(sim, () => L.fireInspector(insp[0]!.id), { ok: true })
-    // A walked-out inspector keeps the seat: fire / re-hire rules.
+    const per = sim.data.employees.desks.maxPerDesk
+    for (let i = 1; i < per; i++) {
+      const id = next()
+      expectResult(sim, () => vs.hire('inspector', id, desk2), {
+        ok: true,
+        employeeId: sim.state.nextId.employee,
+      })
+    }
+    expectResult(
+      sim,
+      () => vs.hire('inspector', next(), desk2),
+      fail('desk-full'),
+    )
+    const insp = sim.state.employees.filter((e) => e.role === 'inspector')
+    expectResult(sim, () => vs.fire(999), fail('invalid'))
+    expectResult(sim, () => vs.fire(insp[0]!.id), { ok: true })
+    // A walked-out inspector keeps the seat: re-hire rules (Fire frees it, D10).
     const out = insp[1]!
     sim.state.economy.balance = 0
     walkOut(sim, out)
-    expectResult(sim, () => L.fireInspector(out.id), fail('invalid'))
     expectResult(sim, () => L.rehire(out.id), fail('insufficient-funds'))
     expectResult(sim, () => L.rehire(insp[2]!.id), fail('invalid'))
     fund(sim)
     expectResult(sim, () => L.rehire(out.id), { ok: true })
     expectResult(sim, () => L.removeFixture('slot2'), { ok: true })
-    expectResult(sim, () => L.hireInspector(), fail('invalid'))
-    expectResult(sim, () => L.placeDesk('slot4'), fail('slot-locked'))
-    expectResult(sim, () => L.placeDesk('slot1'), fail('slot-occupied'))
-    expectResult(sim, () => L.placeDesk('slot3'), { ok: true })
+    expectResult(
+      sim,
+      () => vs.hire('inspector', next(), desk2),
+      fail('invalid'),
+    )
+    expectResult(sim, () => L.placeDesk('slot4', 1), fail('slot-locked'))
+    expectResult(sim, () => L.placeDesk('slot1', 1), fail('slot-occupied'))
+    expectResult(sim, () => L.placeDesk('slot3', 1), { ok: true })
+  })
+
+  it('people: hire / fire / postAd / holdBay.touch / debug.forceLevel failure strings (M6)', () => {
+    const sim = quietSim(5)
+    const vs = createViewSim(sim, { debug: true })
+    const insp = () => sim.state.applicants.inspector[0]!.id
+    expectResult(
+      sim,
+      () => vs.hire('janitor' as Role, insp(), { nodeId: 'slot1' }),
+      fail('invalid'),
+    )
+    expectResult(
+      sim,
+      () => vs.hire('inspector', 999, { nodeId: 'slot1' }),
+      fail('no-applicant'),
+    )
+    expectResult(
+      sim,
+      () => vs.hire('inspector', insp(), { station: 'hold' }),
+      fail('invalid'),
+    )
+    expectResult(
+      sim,
+      () => vs.hire('inspector', insp(), { nodeId: 'slot2' }),
+      fail('invalid'),
+    )
+    expectResult(
+      sim,
+      () => vs.hire('inspector', insp(), { nodeId: 'slot4' }),
+      fail('slot-locked'),
+    )
+    const sorter = sim.state.applicants.sorter[0]!.id
+    expectResult(
+      sim,
+      () => vs.hire('sorter', sorter, { station: 'hold' }),
+      fail('station-locked'),
+    )
+    expectResult(
+      sim,
+      () => vs.hire('sorter', sorter, { nodeId: 'slot1' }),
+      fail('invalid'),
+    )
+    const driver = sim.state.applicants.driver[0]!.id
+    expectResult(
+      sim,
+      () => vs.hire('driver', driver, { vehicleId: 7 }),
+      fail('no-vehicle'),
+    )
+    expectResult(sim, () => vs.postAd('janitor' as Role), fail('invalid'))
+    sim.state.economy.balance = 29
+    expectResult(sim, () => vs.postAd('driver'), fail('insufficient-funds'))
+    fund(sim)
+    expectResult(sim, () => vs.postAd('driver'), { ok: true })
+    expectResult(sim, () => vs.holdBay.touch(999), fail('invalid'))
+    const p = heldParcel(sim)
+    expectResult(sim, () => vs.holdBay.touch(p.id), { ok: true })
+    expectResult(sim, () => vs.debug!.forceLevel(1), fail('invalid'))
+    expectResult(sim, () => vs.debug!.forceLevel(6), fail('invalid'))
+    expectResult(sim, () => vs.debug!.forceLevel(2), { ok: true })
+    expectResult(
+      sim,
+      () => vs.lane.buyMachine('sorter_arm', 'hold'),
+      fail('locked'),
+    )
+    expectResult(sim, () => vs.lane.removeFixture('hold'), fail('invalid'))
   })
 
   it('holdBay.toss / holdBay.clear (shelf-full) and grantLife', () => {
@@ -354,7 +459,7 @@ describe('the idle run: nothing bought for 30 min (seeds 1-3)', () => {
       )
       // $450 at $20/day: short from day 23, out at the second miss (§7.4).
       expect(walked).toEqual([
-        { employeeId: 1, kind: 'inspector', nodeId: 'slot1' },
+        { employeeId: 1, role: 'inspector', nodeId: 'slot1', vehicleId: null },
       ])
       expect(continuationProblems(run)).toEqual([])
     },
@@ -491,9 +596,12 @@ describe('performance and save size (plan.md §6.11: tick() p99 < 1 ms)', () => 
           'truck',
           'truck',
         ] as const) {
-          sim.state.economy.balance += price(type)
+          sim.state.economy.balance += price(type) + 100
           m.resyncLedger()
-          expect(m.dispatch({ kind: 'buyVehicle', type }).ok).toBe(true)
+          const a = sim.state.applicants.driver[0]!
+          expect(
+            m.dispatch({ kind: 'buyVehicle', type, applicantId: a.id }).ok,
+          ).toBe(true)
         }
         sim.state.economy.balance += 100_000
         m.resyncLedger()

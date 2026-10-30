@@ -4382,17 +4382,7 @@
       "chosenCandidate": 0
     },
     {
-      "id": "lr_house_a",
-      "class": "building1x1",
-      "source": "pixellab",
-      "canvas": [64, 96],
-      "footprint": [1, 1],
-      "frames": [""],
       "variants": ["locked"],
-      "district": "lowres",
-      "coversBuildings": ["lr_caret_cottage", "lr_minor_cottage", "lr_wildcard_shop"],
-      "priority": "P2",
-      "subject": "suburban house with a gable roof, cream walls, red roof",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -4400,205 +4390,509 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1001,
-            "prompt": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "13990f84-7a79-55d2-8d94-c2f8d34a6c9b",
-            "source_image_id": "13990f84-7a79-55d2-8d94-c2f8d34a6c9b"
+            "seed": 7102,
+            "prompt": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "86a2b47b-08f9-5cb8-a973-4dd43e52d9a3",
+            "source_image_id": "86a2b47b-08f9-5cb8-a973-4dd43e52d9a3"
           },
-          "jobId": "f6281f24-dd86-466d-b0e5-539c8db5e275",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "4440b18d84b25ddfd239782fbfa2f5e6e33b3a9cd7a34c03d7ac287fa01cfaa3",
-          "at": "2026-10-29T08:14:53.147Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "505b7c7c-c8d5-599d-857b-7a59e69b2ce1",
-            "source_image_id": "505b7c7c-c8d5-599d-857b-7a59e69b2ce1"
-          },
-          "jobId": "bdb22d11-0831-4683-bb3b-5d4a0b60536e",
-          "seed": 1002,
+          "jobId": "6feb9667-8f1f-489a-a902-78834759afff",
+          "seed": 7102,
           "candidate": 2,
-          "cost": 5,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "926821275334c5e2f57e2bd04c8903f4554fb1bce5085867d7f096f440821690",
-          "at": "2026-10-29T08:14:53.156Z"
+          "sha256": "3392359c325011e87134c52faeac3bba36e21149c90866cadc61d454e81763df",
+          "at": "2026-10-30T02:55:24.445Z"
         },
         {
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1000,
-            "prompt": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "f1157fd9-3e0b-59d1-a55e-ad2133054276",
-            "source_image_id": "f1157fd9-3e0b-59d1-a55e-ad2133054276"
+            "seed": 7101,
+            "prompt": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "578979d2-b0e0-5a89-b4f2-27be4b265929",
+            "source_image_id": "578979d2-b0e0-5a89-b4f2-27be4b265929"
           },
-          "jobId": "cea74f67-70b9-40d0-ae30-24bf5469bff4",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 5,
+          "jobId": "8f852600-1890-4797-b4db-64c17bee4662",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "981a36afd0bb2d952a4cf98e168a2d3cbc88e4444e044e63f8dcc9894ba4806c",
-          "at": "2026-10-29T08:14:48.193Z"
+          "sha256": "8b03f646d11cd3461f98c9ea5b1aa7a1404f52e9ff52e324e01e4ceb1ffe9f8f",
+          "at": "2026-10-30T02:55:24.445Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7203,
+            "prompt": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "1ba9d111-63ba-5ef6-adbf-417bcbcec2ac",
+            "source_image_id": "1ba9d111-63ba-5ef6-adbf-417bcbcec2ac"
+          },
+          "jobId": "882a9cd7-6daf-43f0-9355-95634776b19b",
+          "seed": 7203,
+          "candidate": 3,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "dfe74979567d1a1728b9e615d7fb0b1f929c3b993bada93bc9f5a384a8c0dec1",
+          "at": "2026-10-30T02:58:51.429Z"
         }
       ],
       "rejects": [
         {
-          "candidate": 0,
-          "reason": "smaller",
+          "candidate": 1,
+          "reason": "same look but small on the plot (102 px, lifted 7)",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T02:59:58.698Z"
         },
         {
-          "candidate": 1,
-          "reason": "similar",
+          "candidate": 3,
+          "reason": "nice but small on the plot (103 px)",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T02:59:58.698Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "650855b727256565660229f0b89818194a46e19dc7d0d2f5a3338d8906140110",
+      "id": "lr_major_house",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "large two-storey family house with cream walls, a steep terracotta gable roof and a round corner turret with a pointed cone roof",
+      "note": "agent pick #2 (2026-10-30): big cream two-storey house with a terracotta gable roof and a tall round corner turret with a cone roof (its unique feature), fills the 2x2 plot",
+      "finalSha256": "134e0a41b3c69e750303664731a6b79168bfc43e57e7977b5251996fad498603",
       "chosenCandidate": 2
     },
     {
-      "id": "lr_house_b",
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7101,
+            "prompt": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "c633d189-fbb2-52a2-93ce-46210ca2bc87",
+            "source_image_id": "c633d189-fbb2-52a2-93ce-46210ca2bc87"
+          },
+          "jobId": "324169e8-0a41-49df-878e-5c4e285109ce",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "1ac4512e031182cf5bacb94327d489c9ffc50a2d61742fde8d27476aca14b32b",
+          "at": "2026-10-30T02:55:24.445Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "93351774-1241-5400-88de-727f7aebb00a",
+            "source_image_id": "93351774-1241-5400-88de-727f7aebb00a"
+          },
+          "jobId": "bd9f5178-3db5-4dc4-9d61-3a8b5b6b624d",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "f889812286e63c6773094e37bc1f394b579d2000e98ad89fe129fa23a21fff57",
+          "at": "2026-10-30T02:55:24.445Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "2edaecfd-1bc5-5457-96eb-3aafba703238",
+            "source_image_id": "2edaecfd-1bc5-5457-96eb-3aafba703238"
+          },
+          "jobId": "5e3b9a83-ad13-40a4-b41a-19305ba67a35",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "bb01ac5f3a8835ff7e7f698434b2575ec87ee7358c0e33289e1681e8dde9d1fe",
+          "at": "2026-10-30T02:55:24.445Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "patches muted brown/grey",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "good but 10 px fell outside the canvas",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_patch_bungalow",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "long single-storey bungalow with pale blue walls, a wooden front porch and a gable roof patched with mismatched squares of orange, grey and brown shingles",
+      "note": "agent pick #1 (2026-10-30): blue-grey bungalow with a front porch under a gable roof patched in orange, grey and brown squares (the patchwork reads clearest of the three)",
+      "finalSha256": "e22152de5b9c92c386eaec3ad724951571e752596b09b0fd7a1af13cc3804a48",
+      "chosenCandidate": 1
+    },
+    {
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f93e8c8d-7370-5af1-b9d6-b2ca59321bba",
+            "source_image_id": "f93e8c8d-7370-5af1-b9d6-b2ca59321bba"
+          },
+          "jobId": "12804d74-d7bc-4a16-8f46-501c68f5b87c",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "60ee395bc19d97ac348e858613180f9cfc428c372734d9811346e2e62a233879",
+          "at": "2026-10-30T02:55:24.445Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "2591b70a-fed9-565a-9439-5e610602ff6b",
+            "source_image_id": "2591b70a-fed9-565a-9439-5e610602ff6b"
+          },
+          "jobId": "7df0e9bf-9c44-4c5a-9d8b-6fa124b4207e",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "11056f4840acaca4ffbfa5d204b86e0ddad7cdeef01f9a9908cfc7e2501b09fe",
+          "at": "2026-10-30T02:55:50.919Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7203,
+            "prompt": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "e06f4259-ea53-5c30-b568-313b93a45414",
+            "source_image_id": "e06f4259-ea53-5c30-b568-313b93a45414"
+          },
+          "jobId": "12a5c414-9f78-4e00-90c5-9cfb0778c164",
+          "seed": 7203,
+          "candidate": 3,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "4749528b1cc5935d27532a6869d170937ecfc0191b00360c0ccc08fb16aa617f",
+          "at": "2026-10-30T02:58:51.429Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 2,
+          "reason": "small on the plot (98 px, lifted 8)",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 3,
+          "reason": "small on the plot (103 px)",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_prerelease_villa",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "white modern villa still being finished, wooden scaffolding wrapped around one wing, a grey gable roof and a neat stack of bricks on the lawn",
+      "note": "agent pick #0 (2026-10-30): white villa with a grey gable roof and timber scaffolding wrapped round its east wing, a pallet of bricks on the lawn: the only half-built house in town",
+      "finalSha256": "3f2d15770da4cc2a8cad5ed74ebe80729157f6e3d351d242d08e48cd8e719cf2",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "ef2b2023-392e-5963-9931-0853d3edcc4c",
+            "source_image_id": "ef2b2023-392e-5963-9931-0853d3edcc4c"
+          },
+          "jobId": "f536958c-2156-4248-a689-a5954ae49826",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "401110d06a3f28165649480c306b1e63f5f2ed6d00788255adf718a4ae118c52",
+          "at": "2026-10-30T02:55:50.983Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7101,
+            "prompt": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "722e93ac-567b-5950-9c6b-685375d2e008",
+            "source_image_id": "722e93ac-567b-5950-9c6b-685375d2e008"
+          },
+          "jobId": "51b1d2bd-46e3-440f-b639-1c3a341b197d",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "90ab7291e8ed4f297e55c190f60ad135ba77e277092e525e6dd7971695ddad9d",
+          "at": "2026-10-30T02:55:55.930Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "6aca0e1c-602c-5521-acac-cb7ccefcddb7",
+            "source_image_id": "6aca0e1c-602c-5521-acac-cb7ccefcddb7"
+          },
+          "jobId": "c5f51200-e890-4bde-8914-8ba5228bd9c5",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "1f6731fb40ff24c89b12f08e5ae8870b44ad4c25da39fce48c818d7a1dda2c8a",
+          "at": "2026-10-30T02:55:55.942Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "small on the plot, dark roof",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "taller windmill but orange roof duplicates the Majors' House",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_range_ranch_house",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "wide single-storey ranch house with brown timber walls, a long low gable roof, a white picket fence around the lawn and a small wooden windmill",
+      "note": "agent pick #0 (2026-10-30): long low brown-timber ranch house with a grey gable roof, a white picket fence round the whole lawn, a vegetable patch and a small wooden windmill",
+      "finalSha256": "7dae23c4bfd53f2ab33c1425fdf650d9b11da9153c95e87d938a8999c3c8ec40",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "11369723-5184-58f4-9fb9-c866ba828a43",
+            "source_image_id": "11369723-5184-58f4-9fb9-c866ba828a43"
+          },
+          "jobId": "04205fef-c59c-4c60-9c04-d9c13d3813a6",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "aafff5216f9def07a237ab40e30c976d92e4d699c02963c67223291f639c20c0",
+          "at": "2026-10-30T02:55:58.143Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7101,
+            "prompt": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "39b530b6-584d-567e-8b2f-49e1208bf300",
+            "source_image_id": "39b530b6-584d-567e-8b2f-49e1208bf300"
+          },
+          "jobId": "8e44112b-12d1-4cfe-afa6-94c6a07c2a4e",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "389ded3a591fcf3dc6f8443edbe41481e1c39c2ea5217dc648bed3094bb18047",
+          "at": "2026-10-30T02:56:01.045Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "2476b62b-54a7-517d-8082-c56a004aa990",
+            "source_image_id": "2476b62b-54a7-517d-8082-c56a004aa990"
+          },
+          "jobId": "1ebfbf6e-9d1f-4815-aebf-64e7714fd732",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "27b741c77e0c37c38b050130e9154552e8af65305e9214db63e59cfa3816704b",
+          "at": "2026-10-30T02:56:01.101Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "white timber walls, roof less steep",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "similar, plainer front",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_caret_cottage",
       "class": "building1x1",
       "source": "pixellab",
       "canvas": [64, 96],
       "footprint": [1, 1],
       "frames": [""],
-      "variants": ["locked"],
       "district": "lowres",
-      "coversBuildings": ["lr_tilde_terrace", "lr_exact_pin", "lr_buildmeta_bungalow"],
       "priority": "P2",
-      "subject": "small cottage with a hip roof, yellow walls, terracotta roof",
-      "placeholder": false,
-      "approved": false,
-      "gen": [
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1000,
-            "prompt": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "64b7472b-1ead-5d70-b680-3b64fdf7543c",
-            "source_image_id": "64b7472b-1ead-5d70-b680-3b64fdf7543c"
-          },
-          "jobId": "094d7766-4f5f-41c2-81c8-70e39e1424c9",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "dbe5389e35b4cfddbc05960d8a2f579f94ffb1379a6476fb879cb25a1510ffde",
-          "at": "2026-10-29T08:14:53.655Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "f0191df2-a491-5acd-b17a-c75927ccb9a0",
-            "source_image_id": "f0191df2-a491-5acd-b17a-c75927ccb9a0"
-          },
-          "jobId": "9a274bfa-28ce-423c-b9c6-0682e8f4a35d",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "9dcefd11d833cc1fb779447b309b4361e3ee508f30eb563e918ebc2379dc491d",
-          "at": "2026-10-29T08:15:09.550Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1001,
-            "prompt": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "d48509b6-a5fe-57ee-a732-a6e7aaa311c6",
-            "source_image_id": "d48509b6-a5fe-57ee-a732-a6e7aaa311c6"
-          },
-          "jobId": "b9ae3290-f925-46d9-8a6f-33797ca0dfd8",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "cfc0f7c3e3e7fa133eb0d8eb064bb03c9a3181edf478f4ef3276a33622a0988d",
-          "at": "2026-10-29T08:15:09.457Z"
-        }
-      ],
-      "rejects": [
-        {
-          "candidate": 0,
-          "reason": "gable, two storeys",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 2,
-          "reason": "busier",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        }
-      ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "44328fbae178a9ebf5b8989e1e07ac5713ab4e1b675b87aca81d3c38bda49c7a",
+      "subject": "small cottage with an extremely steep pointed A-frame roof shaped like a caret, purple roof tiles and pale yellow walls",
+      "note": "agent pick #1 (2026-10-30): pale yellow cottage under a very steep purple A-frame roof (the caret), a purple porch hood",
+      "finalSha256": "5ca4fe0fd75e1d403a44e2bf6f69804fa45d34c698226b82da23c174cdf76599",
       "chosenCandidate": 1
     },
     {
-      "id": "lr_house_c",
-      "class": "building2x2",
-      "source": "pixellab",
-      "canvas": [128, 160],
-      "footprint": [2, 2],
-      "frames": [""],
       "variants": ["locked"],
-      "district": "lowres",
-      "coversBuildings": ["lr_patch_bungalow", "lr_range_ranch_house"],
-      "priority": "P2",
-      "subject": "two-storey family house with a garden, pastel walls, gable roof",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -4606,102 +4900,101 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1001,
-            "prompt": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "ee699ec8-6ad5-5e6c-9545-e8e1eca8861d",
-            "source_image_id": "ee699ec8-6ad5-5e6c-9545-e8e1eca8861d"
+            "seed": 7100,
+            "prompt": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "430f0e2a-2b1a-5516-bf5d-49c51d3bae42",
+            "source_image_id": "430f0e2a-2b1a-5516-bf5d-49c51d3bae42"
           },
-          "jobId": "b25ffbf4-36ef-4877-acab-1ef12797b0ad",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "fe4ff3c090952f01f8245c7b9431b4872486f9bd03b9178a894a98dec761e47a",
-          "at": "2026-10-29T08:15:14.858Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1000,
-            "prompt": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "48f4c50a-1bd8-52c4-b663-b37fdc61fa6c",
-            "source_image_id": "48f4c50a-1bd8-52c4-b663-b37fdc61fa6c"
-          },
-          "jobId": "0fba77c1-c4b3-4215-b8bb-d61f2e45738f",
-          "seed": 1000,
+          "jobId": "769e1203-127b-47d5-82cc-1e63ee2d9acb",
+          "seed": 7100,
           "candidate": 0,
-          "cost": 6,
+          "cost": 5,
           "downloadUrl": "",
-          "sha256": "6fcc8de29c069a1bb75b59bac16836fcb7263d03e29f357e857e1ec29c475c20",
-          "at": "2026-10-29T08:15:09.673Z"
+          "sha256": "ec5102b9006a980bfd8c942b2d3fa03e475a355a35ee7eacb421010d7c6b89f1",
+          "at": "2026-10-30T02:56:01.195Z"
         },
         {
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1002,
-            "prompt": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "3327edb3-4b2b-593b-ab5d-c40f8ad72a08",
-            "source_image_id": "3327edb3-4b2b-593b-ab5d-c40f8ad72a08"
+            "seed": 7101,
+            "prompt": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "12977863-f328-5729-b4d3-0ebc297871f2",
+            "source_image_id": "12977863-f328-5729-b4d3-0ebc297871f2"
           },
-          "jobId": "3d859b4c-e924-47c7-9bb4-b14e93f89c21",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 6,
+          "jobId": "f87d2f83-3206-4ad0-833c-0cc95970c6a9",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 5,
           "downloadUrl": "",
-          "sha256": "bfbcf54440b9960dbb8a921bab37d0f1bf51ee9866eb8aac1b9e6e7c23ca967e",
-          "at": "2026-10-29T08:15:20.257Z"
+          "sha256": "b0d09f579c0d5111f5da3df9ead9234347ce4eaf2bfbe4351103395c7883feec",
+          "at": "2026-10-30T02:56:19.298Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "200c951d-70ee-5ce5-9a9e-472ba01c1fb7",
+            "source_image_id": "200c951d-70ee-5ce5-9a9e-472ba01c1fb7"
+          },
+          "jobId": "1cbdc281-7ae6-42cd-925a-2cf053ac2828",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "207c64decb1926930f623f8c1271b7463df06c9e0782ea10b10375456e6dfe75",
+          "at": "2026-10-30T02:56:23.047Z"
         }
       ],
       "rejects": [
         {
-          "candidate": 0,
-          "reason": "similar",
+          "candidate": 1,
+          "reason": "pink striped awning, wave less clear",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T02:59:58.698Z"
         },
         {
           "candidate": 2,
-          "reason": "plainer",
+          "reason": "good, flatter wave",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T02:59:58.698Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "3a87f10869d7caa8c9e1ce6574e8d773db85313c010ab0fd31e62c50686f021f",
-      "chosenCandidate": 1
+      "id": "lr_tilde_terrace",
+      "class": "building1x1",
+      "source": "pixellab",
+      "canvas": [64, 96],
+      "footprint": [1, 1],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "narrow two-storey terrace house with pink walls, a wavy curved roof edge like a tilde and a striped bay window",
+      "note": "agent pick #0 (2026-10-30): narrow pink two-storey terrace with a wavy cream roof edge (the tilde) and a blue-and-white striped bay window",
+      "finalSha256": "2aacb610dcca2169096702eed73e9a35ab575cdd27ef89a54e2edd5c5ec6e892",
+      "chosenCandidate": 0
     },
     {
-      "id": "lr_villa",
-      "class": "building2x2",
-      "source": "pixellab",
-      "canvas": [128, 160],
-      "footprint": [2, 2],
-      "frames": [""],
       "variants": ["locked"],
-      "district": "lowres",
-      "coversBuildings": ["lr_major_house", "lr_prerelease_villa"],
-      "priority": "P2",
-      "subject": "large villa with a hip roof and a hedge-lined yard",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -4709,89 +5002,404 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1000,
-            "prompt": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "49a17557-5847-5de4-a3b3-9eb04ae49517",
-            "source_image_id": "49a17557-5847-5de4-a3b3-9eb04ae49517"
+            "seed": 7101,
+            "prompt": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "3137e50f-aa56-5dc8-b4b9-13e623495d5a",
+            "source_image_id": "3137e50f-aa56-5dc8-b4b9-13e623495d5a"
           },
-          "jobId": "b94b7e20-1973-4a5c-b70c-983f536471e6",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "920a0237fb01f349332a1cace2d8da2d51fbc56b033c3e76bb069885a1a3ce20",
-          "at": "2026-10-29T08:15:20.262Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "c6b0ca9b-d3bb-5a9a-8260-d007d42c56cb",
-            "source_image_id": "c6b0ca9b-d3bb-5a9a-8260-d007d42c56cb"
-          },
-          "jobId": "933877ea-70b9-4972-b15c-00f91589c399",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "06f011683e3cf1896fb4aff33e2a56288b46d2e29d0ba651ec92c6fb24a5da67",
-          "at": "2026-10-29T08:15:25.668Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1001,
-            "prompt": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "af88f22b-1d3f-5c0f-8ffb-d6fae60cf72d",
-            "source_image_id": "af88f22b-1d3f-5c0f-8ffb-d6fae60cf72d"
-          },
-          "jobId": "c01d13e5-2af2-4bfb-a85a-1c1afd8ff774",
-          "seed": 1001,
+          "jobId": "10a12fca-2135-45de-8473-8a25cf729745",
+          "seed": 7101,
           "candidate": 1,
-          "cost": 6,
+          "cost": 5,
           "downloadUrl": "",
-          "sha256": "146a5e09cb1898b86f7bf5fe7bd6fd5a06eca5e35eb470eb8674e9e83b6abbe3",
-          "at": "2026-10-29T08:15:25.660Z"
+          "sha256": "2af3b996c2b95b4353afa6aaa5aa2daa9c2b932d205c11a34021f19bc530cd99",
+          "at": "2026-10-30T02:56:26.840Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "e9c768df-3705-5124-ba85-505df96b0d7d",
+            "source_image_id": "e9c768df-3705-5124-ba85-505df96b0d7d"
+          },
+          "jobId": "0366a2bb-c57f-4633-b24d-fddf48c3ae65",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "6d0a9f8ea493abd55f4c881787b735dd098ee2787acee4a78bf3c74156c0aab5",
+          "at": "2026-10-30T02:56:26.875Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "04e2ff93-e77d-56fe-b0c3-90e8b3848cda",
+            "source_image_id": "04e2ff93-e77d-56fe-b0c3-90e8b3848cda"
+          },
+          "jobId": "401b5731-cbf4-4a6d-ab57-c2879ece1486",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "e37ab24634c76045f83a456fd6438d7d88cd36fb80ac8094f2bde578b5d1c9fe",
+          "at": "2026-10-30T02:56:23.873Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "thatch blends into the walls",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "timber walls, busier",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_minor_cottage",
+      "class": "building1x1",
+      "source": "pixellab",
+      "canvas": [64, 96],
+      "footprint": [1, 1],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "tiny one-room cottage with a golden thatched roof, a round window, a blue door and flower boxes",
+      "note": "agent pick #0 (2026-10-30): tiny grey-stone cottage under a golden thatched roof with a round window and a blue door",
+      "finalSha256": "6b68fa7dd74659e4781418b1170b1fa67f023859d9f718d61c2c461b02228af7",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "4101afef-754f-5323-9baf-c3c77e0c7510",
+            "source_image_id": "4101afef-754f-5323-9baf-c3c77e0c7510"
+          },
+          "jobId": "0b7192c8-03e1-4b24-9499-61546cf97949",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "fe909f4ae29846f50306cdb3ebbf64aaee858f5d3026b4c2b54b9886d5225cd4",
+          "at": "2026-10-30T02:56:27.039Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7101,
+            "prompt": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "4a59f619-65dd-5375-bb80-da4d4ecd9fbf",
+            "source_image_id": "4a59f619-65dd-5375-bb80-da4d4ecd9fbf"
+          },
+          "jobId": "db30be1f-91d8-4dcc-a087-fa081f7dae47",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "ae266a4ebc0068242df04f5c2fb2ebb0e656284016b0fb28fe142cdf1fc9f9da",
+          "at": "2026-10-30T02:56:26.974Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "28cd4fda-b32d-5290-946f-3342baa203a2",
+            "source_image_id": "28cd4fda-b32d-5290-946f-3342baa203a2"
+          },
+          "jobId": "2678ad03-e606-4570-8d67-f9b04fec4254",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "648a96d8bd8947c487ca7bc1c076661384f3255e06f5bd2142bc57cc00f081ef",
+          "at": "2026-10-30T02:56:26.969Z"
         }
       ],
       "rejects": [
         {
           "candidate": 0,
-          "reason": "orange roof repeats lr houses",
+          "reason": "grey walls, pin smaller",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "grey walls",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_exact_pin",
+      "class": "building1x1",
+      "source": "pixellab",
+      "canvas": [64, 96],
+      "footprint": [1, 1],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "tall narrow cottage with light green walls, a grey gable roof and a big round orange ball finial on top of the roof peak like a map pin",
+      "note": "agent pick #2 (2026-10-30): tall narrow light-green cottage with a grey gable roof and a big orange ball finial on the peak like a map pin",
+      "finalSha256": "e67aa26c5c56502ad1c0d4673c472123fe29351855f0cd7cdbe244214a7632a1",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b85f9bb9-ea06-5651-8a0c-e474d66a1da0",
+            "source_image_id": "b85f9bb9-ea06-5651-8a0c-e474d66a1da0"
+          },
+          "jobId": "c2026947-2414-4c05-a0d3-9da52adb3302",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "422dca92adea7212bbcc89ae4f6089e0941026d4aa6bb428d69cf3cf540f2f38",
+          "at": "2026-10-30T02:56:50.384Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "4e30bd88-8173-59d8-971f-60eeeb791a86",
+            "source_image_id": "4e30bd88-8173-59d8-971f-60eeeb791a86"
+          },
+          "jobId": "95fbe7e8-26a6-4c12-a2f8-23bc2df58f5e",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "28abf7ab85c5664651f61012ea2e648a5b5bb759f72c56a417a0f5f10fdd1042",
+          "at": "2026-10-30T02:56:52.805Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7101,
+            "prompt": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "d2b00cc8-c006-53af-a0a5-f4fb852246ac",
+            "source_image_id": "d2b00cc8-c006-53af-a0a5-f4fb852246ac"
+          },
+          "jobId": "1389b746-862c-4a47-b1d3-e7b20831edbf",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "d4b23b9034226f71aeed7860b0d0cec80eec462700975251b37d570ffe6b6d0c",
+          "at": "2026-10-30T02:56:52.764Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "flat-roofed two-storey block, reads downtown",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
         },
         {
           "candidate": 2,
-          "reason": "small",
+          "reason": "flat roof, plain",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T02:59:58.698Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "434f936e136ddb940ded7f82e7049ed01c13206b512363d5f2a613d81f89d1ff",
-      "chosenCandidate": 1
+      "id": "lr_wildcard_shop",
+      "class": "building1x1",
+      "source": "pixellab",
+      "canvas": [64, 96],
+      "footprint": [1, 1],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "small corner shop with a yellow and white striped awning over the shop window and a star-shaped sign board on a pole, no text",
+      "note": "agent pick #0 (2026-10-30): timber corner shop with a yellow-white striped awning and a star-shaped sign on a pole, under a gable roof (low-density rule)",
+      "finalSha256": "b09cc50a04bbd5d508988c139221968f02e86291b441fb65319805f3113ecf21",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": ["locked"],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7102,
+            "prompt": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "1bd1a4a8-1cdf-583e-8870-65475c6431db",
+            "source_image_id": "1bd1a4a8-1cdf-583e-8870-65475c6431db"
+          },
+          "jobId": "469f8467-cf62-40e3-b51c-07585f6288ea",
+          "seed": 7102,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0776362bdee3bf942350a661078effda390142b4693eedf918d60f8689714ef7",
+          "at": "2026-10-30T02:56:57.699Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7100,
+            "prompt": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "93584f8e-87f3-54c9-bda0-3a67a620ae80",
+            "source_image_id": "93584f8e-87f3-54c9-bda0-3a67a620ae80"
+          },
+          "jobId": "7ebc5056-1da1-4b0f-81ce-593a759690e8",
+          "seed": 7100,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0b5cc081e882ab5228167f0d90cfffc220576b87692d9a6960b14f61956ad9d6",
+          "at": "2026-10-30T02:56:52.865Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 7101,
+            "prompt": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9c5c7728-fd5e-5372-bf30-5fab4973c3f3",
+            "source_image_id": "9c5c7728-fd5e-5372-bf30-5fab4973c3f3"
+          },
+          "jobId": "4a7007a8-6b07-415e-99b2-33028a97c437",
+          "seed": 7101,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "882b90616c1a925d582064f91e40327f8a68cb3b87d1836652c12191aac3d35d",
+          "at": "2026-10-30T02:56:53.903Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "panels darker, dish small",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "panels less defined",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "lr_buildmeta_bungalow",
+      "class": "building1x1",
+      "source": "pixellab",
+      "canvas": [64, 96],
+      "footprint": [1, 1],
+      "frames": [""],
+      "district": "lowres",
+      "priority": "P2",
+      "subject": "single-storey bungalow with blue walls, solar panels covering its gable roof and a satellite dish on the chimney",
+      "note": "agent pick #2 (2026-10-30): blue bungalow whose gable roof is covered in solar panels, a satellite dish on the chimney",
+      "finalSha256": "e8b5120bbdf517faa1145d2d24add09e798dcdca3a9743c74ed67561c5687e6b",
+      "chosenCandidate": 2
     },
     {
       "id": "ru_farm",
@@ -8223,6 +8831,38 @@
       "finalSha256": "61c1ba14b35c726280e86e0c3e0f8ac0f6fba5c04a6e6ced97ab5e555f4e56ec"
     },
     {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "hold_station",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "warehouse",
+      "priority": "P0",
+      "note": "build 2 M6 (B2 §2.6, design-m6 §6.4): the Hold Bay station podium at RoomLayout HOLD_STATION (48x48): rubber mat, standing desk with the clipboard and the tag roll on its west half; room back layer = interior atlas",
+      "finalSha256": "e13be0fcb0dbf28a2f86a81ef271cbfab734a5f8fbfb44be5aee9cb8ec92ba77"
+    },
+    {
+      "id": "station_outline",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [48, 48],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M6 (B2 §2.6): the Hold Bay station's dashed outline at RoomLayout HOLD_STATION while locked; drawn in the room's badges FRONT layer, so packed into world (atlas.ts ID_PLACEMENT) like slot_empty_outline / ext_outline",
+      "finalSha256": "84780cef6e777df5bc205fd07173c7f61ec9094952a72584c0dc9b36bfb21a5e"
+    },
+    {
       "id": "bay_pad",
       "class": "interior-prop",
       "source": "procedural",
@@ -9910,6 +10550,22 @@
       "note": "build 2 (report §6.24): the scan frames are scripted edits of the idle frames (candidates.ts SCAN_FROM_IDLE / scanPose), the rest is PixelLab candidate 1; approved/approvedBy is the G2 anchor approval of the PixelLab frames only: the 8 scan frames await the author's review (docs/art-todo.md)"
     },
     {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "worker_sorter",
+      "class": "worker",
+      "source": "procedural",
+      "canvas": [24, 32],
+      "frames": ["_s_idle_0", "_s_idle_1", "_s_walk_0", "_s_walk_1", "_s_scan_0", "_s_scan_1", "_s_jump", "_n_idle_0", "_n_idle_1", "_n_walk_0", "_n_walk_1", "_n_scan_0", "_n_scan_1", "_n_jump", "_e_idle_0", "_e_idle_1", "_e_walk_0", "_e_walk_1", "_e_scan_0", "_e_scan_1", "_e_jump", "_w_idle_0", "_w_idle_1", "_w_walk_0", "_w_walk_1", "_w_scan_0", "_w_scan_1", "_w_jump"],
+      "district": "warehouse",
+      "priority": "P0",
+      "note": "build 2 M6 (B2 §6.7): the sorter = the worker frames with the vest yellow ramp swapped to orange step for step (variants.ts SORTER_SWAP, drawn from the worker finals by warehouse.ts); class worker = packed into both atlases",
+      "finalSha256": "630ce24d4a6061700eb2dceb4d81d035a56868ae81cddacdf55d2bdf601527d8"
+    },
+    {
       "id": "metal_detector",
       "class": "machine",
       "source": "pixellab",
@@ -10214,6 +10870,310 @@
       "note": "_f0 idle, _f1 shake left, _f2 shake right",
       "finalSha256": "a4e782918bec2d719b51adbb01f0c9195a77cc6c56aabb3290b6a78b6152b356",
       "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky battery checker gate, two thick boxy light grey pillars as wide as a hand, each with a tall green battery charge meter of stacked glowing cells on its front, joined by a heavy crossbar header with a glowing light strip and a big green battery shape lying on top, the passage between the pillars is completely empty, nothing inside the gate, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e"],
+              "max_colors": 20
+            },
+            "seed": 7002,
+            "prompt": "chunky battery checker gate, two thick boxy light grey pillars as wide as a hand, each with a tall green battery charge meter of stacked glowing cells on its front, joined by a heavy crossbar header with a glowing light strip and a big green battery shape lying on top, the passage between the pillars is completely empty, nothing inside the gate, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "5b3ee6ac-e14a-562a-9b3b-8a4b848f647a",
+            "source_image_id": "5b3ee6ac-e14a-562a-9b3b-8a4b848f647a"
+          },
+          "jobId": "66b4fd09-918f-4ab4-9e64-2e41edba3a63",
+          "seed": 7002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "f858d5d3dae2337c3e72dc491ab8bf9af02b064e4953d17939091e93e65c1d76",
+          "at": "2026-10-30T02:53:11.815Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky battery checker gate, two thick boxy light grey pillars as wide as a hand, each with a tall green battery charge meter of stacked glowing cells on its front, joined by a heavy crossbar header with a glowing light strip and a big green battery shape lying on top, the passage between the pillars is completely empty, nothing inside the gate, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e"],
+              "max_colors": 20
+            },
+            "seed": 7000,
+            "prompt": "chunky battery checker gate, two thick boxy light grey pillars as wide as a hand, each with a tall green battery charge meter of stacked glowing cells on its front, joined by a heavy crossbar header with a glowing light strip and a big green battery shape lying on top, the passage between the pillars is completely empty, nothing inside the gate, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "a8afccfd-8de5-5c0e-90f1-2b1ad1c92383",
+            "source_image_id": "a8afccfd-8de5-5c0e-90f1-2b1ad1c92383"
+          },
+          "jobId": "6447c8c9-6342-41f6-b265-7e1ae19adadc",
+          "seed": 7000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "d1aa8c28f45e3c9f9d551bf7f16409d59183b7a1f8312145269288d19e973047",
+          "at": "2026-10-30T02:53:11.815Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky battery checker gate, two thick boxy light grey pillars as wide as a hand, each with a tall green battery charge meter of stacked glowing cells on its front, joined by a heavy crossbar header with a glowing light strip and a big green battery shape lying on top, the passage between the pillars is completely empty, nothing inside the gate, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e"],
+              "max_colors": 20
+            },
+            "seed": 7203,
+            "prompt": "chunky battery checker gate, two thick boxy light grey pillars as wide as a hand, each with a tall green battery charge meter of stacked glowing cells on its front, joined by a heavy crossbar header with a glowing light strip and a big green battery shape lying on top, the passage between the pillars is completely empty, nothing inside the gate, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "488ed8a4-fcd8-5d72-916e-64d952628dbb",
+            "source_image_id": "488ed8a4-fcd8-5d72-916e-64d952628dbb"
+          },
+          "jobId": "3bd999b9-16ad-49c6-85a6-ff20a817dfa1",
+          "seed": 7203,
+          "candidate": 3,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "312b264b8a51bdfa14593e50e6b8c2aed12b6f1d02ccb34d1d6d685e655782ca",
+          "at": "2026-10-30T02:58:51.429Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 2,
+          "reason": "chunkier pillars but the header cylinder reads less as a battery",
+          "by": "claude",
+          "at": "2026-10-30T02:55:18.209Z"
+        },
+        {
+          "candidate": 3,
+          "reason": "thin arch, small battery; weaker than #0",
+          "by": "claude",
+          "at": "2026-10-30T02:59:58.698Z"
+        }
+      ],
+      "id": "battery_checker",
+      "class": "machine",
+      "source": "pixellab",
+      "canvas": [48, 48],
+      "frames": ["_f0", "_f1"],
+      "district": "warehouse",
+      "priority": "P1",
+      "subject": "battery checker gate with charge-meter pillars over a conveyor",
+      "note": "agent pick #0 (2026-10-30): grey arch with tall green charge-meter pillars and a battery with its terminal nub lying on the header (its unique feature); the header light strip flashes blue/yellow like the detector",
+      "finalSha256": "253a3a392a693b236bd31f2f3e70fedcfcc87ced028079f511043a2394b1c4d9",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner tunnel, a wide boxy light grey housing with thick side walls and a deep roof over the passage, a glowing light strip along the front of the roof, a small dark blue monitor screen on the right wall, purple trim, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 7001,
+            "prompt": "chunky airport x-ray baggage scanner tunnel, a wide boxy light grey housing with thick side walls and a deep roof over the passage, a glowing light strip along the front of the roof, a small dark blue monitor screen on the right wall, purple trim, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "755c9fff-acac-5180-ac2b-8486f613d221",
+            "source_image_id": "755c9fff-acac-5180-ac2b-8486f613d221"
+          },
+          "jobId": "fb69fe1c-1daa-41dc-b150-0e3c4fe31455",
+          "seed": 7001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0218f62f1a51b1d992042dbe57daabb90658ed3d93b2a9eb2be2de0fbb6a974a",
+          "at": "2026-10-30T02:53:11.815Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner tunnel, a wide boxy light grey housing with thick side walls and a deep roof over the passage, a glowing light strip along the front of the roof, a small dark blue monitor screen on the right wall, purple trim, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 7000,
+            "prompt": "chunky airport x-ray baggage scanner tunnel, a wide boxy light grey housing with thick side walls and a deep roof over the passage, a glowing light strip along the front of the roof, a small dark blue monitor screen on the right wall, purple trim, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "91d5269b-8e5a-57a4-ab85-7046358e2bfb",
+            "source_image_id": "91d5269b-8e5a-57a4-ab85-7046358e2bfb"
+          },
+          "jobId": "b86d695f-8f1d-4289-bb72-c7b7b7922c11",
+          "seed": 7000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "d8bc78ace0f63182fa2b7f86c125971ef77ef38ac823ac69b6fb08bd8cb74fed",
+          "at": "2026-10-30T02:53:11.815Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky airport x-ray baggage scanner tunnel, a wide boxy light grey housing with thick side walls and a deep roof over the passage, a glowing light strip along the front of the roof, a small dark blue monitor screen on the right wall, purple trim, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0"],
+              "max_colors": 20
+            },
+            "seed": 7202,
+            "prompt": "chunky airport x-ray baggage scanner tunnel, a wide boxy light grey housing with thick side walls and a deep roof over the passage, a glowing light strip along the front of the roof, a small dark blue monitor screen on the right wall, purple trim, the tunnel passage through the middle is completely empty and open at the bottom, nothing inside the tunnel, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "e1196cae-7b94-5d74-9305-faf758a9456b",
+            "source_image_id": "e1196cae-7b94-5d74-9305-faf758a9456b"
+          },
+          "jobId": "103ae99c-3c25-4bc4-82e6-06b76f9f9e74",
+          "seed": 7202,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "8825ee77aba48a475207a102986eba15749c6d5b2eddd31511cbb1192cfce6ea",
+          "at": "2026-10-30T02:58:51.429Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "monitor smaller, reads as a plain arch",
+          "by": "claude",
+          "at": "2026-10-30T02:55:18.209Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "contract: belt opening (warehouse-view §1.3)",
+          "by": "claude",
+          "at": "2026-10-30T02:59:29.839Z"
+        }
+      ],
+      "id": "xray",
+      "class": "machine",
+      "source": "pixellab",
+      "canvas": [48, 48],
+      "frames": ["_f0", "_f1"],
+      "district": "warehouse",
+      "priority": "P1",
+      "subject": "x-ray scanner tunnel over a conveyor with a monitor screen",
+      "note": "agent pick #0 (2026-10-30): boxy light-grey tunnel housing with depth, purple trim and a dark blue monitor on the right wall (its unique feature); open passage over the belt",
+      "finalSha256": "a36708b5d5fdd55f9d6efbc0e45deeecd8fd5ae5d65b1f8d34b6e737079ff641",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky industrial robot arm on a round grey pedestal base, an orange column, two thick yellow arm segments with grey joints raised up and bent at the elbow, a grey two-finger gripper claw at the end holding nothing, a small status lamp on the column, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e"],
+              "max_colors": 20
+            },
+            "seed": 7001,
+            "prompt": "chunky industrial robot arm on a round grey pedestal base, an orange column, two thick yellow arm segments with grey joints raised up and bent at the elbow, a grey two-finger gripper claw at the end holding nothing, a small status lamp on the column, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "b7086526-baf3-5934-9b6e-5bb45cf55089",
+            "source_image_id": "b7086526-baf3-5934-9b6e-5bb45cf55089"
+          },
+          "jobId": "44a0fb38-694b-4ffe-bc9a-5df8ee465b05",
+          "seed": 7001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "41771c93de185e6ee245b54270786473bdbbb733bd2456309dcb7a87b229a56d",
+          "at": "2026-10-30T02:53:11.815Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky industrial robot arm on a round grey pedestal base, an orange column, two thick yellow arm segments with grey joints raised up and bent at the elbow, a grey two-finger gripper claw at the end holding nothing, a small status lamp on the column, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e"],
+              "max_colors": 20
+            },
+            "seed": 7002,
+            "prompt": "chunky industrial robot arm on a round grey pedestal base, an orange column, two thick yellow arm segments with grey joints raised up and bent at the elbow, a grey two-finger gripper claw at the end holding nothing, a small status lamp on the column, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "de6b9722-d9f5-52a8-b3d0-3a544a680ef2",
+            "source_image_id": "de6b9722-d9f5-52a8-b3d0-3a544a680ef2"
+          },
+          "jobId": "2fd26cfb-2547-4fcb-85df-2bb5df990434",
+          "seed": 7002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "2c160005850f5f355b772bcc7b5324ce9112318f52c24ba945a5a80dc24ab23a",
+          "at": "2026-10-30T02:53:33.369Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "chunky industrial robot arm on a round grey pedestal base, an orange column, two thick yellow arm segments with grey joints raised up and bent at the elbow, a grey two-finger gripper claw at the end holding nothing, a small status lamp on the column, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e"],
+              "max_colors": 20
+            },
+            "seed": 7000,
+            "prompt": "chunky industrial robot arm on a round grey pedestal base, an orange column, two thick yellow arm segments with grey joints raised up and bent at the elbow, a grey two-finger gripper claw at the end holding nothing, a small status lamp on the column, warehouse equipment, top-down 3/4 view from the front and slightly above, light from the top-left, chunky, bright, 1px dark outline, flat fills, saturated clean colours, centred, transparent background, no text, no anti-aliasing",
+            "image_id": "b5117299-44bd-5fdd-8d5d-8390bceef91b",
+            "source_image_id": "b5117299-44bd-5fdd-8d5d-8390bceef91b"
+          },
+          "jobId": "f380fc15-f8c2-4ebf-82f9-62f66597b75d",
+          "seed": 7000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "ad1b7ff2b6c90dc3581806261c38236b3ab6e9fb6a050b2b23a072b1fef98d3d",
+          "at": "2026-10-30T02:53:11.815Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "arm folded over the column, side lamp clutters the silhouette",
+          "by": "claude",
+          "at": "2026-10-30T02:55:18.209Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "nice wheeled base but a shorter, busier arm",
+          "by": "claude",
+          "at": "2026-10-30T02:55:18.209Z"
+        }
+      ],
+      "id": "sorter_arm",
+      "class": "fixture",
+      "source": "pixellab",
+      "canvas": [64, 64],
+      "frames": ["_f0", "_f1", "_f2"],
+      "district": "warehouse",
+      "priority": "P1",
+      "subject": "industrial robot sorter arm on a round pedestal with a gripper claw",
+      "atlas": "both",
+      "note": "agent pick #0 (2026-10-30): orange column on a round grey pedestal, two yellow segments with grey joints and a big two-finger claw reaching out: the clearest robot-arm silhouette; the scripted f1/f2 lean reads as reach/toss",
+      "finalSha256": "95bc2822e8a02abee48f28084c193b88fa2102800275a316c11ec93af43d2ea5",
+      "chosenCandidate": 0
     },
     {
       "id": "battery_checker_sil",
@@ -11379,6 +12339,203 @@
       "finalSha256": "33acfc8f74fafd296084be7ee328f6e4a4bea2cce85dd7a9138349aa81fe704a"
     },
     {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_00",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "note": "build 2 M6 (B2 §6.7, design-m6 §6.5): applicant / employee portraits, face_NN with NN = skin * 4 + hair (skins peach / tan / deep x short dark hair, long auburn hair, blue cap, yellow hard hat); the shirt is seeded per id (tools/art/faces.ts); Employee.look / Applicant.look index them (people.ts FACE_LOOKS = 12); icon16 = packed into both atlases",
+      "finalSha256": "65d3b3685075dcfe6ad37556650cd00452f60cdddff09057a14ce0cb5926edd2"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_01",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "3519e280150e66a018109225935eb6f5d9490884513942a374045fee9f085a1a"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_02",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "da730936873ea9dda7737d90827cec3c77407be37de2fde5453e705c54fb5f47"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_03",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "ab8f9f9624f31ac2401f7fe9ac57fe0440b90535b95c64febb84f058a48ffbfb"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_04",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "1b0df2fc42858805cc94a27b7c8924ae52a3668022368764ea56120883f96329"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_05",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "59c17bc6c246cc4669be6f08fc6d27c72977d7a391cc83bd20cc327af12ab543"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_06",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "25b9088ef6bdb36f6a7d6f68d3a02ca388bdf87dc410645eb2db4ff809c67e4b"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_07",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "452283359e37a5464ee11d1c4fb946351f8bb1c2eb0162a4afb36dcf0eaa4b97"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_08",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "cb9bba5c3b740fe4114aa8a20a86bb883d907a51ce4034acd19341eb288976ea"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_09",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "957fc6415aef61cb5c9204f5ea1bd5f00b3a8ce609b9a6cd1637ae3cfcec7e30"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_10",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "3e69d80d59e02229c37637ef43b51c6e47ef3dcb6142e5ac2d73dfbadc4d9304"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "face_11",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "finalSha256": "514f7b6a5b6cb4f8dea757086a336fac52b8c9a96c5b16810d563108a6a0d8cb"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ic_star",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "note": "build 2 M6 (B2 §2.7, §6.7): the ★ applicant / employee mark, top-right of a face (gold = reward)",
+      "finalSha256": "2a1130eb934ba882b730b52447c85935416058d2ac65d1bc93e7a1c65a64bc66"
+    },
+    {
       "id": "ui_panel",
       "class": "ui",
       "source": "procedural",
@@ -11803,6 +12960,38 @@
       "finalSha256": "e0f674f9fadbcd2e44e6c5f6cb1125379d14b059454532639083daee62adc04c"
     },
     {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ic_pip_on",
+      "class": "ui",
+      "source": "procedural",
+      "canvas": [8, 8],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "note": "build 2 M6 (design-m6 §6.5): a lit stat pip, 6x6 dot at (1, 1), drawn at a 7-px pitch (icons.ts PIP_ROWS)",
+      "finalSha256": "d838d667e29f8bf3a3711842409eba772f7bbcd669823a1063984357c6093565"
+    },
+    {
+      "variants": [],
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ic_pip_off",
+      "class": "ui",
+      "source": "procedural",
+      "canvas": [8, 8],
+      "frames": [""],
+      "district": "ui",
+      "priority": "P0",
+      "note": "build 2 M6 (design-m6 §6.5): an empty stat pip (grey2 ring, grey4 socket)",
+      "finalSha256": "61d80618eb0c5a598808c71a49bfaa6f7d96cb7cdb0e99e3261ebc9594d3e900"
+    },
+    {
       "id": "mood_happy_1x1",
       "class": "building1x1",
       "source": "procedural",
@@ -12209,6 +13398,33 @@
       "usd": 0,
       "balanceBefore": 3188,
       "balanceAfter": 3173
+    },
+    {
+      "at": "2026-10-30T02:54:36.332Z",
+      "ids": ["battery_checker", "xray", "sorter_arm"],
+      "tool": "create-image-pro-flash",
+      "generations": 35,
+      "usd": 0,
+      "balanceBefore": 3173,
+      "balanceAfter": 3138
+    },
+    {
+      "at": "2026-10-30T02:57:58.132Z",
+      "ids": ["lr_major_house", "lr_patch_bungalow", "lr_prerelease_villa", "lr_range_ranch_house", "lr_caret_cottage", "lr_tilde_terrace", "lr_minor_cottage", "lr_exact_pin", "lr_wildcard_shop", "lr_buildmeta_bungalow"],
+      "tool": "create-image-pro-flash",
+      "generations": 150,
+      "usd": 0,
+      "balanceBefore": 3138,
+      "balanceAfter": 2988
+    },
+    {
+      "at": "2026-10-30T02:59:29.839Z",
+      "ids": ["lr_major_house", "lr_prerelease_villa", "battery_checker", "xray"],
+      "tool": "create-image-pro-flash",
+      "generations": 22,
+      "usd": 0,
+      "balanceBefore": 2988,
+      "balanceAfter": 2966
     }
   ],
   "retired": [
@@ -12408,6 +13624,382 @@
           "reason": "victorian customs house",
           "by": "author",
           "at": "2026-10-30T00:58:29.242Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "lr_house_a",
+      "class": "building1x1",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T02:51:48.905Z",
+      "reason": "superseded: B2 §6.5 gives every Low-density building its own unique sprite (shared locked scenery retired in M6)",
+      "replacedBy": ["lr_caret_cottage", "lr_minor_cottage", "lr_wildcard_shop"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "13990f84-7a79-55d2-8d94-c2f8d34a6c9b",
+            "source_image_id": "13990f84-7a79-55d2-8d94-c2f8d34a6c9b"
+          },
+          "jobId": "f6281f24-dd86-466d-b0e5-539c8db5e275",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "4440b18d84b25ddfd239782fbfa2f5e6e33b3a9cd7a34c03d7ac287fa01cfaa3",
+          "at": "2026-10-29T08:14:53.147Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "505b7c7c-c8d5-599d-857b-7a59e69b2ce1",
+            "source_image_id": "505b7c7c-c8d5-599d-857b-7a59e69b2ce1"
+          },
+          "jobId": "bdb22d11-0831-4683-bb3b-5d4a0b60536e",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "926821275334c5e2f57e2bd04c8903f4554fb1bce5085867d7f096f440821690",
+          "at": "2026-10-29T08:14:53.156Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "suburban house with a gable roof, cream walls, red roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f1157fd9-3e0b-59d1-a55e-ad2133054276",
+            "source_image_id": "f1157fd9-3e0b-59d1-a55e-ad2133054276"
+          },
+          "jobId": "cea74f67-70b9-40d0-ae30-24bf5469bff4",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "981a36afd0bb2d952a4cf98e168a2d3cbc88e4444e044e63f8dcc9894ba4806c",
+          "at": "2026-10-29T08:14:48.193Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "smaller",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "similar",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "lr_house_b",
+      "class": "building1x1",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T02:51:48.906Z",
+      "reason": "superseded: B2 §6.5 gives every Low-density building its own unique sprite (shared locked scenery retired in M6)",
+      "replacedBy": ["lr_tilde_terrace", "lr_exact_pin", "lr_buildmeta_bungalow"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "64b7472b-1ead-5d70-b680-3b64fdf7543c",
+            "source_image_id": "64b7472b-1ead-5d70-b680-3b64fdf7543c"
+          },
+          "jobId": "094d7766-4f5f-41c2-81c8-70e39e1424c9",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "dbe5389e35b4cfddbc05960d8a2f579f94ffb1379a6476fb879cb25a1510ffde",
+          "at": "2026-10-29T08:14:53.655Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f0191df2-a491-5acd-b17a-c75927ccb9a0",
+            "source_image_id": "f0191df2-a491-5acd-b17a-c75927ccb9a0"
+          },
+          "jobId": "9a274bfa-28ce-423c-b9c6-0682e8f4a35d",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "9dcefd11d833cc1fb779447b309b4361e3ee508f30eb563e918ebc2379dc491d",
+          "at": "2026-10-29T08:15:09.550Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "small cottage with a hip roof, yellow walls, terracotta roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "d48509b6-a5fe-57ee-a732-a6e7aaa311c6",
+            "source_image_id": "d48509b6-a5fe-57ee-a732-a6e7aaa311c6"
+          },
+          "jobId": "b9ae3290-f925-46d9-8a6f-33797ca0dfd8",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "cfc0f7c3e3e7fa133eb0d8eb064bb03c9a3181edf478f4ef3276a33622a0988d",
+          "at": "2026-10-29T08:15:09.457Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "gable, two storeys",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "busier",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "lr_house_c",
+      "class": "building2x2",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T02:51:48.907Z",
+      "reason": "superseded: B2 §6.5 gives every Low-density building its own unique sprite (shared locked scenery retired in M6)",
+      "replacedBy": ["lr_patch_bungalow", "lr_range_ranch_house"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "ee699ec8-6ad5-5e6c-9545-e8e1eca8861d",
+            "source_image_id": "ee699ec8-6ad5-5e6c-9545-e8e1eca8861d"
+          },
+          "jobId": "b25ffbf4-36ef-4877-acab-1ef12797b0ad",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "fe4ff3c090952f01f8245c7b9431b4872486f9bd03b9178a894a98dec761e47a",
+          "at": "2026-10-29T08:15:14.858Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "48f4c50a-1bd8-52c4-b663-b37fdc61fa6c",
+            "source_image_id": "48f4c50a-1bd8-52c4-b663-b37fdc61fa6c"
+          },
+          "jobId": "0fba77c1-c4b3-4215-b8bb-d61f2e45738f",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "6fcc8de29c069a1bb75b59bac16836fcb7263d03e29f357e857e1ec29c475c20",
+          "at": "2026-10-29T08:15:09.673Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "two-storey family house with a garden, pastel walls, gable roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "3327edb3-4b2b-593b-ab5d-c40f8ad72a08",
+            "source_image_id": "3327edb3-4b2b-593b-ab5d-c40f8ad72a08"
+          },
+          "jobId": "3d859b4c-e924-47c7-9bb4-b14e93f89c21",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "bfbcf54440b9960dbb8a921bab37d0f1bf51ee9866eb8aac1b9e6e7c23ca967e",
+          "at": "2026-10-29T08:15:20.257Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "similar",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "plainer",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "lr_villa",
+      "class": "building2x2",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T02:51:48.907Z",
+      "reason": "superseded: B2 §6.5 gives every Low-density building its own unique sprite (shared locked scenery retired in M6)",
+      "replacedBy": ["lr_major_house", "lr_prerelease_villa"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "49a17557-5847-5de4-a3b3-9eb04ae49517",
+            "source_image_id": "49a17557-5847-5de4-a3b3-9eb04ae49517"
+          },
+          "jobId": "b94b7e20-1973-4a5c-b70c-983f536471e6",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "920a0237fb01f349332a1cace2d8da2d51fbc56b033c3e76bb069885a1a3ce20",
+          "at": "2026-10-29T08:15:20.262Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "c6b0ca9b-d3bb-5a9a-8260-d007d42c56cb",
+            "source_image_id": "c6b0ca9b-d3bb-5a9a-8260-d007d42c56cb"
+          },
+          "jobId": "933877ea-70b9-4972-b15c-00f91589c399",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "06f011683e3cf1896fb4aff33e2a56288b46d2e29d0ba651ec92c6fb24a5da67",
+          "at": "2026-10-29T08:15:25.668Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "large villa with a hip roof and a hedge-lined yard, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small garden lawn, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "af88f22b-1d3f-5c0f-8ffb-d6fae60cf72d",
+            "source_image_id": "af88f22b-1d3f-5c0f-8ffb-d6fae60cf72d"
+          },
+          "jobId": "c01d13e5-2af2-4bfb-a85a-1c1afd8ff774",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "146a5e09cb1898b86f7bf5fe7bd6fd5a06eca5e35eb470eb8674e9e83b6abbe3",
+          "at": "2026-10-29T08:15:25.660Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "orange roof repeats lr houses",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "small",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
         }
       ],
       "note": "shared locked scenery: playtest 1 shows only the _locked frame"

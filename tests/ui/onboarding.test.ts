@@ -1,12 +1,13 @@
 // city-view.md §9.1 / plan.md §9 "Onboarding": three skippable tooltips whose
 // progress is persisted in pm.save.v2.onboarding = {step, skipped,
-// sawFirstFlag, sawTossHint, wanted} so a reload never repeats a step.
-// Steps 1 (Garage), 2 (warehouse hint, computed from the data, 45 s) and 3
-// (rush, 20 s timeout); `step` is the highest step done and steps show in
-// tour order. §9.2: the scripted-flag texts and the wanted-poster list.
+// sawFirstFlag, sawTossHint} so a reload never repeats a step. Steps 1
+// (Garage — M6: `Buy a bike in the Garage and pick its driver`), 2
+// (warehouse hint, computed from the data, 45 s) and 3 (rush, 20 s timeout);
+// `step` is the highest step done and steps show in tour order. §9.2: the
+// scripted-flag texts. The wanted list moved into the sim at M6
+// (spec-build2 §2.8): an old stored `wanted` is dropped.
 import { describe, expect, it } from 'vitest'
 import {
-  addWanted,
   completeStep,
   FIRST_FLAG_CITY_TEXT,
   FIRST_FLAG_ROOM_TEXT,
@@ -21,9 +22,11 @@ import {
   step2Model,
   step2Text,
   STEP_TEXT,
+  startInspectorP,
+  step1Done,
+  step1Text,
   STEP_TIMEOUT_MS,
   stepEligible,
-  wantedByStrain,
 } from '../../src/ui/Onboarding.ts'
 import { dataFixture } from '../sim/helpers.ts'
 
@@ -34,7 +37,6 @@ describe('onboarding state (pm.save.v2.onboarding)', () => {
       skipped: false,
       sawFirstFlag: false,
       sawTossHint: false,
-      wanted: [],
     })
   })
 
@@ -54,7 +56,6 @@ describe('onboarding state (pm.save.v2.onboarding)', () => {
       skipped: true,
       sawFirstFlag: false,
       sawTossHint: true,
-      wanted: ['evil-lodash', 'l0dash'],
     })
     expect(normaliseOnboarding({ step: -2 }).step).toBe(0)
   })
@@ -65,12 +66,25 @@ describe('§9.1 step order: Garage (1), warehouse (2), rush (3)', () => {
     expect(ONBOARDING_STEPS).toEqual([1, 2, 3])
     expect(STEP_TIMEOUT_MS[2]).toBe(45_000)
     expect(STEP2_DELAY_MS).toBe(3_000)
-    expect(STEP_TEXT[1]).toBe('Buy a bike in the Garage to start delivering')
+    expect(STEP_TEXT[1]).toBe('Buy a bike in the Garage and pick its driver')
     expect(STEP_TEXT[3]).toBe(
       'Tap a building with waiting parcels to rush a vehicle there',
     )
     expect(STEP_TIMEOUT_MS[1]).toBeNull()
     expect(STEP_TIMEOUT_MS[3]).toBe(20_000)
+  })
+
+  it('M6 review: step 1 is done once a vehicle has a driver, not on a `Hire later` purchase — then it says so', () => {
+    expect(step1Done([])).toBe(false)
+    expect(step1Text([])).toBe(STEP_TEXT[1])
+    const later = [{ name: 'Bike 1', driverId: null }]
+    expect(step1Done(later)).toBe(false)
+    expect(step1Text(later)).toBe(
+      'Bike 1 has no driver yet: hire one in the Garage',
+    )
+    const driven = [...later, { name: 'Bike 2', driverId: 4 }]
+    expect(step1Done(driven)).toBe(true)
+    expect(step1Text(driven)).toBe(STEP_TEXT[1])
   })
 
   it('step 1 shows on a new game; 2 after 1; 3 after 2', () => {
@@ -133,14 +147,25 @@ describe('§9.1 step 2: the detection hint comes from the data and §6.3', () =>
     )
   })
 
+  it('M6: the start inspector is Audrey 3/3/0 — roles.inspector.p at eye 3 = 0.85', () => {
+    expect(data.employees.start.inspector.pips.eye).toBe(3)
+    expect(startInspectorP(data)).toBe(0.85)
+  })
+
   it('follows the tables, never literals', () => {
     const patched = dataFixture({
-      employees: { inspector: { pMatch: 0.5, pOther: 0.5 } },
+      employees: { roles: { inspector: { p: [0.75, 0.8, 0.5] } } },
       machines: { checkers: [{ price: 175 }] },
     })
     expect(step2Text(patched)).toBe(
       'Your inspector catches 50% by hand. A Metal detector ($175) lifts the lane to 90%',
     )
+    // A 1-eye start inspector reads p[0].
+    const oneEye = dataFixture({
+      employees: { start: { inspector: { pips: { eye: 1 } } } },
+    })
+    expect(step2Model(oneEye)?.inspectorPct).toBe(75)
+    expect(step2Model(oneEye)?.lanePct).toBe(95)
   })
 })
 
@@ -175,31 +200,5 @@ describe('§9.2 funnel: the first flag of a run, scripted or not', () => {
     expect(isFlagFunnelText(FIRST_FLAG_ROOM_TEXT, 3)).toBe(true)
     expect(isFlagFunnelText('Payday — payroll -$28', 3)).toBe(false)
     expect(isFlagFunnelText(null, 3)).toBe(false)
-  })
-})
-
-describe('§9.2 / warehouse-view §5.1: the wanted list', () => {
-  const data = dataFixture()
-
-  it('appends each revealed malware label once, in reveal order', () => {
-    const s = freshOnboarding()
-    expect(addWanted(s, 'evil-lodash')).toBe(true)
-    expect(addWanted(s, 'l0dash')).toBe(true)
-    expect(addWanted(s, 'evil-lodash')).toBe(false)
-    expect(addWanted(s, '')).toBe(false)
-    expect(s.wanted).toEqual(['evil-lodash', 'l0dash'])
-  })
-
-  it('groups the list by the announced strains for the poster', () => {
-    const wanted = ['l0dash', 'faker@6.6.6', 'evil-lodash', 'not-a-label']
-    expect(
-      wantedByStrain(wanted, data.puns.malwareLabels, ['metal', 'rattle']),
-    ).toEqual([
-      { strain: 'metal', labels: ['l0dash', 'evil-lodash'] },
-      { strain: 'rattle', labels: ['faker@6.6.6'] },
-    ])
-    expect(wantedByStrain([], data.puns.malwareLabels, ['metal'])).toEqual([
-      { strain: 'metal', labels: [] },
-    ])
   })
 })

@@ -1,8 +1,9 @@
 // Autosave and the localStorage keys (plan.md §5 "localStorage keys", §6.4
 // "Save and load"; spec §2; city-view.md §9.1, §9.5; spec-build2 §8).
 //
-//   pm.save.v2      {version: 2, savedAt, build, dataHash, seed, state,
-//                    commandLog, onboarding} via src/sim/save.ts
+//   pm.save.v2      {version: SAVE_VERSION (3 since M6), savedAt, build,
+//                    dataHash, seed, state, commandLog, onboarding} via
+//                    src/sim/save.ts
 //   pm.settings.v1  {muted, speed} (merged: the AudioDirector writes `muted`
 //                    through its own store and keeps `speed`; we keep `muted`)
 //   pm.playtest.v1  the playtest profile + its `restore` accumulators
@@ -29,19 +30,21 @@
 // profile on hide. readPlaytest() hands the stored profile to the recorder,
 // which resumes it only for the same run. The Title reads the
 // save header (`Day 7 · $1,240 · Lv 2`) and offers Continue only for a
-// version-2 payload whose dataHash matches the running tables; anything else
-// is discarded with the toast "Save from an older build was reset" (R9: no
-// migrations). The sim never sees the onboarding object: HudScene keeps it in
-// the game registry under REG_ONBOARDING and this module serialises it.
+// current-version (SAVE_VERSION) payload whose dataHash matches the running
+// tables; anything else is discarded with the toast "Save from an older
+// build was reset" (R9: no migrations). The sim never sees the onboarding
+// object: HudScene keeps it in the game registry under REG_ONBOARDING and
+// this module serialises it.
 //
 // onboarding (city-view §9.1-§9.2): `step`/`skipped` (the tour), `sawFirstFlag`
-// (the scripted-flag hint was followed into the warehouse), `sawTossHint`
-// (the one-time puns.json tossHint toast) and `wanted` (malware labels
-// revealed by DEFUSED tosses and lost lives). HudScene mutates the registry
-// object in place; getOnboarding() is the one accessor (the warehouse's
-// wanted poster reads `.wanted` through it) and every save writes it, plus
-// an immediate save after a lost life / game over so a reload never loses a
-// revealed label.
+// (the scripted-flag hint was followed into the warehouse) and `sawTossHint`
+// (the one-time puns.json tossHint toast). The wanted list (malware labels
+// revealed by DEFUSED tosses and lost lives) is sim state since M6
+// (spec-build2 §2.8: `state.wanted`, saved with the state); a `wanted` key in
+// an older payload is dropped by normaliseOnboarding. HudScene mutates the
+// registry object in place; getOnboarding() is the one accessor and every
+// save writes it, plus an immediate save after a lost life / game over so a
+// reload never replays the delivery.
 //
 // Phaser is a type-only import and storage is injectable, so everything here
 // runs under Vitest (tests/ui/autosave.test.ts).
@@ -144,8 +147,10 @@ export function getOnboarding(registry: RegistryLike): OnboardingSave {
   const ok =
     typeof cur === 'object' &&
     cur !== null &&
-    Array.isArray((cur as OnboardingSave).wanted) &&
-    typeof (cur as OnboardingSave).step === 'number'
+    typeof (cur as OnboardingSave).step === 'number' &&
+    typeof (cur as OnboardingSave).skipped === 'boolean' &&
+    typeof (cur as OnboardingSave).sawFirstFlag === 'boolean' &&
+    typeof (cur as OnboardingSave).sawTossHint === 'boolean'
   if (ok) return cur as OnboardingSave
   const fresh = normaliseOnboarding(cur)
   registry.set(REG_ONBOARDING, fresh)
@@ -321,7 +326,7 @@ export type SaveCheck =
   | { kind: 'stale'; problems: string[] }
 
 /**
- * Classify stored save text: none, ok (version 2, same dataHash, loadable),
+ * Classify stored save text: none, ok (SAVE_VERSION, same dataHash, loadable),
  * or stale (anything else, to be discarded with STALE_SAVE_TEXT).
  */
 export function checkSave(text: string | null, data: GameData): SaveCheck {

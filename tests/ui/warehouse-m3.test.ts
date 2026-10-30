@@ -25,7 +25,8 @@ const sc = await import('../../src/ui/warehouse/SlotCard.ts')
 const hb = await import('../../src/ui/warehouse/HoldBayCard.ts')
 const { strainRows } = await import('../../src/ui/ShieldPopover.ts')
 const { FRAMES } = await import('../../src/render/frames.generated.ts')
-const { dataFixture, makeSim } = await import('../sim/helpers.ts')
+const { dataFixture, hireInspector, makeSim } =
+  await import('../sim/helpers.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { laneNode } = await import('../../src/sim/types.ts')
 const payroll = await import('../../src/sim/systems/payroll.ts')
@@ -70,7 +71,7 @@ describe('§8 L2 unlocks the Shaky shaker (data-driven BuySheet row)', () => {
     const sim = makeSim(1)
     const vs = createViewSim(sim)
     sim.state.economy.balance = 1000
-    const l1 = bs.buyRows(data, 1, null).find((r) => r.id === 'shaky_shaker')
+    const l1 = bs.buyRows(data, 1, []).find((r) => r.id === 'shaky_shaker')
     expect(l1?.locked).toBe(true)
     expect(vs.lane.buyMachine('shaky_shaker', 'slot2')).toEqual({
       ok: false,
@@ -78,7 +79,7 @@ describe('§8 L2 unlocks the Shaky shaker (data-driven BuySheet row)', () => {
     })
     toLevel2(sim)
     const l2 = bs
-      .buyRows(data, vs.level, null)
+      .buyRows(data, vs.level, [])
       .find((r) => r.id === 'shaky_shaker')
     expect(l2?.locked).toBe(false)
     expect(bs.rowState(l2!, vs.money)).toBe('ok')
@@ -169,10 +170,10 @@ describe('M3 stable Hold Bay bays (no compaction under the finger)', () => {
 describe('§7.4 payroll rows of the desk card', () => {
   it('re-hire costs one day of the worker’s own salary (the sim’s fee), dimmed below it', () => {
     const sim = makeSim(1)
-    const e = sim.state.employees.find((x) => x.kind === 'inspector')!
+    const e = sim.state.employees.find((x) => x.role === 'inspector')!
     expect(sc.rehireFee(data, e.salaryPerDay)).toBe(payroll.rehireFee(sim, e))
-    expect(sc.rehireLabel(e.name, sc.rehireFee(data, e.salaryPerDay))).toBe(
-      `Re-hire ${e.name} ($20)`,
+    expect(sc.rehireLabel(sc.rehireFee(data, e.salaryPerDay))).toBe(
+      'Re-hire $20',
     )
     expect(sc.rehireBlockReason(19, 20)).toBe('Not enough money')
     expect(sc.rehireBlockReason(20, 20)).toBeNull()
@@ -182,26 +183,31 @@ describe('§7.4 payroll rows of the desk card', () => {
     const sim = makeSim(1)
     const vs = createViewSim(sim)
     sim.state.economy.balance = 1000
-    expect(vs.lane.hireInspector()).toEqual({ ok: true })
-    expect(vs.lane.hireInspector()).toEqual({ ok: true })
+    expect(hireInspector(sim).ok).toBe(true)
+    expect(hireInspector(sim).ok).toBe(true)
     const lin = sim.state.employees.find(
-      (x) => x.kind === 'inspector' && x.id === desk(sim).f.inspectorIds[1],
+      (x) => x.role === 'inspector' && x.id === desk(sim).f.inspectorIds[1],
     )!
     payroll.walkOut(sim, lin)
     const { node, f } = desk(sim)
     expect(f.inspectorIds).toHaveLength(2)
     expect(f.walkedOutIds).toEqual([lin.id])
     expect(node.stations).toHaveLength(2)
-    const max = data.employees.inspector.maxPerDesk
+    const max = data.employees.desks.maxPerDesk
     const why = sc.hireBlockReason(
       f.inspectorIds.length,
       max,
-      vs.money,
-      data.employees.inspector.hireFee,
       f.walkedOutIds.length,
     )
     expect(why).toBe(sc.SEAT_HELD_TEXT)
-    expect(vs.lane.hireInspector()).toEqual({ ok: false, reason: 'desk-full' })
+    expect(hireInspector(sim)).toEqual({ ok: false, reason: 'desk-full' })
+    // The card lists Lin as a walked-out row (Re-hire + Fire).
+    const rows = sc.deskPersonRows(f, vs.people())
+    expect(rows.map((r) => [r.person.id, r.seated])).toEqual([
+      [f.inspectorIds[0], true],
+      [f.inspectorIds[1], true],
+      [lin.id, false],
+    ])
     // Re-hire: back at the desk, the station returns, the fee is paid.
     const bal = vs.money
     expect(vs.lane.rehire(lin.id)).toEqual({ ok: true })
@@ -210,13 +216,37 @@ describe('§7.4 payroll rows of the desk card', () => {
     expect(vs.money).toBe(bal - sc.rehireFee(data, lin.salaryPerDay))
   })
 
+  it('Fire on a walked-out row frees the held seat at once (design D10)', () => {
+    const sim = makeSim(1)
+    const vs = createViewSim(sim)
+    sim.state.economy.balance = 1000
+    hireInspector(sim)
+    hireInspector(sim)
+    const lin = sim.state.employees.find(
+      (x) => x.id === desk(sim).f.inspectorIds[2],
+    )!
+    payroll.walkOut(sim, lin)
+    expect(vs.fire(lin.id)).toEqual({ ok: true })
+    const { f } = desk(sim)
+    expect(f.walkedOutIds).toEqual([])
+    expect(
+      sc.hireBlockReason(
+        f.inspectorIds.length,
+        data.employees.desks.maxPerDesk,
+        f.walkedOutIds.length,
+      ),
+    ).toBeNull()
+  })
+
   it('the re-hire is refused below the fee (the button is dimmed for the same reason)', () => {
     const sim = makeSim(1)
     const vs = createViewSim(sim)
-    const e = sim.state.employees.find((x) => x.kind === 'inspector')!
+    const e = sim.state.employees.find((x) => x.role === 'inspector')!
     payroll.walkOut(sim, e)
     sim.state.economy.balance = 5
-    expect(sc.rehireBlockReason(vs.money, sc.rehireFee(data))).not.toBeNull()
+    expect(
+      sc.rehireBlockReason(vs.money, sc.rehireFee(data, e.salaryPerDay)),
+    ).not.toBeNull()
     expect(vs.lane.rehire(e.id)).toEqual({
       ok: false,
       reason: 'insufficient-funds',
@@ -224,9 +254,7 @@ describe('§7.4 payroll rows of the desk card', () => {
   })
 
   it('the salary line counts the seated inspectors only', () => {
-    expect(sc.salaryLine(1, 20, 230)).toBe(
-      'Salaries: 1 × $20 = $20/day · Payday in 0:23',
-    )
+    expect(sc.salaryLine(20, 230)).toBe('Salaries $20/day · Payday in 0:23')
   })
 })
 

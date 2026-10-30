@@ -1,8 +1,12 @@
 // city-view.md §7 (Garage sheet: geometry, rows, buy cards, footer), §6.2
 // (ZonePicker), spec §4.1 (sell refund 50 %, last vehicle unsellable, home
 // zones, Industrial trucks only), §4.6 (state text), §7.3-§7.4 (payday,
-// salaries, re-hire fee). Pure helpers only; Phaser is stubbed because the
-// modules import the Button kit (Phaser cannot load under Node).
+// salaries, re-hire fee); M6 (spec-build2 §2.5, design-m6 §6.3): the driver
+// block (name, ★, compact pips, affinity, pay / `! unpaid` / a waiting
+// Replace), the action slot (Hire driver / Re-hire / `···`), the popover
+// (Replace / Fire / Sell) and the buy, Replace and Fire copy. Pure helpers
+// only; Phaser is stubbed because the modules import the Button kit (Phaser
+// cannot load under Node).
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -22,8 +26,18 @@ vi.mock('phaser', () => {
 const garage = await import('../../src/scenes/GarageSheet.ts')
 const zp = await import('../../src/ui/ZonePicker.ts')
 const { followIconPos } = await import('../../src/ui/FollowStrip.ts')
+const { salaryOf } = await import('../../src/sim/systems/people.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
-const { dataFixture, makeSim } = await import('../sim/helpers.ts')
+const {
+  buy,
+  dataFixture,
+  fund,
+  injectParcel,
+  makeSim,
+  quietSim,
+  runUntil,
+  standardApplicant,
+} = await import('../sim/helpers.ts')
 
 import type { VehicleSnapshot } from '../../src/sim/view-api.ts'
 
@@ -37,6 +51,11 @@ function snap(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
     type: 'bike',
     name: 'Bike 1',
     driverName: 'Dee',
+    driverId: 7,
+    driverPips: { speed: 3, energy: 3, charisma: 0 },
+    driverStar: false,
+    driverAffinity: 'none',
+    nextDriverName: null,
     state: 'idle_lot',
     prev: { tx: 0, ty: 0 },
     cur: { tx: 0, ty: 0 },
@@ -135,13 +154,14 @@ describe('Garage sheet geometry (city-view §7, §7.2-§7.3)', () => {
     }
   })
 
-  it('row columns (name, status, zone chip, Sell) never overlap from W 360 to 430', () => {
+  it('row columns (name, status, zone chip, the ··· slot) never overlap from W 360 to 430', () => {
     for (const W of [360, 393, 430]) {
       const c = garage.rowColumns(W)
       expect(c.nameX + c.nameW).toBeLessThanOrEqual(c.statusX)
       expect(c.statusX + c.statusW).toBeLessThanOrEqual(c.zoneX)
-      expect(c.zoneX + garage.ZONE_W).toBeLessThanOrEqual(c.sellX)
-      expect(c.sellX + garage.SELL_W).toBeLessThanOrEqual(W - 12)
+      expect(c.zoneX + garage.ZONE_W).toBeLessThanOrEqual(c.actionX)
+      // the 44-px ··· sits at the row's right edge (no empty slot beside it)
+      expect(c.actionX + garage.MORE_W).toBe(W - 12 - 6)
       expect(c.nameW).toBeGreaterThanOrEqual(64) // `Dee · $8/day`
       expect(c.statusW).toBeGreaterThanOrEqual(60)
     }
@@ -158,28 +178,132 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     )
   })
 
-  it('the last vehicle cannot be sold: Sell disabled with "Keep at least one vehicle"', () => {
-    const one = garage.rowAction(snap(), data, 1, false)
-    expect(one).toEqual({
-      kind: 'sell',
+  it('the last vehicle cannot be sold: Sell (in the ··· popover) disabled with "Keep at least one vehicle"', () => {
+    expect(garage.sellAction(snap(), data, 1)).toEqual({
       label: 'Sell $100',
       enabled: false,
       tip: 'Keep at least one vehicle',
     })
-    const two = garage.rowAction(snap(), data, 2, false)
+    const two = garage.sellAction(snap(), data, 2)
     expect(two.enabled).toBe(true)
     expect(two.tip).toBeNull()
+    // A driven row's action slot is the ··· popover whatever the fleet size.
+    expect(garage.rowAction(snap(), data, 1, true)).toEqual({
+      kind: 'more',
+      label: garage.MORE_LABEL,
+      enabled: true,
+      tip: null,
+    })
   })
 
-  it('an inactive row offers Re-hire for one day of salary, enabled only once payroll ships', () => {
+  it('design-m6 §6.3: the ··· popover lists Replace driver, Fire driver, Sell (last vehicle: disabled + tip)', () => {
+    const items = garage.menuItems(snap({ type: 'van' }), data, 3)
+    expect(items.map((i) => [i.kind, i.label, i.enabled])).toEqual([
+      ['replace', 'Replace driver', true],
+      ['fire', 'Fire driver', true],
+      ['sell', 'Sell $500', true],
+    ])
+    const last = garage.menuItems(snap(), data, 1)[2]
+    expect(last).toMatchObject({
+      kind: 'sell',
+      enabled: false,
+      tip: 'Keep at least one vehicle',
+    })
+    expect(garage.menuHeight(3)).toBe(4 + 3 * 44 + 2 * 2 + 4)
+  })
+
+  it('M6 integration: a driverless row keeps Sell (and Fire for a walked-out driver) in its ··· popover, its primary action first', () => {
+    const none = snap({ state: 'inactive', driverName: null, driverId: null })
+    const hire = garage.rowAction(none, data, 3, true)
+    expect(
+      garage.menuItems(none, data, 3, hire).map((i) => [i.kind, i.label]),
+    ).toEqual([
+      ['hire', 'Hire driver'],
+      ['sell', 'Sell $100'],
+    ])
+    const out = snap({ state: 'inactive', driverName: null })
+    const rehire = garage.rowAction(out, data, 3, true, 24)
+    expect(
+      garage
+        .menuItems(out, data, 3, rehire)
+        .map((i) => [i.kind, i.label, i.enabled]),
+    ).toEqual([
+      ['rehire', 'Re-hire $24', true],
+      ['fire', 'Fire driver', true],
+      ['sell', 'Sell $100', true],
+    ])
+    // Before payroll ships the Re-hire item is disabled with its tip.
+    expect(
+      garage.menuItems(out, data, 3, garage.rowAction(out, data, 3, false))[0],
+    ).toMatchObject({
+      kind: 'rehire',
+      enabled: false,
+      tip: 'Not available yet',
+    })
+    // The last vehicle still cannot be sold from a driverless row.
+    expect(garage.menuItems(none, data, 1, hire)[1]).toMatchObject({
+      kind: 'sell',
+      enabled: false,
+    })
+    // A driven row (or no primary) keeps Replace / Fire / Sell.
+    expect(
+      garage
+        .menuItems(snap(), data, 3, garage.rowAction(snap(), data, 3, true))
+        .map((i) => i.kind),
+    ).toEqual(['replace', 'fire', 'sell'])
+  })
+
+  it('a walked-out row offers Re-hire for one day of that driver’s salary (class base without one), enabled only once payroll ships', () => {
     const v = snap({ type: 'van', state: 'inactive', driverName: null })
     expect(garage.rehireCost(data, 'van')).toBe(15)
+    expect(garage.rehireCost(data, 'van', 18)).toBe(18)
     expect(garage.rowAction(v, data, 3, false)).toMatchObject({
       kind: 'rehire',
       label: 'Re-hire $15',
       enabled: false,
     })
     expect(garage.rowAction(v, data, 3, true).enabled).toBe(true)
+    // M6: the walked-out driver's own pay (a 5/5/2 van driver earns $24).
+    expect(garage.rowAction(v, data, 3, true, 24).label).toBe('Re-hire $24')
+    // Still finishing its trip after the walkout: Re-hire at once (§7.4).
+    expect(
+      garage.rowAction(
+        snap({ driverName: null, state: 'delivering' }),
+        data,
+        3,
+        true,
+      ),
+    ).toMatchObject({ kind: 'rehire', label: 'Re-hire $8' })
+    // M6 review: no Re-hire while a Replace waits for this vehicle (the swap
+    // lets the walked-out driver go anyway) — Replace / Fire / Sell instead.
+    for (const state of ['inactive', 'delivering'] as const) {
+      const pending = snap({ state, driverName: null, nextDriverName: 'Rae' })
+      const a = garage.rowAction(pending, data, 3, true, 24)
+      expect(a.kind).toBe('more')
+      expect(garage.menuItems(pending, data, 3, a).map((i) => i.kind)).toEqual([
+        'replace',
+        'fire',
+        'sell',
+      ])
+    }
+  })
+
+  it('M6: a vehicle with no driver at all (Hire later, a fire) offers Hire driver', () => {
+    for (const state of ['inactive', 'delivering'] as const) {
+      expect(
+        garage.rowAction(
+          snap({ state, driverName: null, driverId: null }),
+          data,
+          3,
+          true,
+        ),
+      ).toEqual({
+        kind: 'hire',
+        label: 'Hire driver',
+        enabled: true,
+        tip: null,
+      })
+    }
   })
 
   it('state text follows the §4.6 states', () => {
@@ -228,14 +352,10 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     ).toEqual(['No driver', ''])
   })
 
-  it('driver line: "Dee · $8/day", red "! unpaid" after a short payday, "No driver" after a walkout', () => {
+  it('driver name line: the active driver, red "Dee left" after a walkout, red "No driver" with none', () => {
     expect(garage.driverLine(snap(), data)).toEqual({
-      text: 'Dee · $8/day',
+      text: 'Dee',
       red: false,
-    })
-    expect(garage.driverLine(snap({ unpaid: true }), data)).toEqual({
-      text: 'Dee · ! unpaid',
-      red: true,
     })
     expect(garage.driverLine(snap({ driverName: null }), data).text).toBe(
       'No driver',
@@ -247,7 +367,94 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     })
   })
 
-  it('the longest Sell / Re-hire and zone-chip labels keep Button.CONTENT_PAD of air in m5x7 (UX M3: `Re-hire $25` touched its 64-px face)', async () => {
+  it('design-m6 §6.3: the driver block reads name, compact pips, affinity and pay; red "! unpaid"; "→ Rae after this trip" while a Replace waits', () => {
+    const dee = { name: 'Dee', salaryPerDay: 9 }
+    const base = garage.driverRow(
+      snap({
+        driverPips: { speed: 4, energy: 3, charisma: 1 },
+        driverAffinity: 'bike',
+        driverStar: true,
+      }),
+      dee,
+      data,
+    )
+    expect(base).toMatchObject({
+      name: 'Dee',
+      nameRed: false,
+      star: true,
+      dim: false,
+      affinity: 'bike',
+      tail: ['$9/day', '$9'],
+      tailRed: false,
+    })
+    expect(
+      base.pips?.map((r) => [r.label, r.on.filter(Boolean).length]),
+    ).toEqual([
+      ['speed', 4],
+      ['energy', 3],
+      ['charisma', 1],
+    ])
+    expect(base.pips?.map((r) => r.on.length)).toEqual([5, 5, 2])
+    // affinity 'none' draws no icon
+    expect(garage.driverRow(snap(), dee, data).affinity).toBeNull()
+    const unpaid = garage.driverRow(snap({ unpaid: true }), dee, data)
+    expect(unpaid).toMatchObject({ tail: ['! unpaid', '!'], tailRed: true })
+    const pending = garage.driverRow(snap({ nextDriverName: 'Rae' }), dee, data)
+    expect(pending.tail[0]).toBe('→ Rae after this trip')
+    expect(pending.tail.at(-1)).toBe('→ Rae')
+    // walked out: red `Dee left`, its pips dimmed
+    const left = garage.driverRow(snap({ driverName: null }), dee, data)
+    expect(left).toMatchObject({ name: 'Dee left', nameRed: true, dim: true })
+    // no driver: `No driver` while it still drives its last trip; blank when
+    // parked (the status column already reads `No driver`)
+    const none = { driverName: null, driverId: null, driverPips: null }
+    expect(
+      garage.driverRow(snap({ ...none, state: 'delivering' }), null, data),
+    ).toMatchObject({ name: 'No driver', nameRed: true, pips: null, tail: [] })
+    expect(
+      garage.driverRow(snap({ ...none, state: 'inactive' }), null, data).name,
+    ).toBe('')
+  })
+
+  it('the third line keeps inside the name + status columns at W 360: the tail falls back to what fits', () => {
+    const col = garage.rowColumns(360)
+    const end = col.zoneX - 4
+    const rows = garage.driverRow(
+      snap({ driverAffinity: 'truck' }),
+      { name: 'Dee', salaryPerDay: 13 },
+      data,
+    )
+    const lay = garage.driverLineLayout(rows.pips ?? [], true, end)
+    expect(lay.pipX).toEqual([42, 82, 122])
+    expect(lay.iconX).toBe(141)
+    expect(lay.tailX + lay.tailW).toBe(end)
+    // M6 review: with the chip placed from the 44-px ··· slot the tail gets
+    // 59 px at 360 — the pay, `! unpaid` and `→ Audrey` all fit in full.
+    expect(lay.tailW).toBe(59)
+    expect(garage.fitTail(rows.tail, lay.tailW, measure)).toBe('$13/day')
+    expect(garage.fitTail(['! unpaid', '!'], lay.tailW, measure)).toBe(
+      '! unpaid',
+    )
+    expect(
+      garage.fitTail(
+        ['→ Audrey after this trip', '→ Audrey'],
+        lay.tailW,
+        measure,
+      ),
+    ).toBe('→ Audrey')
+    expect(garage.fitTail(rows.tail, 30, measure)).toBe('$13')
+    expect(garage.fitTail(rows.tail, 200, measure)).toBe('$13/day')
+    expect(
+      garage.fitTail(['→ Rae after this trip', '→ Rae'], 40, measure),
+    ).toBe('→ Rae')
+    expect(garage.fitTail([], 40, measure)).toBe('')
+    // At 393 the pay fits in full next to an affinity icon.
+    const wide = garage.rowColumns(393)
+    const lay2 = garage.driverLineLayout(rows.pips ?? [], true, wide.zoneX - 4)
+    expect(garage.fitTail(rows.tail, lay2.tailW, measure)).toBe('$13/day')
+  })
+
+  it('the longest Re-hire / Hire driver, popover and zone-chip labels keep Button.CONTENT_PAD of air in m5x7 (UX M3: `Re-hire $25` touched its 64-px face)', async () => {
     const { readFileSync } = await import('node:fs')
     const xml = readFileSync(
       new URL('../../src/assets/m5x7.xml', import.meta.url),
@@ -259,18 +466,35 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     const width = (s: string): number =>
       [...s].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
     const { CONTENT_PAD } = await import('../../src/ui/Button.ts')
+    // M6: the dearest driver of each class (5/5/2) sets the longest Re-hire.
+    const top = { speed: 5, energy: 5, charisma: 2 }
     const actions = data.vehicles.types.flatMap((t) => [
       garage.rowAction(
-        { state: 'inactive', type: t.id, driverName: null },
+        { state: 'inactive', type: t.id, driverName: null, driverId: 3 },
+        data,
+        3,
+        true,
+        salaryOf(data, 'driver', top, t.id),
+      ).label,
+      garage.rowAction(
+        { state: 'inactive', type: t.id, driverName: null, driverId: null },
         data,
         3,
         true,
       ).label,
-      garage.rowAction({ state: 'idle_lot', type: t.id }, data, 3, true).label,
     ])
+    expect(actions).toContain('Re-hire $40')
+    // Hire driver / Re-hire are popover items (the slot is always ···).
     for (const label of actions)
       expect(width(label), label).toBeLessThanOrEqual(
-        garage.SELL_W - 2 * CONTENT_PAD,
+        garage.MENU_W - 8 - 2 * CONTENT_PAD,
+      )
+    const menu = data.vehicles.types.flatMap((t) =>
+      garage.menuItems({ type: t.id }, data, 3).map((i) => i.label),
+    )
+    for (const label of menu)
+      expect(width(label), label).toBeLessThanOrEqual(
+        garage.MENU_W - 8 - 2 * CONTENT_PAD,
       )
     const chips = ['any', 'highres', 'downtown', 'industrial'].map((z) =>
       zp.zoneChipText(data, data.map, z as never),
@@ -293,7 +517,52 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
     expect(garage.boughtToast('Bike 2', 'Dee')).toBe(
       'Bike 2 bought — Dee hired',
     )
-    expect(garage.boughtToast('Bike 2', null)).toBe('Bike 2 bought')
+    expect(garage.boughtToast('Bike 2', null)).toBe(
+      'Bike 2 bought — no driver yet',
+    )
+    expect(garage.driveToast('Rae', 'Bike 2', true)).toBe(
+      'Rae takes over Bike 2 after this trip',
+    )
+    expect(garage.driveToast('Rae', 'Bike 2', false)).toBe(
+      'Rae now drives Bike 2',
+    )
+    expect(garage.replaceTitle('Dee', 'Bike 2')).toBe('Replace Dee · Bike 2')
+    expect(garage.driverForTitle('Bike 2')).toBe('Driver for Bike 2')
+    const v = { name: 'Bike 2', nextDriverName: null }
+    expect(garage.firePrompt('Dee', { ...v, state: 'idle_lot' })).toBe(
+      'Fire Dee? Bike 2 parks with no driver.',
+    )
+    expect(garage.firePrompt('Dee', { ...v, state: 'delivering' })).toBe(
+      'Fire Dee? Bike 2 finishes its trip, then parks.',
+    )
+    expect(
+      garage.firePrompt('Dee', {
+        ...v,
+        state: 'delivering',
+        nextDriverName: 'Rae',
+      }),
+    ).toBe('Fire Dee? Rae takes over Bike 2 now.')
+    expect(
+      garage.firedToast('Dee', {
+        name: 'Bike 2',
+        state: 'inactive',
+        driverName: null,
+      }),
+    ).toBe('Dee fired — Bike 2 has no driver')
+    expect(
+      garage.firedToast('Dee', {
+        name: 'Bike 2',
+        state: 'delivering',
+        driverName: null,
+      }),
+    ).toBe('Dee fired — Bike 2 parks after this trip')
+    expect(
+      garage.firedToast('Dee', {
+        name: 'Bike 2',
+        state: 'delivering',
+        driverName: 'Rae',
+      }),
+    ).toBe('Dee fired — Rae now drives Bike 2')
     expect(garage.sellPrompt('Bike 2', 100)).toBe(
       'Sell Bike 2 for $100? Its parcels go back to the warehouse.',
     )
@@ -361,24 +630,104 @@ describe('Garage buy cards (city-view §7.3)', () => {
   })
 })
 
-describe('Garage rows against a live sim (spec §7.1, §4.1)', () => {
-  it('a new game has no vehicle (empty state) and the first bike reads Idle, Dee · $8/day, Any ▾, Sell disabled', () => {
+/** Row model for vehicle `id` as the scene builds it (ViewSim only). */
+function rowOf(vs: ReturnType<typeof createViewSim>, id: number) {
+  const v = vs.vehicles.find((x) => x.id === id)!
+  const d =
+    v.driverId === null
+      ? null
+      : (vs.people().find((p) => p.id === v.driverId) ?? null)
+  return {
+    v,
+    d,
+    row: garage.driverRow(v, d, vs.data),
+    action: garage.rowAction(
+      v,
+      vs.data,
+      vs.vehicles.length,
+      true,
+      d?.salaryPerDay ?? null,
+    ),
+  }
+}
+
+describe('Garage rows against a live sim (spec §7.1, §4.1; M6 design §4.5, §6.3)', () => {
+  it('a new game has no vehicle (empty state); the first bike, bought with a picked driver, reads Idle, the driver, pips, pay, Any ▾, ···, Sell disabled', () => {
     const sim = makeSim(1)
     const vs = createViewSim(sim)
     expect(vs.vehicles).toHaveLength(0)
-    const res = vs.buyVehicle('bike')
-    expect(res.ok).toBe(true)
-    const [v] = vs.vehicles
-    expect(v).toBeDefined()
-    if (!v) return
+    const pick = vs.applicants('driver', 'bike')[0]!
+    const res = vs.buyVehicle('bike', pick.id)
+    expect(res).toMatchObject({ ok: true, vehicleId: 1 })
+    const { v, d, row, action } = rowOf(vs, 1)
     expect(v.name).toBe('Bike 1')
     expect(garage.stateText(v)).toBe('Idle')
-    expect(garage.driverLine(v, vs.data).text).toBe(`${v.driverName} · $8/day`)
+    expect(d?.name).toBe(pick.name)
+    expect(row.name).toBe(pick.name)
+    expect(row.tail[0]).toBe(`$${pick.salaryPerDay}/day`)
+    expect(row.pips?.map((r) => r.on.filter(Boolean).length)).toEqual([
+      pick.pips.speed,
+      pick.pips.energy,
+      pick.pips.charisma,
+    ])
     expect(zp.zoneChipText(vs.data, vs.map, v.zone)).toBe('Any ▾')
-    expect(
-      garage.rowAction(v, vs.data, vs.vehicles.length, false).enabled,
-    ).toBe(false)
+    expect(action.kind).toBe('more')
+    expect(garage.sellAction(v, vs.data, vs.vehicles.length).enabled).toBe(
+      false,
+    )
     expect(garage.unitsText(v)).toBe('0/4')
+  })
+
+  it('Hire later parks it No driver with a Hire driver button; hiring into it puts it on the road', () => {
+    const sim = fund(quietSim(1))
+    const vs = createViewSim(sim)
+    const res = vs.buyVehicle('bike', null)
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    const id = res.vehicleId!
+    let r = rowOf(vs, id)
+    expect(r.v.state).toBe('inactive')
+    expect(garage.stateText(r.v)).toBe('No driver')
+    expect(r.row.name).toBe('') // the status column says it
+    expect(r.action).toMatchObject({ kind: 'hire', label: 'Hire driver' })
+    const a = vs.applicants('driver', 'bike')[1]!
+    expect(vs.hire('driver', a.id, { vehicleId: id }).ok).toBe(true)
+    r = rowOf(vs, id)
+    expect(r.v.state).toBe('idle_lot')
+    expect(r.row.name).toBe(a.name)
+    expect(r.action.kind).toBe('more')
+  })
+
+  it('Replace mid-trip: the row reads "→ Rae after this trip" until the unload; Fire on the lot parks it No driver', () => {
+    const sim = fund(quietSim(1))
+    const v0 = buy(sim, 'bike')
+    const vs = createViewSim(sim)
+    injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    expect(runUntil(sim, () => v0.cargo.length > 0, 3000)).toBeGreaterThan(0)
+    const rae = standardApplicant(sim, 'driver')
+    expect(vs.hire('driver', rae.id, { vehicleId: v0.id }).ok).toBe(true)
+    let r = rowOf(vs, v0.id)
+    expect(r.v.nextDriverName).toBe(rae.name)
+    expect(r.row.tail[0]).toBe(`→ ${rae.name} after this trip`)
+    expect(vs.people().find((p) => p.name === rae.name)?.pending).toBe(true)
+    expect(runUntil(sim, () => v0.nextDriverId === null, 3000)).toBeGreaterThan(
+      0,
+    )
+    r = rowOf(vs, v0.id)
+    expect(r.row.name).toBe(rae.name)
+    expect(r.row.tail[0]).toMatch(/^\$\d+\/day$/)
+    expect(runUntil(sim, () => v0.state === 'idle_lot', 3000)).toBeGreaterThan(
+      -1,
+    )
+    const driver = r.d!
+    expect(vs.fire(driver.id).ok).toBe(true)
+    r = rowOf(vs, v0.id)
+    expect(r.v.state).toBe('inactive')
+    expect(r.v.driverName).toBeNull()
+    expect(r.action.kind).toBe('hire')
+    expect(garage.firedToast(driver.name, r.v)).toBe(
+      `${driver.name} fired — ${r.v.name} has no driver`,
+    )
   })
 })
 

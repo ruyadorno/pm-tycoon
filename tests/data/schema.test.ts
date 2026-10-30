@@ -196,7 +196,7 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
     raw.levels[1].unlockRegions = ['moon']
     raw.levels[2].threshold = 1000
     raw.vehicles.types[0].disallowedRegions.push('mars')
-    raw.employees.inspector.startSlot = 4
+    raw.employees.start.inspector.slot = 4
     const p = problemsOf(raw)
     expect(p).toContainEqual(
       'levels[1].unlockRegions[0]: unknown district "moon"',
@@ -208,8 +208,54 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
       'vehicles.types[0].disallowedRegions[1]: unknown district "mars"',
     )
     expect(p).toContainEqual(
-      'employees.inspector.startSlot: 4 exceeds levels[0].slots 3',
+      'employees.start.inspector.slot: 4 exceeds levels[0].slots 3',
     )
+  })
+
+  it('employees.json (spec-build2 §9): the Toss-only sorter, the pay order, the pip tables, the desk rows (M6)', () => {
+    const raw = fresh()
+    raw.employees.roles.sorter.canClear = true
+    raw.employees.payOrder = ['inspectors', 'drivers']
+    raw.employees.roles.inspector.p = [0.75, 0.8, 0.85, 0.9]
+    raw.employees.desks.rows[0].index = 2
+    const p = problemsOf(raw)
+    expect(p).toContainEqual(
+      'employees.roles.sorter.canClear: expected one of false, got true',
+    )
+    expect(p).toContainEqual('employees.payOrder: expected 3..3 items, got 2')
+    expect(p).toContainEqual(
+      'employees.roles.inspector.p: expected 5..5 items, got 4',
+    )
+    const rows = fresh()
+    rows.employees.desks.rows[0].index = 2
+    expect(problemsOf(rows)).toContainEqual(
+      'employees.desks.rows[0].index: expected 1 (ascending from 1, unique), got 2',
+    )
+    const order = fresh()
+    order.employees.payOrder = ['inspectors', 'drivers', 'drivers']
+    expect(problemsOf(order)).toContainEqual(
+      'employees.payOrder: lists "sorters" 0 times',
+    )
+    const cap = fresh()
+    cap.employees.roles.inspector.pCap = 0.9
+    cap.employees.roles.inspector.stats = ['eye', 'charisma']
+    expect(problemsOf(cap)).toEqual(
+      expect.arrayContaining([
+        'employees.roles.inspector.pCap: 0.9 is below max(p) 0.94',
+        'employees.roles.inspector.stats: expected ["eye","pace","charisma"], got ["eye","charisma"]',
+      ]),
+    )
+    const names = fresh()
+    names.puns.peopleNames = ['Audrey', 'Lin', 'Audrey']
+    expect(problemsOf(names)).toEqual(
+      expect.arrayContaining([
+        'puns.peopleNames: 3 names, need ≥ 10',
+        'puns.peopleNames[2]: duplicate name "Audrey"',
+      ]),
+    )
+    const old = fresh()
+    old.puns.inspectorNames = ['Audrey']
+    expect(problemsOf(old)).toContainEqual('puns.inspectorNames: unknown key')
   })
 
   it('empty pun list for a strain', () => {

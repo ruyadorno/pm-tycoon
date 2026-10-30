@@ -636,6 +636,20 @@ const ICONS: Record<string, readonly string[]> = {
     '.yyyyyyyyyy.',
     '.yyyyyyyyyy.',
   ],
+  // build 2 M6 (B2 §6.7): the ★ applicant / employee mark (gold = reward,
+  // STYLE.md §4), drawn top-right of a face on the hire cards and rows
+  ic_star: [
+    '.....c.....',
+    '....ccc....',
+    '....ccc....',
+    'ccccccccccc',
+    '.ccccccccc.',
+    '..ccccccc..',
+    '..ccccccc..',
+    '.cccc.cccc.',
+    '.ccc...ccc.',
+    'cc.......cc',
+  ],
   ic_honk: [
     '.wwwwwwwwww.',
     'wwwwwwwwwwww',
@@ -993,6 +1007,68 @@ registerDrawer({ id: 'wh_dock_light' }, (d) =>
     d.entry.frames.map((s) => iconGrid(dockLight(s === '_red'))),
   ),
 )
+
+// ---------------------------------------------------------------------------
+// Stat pips (build 2 M6, design-m6 §6.5): class `ui` 8x8 — a 6x6 dot at
+// (1, 1), lit pip = yellow3 with an ink outline (yellow2 shade on its
+// bottom-right), empty pip = a grey2 ring around a grey4 socket. Drawn at a
+// 7-px pitch on the hire cards, the desk rows and the follow strip, so the
+// 1-px transparent column/row on the right/bottom keeps the pips apart.
+
+const PIP_ROWS: Record<string, readonly string[]> = {
+  ic_pip_on: [
+    '........',
+    '..oooo..',
+    '.oYYYYo.',
+    '.oYYYyo.',
+    '.oYYyyo.',
+    '.oYyyyo.',
+    '..oooo..',
+    '........',
+  ],
+  ic_pip_off: [
+    '........',
+    '..GGGG..',
+    '.GLLLLG.',
+    '.GLLLLG.',
+    '.GLLLLG.',
+    '.GLLLLG.',
+    '..GGGG..',
+    '........',
+  ],
+}
+
+/** flat colours of the pip templates (no auto-shading) */
+const PIP_CHARS: Readonly<Record<string, string>> = {
+  o: 'outline',
+  Y: 'yellow3',
+  y: 'yellow2',
+  G: 'grey2',
+  L: 'grey4',
+}
+
+/** one pip as an 8x8 Grid */
+export function pipGrid(id: string): Grid {
+  const rows = PIP_ROWS[id]
+  if (!rows) throw new Error(`unknown pip ${id}`)
+  const g = new Grid(8, 8)
+  rows.forEach((r, y) => {
+    for (let x = 0; x < r.length; x++) {
+      const c = PIP_CHARS[r[x] as string]
+      if (c) g.set(x, y, c)
+    }
+  })
+  return g
+}
+
+for (const id of Object.keys(PIP_ROWS)) {
+  registerDrawer({ id }, (d) =>
+    gridFrames(
+      d,
+      d.entry.frames.map(() => pipGrid(id)),
+    ),
+  )
+}
 
 export const ICON_IDS: readonly string[] = Object.keys(ICONS)
 

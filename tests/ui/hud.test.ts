@@ -21,6 +21,9 @@ import {
   speedSegment,
   trendGlyph,
   cargoCounts,
+  FOLLOW_PIPS_W,
+  followFit,
+  followModel,
   followText,
   vehicleStateText,
 } from '../../src/ui/hudKit.ts'
@@ -40,6 +43,8 @@ import type { VehicleType } from '../../src/sim/types.ts'
 import { dataFixture } from '../sim/helpers.ts'
 
 const data = dataFixture()
+/** A stand-in for BitmapText width: 5 px per character. */
+const measure = (s: string): number => s.length * 5
 
 function vehicle(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
   return {
@@ -47,6 +52,11 @@ function vehicle(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
     type: 'bike',
     name: 'Bike 1',
     driverName: 'Dee',
+    driverId: 2,
+    driverPips: { speed: 4, energy: 3, charisma: 1 },
+    driverStar: false,
+    driverAffinity: 'none',
+    nextDriverName: null,
     state: 'idle_lot',
     prev: { tx: 0, ty: 0 },
     cur: { tx: 0, ty: 0 },
@@ -282,6 +292,43 @@ describe('city-view §2 / spec §4.6: follow strip text', () => {
     expect(followText(vehicle({ state: 'inactive', driverName: null }))).toBe(
       'Bike 1 · No driver',
     )
+  })
+
+  it('M6: "Bike 1 · Dee ●●●●○ · Delivering" — the driver\'s speed pips after the name', () => {
+    expect(followModel(vehicle({ state: 'delivering' }))).toEqual({
+      head: 'Bike 1 · Dee',
+      pips: 4,
+      tail: '· Delivering',
+    })
+    expect(
+      followModel(vehicle({ state: 'delivering', stopsLeft: 2 })).tail,
+    ).toBe('· Delivering · 2 stops')
+    // No active driver: no pips, the "No driver" line.
+    expect(
+      followModel(vehicle({ state: 'inactive', driverName: null })),
+    ).toEqual({ head: 'Bike 1 · No driver', pips: null, tail: '' })
+    expect(followModel(vehicle({ driverPips: null })).pips).toBeNull()
+  })
+
+  it('M6: a long line ellipsizes the state first, then drops the pips', () => {
+    const m = followModel(vehicle({ state: 'delivering', stopsLeft: 2 }))
+    const headW = measure(m.head)
+    const all = followFit(m, 1000, measure)
+    expect(all).toEqual({ head: m.head, pips: true, tail: m.tail })
+    const short = followFit(m, headW + FOLLOW_PIPS_W + 40, measure)
+    expect(short.pips).toBe(true)
+    expect(short.tail.endsWith('…')).toBe(true)
+    expect(measure(short.tail)).toBeLessThanOrEqual(40)
+    // Only "· …" would be left: the tail goes.
+    expect(followFit(m, headW + FOLLOW_PIPS_W + 12, measure).tail).toBe('')
+    const tiny = followFit(m, headW + 10, measure)
+    expect(tiny.pips).toBe(false)
+    expect(tiny.tail).toBe('')
+    expect(measure(tiny.head)).toBeLessThanOrEqual(headW + 10)
+    // Without pips (no driver, or no pip frames) the line is one ellipsized text.
+    const none = followFit({ ...m, pips: null }, 60, measure)
+    expect(none.pips).toBe(false)
+    expect(measure(none.head)).toBeLessThanOrEqual(60)
   })
 
   it('groups cargo by size in S, M, L, XL order', () => {

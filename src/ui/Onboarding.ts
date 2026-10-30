@@ -2,13 +2,16 @@
 // `ui_panel` with the step text, a grey `Skip tour` link (44-px hit) and the
 // 16x16 `arrow` frame (an 8x8 down-pointing glyph, artUi hand-off) touching
 // its target. The state object is `pm.save.v2.onboarding` = {step, skipped,
-// sawFirstFlag, sawTossHint, wanted}: HudScene keeps it in the game registry
+// sawFirstFlag, sawTossHint}: HudScene keeps it in the game registry
 // (REG_ONBOARDING, src/boot/autosave.ts), this class mutates it in place and
 // autosave.ts writes it; the sim never sees it, so a reload never repeats a
 // step. `step` = the highest step completed (0 = none).
 //
-// Steps: 1 (Garage, at a new game with no vehicle; clears on vehicle:bought,
-// no timeout), 2 (warehouse, 3 s after the first vehicle:bought: the
+// Steps: 1 (Garage, at a new game with no vehicle — M6: `Buy a bike in the
+// Garage and pick its driver`, spec-build2 §2.5; clears once a vehicle has a
+// driver — the first driver worker:hired, so a `Hire later` purchase keeps
+// it, reworded `Bike 1 has no driver yet: hire one in the Garage`
+// (step1Text) — no timeout), 2 (warehouse, 3 s after step 1 clears: the
 // detection hint computed from employees.json / machines.json and the §6.3
 // compounding — step2Text(); clears on pm:view warehouse or 45 s) and 3
 // (rush, on the first parcel:pickedUp once another building has waiting
@@ -18,9 +21,9 @@
 // overlap the city's building tooltip (setSuppressed); an arrow that would
 // land inside the card is dropped.
 //
-// `wanted` (city-view §9.2, warehouse-view §5.1) is the run's list of
-// revealed malware labels (DEFUSED tosses and lost lives): addWanted()
-// appends, wantedByStrain() groups it for the warehouse's wanted poster.
+// The wanted list (city-view §9.2) moved into the sim at M6 (spec-build2
+// §2.8: `state.wanted`, ViewSim.wanted): a stored `wanted` key from an older
+// save is dropped by normaliseOnboarding.
 //
 // The class is plain (constructed by HudScene with the layout; HudScene
 // forwards the sim events, city-view §11.2). Phaser is a type-only import so
@@ -39,8 +42,30 @@ export const ONBOARDING_STEPS: readonly number[] = [1, 2, 3]
 
 /** Static step texts; step 2's is computed from the data (step2Text). */
 export const STEP_TEXT: Readonly<Record<number, string>> = {
-  1: 'Buy a bike in the Garage to start delivering',
+  1: 'Buy a bike in the Garage and pick its driver',
   3: 'Tap a building with waiting parcels to rush a vehicle there',
+}
+
+/** What step 1 reads about the fleet: each vehicle's name and driver (any, walked out or not). */
+export interface Step1Vehicle {
+  name: string
+  driverId: number | null
+}
+
+/** Step 1's job is done: some vehicle has a driver (spec-build2 §2.5 "and pick its driver"). */
+export function step1Done(vehicles: readonly Step1Vehicle[]): boolean {
+  return vehicles.some((v) => v.driverId !== null)
+}
+
+/**
+ * Step 1's text: STEP_TEXT[1] with no vehicle yet; after a `Hire later`
+ * purchase (vehicles, none with a driver) `Bike 1 has no driver yet: hire
+ * one in the Garage` — the arrow still points at the Garage.
+ */
+export function step1Text(vehicles: readonly Step1Vehicle[]): string {
+  const first = vehicles[0]
+  if (!first || step1Done(vehicles)) return STEP_TEXT[1] ?? ''
+  return `${first.name} has no driver yet: hire one in the Garage`
 }
 
 /** Auto-clear after this many ms of scene time (null = until its action). */
@@ -71,7 +96,6 @@ export function freshOnboarding(): OnboardingSave {
     skipped: false,
     sawFirstFlag: false,
     sawTossHint: false,
-    wanted: [],
   }
 }
 
@@ -85,8 +109,6 @@ export function normaliseOnboarding(x: unknown): OnboardingSave {
   o.skipped = r.skipped === true
   o.sawFirstFlag = r.sawFirstFlag === true
   o.sawTossHint = r.sawTossHint === true
-  if (Array.isArray(r.wanted))
-    o.wanted = r.wanted.filter((w): w is string => typeof w === 'string')
   return o
 }
 
@@ -120,7 +142,7 @@ export function skipTour(s: OnboardingSave): OnboardingSave {
 export interface Step2Model {
   /** The first announced strain (L1: metal). */
   strain: StrainId
-  /** The inspector's catch chance vs that strain, 0..100. */
+  /** The start inspector's catch chance vs that strain, 0..100. */
   inspectorPct: number
   /** The strain's counter machine (parcels.json strains[].counter). */
   machineId: string
@@ -128,6 +150,16 @@ export interface Step2Model {
   price: number
   /** D(strain) for inspector + that machine (§6.3 series compounding), 0..100. */
   lanePct: number
+}
+
+/**
+ * The pre-hired start inspector's own p (spec-build2 §2.1: Audrey 3/3/0 =
+ * 0.85): roles.inspector.p at start.inspector.pips.eye; any strain.
+ */
+export function startInspectorP(data: GameData): number {
+  const eye = data.employees.start.inspector.pips.eye ?? 1
+  const p = data.employees.roles.inspector.p
+  return p[Math.max(0, Math.min(p.length - 1, eye - 1))] ?? 0
 }
 
 /** p(strain) of a checker row: pMatch on its strain (generalists: always), else pOther. */
@@ -139,9 +171,11 @@ function rowP(
 }
 
 /**
- * The numbers of step 2, never literals: the L1 strain, the inspector's
- * catch chance (employees.json), its counter machine (parcels.json →
- * machines.json) and the lane D(s) = 1 − Π(1 − p_i) with both (§6.3).
+ * The numbers of step 2, never literals: the L1 strain, the start
+ * inspector's catch chance (employees.json roles.inspector.p at the start
+ * inspector's eye pip; M6 — inspectors are generalists), its counter machine
+ * (parcels.json → machines.json) and the lane D(s) = 1 − Π(1 − p_i) with
+ * both (§6.3).
  */
 export function step2Model(data: GameData): Step2Model | null {
   const strains = data.parcels.malware.strains
@@ -149,7 +183,7 @@ export function step2Model(data: GameData): Step2Model | null {
   if (!first) return null
   const machine = data.machines.checkers.find((c) => c.id === first.counter)
   if (!machine) return null
-  const pi = rowP(data.employees.inspector, first.id)
+  const pi = startInspectorP(data)
   const pm = rowP(machine, first.id)
   const d = 1 - (1 - pi) * (1 - pm)
   return {
@@ -204,32 +238,6 @@ export function isFlagFunnelText(text: string | null, lives: number): boolean {
     text === FIRST_FLAG_ROOM_TEXT ||
     text === firstFlagText(lives)
   )
-}
-
-// ---- wanted poster (city-view §9.2, warehouse-view §5.1) ----------------------
-
-/** Append a revealed malware label (deduped, in place); true when added. */
-export function addWanted(s: OnboardingSave, label: string): boolean {
-  if (!label || s.wanted.includes(label)) return false
-  s.wanted.push(label)
-  return true
-}
-
-/**
- * The wanted list grouped by strain (puns.json malwareLabels), for the
- * strains in `strains` (the announced ones), in that order; labels of other
- * strains or unknown labels are left out. Empty groups are kept so the
- * poster can show the strain icon with nothing under it.
- */
-export function wantedByStrain(
-  wanted: readonly string[],
-  malwareLabels: Readonly<Partial<Record<StrainId, readonly string[]>>>,
-  strains: readonly StrainId[],
-): { strain: StrainId; labels: string[] }[] {
-  return strains.map((strain) => {
-    const known = malwareLabels[strain] ?? []
-    return { strain, labels: wanted.filter((w) => known.includes(w)) }
-  })
 }
 
 // ---- view ---------------------------------------------------------------------
@@ -351,6 +359,14 @@ export class Onboarding {
       w: Math.round(this.panel.width),
       h: Math.round(this.panel.height),
     }
+  }
+
+  /** Re-word the card while `step` is the active one (step 1 after a `Hire later`). */
+  retext(step: number, text: string): void {
+    if (this.active !== step || !text || this.text.text === text) return
+    this.text.setText(text)
+    this.fit()
+    this.place()
   }
 
   /** The step's action happened (or it timed out): mark it done and hide. */

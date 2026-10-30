@@ -6,6 +6,10 @@
 // policy module is loaded whenever the Title may run its attract city (the
 // competent policy drives the demo), not only for ?policy=1; registry
 // 'createPolicy' holds its factory. The director never hears the attract sim.
+// M6 (design-m6 §8 G): ?policy=delegating installs the delegating policy kind
+// (?policy=1 stays competent), and ?level=N forces level N on every fresh
+// player's game (forceLevelParam: Boot's new sim, then each New game through
+// SIM_REPLACED) before any scene, the policy or the director hears it.
 import Phaser from 'phaser'
 import type { AudioDirector, SimLookups } from '../audio/director.ts'
 import {
@@ -25,6 +29,7 @@ import { DataError, type GameData } from '../data/index.ts'
 import { loadGameData } from '../data/load.browser.ts'
 import { installDebugApi } from '../debug/pm.ts'
 import { debugEnabled, params, type Params } from '../debug/params.ts'
+import type { CommandResult } from '../sim/commands.ts'
 import { Sim, type PolicyFactory } from '../sim/sim.ts'
 import type { ViewSim } from '../sim/view-api.ts'
 import { GROUND_W } from '../render/atlases.ts'
@@ -155,6 +160,30 @@ export function patchKeyboardShutdown(): void {
   }
 }
 
+/**
+ * ?level=N (debug builds; design-m6 §8 G, §3.1 debugForceLevel): force level
+ * N on a fresh player's game through the ViewSim's debug.forceLevel — a
+ * logged sim command, so replays and saves stay exact. Fresh = tick 0 with
+ * an empty command log: Boot's own new sim and every New game, never a
+ * Continue, a __pm.load of a running game or the Title's attract sim (the
+ * caller skips it). `vs` must already read `sim` (call after setSim). null
+ * when nothing was asked, the sim is not fresh, it is already at that level
+ * or the build has no debug facet; a refusal (a level past levels.json) is
+ * returned and warned about, never thrown.
+ */
+export function forceLevelParam(
+  vs: ViewSim,
+  sim: Sim,
+  level: number | null,
+): CommandResult | null {
+  if (level === null || !vs.debug) return null
+  if (sim.state.tick !== 0 || sim.commandLog.length > 0) return null
+  if (sim.state.level.level >= level) return null
+  const res = vs.debug.forceLevel(level)
+  if (!res.ok) console.warn(`level=${level}: refused (${res.reason})`)
+  return res
+}
+
 /** The ground bake needs a 3072-px texture; refuse below 4096 (city-view.md §1.2). */
 export const MIN_TEXTURE_SIZE = 4096
 
@@ -269,12 +298,22 @@ export class BootScene extends Phaser.Scene {
     if (p.policy) {
       if (createPolicy)
         game.registry.set(REG.policyFactory, (s: Sim) =>
-          createPolicy(s, 'competent'),
+          createPolicy(s, p.policyKind),
         )
       else
-        console.warn('policy=1: no policy module (absent, or its chunk failed)')
+        console.warn(
+          `policy=${p.policyKind}: no policy module (absent, or its chunk failed)`,
+        )
     }
-    setSim(game, sim)
+    const vs = setSim(game, sim)
+    // ?level=N: Boot's fresh sim now, each New game's on its swap. This
+    // listener is registered before any scene's and the director's, so the
+    // forced level:up events reach nobody: the views sync from state.
+    if (!resume.game) forceLevelParam(vs, sim, p.level)
+    if (p.level !== null)
+      game.events.on(SIM_REPLACED, (e: SimReplaced) => {
+        if (!e.attract) forceLevelParam(e.viewSim, e.sim, p.level)
+      })
     const waitFrom = performance.now()
     const audio = await (this.audioModule ?? importAudio())
     measureSince(AUDIO_WAIT_MEASURE, waitFrom)

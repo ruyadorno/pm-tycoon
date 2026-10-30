@@ -21,6 +21,11 @@
 // including `dest` (b's anchor; default b.entry / buffer[0]). It encodes the
 // edge art: the conveyor corner, the belt column, the chute (each slot's
 // `divert` edge) and the Clear path back to the shelf.
+//
+// M6 (spec-build2 §2.6, §4.4): the Hold Bay station is a fixed cell east of
+// the rack (HOLD_STATION, not a lane node: `stationAt`, never `nodeAt`), the
+// wanted poster and the tier props moved up the east column to make room,
+// and the sorter walks in from the dock door along `stationWalkPath`.
 
 export interface Point {
   x: number
@@ -141,14 +146,59 @@ export const STRIP_LIGHTS: readonly Point[] = [
   { x: 8, y: 2 },
   { x: 280, y: 2 },
 ]
-/** Tier props (§5.1 / §5.2) and the wanted poster (hit padded to 44). */
+/**
+ * The east column (x 256–319) between the rack and the east wall, top to
+ * bottom (spec-build2 §4.4, applied at M6 because the station is M6): the
+ * wanted poster (y 120), the tier props (y 164–283), the Hold Bay station
+ * (y 300–347, east of the rack, above the bin). Tier props (§5.1 / §5.2):
+ * two 48 × 48 cardboard piles at tier 1, one 48 × 64 shelving unit at tier 2,
+ * both clear of the poster's hit and the station's cell.
+ */
 export const PROPS_T1: readonly Point[] = [
-  { x: 264, y: 120 },
-  { x: 264, y: 280 },
+  { x: 264, y: 164 },
+  { x: 264, y: 236 },
 ]
-export const PROPS_T2: readonly Point[] = [{ x: 264, y: 112 }]
-export const POSTER = { x: 272, y: 200, w: 32, h: 32 } as const
-export const POSTER_HIT = { x: 266, y: 194, w: 44, h: 44 } as const
+export const PROPS_T2: readonly Point[] = [{ x: 264, y: 196 }]
+/** Prop canvases (art/manifest.json `props_t1` / `props_t2`). */
+export const PROP_T1_SIZE = { w: 48, h: 48 } as const
+export const PROP_T2_SIZE = { w: 48, h: 64 } as const
+/** The wanted poster (32 × 32) and its tap rect padded to 44 (B2 §4.4). */
+export const POSTER = { x: 272, y: 120, w: 32, h: 32 } as const
+export const POSTER_HIT = { x: 266, y: 114, w: 44, h: 44 } as const
+/**
+ * The Hold Bay station (B2 §2.6, §4.4): one 48 × 48 cell east of the rack,
+ * above the Quarantine Bin; the `hold_station` podium (interior back layer)
+ * fills it, the seated sorter (or the Sorter Arm) stands in it. The tap rect
+ * is the cell itself (48 ≥ 44).
+ */
+export const HOLD_STATION = { x: 264, y: 300, w: 48, h: 48 } as const
+export const HOLD_STATION_HIT = { x: 264, y: 300, w: 48, h: 48 } as const
+/**
+ * The sorter's feet: the station's east half (sprite x 284–307), facing
+ * west toward the rack — the podium art keeps its clipboard in the west half.
+ */
+export const SORTER_STAND: Point = { x: 296, y: 340 }
+export const SORTER_FACING = 'w' as const
+/**
+ * The Sorter Arm (L4, M6 rule) in the same station: its 64 × 64 `fixture`
+ * canvas (art/manifest.json `sorter_arm`) bottom-centred on the cell — x
+ * 256–319 between the rack and the east wall, y 284–347 under the props.
+ */
+export const SORTER_ARM_SIZE = { w: 64, h: 64 } as const
+export const SORTER_ARM_AT: Point = {
+  x: HOLD_STATION.x + HOLD_STATION.w / 2 - SORTER_ARM_SIZE.w / 2,
+  y: HOLD_STATION.y + HOLD_STATION.h - SORTER_ARM_SIZE.h,
+}
+/**
+ * The row the sorter crosses the room on (feet y): just south of the rack,
+ * the chute and the station, north of the slots-5–6 strip and the shelf —
+ * the walker's 24 × 32 sprite (y 324–355) never passes under a plate.
+ */
+export const STATION_ROW_Y = 352
+/** The aisle west of the desks the workers walk (feet x). */
+export const AISLE_X = 56
+/** The rack lamp's `S` badge (m5x7 text top-left: cap y 110–116, x 245–249). */
+export const RACK_S_BADGE = { x: 245, y: 106 } as const
 /**
  * Tier-2 signage plates (§5.2): text + top-left; each plate is the m5x7 text
  * width + 8 px wide and 16 px tall (`ui_tag`). SHELF sits at x 32 (§5.2
@@ -376,6 +426,14 @@ export class FixedLaneLayout implements LaneLayout {
     return [to]
   }
 
+  /**
+   * True when room point (x, y) is on the Hold Bay station's tap rect (it is
+   * not a lane node, so nodeAt never returns it; the scene asks first).
+   */
+  stationAt(x: number, y: number): boolean {
+    return containsPt(HOLD_STATION_HIT, x, y)
+  }
+
   nodeAt(x: number, y: number): string | null {
     // Most specific first: slots (incl. the desk's west hit strip is the
     // caller's), bays, bin, shelf, extension, dock.
@@ -437,10 +495,35 @@ export class FixedLaneLayout implements LaneLayout {
     const y = r ? r.y + 36 : stand.y
     return [
       { ...DOOR_POINT },
-      { x: 56, y: DOOR_POINT.y },
-      { x: 56, y },
+      { x: AISLE_X, y: DOOR_POINT.y },
+      { x: AISLE_X, y },
       { x: stand.x, y },
       stand,
+    ]
+  }
+
+  /**
+   * Walk path from the dock door to the Hold Bay station's stand point (a
+   * sorter's hire, M6): down the aisle, east along STATION_ROW_Y south of
+   * the rack, then up into the station. Axis-aligned legs.
+   */
+  stationWalkPath(): Point[] {
+    return [
+      { ...DOOR_POINT },
+      { x: AISLE_X, y: DOOR_POINT.y },
+      { x: AISLE_X, y: STATION_ROW_Y },
+      { x: SORTER_STAND.x, y: STATION_ROW_Y },
+      { ...SORTER_STAND },
+    ]
+  }
+
+  /** The way back out from `from` (a sorter's fire / walkout): the walk-in, reversed. */
+  stationExitPath(from: Point): Point[] {
+    return [
+      { x: from.x, y: STATION_ROW_Y },
+      { x: AISLE_X, y: STATION_ROW_Y },
+      { x: AISLE_X, y: DOOR_POINT.y },
+      { ...DOOR_POINT },
     ]
   }
 

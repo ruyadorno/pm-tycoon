@@ -5,7 +5,7 @@
 // puns.json companyName) with `Day N` / `Lv N` in its corners, a double rule,
 // a 48×48 picture at the left (level → the level's `wh_ext_tN`, incident →
 // `parcel_m_mal`, region → the region's hero building, walkout →
-// `worker_s_idle_0`), the headline wrapped at 236 px (at most 4 lines, the
+// `worker_s_idle_0`, M6 hired → the role's worker idle frame), the headline wrapped at 236 px (at most 4 lines, the
 // last one ellipsized) and an `OK` button bottom-right. It never pauses the
 // sim; it dismisses on OK, on a tap anywhere on it, or after 6 s on screen.
 // One paper at a time; later ones wait in a queue of 3 (the oldest waiting
@@ -26,6 +26,7 @@
 // queue) are unit-tested under Node (tests/ui/newspaper.test.ts).
 import type Phaser from 'phaser'
 import type { BuildingDef, GameData } from '../data/types.ts'
+import type { Role } from '../sim/types.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { buildingSprite, frameOrNull } from '../render/frames.ts'
 import { Button, TAP_PX } from './Button.ts'
@@ -61,7 +62,8 @@ const OK_H = 44
 /** Opaque cut-off for the box-filtered picture (pixel art has no soft edges). */
 const ALPHA_CUT = 128
 
-export type NewsKind = 'level' | 'incident' | 'region' | 'walkout'
+/** M6 `hired`: a ★ applicant joined (spec-build2 §2.5, stars only). */
+export type NewsKind = 'level' | 'incident' | 'region' | 'walkout' | 'hired'
 
 export interface NewsItem {
   kind: NewsKind
@@ -103,16 +105,32 @@ export function heroBuilding(
   return best
 }
 
+/** `an inspector`, `a sorter`, `a driver`. */
+const ROLE_NOUN: Readonly<Record<Role, string>> = {
+  inspector: 'an inspector',
+  sorter: 'a sorter',
+  driver: 'a driver',
+}
+
+/**
+ * M6 (spec-build2 §2.5 "a one-line hired item for star applicants only"):
+ * `Star hire: Wren joins as a sorter` (m5x7 has no ★ glyph).
+ */
+export function starHireHeadline(name: string, role: Role): string {
+  return `Star hire: ${name} joins as ${ROLE_NOUN[role] ?? 'staff'}`
+}
+
 /**
  * The picture frame for a paper (city-view §8.2): the warehouse tier the
  * level brings (levels.json warehouseTier → `wh_ext_tN`), the malware parcel,
- * the region's hero building, the worker's idle frame. Null when the atlas
- * has no such frame (the box then stays empty).
+ * the region's hero building, the worker's idle frame (M6 `hired`: the
+ * sorter's own variant for a sorter). Null when the atlas has no such frame
+ * (the box then stays empty).
  */
 export function newsPicture(
   kind: NewsKind,
   data: Pick<GameData, 'levels' | 'buildings'>,
-  ref: { level?: number; district?: string } = {},
+  ref: { level?: number; district?: string; role?: Role } = {},
 ): string | null {
   switch (kind) {
     case 'level': {
@@ -128,6 +146,12 @@ export function newsPicture(
     }
     case 'walkout':
       return frameOrNull('worker_s_idle_0')
+    case 'hired':
+      return (
+        (ref.role === 'sorter'
+          ? frameOrNull('worker_sorter_s_idle_0')
+          : null) ?? frameOrNull('worker_s_idle_0')
+      )
   }
 }
 

@@ -19,16 +19,18 @@ import {
 const data = dataFixture()
 
 describe('economy (spec §7)', () => {
-  it('§7.1 start $450; buying needs balance ≥ price and the balance never goes negative', () => {
+  it('§7.1 start $450; buying needs balance ≥ price (+ the driver’s fee, M6) and the balance never goes negative', () => {
     const sim = makeSim(1)
+    const buyLater = (type: 'bike' | 'van') =>
+      sim.dispatch({ kind: 'buyVehicle', type, applicantId: null })
     expect(sim.state.economy.balance).toBe(data.economy.startMoney)
-    expect(sim.dispatch({ kind: 'buyVehicle', type: 'van' })).toEqual({
+    expect(buyLater('van')).toEqual({
       ok: false,
       reason: 'insufficient-funds',
     })
-    expect(sim.dispatch({ kind: 'buyVehicle', type: 'bike' }).ok).toBe(true)
-    expect(sim.dispatch({ kind: 'buyVehicle', type: 'bike' }).ok).toBe(true)
-    expect(sim.dispatch({ kind: 'buyVehicle', type: 'bike' })).toEqual({
+    expect(buyLater('bike').ok).toBe(true)
+    expect(buyLater('bike').ok).toBe(true)
+    expect(buyLater('bike')).toEqual({
       ok: false,
       reason: 'insufficient-funds',
     })

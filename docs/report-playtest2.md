@@ -1,7 +1,7 @@
 # Playtest 2 — end-of-run report
 
 Package Management Tycoon build 2: company levels 1 → 5, hired people, quests, the Golden Release and endless mode,
-built in one autonomous run on 2026-10-30 (00:46 UTC, 9c32062 → the M10 commit {{SHA}}) from
+built in one autonomous run on 2026-10-30 (00:46 UTC, 9c32062 → the M10 commit 13245fd) from
 plans/pm-tycoon/plan-build2.md (DRAFT v2) and spec-build2.md (cited `B2 §N`). Node v26, vlt 1.6.1, Phaser 4.2.1,
 Chromium (Chrome for Testing, SwiftShader WebGL) with the Playwright `iPhone 16` profile. Sources for every number
 below: docs/status.md (M5–M9 entries), docs/decisions.md, docs/art-todo.md, docs/gate/{latest,latest-35min,delegating}.md,
@@ -80,7 +80,7 @@ card when it is offered at 30:00 (or from the pause menu), download `playtest.js
 - The policy's L4/L5 plan, NEW STRAIN FIRST and the Arm taking over the Hold Bay; the balance pass (§4); `dk_ship` and
   `xray` re-rolled; the G5/G6 contact sheets; a ✓ glyph in m5x7.
 
-**M10 — playtest-2 build** (the commit that carries this report, {{SHA}})
+**M10 — playtest-2 build** (13245fd; this report's hand-off details are in the docs commit after it)
 
 - `src/metrics/playtest.ts` v2 (`pm.playtest.v2`, plan-build2 §8.7 task 1): level 3–5 and Victory times, `hires[]`
   with a `cheapest` flag, fired, ads, sorter, quests by template, overseas, docks, desks, endless time;
@@ -105,14 +105,14 @@ Nothing in the plan-build2 §8.8 cut order was cut.
 
 ### 2.1 Get the build
 
-Hand-off bundle: `dist-zip/{{ZIP}}` (`vlr bundle` of `dist/` built from {{SHA}}), sent with this report and the shots
+Hand-off bundle: `dist-zip/pm-tycoon-13245fd.zip` (`vlr bundle` of `dist/` built from 13245fd), sent with this report and the shots
 zip. Rebuild any time with `vlr build && vlr bundle` (remove the dev-only `public/gallery/` first, §6.30).
 
 | Path                  | How                                                                                                                                                                                                                                          |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1. Desktop devtools   | Serve `dist/` (path 2), open `http://localhost:4173/` in Chrome, devtools → device toolbar → **iPhone 16** (393 × 852, DPR 3), reload. At 393 × 852 the tier 4–5 rooms fit; add a custom 393 × 659 (or 360 × 604) device to see them scroll. |
 | 2. iPhone via the Mac | Unzip, `cd dist && python3 -m http.server 4173`, open `http://<mac-lan-ip>:4173/` in Safari (same Wi-Fi; `ipconfig getifaddr en0`).                                                                                                          |
-| 3. GitHub Pages       | `https://ruyadorno.com/pm-tycoon/` ({{PAGES}}). Actions → **Pages** → Run workflow (or `gh workflow run pages.yml`) redeploys `main`.                                                                                                        |
+| 3. GitHub Pages       | `https://ruyadorno.com/pm-tycoon/` (still the playtest-1 build: the run's dispatch was refused, §12.1; run it once by hand). Actions → **Pages** → Run workflow (or `gh workflow run pages.yml`) redeploys `main`.                           |
 | SSH tunnel            | Only with a route to the VM: `vlr preview -- --host` there, `ssh -g -L 4173:localhost:4173 <vm>` on the Mac, then the LAN URL on the phone.                                                                                                  |
 
 Plain http works (localStorage, WebGL, the audio-unlock tap; no service worker). Each origin (`localhost`, the LAN
@@ -329,19 +329,19 @@ the `start` recipe).
 
 At the final M10 working tree (HEAD bb5646e plus the M10 changes), after the review fixes, unless noted.
 
-| Check                    | Result                                                                                                                                                                                                                                                                                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vitest                   | 103 files, 2,152 tests: **2,151 passed**, 1 todo, 0 failed (83.3 s, rerun for this report). Growth: M4 1,082 → M5 1,204 → M6 1,344 (outside the long sweeps) → M8 1,925 → M9 2,099 → M10 2,151.                                                                                                                                      |
-| `vlr check`              | PASS in **158.3 s** (target < 3 min): toolchain 0.1, typecheck 10.5, lint 0.3, fmt 0.5, test 84.8, art:lint 1.9, quick gate 1.2, e2e:smoke (smoke + dist) 58.9 s. Per milestone: M5 88 s, M6 107, M7 118, M8 125, M9 ~157.                                                                                                           |
-| `vlr e2e`                | Final full run at the M10 tree (after every review fix): **135 passed, 104 skipped** (project-scoped), **0 failed**, 8.9 min — smoke, dist, lifecycle, audio, audio-render, quests, configs and every shot.                                                                                                                          |
-| `vlr shots`              | 88 passed, 104 skipped, 5.2 min (96 PNGs + `tests/playtest/seed-7.json`).                                                                                                                                                                                                                                                            |
-| Sim gates                | `sim:gate` (30 min), `sim:gate -- --minutes 35`, `sim:delegating`: PASS, outputs byte-identical to the committed files; victory long test PASS.                                                                                                                                                                                      |
-| `vlr build` + check-dist | PASS: **6.35 MB raw / ~4.32 MB gzip** transfer in 68 files vs the 8 MB budget (Q-B2-10); excluded: 5 sourcemaps (15.64 MB). Every asset hashed and fetched once; both configs present and byte-identical to `public/configs/`.                                                                                                       |
-| JS chunks (gzip)         | phaser 353.3 kB, index 221.9 kB, director (lazy audio) 73.3 kB, policy 3.2 kB (the Title's demo city), offline 1.0 kB. `world` 2048² 2,394.9 kB (513 frames, 80.3 % full), `interior` 2048×512 144.2 kB (298 frames, 37.1 %); samples 1.03 MB.                                                                                       |
-| Draw calls               | City 3; warehouse 4 (6 at M9 — the baseboard is an atlas frame now); tier 5 scrolled 4; tier 5 with the full tycoon lane 6 while a dock's loading bar shows (budget 7); attract Title 4 at 56.1–56.3 fps under SwiftShader.                                                                                                          |
-| Browser perf             | seed-7 profile: fps p50 60, p5 59, min 55 over 107 real seconds (SwiftShader).                                                                                                                                                                                                                                                       |
-| Cold install             | M10 integration: `git archive HEAD` plus the modified and untracked files copied to `/tmp/pm-cold-…` (file list matched, no `.env`): `vlt install` ~4 s (133 packages, from cache), `vlr check:quick` PASS in **46.9 s** (test step 35.1 s); total ~51 s; lockfile unchanged, 0 `registry.vlt.io`. This was before the review fixes. |
-| AI attribution           | Commit history: **0** hits over 84334f7..HEAD (6 commits) and over all 29 commits. Files: 257 matching lines in 14 files, none an attribution line or session link (§6.33).                                                                                                                                                          |
+| Check                    | Result                                                                                                                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vitest                   | 103 files, 2,152 tests: **2,151 passed**, 1 todo, 0 failed (83.3 s, rerun for this report). Growth: M4 1,082 → M5 1,204 → M6 1,344 (outside the long sweeps) → M8 1,925 → M9 2,099 → M10 2,151.                                                    |
+| `vlr check`              | PASS in **158.3 s** (target < 3 min): toolchain 0.1, typecheck 10.5, lint 0.3, fmt 0.5, test 84.8, art:lint 1.9, quick gate 1.2, e2e:smoke (smoke + dist) 58.9 s. Per milestone: M5 88 s, M6 107, M7 118, M8 125, M9 ~157.                         |
+| `vlr e2e`                | Final full run at the M10 tree (after every review fix): **135 passed, 104 skipped** (project-scoped), **0 failed**, 8.9 min — smoke, dist, lifecycle, audio, audio-render, quests, configs and every shot.                                        |
+| `vlr shots`              | 88 passed, 104 skipped, 5.2 min (96 PNGs + `tests/playtest/seed-7.json`).                                                                                                                                                                          |
+| Sim gates                | `sim:gate` (30 min), `sim:gate -- --minutes 35`, `sim:delegating`: PASS, outputs byte-identical to the committed files; victory long test PASS.                                                                                                    |
+| `vlr build` + check-dist | PASS: **6.35 MB raw / ~4.32 MB gzip** transfer in 68 files vs the 8 MB budget (Q-B2-10); excluded: 5 sourcemaps (15.64 MB). Every asset hashed and fetched once; both configs present and byte-identical to `public/configs/`.                     |
+| JS chunks (gzip)         | phaser 353.3 kB, index 221.9 kB, director (lazy audio) 73.3 kB, policy 3.2 kB (the Title's demo city), offline 1.0 kB. `world` 2048² 2,394.9 kB (513 frames, 80.3 % full), `interior` 2048×512 144.2 kB (298 frames, 37.1 %); samples 1.03 MB.     |
+| Draw calls               | City 3; warehouse 4 (6 at M9 — the baseboard is an atlas frame now); tier 5 scrolled 4; tier 5 with the full tycoon lane 6 while a dock's loading bar shows (budget 7); attract Title 4 at 56.1–56.3 fps under SwiftShader.                        |
+| Browser perf             | seed-7 profile: fps p50 60, p5 59, min 55 over 107 real seconds (SwiftShader).                                                                                                                                                                     |
+| Cold install             | At the final M10 commit: `git archive 13245fd` unpacked into a fresh `/tmp` dir (no `node_modules`, no `.env`), `vlt install` then `vlr check:quick`: **PASS in 46.4 s** (test step 35.0 s), 47 s in all; lockfile unchanged, 0 `registry.vlt.io`. |
+| AI attribution           | Commit history: **0** hits over 84334f7..HEAD (6 commits) and over all 29 commits. Files: 257 matching lines in 14 files, none an attribution line or session link (§6.33).                                                                        |
 
 WebKit cannot launch on this VM, so every browser check ran in Chromium (as in playtest 1).
 
@@ -423,7 +423,7 @@ Nothing here blocks the playtest. File references are to the M10 tree.
 30. Fixed at hand-off: the dev-only `public/gallery/` (regenerated by every `vlr art:build`) was removed before the
     hand-off build, so the zip carries no gallery files; `check-dist` still warns about the tracked 0.01 MB
     `public/gallery.html`.
-31. The cold `vlr check:quick` took 46.9 s, over playtest 1's 40-s target (the unit suite grew from 1,082 to 2,151).
+31. The cold `vlr check:quick` took 46.4 s, over playtest 1's 40-s target (the unit suite grew from 1,082 to 2,151).
 32. Fixed at hand-off: the M7 status entry's test count (1,651 outside the long sweeps) was filled in.
 33. The attribution grep's file hits (none is an attribution line): 238 are the art reviewer id in the manifest's `by`
     fields (`art/manifest.json` 228, `tools/art/decide.ts` 6, `gen.ts` 2, `manifest.ts` 2) — a provenance value the code
@@ -449,7 +449,7 @@ rush given where nothing fits keeps its flag until it expires; a sim ticked afte
 | Q-B2-6  | Post an ad                               | $30 rerolls one pool now; pools also refresh free every day                                               | `employees.json applicants.adPrice`, `people.ts`                                       |
 | Q-B2-7  | Failed quest penalty                     | None                                                                                                      | `src/sim/systems/quests.ts`                                                            |
 | Q-B2-8  | Run shape (answered: one long run)       | M5 → M10 in one run, reviews at the end                                                                   | —                                                                                      |
-| Q-B2-9  | Pages deploy                             | The run dispatches `pages.yml` once and checks the URL with one GET: {{PAGES}}                            | `.github/workflows/pages.yml`                                                          |
+| Q-B2-9  | Pages deploy                             | Dispatch refused (HTTP 403, the app lacks Actions: write); the one GET served playtest 1 — run it by hand | `.github/workflows/pages.yml`                                                          |
 | Q-B2-10 | Dist budget                              | 8 MB (6.35 MB used)                                                                                       | `tools/check-dist.mjs`                                                                 |
 | Q-B2-11 | Attract city                             | A fixed demo snapshot, never your save: seed 7 at 32:00 (L5, all eight districts; the plan said L3)       | `src/assets/attract.json` from `vlr fixtures:attract` (`tools/fixtures/attract.ts`)    |
 | Q-B2-12 | Quest cash and lifetime earned           | Counts toward lifetime earned (levels)                                                                    | `quests.ts` rewards                                                                    |
@@ -653,11 +653,15 @@ one-liner.
 ### 12.1 GitHub state, Pages and hand-off
 
 - `main` was pushed at every checkpoint (M5 67fd97a, M6 1f0b631, M7 11b6517, M8 99ce939, M9 bb5646e) and at the end
-  (M10 {{SHA}}), always `git push origin main`, no branches or PRs.
-- Pages: {{PAGES}}. To redeploy: Actions → **Pages** → **Run workflow** (or `gh workflow run pages.yml`); uncomment the
+  (M10 13245fd), always `git push origin main`, no branches or PRs.
+- Pages: **the dispatch was refused.** `gh workflow run pages.yml` with the ruy-bot token returned `HTTP 403: Resource
+  not accessible by integration` (the GitHub App has Contents: write for the pushes but not Actions: write). The one GET
+  of `https://ruyadorno.com/pm-tycoon/` returned HTTP 200 with the bundle `assets/index-u7CqBocO.js` — the build of your
+  manual Pages run of 2026-10-29 (playtest 1), not build 2 (`assets/index-BGt1Jkp1.js`). Deploy build 2 with one manual
+  run (below) or grant the app Actions: write. To redeploy: Actions → **Pages** → **Run workflow** (or `gh workflow run pages.yml`); uncomment the
   `push` block of `.github/workflows/pages.yml` to deploy on every push. The atlases are content-hashed, so a redeploy
   never mixes old art with new code.
-- Hand-off: `dist-zip/{{ZIP}}` and the shots zip, both sent with this report; `dist-zip/` is gitignored. docs/status.md
+- Hand-off: `dist-zip/pm-tycoon-13245fd.zip` and the shots zip, both sent with this report; `dist-zip/` is gitignored. docs/status.md
   gets its M10 entry and is copied back to `plans/pm-tycoon/status.md`.
 
 ### 12.2 What the playtest profile should answer

@@ -3,10 +3,10 @@
 Filled in place by the runs (format: plans/pm-tycoon/status.md); newest checkpoint entry first. Playtest 1 (M0–M4) was
 copied back to plans/pm-tycoon/status.md at its end; build 2 (M5–M10, plan-build2.md) copies the file back at M10.
 
-Run (build 2): started 2026-10-30 — plan-build2.md DRAFT v2 + spec-build2.md — Node v26.12.1 / vlt 1.6.1 — Chromium:
-installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2;
-budget 1,500 generations with a 300 reserve (author's run prompt); balance at start 3,299 — current head: see the
-newest entry.
+Run (build 2): started 2026-10-30 00:46 UTC — plan-build2.md DRAFT v2 + spec-build2.md — Node v26 / vlt 1.6.1 —
+Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab token: present,
+Tier 2; budget 1,500 generations with a 300 reserve (author's run prompt); 877 spent, balance 3,299 → 2,422 — M10 at
+13245fd + the hand-off docs commit; zip dist-zip/pm-tycoon-13245fd.zip; Pages dispatch refused (HTTP 403).
 
 Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: 77615ef (M4) + the hand-off docs commit; zip dist-zip/pm-tycoon-77615ef.zip
 
@@ -47,7 +47,7 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M10 — playtest-2 build — 2026-10-30 17:20 UTC — DONE at (this commit; sha in the hand-off docs commit)
+## M10 — playtest-2 build — 2026-10-30 17:20 UTC — DONE at 13245fd
 
 Built: the playtest recorder v2 (`src/metrics/playtest.ts`, `pm.playtest.v2` + the per-config suffix: level 3–5 and
 Victory times, `hires[]` with a `cheapest` flag, fired, ads, sorter, quests by template, overseas, docks, desks, endless);
@@ -75,6 +75,11 @@ Deviations from spec-core.md / B2: the fun-bar thresholds and the offer time liv
 recipe (decisions.md "Run decisions and deviations (M10 — playtest-2 build)").
 Open for the author: docs/report-playtest2.md §6 (rough edges), §7 (decisions to confirm, incl. the victory-by-45 waiver),
 §9 (G4–G6 approvals), §10.5 (levers left).
+Hand-off: `dist-zip/pm-tycoon-13245fd.zip` (6.57 MB; 6.35 MB transfer) + `dist-zip/pm-tycoon-shots-13245fd.zip` +
+docs/report-playtest2.md sent; cold install of 13245fd: `vlt install` + `vlr check:quick` PASS in 46.4 s; `main` pushed.
+Pages: `gh workflow run pages.yml` refused with HTTP 403 "Resource not accessible by integration" (the ruy-bot app lacks
+Actions: write); one GET of https://ruyadorno.com/pm-tycoon/ → HTTP 200 serving the playtest-1 build
+(`index-u7CqBocO.js`) — build 2 needs one manual run of the Pages workflow.
 Next: author playtest (30–40 minutes cold on the iPhone 16, then the summary card)
 
 ## M9 — L4 + L5 Tycoon — 2026-10-30 14:39 UTC — DONE at bb5646e
@@ -307,13 +312,30 @@ Next: <M(n+1) | author playtest + GitHub push>
 
 Numbering continues after the consolidated list in plan.md; each line carries the default taken and where it is coded.
 
-- Q-RUN1 <question> — default: <…> — code: <path or data key>
+- Q-RUN1–Q-RUN3 (playtest 1): see docs/report-playtest1.md §7 (dock relief, waiting-penalty threshold, scripted origin).
+- Q-RUN4 The people layer moves L2 −5.9 % and the truck row −8.1 % past plan-build2's ±5 % (the policy hires the fastest
+  of three drivers) — default: accepted, no retune — code: `src/sim/policy.ts` `bestApplicant`.
+- Q-RUN5 The level cap at M8 — default: 3 at M8, 5 at M9 (no L4/L5 rooms or live art until M9) — code: `economy.json
+  playtestMaxLevel`.
+- Q-RUN6 Six slots at the 64-px pitch need 18 rows, not B2's 16 — default: rows 14/14/14/16/18, the room scrolls —
+  code: `src/render/warehouse/RoomLayout.ts rowsForTier`.
+- Q-RUN7 Atlas placement — default: frames go where they are drawn (world: city, HUD, `src/ui`, room front layers;
+  interior: room back layers; shared classes in both) — code: `tools/art/atlas.ts`, `src/render/frames.ts`.
+- Q-RUN8 NEW STRAIN FIRST — default: a newly announced strain's counter is bought before older pending plan steps —
+  code: `src/sim/policies/levelPlan.ts`.
+- Q-RUN9 Victory by 45 min (plan-build2 §8.6) is not met: the Golden Release's ≥ 90 % on-time rule fails against the L5
+  fleet — default: keep the spec's quest rules and B2 §7.2's order, waived pending the author — code: `levels.json
+  ultimateQuest`, `tests/sim/victory.long.test.ts`.
+- Q-RUN10 Threshold and price retunes (L3 $3,700, L4 $5,200, L5 $7,400, dock 3 $1,000; quest goals) — default: as in
+  docs/decisions.md with the gate rows named — code: `levels.json`, `economy.json`, `quests.json`.
+- Q-RUN11 The Pages dispatch is refused for the ruy-bot app (HTTP 403, no Actions: write) — default: recorded; the
+  author runs the workflow by hand — code: `.github/workflows/pages.yml`.
 
 ## Art approvals pending
 
 - G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
 - G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural presented at M7 — `art/contact/rural@4x.png` (ten uniques, agent picks); Docks (live), Airport, Park & civic presented at M8 — `art/contact/{docks,airport,civic}@4x.png` (agent picks, 2 candidates for L5)
-- G6 tiers 3–5 + machines + people (build 2): people + machines presented at M6 — `art/contact/people@4x.png` (agent picks `battery_checker`, `xray`, `sorter_arm`; procedural faces, pips, ★, `worker_sorter`, `hold_station`); tiers pending (M8–M9)
+- G6 tiers 3–5 + machines + people (build 2): presented — `art/contact/people@4x.png`, `art/contact/tiers@4x.png`, `art/contact/g6-tiers-machines-people@4x.png`, `art/contact/warehouse-tier3@4x.png` (agent picks `battery_checker`, `xray` (M9 re-roll), `sorter_arm`, `wh_ext_t3/t4/t5`; procedural faces, pips, ★, `worker_sorter`, `hold_station`, tier 3–5 interiors); commands in docs/report-playtest2.md §9
 
 - G1 palette + STYLE.md: drawn 2026-10-29 (M0), presented in the end-of-run report — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
 - G2 anchor sheet: <not run | provisional (agent-approved ids: …, scores) | author-confirmed ids: … | rejected ids: …> — `art/contact/anchors@4x.png`

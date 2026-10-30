@@ -49,7 +49,7 @@ jobs:
       - name: Build
         run: vlr build
 
-      # Transfer budget (≤ 6 MB without *.map), atlas, samples, spicy.json.
+      # Transfer budget (≤ 8 MB without *.map, Q-B2-10), hashed atlases, samples, configs.
       - name: Check dist
         run: node tools/check-dist.mjs dist
 

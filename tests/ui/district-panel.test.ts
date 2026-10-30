@@ -1,7 +1,8 @@
 // city-view.md §5.1 (district half-sheet rows 1-7), spec §9.2 (trend,
 // loud districts), §9.4 (70 / 40 bands), §3.3 + §4.1 (Industrial trucks
-// only), §3.5 + §8 (unlock line from levels.json). Pure helpers only; Phaser
-// is stubbed because DistrictPanel imports the Button kit.
+// only), §3.5 + §8 (unlock line from levels.json); M7 (spec-build2 §3.1,
+// design-m7 §6.5) the quest row. Pure helpers only; Phaser is stubbed
+// because DistrictPanel imports the Button kit.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -19,7 +20,10 @@ vi.mock('phaser', () => {
 })
 
 const dp = await import('../../src/ui/DistrictPanel.ts')
-const { dataFixture } = await import('../sim/helpers.ts')
+const { dataFixture, makeSim, noOffers, offerQuest, acceptOffer } =
+  await import('../sim/helpers.ts')
+const { createViewSim } = await import('../../src/sim/view-api.ts')
+const { questRowText } = await import('../../src/ui/questText.ts')
 
 const data = dataFixture()
 const district = (id: string) => {
@@ -71,11 +75,13 @@ describe('District panel (city-view §5.1)', () => {
       [659, 34],
     ] as const) {
       for (const d of data.districts) {
-        // Every optional row at once (a sign 96 px tall when locked).
+        // Every optional row at once (a sign 96 px tall when locked; M7: a
+        // district can be a quest's target).
         const open = dp.districtContentBottom({
           locked: false,
           satisfaction: d.kind === 'district',
           moodNote: d.kind === 'district',
+          quest: d.kind === 'district',
           favouredOrRule: !!(
             dp.favouredLine(d, data) || dp.vehicleRuleLine(d, data)
           ),
@@ -244,5 +250,85 @@ describe('M6 (spec-build2 §2.5): the district panel names the homed drivers', (
     expect(dp.homedLine(3, dp.homedDrivers(fleet, 'highres'))).toBe(
       'Vehicles homed here: 3 (Dee, Pax, no driver)',
     )
+  })
+})
+
+describe('M7 (design-m7 §6.5): the quest row', () => {
+  it("takes the mood note's 28-px row (one row more only without a note); the fullest district still fits 360×604", () => {
+    const base = {
+      locked: false,
+      satisfaction: true,
+      favouredOrRule: true,
+      missing: true,
+      waiting: true,
+    }
+    const plain = dp.districtContentBottom(base)
+    expect(dp.districtContentBottom({ ...base, quest: true }) - plain).toBe(28)
+    const noted = dp.districtContentBottom({ ...base, moodNote: true })
+    const withQuest = dp.districtContentBottom({
+      ...base,
+      moodNote: true,
+      quest: true,
+    })
+    expect(withQuest).toBe(noted)
+    const h = dp.districtFitHeight(withQuest, {
+      H: 604,
+      safeTop: 0,
+      safeBottom: 0,
+    })
+    expect(h).toBeLessThanOrEqual(dp.districtSheetHeight(604))
+  })
+
+  it('the row is the active quest targeting the district, else its offer; none for other districts', () => {
+    const sim = noOffers(makeSim(1))
+    const vs = () => createViewSim(sim).quests()
+    expect(dp.districtQuest(vs(), 'downtown')).toBeNull()
+    const offer = offerQuest(sim, 'rush_district')
+    const target = offer.target
+    expect(target).not.toBeNull()
+    const other = data.districts.find(
+      (d) => d.kind === 'district' && d.id !== target,
+    )!.id
+    const q = dp.districtQuest(vs(), target!)
+    expect(q?.id).toBe(offer.id)
+    expect(q?.status).toBe('offered')
+    expect(questRowText(q!)).toBe('Job offer: Rush hour ▸')
+    expect(dp.districtQuest(vs(), other)).toBeNull()
+    acceptOffer(sim)
+    const a = sim.state.quests.active!
+    if (a.progress.kind !== 'deliveriesFrom') throw new Error(a.progress.kind)
+    a.progress.count = 4
+    a.deadlineTick = sim.state.tick + 600 + 12 * 25
+    const active = dp.districtQuest(vs(), target!)
+    expect(active?.status).toBe('active')
+    expect(questRowText(active!)).toBe(`Rush hour · 4/${a.goal} · 1d 12h`)
+    expect(dp.districtQuest(vs(), other)).toBeNull()
+  })
+
+  it('an untargeted quest has no district row', () => {
+    const sim = noOffers(makeSim(1))
+    offerQuest(sim, 'big_haul')
+    const qs = createViewSim(sim).quests()
+    expect(qs.offer?.target).toBeNull()
+    for (const d of data.districts)
+      expect(dp.districtQuest(qs, d.id), d.id).toBeNull()
+  })
+
+  it('the active quest wins over an offer for the same district', () => {
+    const sim = noOffers(makeSim(1))
+    offerQuest(sim, 'rush_district')
+    acceptOffer(sim)
+    const a = sim.state.quests.active!
+    sim.state.quests.offer = {
+      ...structuredClone(a),
+      id: 'q99',
+      status: 'offered',
+    }
+    const q = dp.districtQuest(createViewSim(sim).quests(), a.target!)
+    expect(q?.id).toBe(a.id)
+  })
+
+  it('its tap band is 44 px, centred on the 28-px row, full width', () => {
+    expect(dp.questTapBand(100, 360)).toEqual({ x: 0, y: 92, w: 360, h: 44 })
   })
 })

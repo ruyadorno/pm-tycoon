@@ -4,7 +4,11 @@
 // rush bell + draining ring, the waiting badge (ic_parcel + count at the
 // doorstep, the count tinted by the oldest waiting parcel's decay phase) and
 // the lost-life scorch (`mood_scorch_<class>`, city-view §3.3: one in-game
-// day on the destination of a delivered malware parcel; the scene times it).
+// day on the destination of a delivered malware parcel; the scene times it)
+// and, M7 (spec-build2 §3.3, design-m7 §6.8), the magic parcel's gold
+// `ic_magic` at the bell anchor (14 px higher while a rush bell is up) with
+// its draining `magic_ring_<step>` to the right, on A and B while the
+// golden parcel is on its way.
 // Everything is a plain Image / BitmapText in the CityScene world Layer; the
 // scene drives it (no sim access here, no per-frame work while idle). On a
 // region unlock (§1.4) setLocked(false, true) hands the old `_locked` Image
@@ -12,7 +16,7 @@
 import Phaser from 'phaser'
 import type { BuildingDef } from '../data/index.ts'
 import { FONT_KEY, WORLD_ATLAS } from './atlases.ts'
-import type { MoodKind } from './cityFx.ts'
+import { magicRingStep, ringStep, type MoodKind } from './cityFx.ts'
 import type { DecayPhase } from './decayPhase.ts'
 import { buildingSprite, frameOrNull, lockedFrame } from './frames.ts'
 import { footprintAnchor, footprintDepth, tileToScreen } from './iso.ts'
@@ -24,6 +28,8 @@ export const DEPTH = {
   mood: 0.01,
   scorch: 0.015,
   bell: 0.02,
+  /** M7: the magic marker (ic_magic + its ring) over the rush bell. */
+  magic: 0.025,
   smoke: 0.03,
   /**
    * Waiting badges and rush bells sit in an overlay band above every world
@@ -62,6 +68,11 @@ export function capTop(centreY: number): number {
 const BADGE_LIFT = 14
 const BELL_LIFT = 6
 const BELL_H = 16
+/** Bell / magic icon x off the anchor, and their ring's (city-view §6.1). */
+const BELL_DX = -5
+const RING_DX = 9
+/** The magic marker rides this far above a rush bell (design-m7 §6.8). */
+export const MAGIC_OVER_BELL = 14
 
 interface Pt {
   x: number
@@ -104,6 +115,8 @@ export class BuildingView {
   private scorch: Phaser.GameObjects.Image | null = null
   private bell: Phaser.GameObjects.Image | null = null
   private ring: Phaser.GameObjects.Image | null = null
+  private magicIcon: Phaser.GameObjects.Image | null = null
+  private magicRing: Phaser.GameObjects.Image | null = null
   private badgeBg: Phaser.GameObjects.NineSlice | null = null
   private badgeIcon: Phaser.GameObjects.Image | null = null
   private badgeText: Phaser.GameObjects.BitmapText | null = null
@@ -149,9 +162,13 @@ export class BuildingView {
     return this.image ? visibleRect(this.image).y : this.anchor.y - 32
   }
 
-  /** Top of the rush-bell zone over the roof (the tooltip anchors above it). */
+  /**
+   * Top of the rush-bell zone over the roof (the tooltip anchors above it);
+   * M7: above the magic marker when it rides over a bell.
+   */
   get markerTop(): number {
-    return this.topY - BELL_LIFT - BELL_H
+    const stacked = this.magicIcon !== null && this.bell !== null
+    return this.topY - BELL_LIFT - BELL_H - (stacked ? MAGIC_OVER_BELL : 0)
   }
 
   private buildImage(): Phaser.GameObjects.Image | null {
@@ -191,6 +208,7 @@ export class BuildingView {
       this.setMood(null)
       this.setWaiting(0, 'plain')
       this.setRush(null)
+      this.setMagic(null)
     }
     if (!crossfade || !old || !img) {
       old?.destroy()
@@ -290,28 +308,85 @@ export class BuildingView {
    */
   setRush(remaining: number | null): void {
     if (remaining === null || this.locked) {
+      const had = this.bell !== null
       this.bell?.destroy()
       this.ring?.destroy()
       this.bell = null
       this.ring = null
+      if (had) this.placeMagic()
       return
     }
-    const step = Math.min(3, Math.max(0, Math.floor((1 - remaining) * 4)))
+    const step = ringStep(remaining)
     const d = DEPTH.marker + this.depth + DEPTH.bell
     const x = this.anchor.x
-    const y = Math.round(this.topY - BELL_LIFT)
+    const y = this.bellY
     if (!this.bell) {
       this.ring = this.scene.add
-        .image(x + 9, y, WORLD_ATLAS, `rush_ring_${step}`)
+        .image(x + RING_DX, y, WORLD_ATLAS, `rush_ring_${step}`)
         .setOrigin(0.5, 1)
         .setDepth(d)
       this.bell = this.scene.add
-        .image(x - 5, y, WORLD_ATLAS, 'ic_bell')
+        .image(x + BELL_DX, y, WORLD_ATLAS, 'ic_bell')
         .setOrigin(0.5, 1)
         .setDepth(d + 0.001)
       this.layer.add([this.ring, this.bell])
+      this.placeMagic()
     }
     this.ring?.setFrame(`rush_ring_${step}`, false, false)
+  }
+
+  /** Bottom y of the bell / magic icons over the roof. */
+  private get bellY(): number {
+    return Math.round(this.topY - BELL_LIFT)
+  }
+
+  /**
+   * M7 magic marker (design-m7 §6.8): the gold `ic_magic` at the bell
+   * anchor (MAGIC_OVER_BELL px higher while a rush bell is up) with the
+   * countdown's `magic_ring_<step>` to its right; `remaining` = 1 → 0, or
+   * null to clear. Hidden while fogged; frames the atlas lacks are skipped.
+   */
+  setMagic(remaining: number | null): void {
+    const icon = frameOrNull('ic_magic')
+    if (remaining === null || this.locked || !icon) {
+      this.magicIcon?.destroy()
+      this.magicRing?.destroy()
+      this.magicIcon = null
+      this.magicRing = null
+      return
+    }
+    const ring = frameOrNull(`magic_ring_${magicRingStep(remaining)}`)
+    const d = DEPTH.marker + this.depth + DEPTH.magic
+    if (!this.magicIcon) {
+      this.magicIcon = this.scene.add
+        .image(0, 0, WORLD_ATLAS, icon)
+        .setOrigin(0.5, 1)
+        .setDepth(d + 0.001)
+      this.layer.add(this.magicIcon)
+    }
+    if (ring && !this.magicRing) {
+      this.magicRing = this.scene.add
+        .image(0, 0, WORLD_ATLAS, ring)
+        .setOrigin(0.5, 1)
+        .setDepth(d)
+      this.layer.add(this.magicRing)
+    } else if (ring && this.magicRing?.frame.name !== ring)
+      this.magicRing?.setFrame(ring, false, false)
+    this.placeMagic()
+  }
+
+  /** True while the magic marker is shown (debug / e2e probes). */
+  get magic(): boolean {
+    return this.magicIcon !== null
+  }
+
+  /** Re-seat the magic marker over / at the bell anchor. */
+  private placeMagic(): void {
+    if (!this.magicIcon) return
+    const x = this.anchor.x
+    const y = this.bellY - (this.bell ? MAGIC_OVER_BELL : 0)
+    this.magicIcon.setPosition(x + BELL_DX, y)
+    this.magicRing?.setPosition(x + RING_DX, y)
   }
 
   /** True when world point (wx, wy) lands on an opaque pixel of the sprite. */
@@ -338,6 +413,8 @@ export class BuildingView {
       this.scorch,
       this.bell,
       this.ring,
+      this.magicIcon,
+      this.magicRing,
       this.badgeBg,
       this.badgeIcon,
       this.badgeText,
@@ -348,6 +425,8 @@ export class BuildingView {
     this.scorch = null
     this.bell = null
     this.ring = null
+    this.magicIcon = null
+    this.magicRing = null
     this.badgeBg = null
     this.badgeIcon = null
     this.badgeText = null

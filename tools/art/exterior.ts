@@ -1,6 +1,7 @@
 // Warehouse exterior, lot/dock props and city props (style-guide.md §2.4,
-// §2.5, §4.3): wh_ext_t1/_t2 (the 4x4 company building), the city props
-// (tree_round, tree_pine, bush, lamp_post, bench, fence), the docks crane
+// §2.5, §4.3): wh_ext_t1/_t2 (the 4x4 company building) and the tier 3-5
+// stand-ins (build 2 M7), the city props (tree_round, tree_pine, bush,
+// lamp_post, bench, fence, hay_bale), the docks crane
 // and ship, and the sign boards sign_locked / sign_days / sign_pop.
 //
 // Props have no ground patch. Placement rule (same as buildings): the
@@ -179,6 +180,82 @@ export function drawWarehouseExt(d: DrawCtx, tier: 1 | 2): Img {
   return finish(k)
 }
 
+/**
+ * Build 2 M7 (B2 §6.6): procedural stand-ins for the tier 3-5 exteriors
+ * (PixelLab rows wh_ext_t3 / _t4 / _t5, shipped only without a chosen
+ * candidate). No apron (B2 §6.1, lint A04 strict): the walls fill the 4x4
+ * footprint diamond, no ground, no shadow strip. t3 brick with two open
+ * bays, t4 steel with three and a logo board, t5 a glass tower with a pink
+ * neon box sign; every bay has its amber lamp (yellow1) above the door.
+ */
+export function drawTierExt(d: DrawCtx, tier: 3 | 4 | 5): Img {
+  const k = newKit(d, { fp: 4, canvas: [256, 256] })
+  k.shadow = false
+  const wall = tier === 3 ? M.brick : tier === 4 ? rampMat('grey', 2) : M.white
+  const shed = box(k, 0, 0, 0, 64, 64, 30, wall)
+  const v = shed.v0 + shed.b - 1
+  const bays = tier === 3 ? 2 : 3
+  for (let i = 0; i < bays; i++) {
+    const t0 = 4 + i * 10
+    for (let t = t0; t < t0 + 7; t++) {
+      for (let z = 0; z < 14; z++) {
+        k.vox.set(t, v, z, mat('grey0', 'grey0', 'grey0'))
+      }
+      k.vox.set(t, v, 14, (t - t0) % 2 ? M.sign : M.darkMetal)
+    }
+    // the bay lamp the city lights (manifest bayLights)
+    k.vox.set(t0 + 3, v, 17, mat('yellow1', 'yellow1', 'yellow1'))
+  }
+  windows(k, shed, {
+    z: 18,
+    storey: 12,
+    wh: 4,
+    ww: 3,
+    pitch: 6,
+    margin: 36,
+    lit: 1,
+    faces: ['left'],
+  })
+  windows(k, shed, {
+    z: 6,
+    storey: 12,
+    wh: 4,
+    ww: 3,
+    pitch: 6,
+    margin: 4,
+    lit: 0.7,
+    faces: ['right'],
+  })
+  // flat roof with a parapet
+  k.vox.box(0, 0, 30, 64, 64, 1, M.roofFlat)
+  if (tier === 3) {
+    k.vox.box(20, 20, 31, 6, 6, 6, M.woodDark) // water tank
+    k.vox.box(40, 12, 31, 4, 4, 3, M.metal)
+  } else if (tier === 4) {
+    k.vox.box(6, 60, 31, 30, 1, 8, M.blue) // the logo board
+    k.vox.box(10, 61, 33, 22, 1, 4, M.sign)
+    k.vox.box(44, 20, 31, 6, 6, 4, M.metal)
+  } else {
+    const tower = box(k, 40, 40, 31, 24, 24, 30, M.glassLit)
+    windows(k, tower, {
+      z: 34,
+      storey: 8,
+      wh: 5,
+      ww: 2,
+      pitch: 4,
+      lit: 1,
+      litMat: M.white,
+      darkMat: M.white,
+    })
+    k.vox.box(46, 50, 61, 12, 1, 8, M.pink) // neon sign
+    k.vox.box(48, 51, 63, 8, 1, 4, M.purple)
+    for (const u of [8, 20]) {
+      k.vox.blob(u + 1.5, 20, 33, 2, 2, 2, M.leaf)
+    }
+  }
+  return finish(k)
+}
+
 // ---------------------------------------------------------------------------
 // City props (prop 64x128): standing on the tile centre
 
@@ -226,6 +303,24 @@ function fence(k: Kit): void {
   for (let u = 0; u < 16; u += 3) k.vox.box(u, 8, 0, 1, 1, 6, M.woodDark)
   k.vox.box(0, 8, 2, 16, 1, 1, M.wood)
   k.vox.box(0, 8, 4, 16, 1, 1, M.wood)
+}
+
+/**
+ * build 2 M7 (plan-build2 §6 Rural props): a stack of three square straw
+ * bales (two side by side on the ground, one on top), each with two brown
+ * twine bands across its lit faces.
+ */
+function hayBale(k: Kit): void {
+  const straw = mat('yellow2', 'yellow1', 'yellow0')
+  const twine = mat('brown1', 'brown1', 'brown0')
+  for (const [u, v, z] of [
+    [1, 6, 0],
+    [8, 6, 0],
+    [4, 6, 6],
+  ] as const) {
+    k.vox.box(u, v, z, 7, 5, 6, straw)
+    for (const du of [2, 5]) k.vox.box(u + du, v, z, 1, 5, 6, twine)
+  }
 }
 
 function crane(k: Kit): void {
@@ -496,6 +591,12 @@ registerDrawer({ id: 'bush' }, voxProp(bush))
 registerDrawer({ id: 'lamp_post' }, voxProp(lampPost))
 registerDrawer({ id: 'bench' }, voxProp(bench))
 registerDrawer({ id: 'fence' }, voxProp(fence))
+registerDrawer({ id: 'hay_bale' }, voxProp(hayBale))
+registerDrawer({ id: /^wh_ext_t[345]$/ }, (d): DrawnFrame[] => {
+  const tier = Number(d.entry.id.slice(-1)) as 3 | 4 | 5
+  const canvas = imgToCanvas(drawTierExt(d, tier), d)
+  return d.entry.frames.map((suffix) => ({ suffix, canvas }))
+})
 registerDrawer({ id: 'dk_crane' }, voxProp(crane))
 registerDrawer({ id: 'dk_ship' }, (d): DrawnFrame[] => {
   const k = newKit(d, { fp: 2, canvas: d.entry.canvas })

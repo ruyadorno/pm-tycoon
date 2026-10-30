@@ -650,6 +650,39 @@ const ICONS: Record<string, readonly string[]> = {
     '.ccc...ccc.',
     'cc.......cc',
   ],
+  // build 2 M7 (design-m7 §6.1, B2 §3.1): the job board — a clipboard with
+  // a gold ★ on its sheet (QuestCard masthead, the HUD quest chip, the
+  // district panel's quest row, the newspaper's quest picture)
+  ic_quest: [
+    '...mmmmm...',
+    'nnnmDDDmnnn',
+    'nwwwwwwwwwn',
+    'nwwwwcwwwwn',
+    'nwwwcccwwwn',
+    'nwcccccccwn',
+    'nwwcccccwwn',
+    'nwwccwccwwn',
+    'nwwCwwwCwwn',
+    'nwGGGGGGGwn',
+    'nwwwwwwwwwn',
+    'nnnnnnnnnnn',
+  ],
+  // build 2 M7 (B2 §3.3): the golden parcel — the parcel_s_magic look at
+  // 16 px (gold box, pink ribbon and bow, a 1-px sparkle on the lid), over
+  // the magic parcel's A and B buildings, on the hops and the quest chip
+  ic_magic: [
+    '..pp....pp..',
+    '..pppIIppp..',
+    '...ppIIpp...',
+    'cccccppccccc',
+    'cccccppccWcc',
+    'pppppIIppppp',
+    'cccccppccccc',
+    'cccccppccccc',
+    'CCCCCIICCCCC',
+    'CCCCCIICCCCC',
+    'CCCCCIICCCCC',
+  ],
   ic_honk: [
     '.wwwwwwwwww.',
     'wwwwwwwwwwww',

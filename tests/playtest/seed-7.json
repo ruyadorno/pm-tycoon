@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "buildStamp": "67fd97a 2026-10-30",
+  "buildStamp": "1f0b631 2026-10-30",
   "seed": 7,
-  "startedAt": "2026-10-30T05:15:31Z",
+  "startedAt": "2026-10-30T08:13:50Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -11,8 +11,8 @@
     "zoom": 1,
     "maxTexture": 8192
   },
-  "elapsedS": 183.8,
-  "simS": 720.1,
+  "elapsedS": 185.1,
+  "simS": 721.3,
   "pausedS": 0.9,
   "firstDeliveryS": 31.5,
   "firstMalware": {
@@ -21,14 +21,14 @@
     "by": "inspector",
     "tossedS": 180.1
   },
-  "level2AtS": null,
+  "level2AtS": 713.1,
   "truckBoughtS": null,
   "deliveries": {
-    "total": 78,
-    "onTime": 50,
+    "total": 77,
+    "onTime": 49,
     "late": 28,
     "byType": {
-      "bike": 78,
+      "bike": 77,
       "van": 0,
       "truck": 0
     }
@@ -43,14 +43,14 @@
     172,
     178,
     284,
-    242,
+    362,
     260,
-    321
+    276
   ],
-  "lifetimeEarned": 1953,
-  "balanceEnd": 925,
+  "lifetimeEarned": 2028,
+  "balanceEnd": 1000,
   "malware": {
-    "spawned": 4,
+    "spawned": 5,
     "caught": 4,
     "missed": 0,
     "tossedClean": 4,
@@ -82,16 +82,16 @@
       "atS": 473.4
     }
   ],
-  "taps": 3,
-  "tapsPerMin": 1,
-  "rushTaps": 0,
+  "taps": 5,
+  "tapsPerMin": 1.6,
+  "rushTaps": 1,
   "viewSwitches": 2,
-  "warehouseS": 59.4,
+  "warehouseS": 58.9,
   "fps": {
     "p50": 61,
     "p5": 60,
     "min": 55,
-    "samples": 183
+    "samples": 185
   },
   "holdBayEvents": 8,
   "holdBayEventsPer10Min": 6.7,
@@ -106,6 +106,7 @@
   },
   "satisfactionEnd": {
     "highres": 40,
-    "downtown": 29
+    "downtown": 29,
+    "industrial": 59
   }
 }

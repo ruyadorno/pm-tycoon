@@ -259,9 +259,10 @@ describe('plan.md §12.9 rules: sim seconds, null = not reached', () => {
     expect(pt.warehouseS).toBe(60)
   })
 
-  it('null = not reached (seed 7 levels up after 12 minutes)', () => {
-    expect(r.sim.state.level.level).toBe(1)
-    expect(pt.level2AtS).toBeNull()
+  it('null = not reached (seed 7 levels up just before 12:00 since M7 quests, the truck comes later)', () => {
+    expect(r.sim.state.level.level).toBe(2)
+    expect(pt.level2AtS).toBe((st.levelTick['2'] ?? NaN) / 10)
+    expect(st.truckTick).toBeNull()
     expect(pt.truckBoughtS).toBeNull()
   })
 
@@ -313,10 +314,11 @@ describe('plan.md §12.9 rules: sim seconds, null = not reached', () => {
     expect(pt.rushTaps).toBe(log.filter((e) => e.cmd.kind === 'rush').length)
   })
 
-  it('satisfactionEnd lists the live local districts', () => {
+  it('satisfactionEnd lists the live local districts (Industrial opens at L2)', () => {
     expect(Object.keys(pt.satisfactionEnd).toSorted()).toEqual([
       'downtown',
       'highres',
+      'industrial',
     ])
   })
 
@@ -458,12 +460,12 @@ describe('plan.md §12.9: the profile survives a reload of the same run only', (
 })
 
 describe('plan.md §12.9 fun bar from the same object', () => {
-  it('reads the seed-7 run: delivery and catch pass, L2 still open, 15 min not reached', () => {
+  it('reads the seed-7 run: delivery, catch and L2 pass, 15 min not reached', () => {
     const checks = funBar(run.pt, data.economy.pacingTargets)
     expect(checks.map((c) => [c.n, c.state])).toEqual([
       [1, 'pass'],
       [2, 'pass'],
-      [3, 'pending'],
+      [3, 'pass'],
       [4, 'fail'],
       [5, 'pass'],
     ])

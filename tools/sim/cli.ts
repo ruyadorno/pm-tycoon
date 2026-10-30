@@ -24,8 +24,12 @@
 //                      code is unchanged. Read before the gate files are
 //                      written, so it may name the file being replaced.
 //
-// Prints one row per in-game minute, '!' event lines, a GATE line, the
-// conservation identity and the tick time percentiles. Asserts every tick:
+// Prints one row per in-game minute (M7: + the active quest), '!' event
+// lines (M7: every quest offer / accept / completion / fail), a GATE line
+// (M7: + questsOfferedBy30MinMin / questsCompletedBy30MinMin, gated behind
+// SIM_FEATURES.quests, informational below 30 minutes), a quests line (the
+// per-template offered / completed / failed counts), the conservation
+// identity and the tick time percentiles. Asserts every tick:
 // finite balance ≥ 0, finite vehicle positions, no vehicle in one state
 // > 120 s (idle_lot / inactive exempt); every 600 ticks: auditState (no NaN /
 // non-JSON, ids resolve, each parcel in one place, the conservation identity
@@ -65,6 +69,7 @@ import {
   gateMarkdown,
   Highlights,
   RunRecorder,
+  questTallies,
   seedResult,
   summarise,
 } from './report.ts'
@@ -327,6 +332,15 @@ export function runSeed(
 
 const ms = (x: number): string => x.toFixed(4)
 
+/** `# quests: 5 offered · 3 completed by 30 min · active in min 7-13: yes · magic 1/1 on time · rush_district 2/2, …` */
+export function questsLine(run: RunResult): string {
+  const m = run.result.metrics
+  const by = questTallies([m])
+    .map(([id, t]) => `${id} ${t.completed}/${t.offered}`)
+    .join(', ')
+  return `# quests: ${m.questsOffered30} offered · ${m.questsCompleted30} completed by 30 min · active in min 7-13: ${m.questActive7to13 === 1 ? 'yes' : 'no'} · magic ${m.magicOnTime}/${m.magicSpawned} on time${by ? ` · completed/offered: ${by}` : ''}`
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   const opts = parseCli(argv)
   const data = loadGameData(opts.config)
@@ -378,6 +392,7 @@ async function main(argv: readonly string[]): Promise<number> {
       console.error(`ASSERT seed ${seed} @${a}`)
     if (verbose) {
       console.log(formatGateLine(run.result))
+      if (SIM_FEATURES.quests) console.log(questsLine(run))
       console.log(`# conservation: ${formatConservation(run.conservation)}`)
       console.log(
         `# perf: ${run.perf.ticks} ticks · tick p50 ${ms(run.perf.p50Ms)} ms · p99 ${ms(run.perf.p99Ms)} ms · max ${ms(run.perf.maxMs)} ms`,

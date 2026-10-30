@@ -106,10 +106,50 @@
 //                         (`Mo: looks clean (90%)` — the fixture's sorter,
 //                         not the plan's Pat 85 %) (+ `-360x604`)
 // tools/fixtures/people.ts writes both fixtures (same staleness rule).
+//
+// M7 (plan-build2 §8.4 task 8; design-m7 §6.3-§6.8, §7 "e2e/shots.spec.ts"):
+//   quest-offer           ?quest=rush_district on a new game (Boot's debug
+//                         offer, its card opened at create), 20 s of a
+//                         player-less city behind it (waiting badges): the
+//                         JOB BOARD card, Accept · Later · Decline
+//                         (+ `-360x604`: the card inside the canvas, above
+//                         the bottom bar)
+//   quest-chip            policy, ?fastForward=720 (L2 at ~11.9 min on
+//                         seed 7), the quest it holds abandoned, then
+//                         debug rush_district on the busiest district (L2
+//                         goal 10): frozen at its 4th delivery — the chip
+//                         `4/10 · 1d 19h` in row B (the plan's `1d 12h`
+//                         is not reached: a forced-L2 game from tick 0
+//                         times out at 2/10), the level bar short
+//   magic-parcel          policy 40 s, debug.offerQuest('magic_parcel') +
+//                         Accept: frozen while the golden parcel waits at A,
+//                         the camera between A and B — `ic_magic` + the
+//                         countdown ring over both
+//   quest-complete        the same magic quest followed in real frames (4×)
+//                         from its outbound load to the delivery at B: the
+//                         gold `QUEST COMPLETE +1 life +$150` stamp mid-rise
+//                         at the money cell, the 4th bomb slot lit
+//   district-panel-quest  ?policy=1&quest=rush_district, 30 s: the target
+//                         district's panel with its quest row
+//                         (`Rush hour · n/6 · 2d …h`)
+//   victory-card          policy, ?fastForward=600 (a 10-minute run for
+//                         the card's stats), the quest it holds abandoned,
+//                         the Golden Release by debug (debugQuest +
+//                         finishUltimate: its counters set to the goal),
+//                         the VictoryCard after the stamp
+//                         (+ `-360x604`: its buttons inside the canvas)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
-import { expect, test, titleUp, type PmHelpers } from './fixtures.ts'
+import {
+  debugQuest,
+  expect,
+  finishUltimate,
+  questUi,
+  test,
+  titleUp,
+  type PmHelpers,
+} from './fixtures.ts'
 import {
   bayRect,
   hireSheet,
@@ -1220,27 +1260,143 @@ async function untilSimS(
   })
 }
 
+/** The HUD's cards, holds and quest slots (summary-flow diagnostics). */
+function hudDiag(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const api = window.__pm!
+    const h = api.game.scene.getScene('HUD') as unknown as {
+      paused: { isOpen(): boolean }
+      holds: Set<string>
+      modalDepth(): number
+      lostCard: { isOpen(): boolean }
+      toast: { currentText(): string | null }
+      questCard: { isOpen: boolean; mode: string | null }
+      victoryCard: { isOpen: boolean }
+      summary: { isOpen(): boolean }
+      district: { isOpen(): boolean } | null
+      paper: { isVisible(): boolean }
+    }
+    const qs = api.quests()
+    return {
+      menu: h.paused.isOpen(),
+      tick: api.sim.tick,
+      speed: api.stepper.speed,
+      paused: api.stepper.paused,
+      holds: [...h.holds],
+      modals: h.modalDepth(),
+      lostCard: h.lostCard.isOpen(),
+      questCard: h.questCard.isOpen ? h.questCard.mode : null,
+      victoryCard: h.victoryCard.isOpen,
+      summary: h.summary.isOpen(),
+      district: h.district?.isOpen() ?? false,
+      paper: h.paper.isVisible(),
+      garage: api.game.scene.isActive('Garage'),
+      toast: h.toast.currentText(),
+      offer: qs.offer?.templateId ?? null,
+      active: qs.active?.templateId ?? null,
+      last: qs.history.at(-1)?.outcome ?? null,
+    }
+  })
+}
+
+/** A newspaper on screen or waiting in the HUD's queue. */
+function paperPending(
+  page: Page,
+): Promise<{ visible: boolean; queued: number }> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      paper: {
+        isVisible(): boolean
+        queue: { current: unknown; waiting: unknown[] }
+      }
+    }
+    const q = hud.paper.queue
+    return {
+      visible: hud.paper.isVisible(),
+      queued: (q.current !== null ? 1 : 0) + q.waiting.length,
+    }
+  })
+}
+
+/**
+ * The paper's OK target once its 300-ms slide has landed (two equal reads
+ * 100 ms apart): a rect read mid-slide sits lower, and its centre can fall
+ * on the bottom bar's Garage button (which draws over the sliding paper).
+ */
+async function restingPaperOk(page: Page): Promise<boolean> {
+  let prev: { x: number; y: number } | null = null
+  for (let i = 0; i < 40; i++) {
+    const r = await sceneTarget(page, 'HUD', 'newspaper:ok')
+    if (r && prev && r.x === prev.x && r.y === prev.y) return true
+    prev = r
+    await page.waitForTimeout(100)
+  }
+  return false
+}
+
+/**
+ * M7: close what quests leave over the bottom bar before the ❚❚ taps — by
+ * real taps, as a player would. A QuestCard (OK / Close / Later by its
+ * mode) if one is up (a guard: the HUD never auto-opens one while the
+ * policy drives the stepper); then every newspaper (OK), once its slide
+ * has landed,
+ * until none is up or queued: seed 7 now reaches L2 at ~11.9 min (tick
+ * ~7131, quest cash), so the level / region / quest papers sit over the
+ * bottom bar when the 12-minute run ends.
+ */
+async function dismissQuestUi(
+  page: Page,
+  pm: PmHelpers,
+  settle: () => Promise<void>,
+): Promise<void> {
+  for (let i = 0; i < 12; i++) {
+    const card = (await questUi(page)).card
+    if (card.open) {
+      const name =
+        card.mode === 'complete'
+          ? 'ok'
+          : card.mode === 'active'
+            ? 'close'
+            : 'later'
+      await tapTarget(page, pm, 'HUD', `quest:${name}`)
+      await settle()
+      continue
+    }
+    const st = await paperPending(page)
+    if (!st.visible && st.queued === 0) return
+    if (
+      st.visible &&
+      (await restingPaperOk(page)) &&
+      (await paperPending(page)).visible
+    )
+      await tapTarget(page, pm, 'HUD', 'newspaper:ok')
+    await settle()
+  }
+  expect((await questUi(page)).card.open, 'no QuestCard left up').toBe(false)
+  expect((await paperPending(page)).visible, 'no newspaper left up').toBe(false)
+}
+
 /**
  * ❚❚ (pause), ❚❚ again (the pause menu: the Paused card), then `End run —
  * show summary` — real taps; `settle` lets the frames run between them.
+ * An open QuestCard and any newspaper are closed first (dismissQuestUi).
  */
 async function openSummaryByTaps(
   page: Page,
   pm: PmHelpers,
   settle: () => Promise<void>,
 ): Promise<void> {
-  await tapTarget(page, pm, 'HUD', 'speed:0')
-  await settle()
-  await tapTarget(page, pm, 'HUD', 'speed:0')
-  await settle()
-  const menu = await page.evaluate(() =>
-    (
-      window.__pm!.game.scene.getScene('HUD') as unknown as {
-        paused: { isOpen(): boolean }
-      }
-    ).paused.isOpen(),
+  console.log(
+    `shots: before the summary taps ${JSON.stringify(await hudDiag(page))}`,
   )
-  expect(menu, '❚❚ while paused opens the pause menu').toBe(true)
+  await dismissQuestUi(page, pm, settle)
+  await tapTarget(page, pm, 'HUD', 'speed:0')
+  await settle()
+  await tapTarget(page, pm, 'HUD', 'speed:0')
+  await settle()
+  const hud = await hudDiag(page)
+  console.log(`shots: pause menu ${JSON.stringify(hud)}`)
+  expect(hud.menu, '❚❚ while paused opens the pause menu').toBe(true)
   await tapTarget(page, pm, 'HUD', 'paused:summary')
   await settle()
   const st = await summaryState(page)
@@ -1945,6 +2101,366 @@ test.describe('M6 shots', () => {
     })
     expect(touched).toBe('touchHeld')
     await pm.shot(shotName('holdcard-sorter-hint'), 30)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M7 ------------------------------------------------------------------
+
+/** The HUD's QuestCard / VictoryCard rect and the bands around them (logical px). */
+function questCardFit(page: Page): Promise<{
+  W: number
+  H: number
+  card: { x: number; y: number; w: number; h: number }
+  bandTop: number
+  bandBottom: number
+}> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      L: {
+        W: number
+        H: number
+        ticker: { y: number; h: number }
+        bottomBar: { y: number }
+      }
+      questCard: { rect: { x: number; y: number; w: number; h: number } }
+    }
+    const L = hud.L
+    return {
+      W: L.W,
+      H: L.H,
+      card: { ...hud.questCard.rect },
+      bandTop: L.ticker.y + L.ticker.h,
+      bandBottom: L.bottomBar.y,
+    }
+  })
+}
+
+/** Every live target `ids` of scene `key` lies inside the W×H canvas. */
+async function expectInside(
+  page: Page,
+  key: string,
+  ids: readonly string[],
+): Promise<void> {
+  const L = await page.evaluate(() => ({
+    W: window.__pm!.game.scale.width,
+    H: window.__pm!.game.scale.height,
+  }))
+  for (const id of ids) {
+    const r = await sceneTarget(page, key, id)
+    expect(r, `${id} is live`).not.toBeNull()
+    expect(r!.x, `${id} left`).toBeGreaterThanOrEqual(0)
+    expect(r!.y, `${id} top`).toBeGreaterThanOrEqual(0)
+    expect(r!.x + r!.w, `${id} right`).toBeLessThanOrEqual(L.W)
+    expect(r!.y + r!.h, `${id} bottom`).toBeLessThanOrEqual(L.H)
+  }
+}
+
+/** Sim-only 100-ms steps until `cond(api)` holds in the page (cap `capMs`). */
+async function advanceUntil(
+  page: Page,
+  cond: string,
+  capMs: number,
+): Promise<{ ok: boolean; ms: number; tick: number }> {
+  return page.evaluate(
+    ([src, cap]) => {
+      const api = window.__pm!
+      const f = new Function('api', `return (${src as string})`) as (
+        a: typeof api,
+      ) => boolean
+      let ms = 0
+      while (!f(api) && ms < (cap as number)) {
+        api.advance(100)
+        ms += 100
+      }
+      return { ok: f(api), ms, tick: api.sim.tick }
+    },
+    [cond, capMs] as const,
+  )
+}
+
+/** Abandon the quest the policy holds (a logged command), if any. */
+async function abandonActive(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const vs = window.__pm!.sim
+    if (vs.quests().active) vs.quest.abandon()
+  })
+}
+
+/** Policy 40 s, then the magic quest offered by debug and accepted. */
+async function magicQuest(
+  page: Page,
+  pm: PmHelpers,
+): Promise<{ id: string; origin: string; dest: string; parcelId: number }> {
+  await pm.open(POLICY)
+  await runFor(page, pm, 40_000)
+  const id = await debugQuest(page, 'magic_parcel')
+  const ui = await questUi(page)
+  expect(ui.active?.route, 'the magic quest has its route').toBeTruthy()
+  return {
+    id,
+    origin: ui.active!.route!.origin,
+    dest: ui.active!.route!.dest,
+    parcelId: ui.active!.parcelId!,
+  }
+}
+
+test.describe('M7 shots', () => {
+  test('quest-offer', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(`${CITY}&quest=rush_district`)
+    await pm.freeze()
+    // 20 s with no player: parcels wait (the badges), the offer stands (1 day).
+    await page.evaluate(() => window.__pm!.advance(20_000))
+    expect(
+      await settleUntil(page, pm, async () => {
+        const ui = await questUi(page)
+        return ui.card.open && ui.card.mode === 'offer'
+      }),
+      'the ?quest= offer opens its card',
+    ).toBe(true)
+    await pm.settle(30)
+    const ui = await questUi(page)
+    const fit = await questCardFit(page)
+    console.log(
+      `shots: quest-offer ${JSON.stringify({ offer: ui.offer, card: ui.card, fit })}`,
+    )
+    expect(ui.card).toMatchObject({
+      title: 'Rush hour',
+      buttons: ['accept', 'later', 'decline'],
+    })
+    expect(fit.card.x).toBeGreaterThanOrEqual(0)
+    expect(fit.card.x + fit.card.w).toBeLessThanOrEqual(fit.W)
+    expect(fit.card.y).toBeGreaterThanOrEqual(fit.bandTop)
+    expect(fit.card.y + fit.card.h).toBeLessThanOrEqual(fit.bandBottom)
+    await expectInside(page, 'HUD', [
+      'quest:accept',
+      'quest:later',
+      'quest:decline',
+    ])
+    await pm.shot(shotName('quest-offer'), 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('quest-chip', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(180_000)
+    await pm.open(`${POLICY}&fastForward=720`)
+    await pm.freeze()
+    await abandonActive(page)
+    await debugQuest(page, 'rush_district')
+    const run = await advanceUntil(
+      page,
+      `(api.core.state.quests.active?.progress.kind === 'deliveriesFrom' && api.core.state.quests.active.progress.count >= 4)`,
+      240_000,
+    )
+    await pm.settle(8)
+    const ui = await questUi(page)
+    console.log(
+      `shots: quest-chip after ${run.ms} ms ${JSON.stringify({ active: ui.active, chip: ui.chip })}`,
+    )
+    expect(run.ok, 'four deliveries from the rush district').toBe(true)
+    expect(ui.active).toMatchObject({ templateId: 'rush_district', goal: 10 })
+    expect(ui.chip.visible).toBe(true)
+    expect(ui.chip.barText).toMatch(/^[4-9]\/10$/)
+    expect(await page.evaluate(() => window.__pm!.sim.level)).toBe(2)
+    await pm.shot('quest-chip', 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('magic-parcel', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    const q = await magicQuest(page, pm)
+    const a = await buildingCentre(page, q.origin)
+    const b = await buildingCentre(page, q.dest)
+    await focusCity(page, {
+      x: Math.round((a.x + b.x) / 2),
+      y: Math.round((a.y + b.y) / 2),
+    })
+    await pm.settle(30)
+    const st = await page.evaluate(
+      ([o, d, pid]) => {
+        const api = window.__pm!
+        const city = api.game.scene.getScene('City') as unknown as {
+          buildings: Map<string, { magic: boolean; anchor: Pt; topY: number }>
+          cameras: {
+            main: { worldView: { contains(x: number, y: number): boolean } }
+          }
+        }
+        const view = city.cameras.main.worldView
+        const seen = (id: string): boolean => {
+          const v = city.buildings.get(id)
+          return !!v && view.contains(v.anchor.x, v.topY)
+        }
+        return {
+          parcel: api.core.state.parcels[pid as number]?.state ?? null,
+          marks: [
+            city.buildings.get(o as string)?.magic ?? false,
+            city.buildings.get(d as string)?.magic ?? false,
+          ],
+          onScreen: [seen(o as string), seen(d as string)],
+          rushed: api.sim.rushState(o as string) !== null,
+        }
+      },
+      [q.origin, q.dest, q.parcelId] as const,
+    )
+    console.log(`shots: magic-parcel ${JSON.stringify({ ...q, ...st })}`)
+    expect(st.parcel, 'the golden parcel still waits at A').toBe('waiting')
+    expect(st.marks).toEqual([true, true])
+    expect(st.onScreen, 'A and B both in frame').toEqual([true, true])
+    await pm.shot('magic-parcel', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('quest-complete', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(180_000)
+    const q = await magicQuest(page, pm)
+    // Sim-only until the golden parcel rides out of the warehouse …
+    const out = await advanceUntil(
+      page,
+      `['loaded', 'in_transit_out'].includes(api.core.state.parcels[${q.parcelId}]?.state ?? '') || api.quests().active === null`,
+      120_000,
+    )
+    expect(out.ok).toBe(true)
+    const pending = await page.evaluate(() => window.__pm!.quests().active)
+    expect(pending, 'still on its way (not delivered yet)').not.toBeNull()
+    await focusCity(page, await buildingCentre(page, q.dest))
+    await pm.settle(64)
+    // … then real frames at 4× to the delivery at B, so the stamp starts
+    // on a rendered frame with everything around it in play.
+    const done = await page.evaluate(() => {
+      const api = window.__pm!
+      const ev = api.core.events as unknown as {
+        on(n: string, f: (p: unknown) => void): unknown
+        off(n: string, f: (p: unknown) => void): unknown
+      }
+      const got: { reward: unknown } = { reward: null }
+      const fn = (p: unknown): void => {
+        got.reward ??= (p as { reward: unknown }).reward
+      }
+      ev.on('quest:completed', fn)
+      api.speed(4)
+      let frames = 0
+      while (got.reward === null && frames < 6000) {
+        api.step(16)
+        frames++
+      }
+      api.speed(1)
+      ev.off('quest:completed', fn)
+      return { frames, reward: got.reward }
+    })
+    console.log(
+      `shots: quest-complete after ${done.frames} frames ${JSON.stringify(done.reward)}`,
+    )
+    expect(done.reward, 'quest:completed (on time)').not.toBeNull()
+    // 36 frames ≈ 580 ms: the stamp half-way up its 1.2-s rise.
+    await pm.shot('quest-complete', 36)
+    const ui = await questUi(page)
+    const st = await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        questStamp: {
+          ms: number
+          root: { list: { text?: string }[] }
+        } | null
+      }
+      const s = hud.questStamp
+      return {
+        ms: s?.ms ?? null,
+        text:
+          s?.root.list.find((o) => typeof o.text === 'string')?.text ?? null,
+        lives: window.__pm!.sim.lives,
+      }
+    })
+    console.log(`shots: quest-complete stamp ${JSON.stringify(st)}`)
+    expect(ui.stamp, 'the QUEST COMPLETE stamp is up').toBe(true)
+    expect(st.text).toMatch(/^QUEST COMPLETE /)
+    expect(st.lives, 'the golden parcel gave a life').toBe(4)
+    // The new slot blinks 3× (LivesRow.gainLife), then stays lit: 4 of 5.
+    await pm.settle(120)
+    const lit = await page.evaluate(
+      () =>
+        (
+          window.__pm!.game.scene.getScene('HUD') as unknown as {
+            lives: { slots: { frame: { name: string } }[] }
+          }
+        ).lives.slots.filter((x) => x.frame.name === 'ic_life_on').length,
+    )
+    expect(lit, 'bomb slot 4 lit after its blink').toBe(4)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('district-panel-quest', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(`${POLICY}&quest=rush_district`)
+    await runFor(page, pm, 30_000)
+    const ui = await questUi(page)
+    expect(ui.active, 'the policy accepted the rush').toMatchObject({
+      templateId: 'rush_district',
+    })
+    const target = ui.active!.target!
+    await emit(page, 'pm:select', { kind: 'district', id: target })
+    await pm.settle(40)
+    const open = await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        district: { isOpen(): boolean; districtId: string | null } | null
+      }
+      return hud.district?.isOpen() ? hud.district.districtId : null
+    })
+    expect(open).toBe(target)
+    const row = (await sceneTexts(page, 'HUD')).find((t) =>
+      t.startsWith('Rush hour'),
+    )
+    console.log(`shots: district-panel-quest ${target} "${row}"`)
+    expect(row).toMatch(/^Rush hour · \d\/6 · /)
+    // The row's tap band leads to this quest's card (DistrictPanel.questId).
+    expect(
+      await page.evaluate(
+        () =>
+          (
+            window.__pm!.game.scene.getScene('HUD') as unknown as {
+              district: { questId: string | null }
+            }
+          ).district.questId,
+      ),
+    ).toBe(ui.active!.id)
+    await pm.shot('district-panel-quest')
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('victory-card', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    test.setTimeout(180_000)
+    await pm.open(`${POLICY}&fastForward=600`)
+    await pm.freeze()
+    await pm.settle(64)
+    await abandonActive(page)
+    await debugQuest(page, 'golden_release')
+    await pm.settle(8)
+    const w = await finishUltimate(page)
+    expect(w.ok, 'game:victory').toBe(true)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await questUi(page)).victoryCard,
+      ),
+      'the VictoryCard opens',
+    ).toBe(true)
+    await pm.settle(30)
+    const ui = await questUi(page)
+    console.log(
+      `shots: victory-card ${JSON.stringify({ day: w.day, holds: ui.holds, paused: ui.paused, victory: ui.victory })}`,
+    )
+    expect(ui.holds).toContain('victory')
+    await expectInside(page, 'HUD', [
+      'victory:continue',
+      'victory:newGame',
+      'victory:summary',
+    ])
+    const texts = await sceneTexts(page, 'HUD')
+    expect(texts).toContain('TYCOON')
+    await pm.shot(shotName('victory-card'), 20)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

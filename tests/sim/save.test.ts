@@ -1,7 +1,8 @@
 // plan.md §6.4 "Save and load" + §6.9.1 save.test: snapshot → JSON → load →
 // deep-equal; 600 ticks after a load = the uninterrupted run; no non-JSON
 // values; version + dataHash gate (no migrations, R9; build 2 = version 2,
-// M6 = version 3 under the same `pm.save.v2` key, spec-build2 §8). Also pins the M0 sim
+// M6 = version 3, M7 = version 4 under the same `pm.save.v2` key,
+// spec-build2 §8; design-m7 §2.5). Also pins the M0 sim
 // skeleton the save format rests on: the spec §7.1 start state, the tick
 // clock + day boundary, and the "handlers never dispatch" rule.
 
@@ -84,11 +85,11 @@ describe('save round trip (plan.md §6.4)', () => {
     const text = serialise(sim, { savedAt: 1234, build: 'test', onboarding })
     const payload = deserialise(text)
     expect(SAVE_KEY).toBe('pm.save.v2')
-    expect(SAVE_VERSION).toBe(3)
-    expect(STATE_VERSION).toBe(3)
-    expect(payload.version).toBe(3)
-    expect(payload.state.version).toBe(3)
-    expect(sim.snapshot().version).toBe(3)
+    expect(SAVE_VERSION).toBe(4)
+    expect(STATE_VERSION).toBe(4)
+    expect(payload.version).toBe(4)
+    expect(payload.state.version).toBe(4)
+    expect(sim.snapshot().version).toBe(4)
     expect(payload.dataHash).toBe(sim.data.hash)
     expect(payload.onboarding).toEqual(onboarding)
     expect(isCompatible(payload, dataFixture())).toBe(true)
@@ -104,7 +105,8 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(isCompatible(payload, retuned)).toBe(false)
     expect(isCompatible({ ...payload, version: 1 }, dataFixture())).toBe(false)
     expect(isCompatible({ ...payload, version: 2 }, dataFixture())).toBe(false)
-    expect(isCompatible({ ...payload, version: 4 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 3 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 5 }, dataFixture())).toBe(false)
     expect(() => Sim.load(retuned, payload)).toThrow(SimLoadError)
     expect(
       Sim.load(retuned, payload, { ignoreDataHash: true }).state.tick,
@@ -113,7 +115,7 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(() => deserialise('{"version":2}')).toThrow(SaveError)
   })
 
-  it('save v3 rejects a v1 snapshot (plan.md R9: no migrations) — and an M5 v2 one', () => {
+  it('save v4 rejects a v1 snapshot (plan.md R9: no migrations) — and an M5 v2 one', () => {
     const sim = playedSim()
     // A build-1 save: the same shape, version 1 on the payload and the state.
     const v1 = structuredClone(sim.snapshot()) as unknown as {
@@ -130,19 +132,19 @@ describe('save round trip (plan.md §6.4)', () => {
     }
     expect(err).toBeInstanceOf(SimLoadError)
     const problems = (err as SimLoadError).problems
-    expect(problems).toContain('version: 1 ≠ 3')
-    expect(problems).toContain('state.version: 1 ≠ 3')
-    // validate.ts accepts version 3 only: a v1 state inside a v3 envelope
-    // is still refused, and so is a v3 state inside a v1 envelope.
+    expect(problems).toContain('version: 1 ≠ 4')
+    expect(problems).toContain('state.version: 1 ≠ 4')
+    // validate.ts accepts version 4 only: a v1 state inside a v4 envelope
+    // is still refused, and so is a v4 state inside a v1 envelope.
     const innerV1 = structuredClone(sim.snapshot()) as unknown as {
       state: { version: number }
     }
     innerV1.state.version = 1
     expect(() => Sim.load(dataFixture(), innerV1)).toThrow(/state.version/)
     const outerV1 = { ...sim.snapshot(), version: 1 }
-    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 3/)
+    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 4/)
     const m5 = { ...sim.snapshot(), version: 2 }
-    expect(() => Sim.load(dataFixture(), m5)).toThrow(/version: 2 ≠ 3/)
+    expect(() => Sim.load(dataFixture(), m5)).toThrow(/version: 2 ≠ 4/)
     // The payload layer refuses it before Sim.load: deserialise throws.
     const text = serialise(sim, { savedAt: 0, build: 'build-1' })
     const p = JSON.parse(text) as {
@@ -153,10 +155,52 @@ describe('save round trip (plan.md §6.4)', () => {
     p.state.version = 1
     expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
     expect(isCompatible(p, dataFixture())).toBe(false)
-    // A v3 snapshot of the same run loads.
+    // A v4 snapshot of the same run loads.
     expect(Sim.load(dataFixture(), sim.snapshot()).state.tick).toBe(
       sim.state.tick,
     )
+  })
+
+  it('an M6 version-3 save is refused (design-m7 §2.5: state.quests, nextId.quest, stats.victoryTick)', () => {
+    const sim = playedSim()
+    // An M6 save as it was written: version 3 throughout, no quest state.
+    const v3 = structuredClone(sim.snapshot()) as unknown as {
+      version: number
+      state: Record<string, unknown> & {
+        version: number
+        nextId: Record<string, number>
+        stats: Record<string, unknown>
+      }
+    }
+    v3.version = 3
+    v3.state.version = 3
+    delete v3.state.quests
+    delete v3.state.nextId.quest
+    delete v3.state.stats.victoryTick
+    let err: unknown = null
+    try {
+      Sim.load(dataFixture(), v3)
+    } catch (e) {
+      err = e
+    }
+    expect(err).toBeInstanceOf(SimLoadError)
+    expect((err as SimLoadError).problems).toContain('version: 3 ≠ 4')
+    // Even relabelled version 4, the M6 shape fails validation (no crash).
+    const relabelled = structuredClone(v3)
+    relabelled.version = 4
+    relabelled.state.version = 4
+    expect(() => Sim.load(dataFixture(), relabelled)).toThrow(
+      /state\.quests: missing/,
+    )
+    const text = serialise(sim, { savedAt: 0, build: 'm6' })
+    const p = JSON.parse(text) as {
+      version: number
+      state: { version: number }
+    }
+    p.version = 3
+    p.state.version = 3
+    expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
+    expect(isCompatible(p, dataFixture())).toBe(false)
   })
 
   it('Sim.load rejects dangling ids and non-JSON numbers', () => {

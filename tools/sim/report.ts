@@ -15,6 +15,16 @@
 // the seven playtest-1 medians and the "within ±5 %" line (plan-build2
 // §8.3 task 11: the people layer must not move them; informational, the
 // exit code is unchanged).
+//
+// Build 2, M7 (spec-build2 §7.3; plan-build2 §8.4; design-m7 §5.2): the
+// quest rows questsOfferedBy30MinMin (≥ 4) and questsCompletedBy30MinMin
+// (≥ 2) are gated behind SIM_FEATURES.quests (informational with
+// `--minutes` < 30: "minutes too short"); goldenReleaseOfferedMaxMin and
+// victoryMaxMin stay informational until M9 (the sim caps at L2); the plan's
+// "a quest active between minutes 7 and 13 on ≥ 8/10 seeds", the magic
+// parcel's on-time count and the per-template offered / completed / failed
+// counts are printed. The --baseline Δ compares the seven playtest-1 rows
+// only.
 
 import type { PacingTargets } from '../../src/data/types.ts'
 import type { SimEventName } from '../../src/sim/events.ts'
@@ -71,14 +81,19 @@ const COLUMNS: readonly [string, number][] = [
   ['dock%', 6],
   ['fleet', 6],
   ['lives', 6],
+  ['quest', 14],
 ]
 
-/** `min money earned lvl sat spawn deliv late mal s/c/m shelf held stall_s dock% fleet lives` */
+/** `min money earned lvl sat spawn deliv late mal s/c/m shelf held stall_s dock% fleet lives quest` */
 export function formatHeader(): string {
   return COLUMNS.map(([name, w]) => name.padStart(w)).join(' ')
 }
 
-/** One row; mal = malware share now, s/c/m = malware spawned/caught/missed, held = now/total. */
+/**
+ * One row; mal = malware share now, s/c/m = malware spawned/caught/missed,
+ * held = now/total, quest = the active quest's template id at the minute's
+ * end (M7; — with none).
+ */
 export function formatRow(r: MinuteRow): string {
   const cells = [
     String(r.min),
@@ -97,6 +112,7 @@ export function formatRow(r: MinuteRow): string {
     String(r.dockPct),
     String(r.fleet),
     String(r.lives),
+    r.quest ?? '—',
   ]
   return cells.map((c, i) => c.padStart(COLUMNS[i]?.[1] ?? 0)).join(' ')
 }
@@ -112,8 +128,9 @@ export function clockOf(tick: number): string {
  * scripted malware flagged + tossed, first malware toss, first wrong toss,
  * first stall per reason, first short payroll) and every rush, level-up,
  * unlock, strain spotted, purchase, sale, hire, walkout, inactive vehicle,
- * life lost and game over. Call in emit order, while the sim is current (purchases
- * are named from its state).
+ * life lost and game over; M7: every quest offer / accept / completion /
+ * fail / decline (expired, withdrawn), life gained and the victory. Call in
+ * emit order, while the sim is current (purchases are named from its state).
  */
 export class Highlights {
   readonly #seen: string[] = []
@@ -219,6 +236,49 @@ export class Highlights {
         return e.kind === 'strain' ? `${at} ${String(e.text)}` : null
       case 'life:lost':
         return `${at} LIFE LOST: #${e.parcelId} ${e.label} → ${e.destBuildingId} (lives ${s.economy.lives})`
+      case 'quest:offered':
+        return `${at} quest ${e.questId} offered: ${e.templateId}${e.target === null ? '' : ` (${String(e.target)})`}${e.ultimate === true ? ' — ULTIMATE' : ''}`
+      case 'quest:accepted': {
+        const act = s.quests.active
+        const a = act !== null && act.id === e.questId ? act : null
+        const due =
+          a !== null && a.deadlineTick !== null
+            ? `, due ${clockOf(a.deadlineTick)}`
+            : ''
+        const pr = a === null ? null : a.progress
+        const route =
+          pr?.kind === 'magicParcel' && pr.origin !== null
+            ? ` ${pr.origin} → ${String(pr.dest)}`
+            : ''
+        return `${at} quest ${e.questId} accepted: ${e.templateId}${route}${due}`
+      }
+      case 'quest:completed': {
+        const r = e.reward as {
+          cash?: number
+          lives?: number
+          satisfaction?: number
+          star?: { name?: string } | null
+          voucher?: string | null
+          victory?: boolean
+        }
+        const parts = [
+          r.cash ? `+$${r.cash}` : '',
+          r.lives ? `+${r.lives} life` : '',
+          r.satisfaction ? `+${r.satisfaction} sat` : '',
+          r.star ? `★ ${String(r.star.name)}` : '',
+          r.voucher ? `free ${r.voucher}` : '',
+          r.victory ? 'VICTORY' : '',
+        ].filter((x) => x !== '')
+        return `${at} quest ${e.questId} COMPLETE: ${e.templateId} ${parts.join(' ')}`
+      }
+      case 'quest:failed':
+        return `${at} quest ${e.questId} failed: ${e.templateId} (${String(e.reason)})`
+      case 'quest:declined':
+        return `${at} quest ${e.questId} ${String(e.reason)}: ${e.templateId}`
+      case 'life:gained':
+        return `${at} life gained (${String(e.reason)}): lives ${e.lives}`
+      case 'game:victory':
+        return `${at} VICTORY on day ${e.day}`
       case 'game:over':
         return `${at} GAME OVER`
       default:
@@ -264,7 +324,43 @@ export interface RunMetrics {
   sorterMissed: number
   /** M6: worker:hired that are not re-hires (the pre-hired start inspector is not one). */
   hires: number
+  /** M7: quest:offered by QUEST_WINDOW_MIN (tick ≤ 30 × 600; the whole run when shorter). */
+  questsOffered30: number
+  /** M7: quest:completed by QUEST_WINDOW_MIN. */
+  questsCompleted30: number
+  /** M7: 1 when an accepted → ended quest interval meets minutes 7-13 (plan-build2 §8.4), else 0. */
+  questActive7to13: number
+  /** M7: minute of the first quest:offered {ultimate: true}, or null. */
+  goldenReleaseOfferedMin: number | null
+  /** M7: minute of game:victory, or null. */
+  victoryMin: number | null
+  /** M7: magic parcels spawned (accepted magic_parcel quests). */
+  magicSpawned: number
+  /** M7: magic parcels delivered on time (completed magic_parcel quests). */
+  magicOnTime: number
+  /** M7: per template id — offers, completions, fails (timeout / abandon / malware), declines (expired / withdrawn). */
+  questsByTemplate: Record<string, QuestTally>
 }
+
+/** One template's quest counts over a run (or summed over seeds). */
+export interface QuestTally {
+  offered: number
+  completed: number
+  failed: number
+  declined: number
+}
+
+/** The window of the questsOfferedBy30MinMin / questsCompletedBy30MinMin keys (named in the key). */
+export const QUEST_WINDOW_MIN = 30
+
+/**
+ * plan-build2 §8.4 acceptance (informational): "between minutes 7 and 13
+ * under the policy at least one quest is active on ≥ 8/10 seeds".
+ */
+export const QUEST_PLATEAU = { fromMin: 7, toMin: 13, seedsMin: 8 } as const
+
+/** The magic_parcel template id (quests.json; its offers / completions are the magic rows). */
+const MAGIC_TEMPLATE = 'magic_parcel'
 
 export interface GateCheck {
   /** The economy.pacingTargets key. */
@@ -287,20 +383,46 @@ export const WINDOW_NEEDS: Partial<Record<keyof PacingTargets, SimFeature[]>> =
     level2Min: ['levels'],
     truckAfterLevel2MaxMin: ['levels'],
     payrollShareOfGrossMax: ['people'],
+    questsOfferedBy30MinMin: ['quests'],
+    questsCompletedBy30MinMin: ['quests'],
   }
+
+/** The windows read over the first QUEST_WINDOW_MIN minutes (informational on a shorter run). */
+const WINDOW_MIN_MINUTES: Partial<Record<keyof PacingTargets, number>> = {
+  questsOfferedBy30MinMin: QUEST_WINDOW_MIN,
+  questsCompletedBy30MinMin: QUEST_WINDOW_MIN,
+}
+
+/** The seven playtest-1 windows (the --baseline Δ compares these only). */
+export const PLAYTEST1_KEYS: readonly (keyof PacingTargets)[] = [
+  'firstDeliveryS',
+  'firstMalwareCaughtMaxS',
+  'level2Min',
+  'truckAfterLevel2MaxMin',
+  'maxLivesLost',
+  'maxShelfStallS',
+  'holdBayEventsPer10MinMin',
+]
 
 export type SimFeatures = Record<SimFeature, boolean>
 
-/** null when every system the window needs is built, else "informational (Mn)". */
+/**
+ * null when every system the window needs is built, else "informational
+ * (Mn)"; a window read over the first 30 minutes on a shorter run (the
+ * quick gate's 20) is "informational (minutes too short)".
+ */
 export function windowNote(
   key: keyof PacingTargets,
   features: SimFeatures = SIM_FEATURES,
+  minutes: number | null = null,
 ): string | null {
   const missing = (WINDOW_NEEDS[key] ?? []).filter((f) => !features[f])
   const first = missing[0]
-  return first === undefined
-    ? null
-    : `informational (${FEATURE_MILESTONE[first]})`
+  if (first !== undefined) return `informational (${FEATURE_MILESTONE[first]})`
+  const need = WINDOW_MIN_MINUTES[key]
+  return need !== undefined && minutes !== null && minutes < need
+    ? 'informational (minutes too short)'
+    : null
 }
 
 /** A check counts toward the gate when gated (no note) and passing. */
@@ -367,6 +489,7 @@ export function computeMetrics(
   const scripted = firstTick(
     (e) => e.name === 'parcel:flagged' && e.scripted === true,
   )
+  const quests = questMetrics(events, endTick)
   return {
     seed,
     minutes,
@@ -397,7 +520,125 @@ export function computeMetrics(
     sorterMissed: calls.filter((e) => e.call === 'leave' && !e.correct).length,
     hires: events.filter((e) => e.name === 'worker:hired' && e.rehire !== true)
       .length,
+    ...quests,
   }
+}
+
+type QuestMetrics = Pick<
+  RunMetrics,
+  | 'questsOffered30'
+  | 'questsCompleted30'
+  | 'questActive7to13'
+  | 'goldenReleaseOfferedMin'
+  | 'victoryMin'
+  | 'magicSpawned'
+  | 'magicOnTime'
+  | 'questsByTemplate'
+>
+
+/** A tick in minutes, 2 dp (null stays null). */
+const minutesOf = (t: number | null): number | null =>
+  t === null ? null : round(t / TICKS_PER_DAY, 2)
+
+/** The M7 rows from the quest events (design-m7 §5.2). */
+export function questMetrics(
+  events: readonly RecordedEvent[],
+  endTick: number,
+): QuestMetrics {
+  const windowEnd = QUEST_WINDOW_MIN * TICKS_PER_DAY
+  const inWindow = (e: RecordedEvent): boolean => e.tick <= windowEnd
+  const byTemplate: Record<string, QuestTally> = {}
+  const tally = (id: unknown): QuestTally => {
+    const k = String(id)
+    byTemplate[k] ??= { offered: 0, completed: 0, failed: 0, declined: 0 }
+    return byTemplate[k]
+  }
+  // Accepted → ended intervals (an open one runs to the end of the run).
+  const open = new Map<string, number>()
+  const spans: [number, number][] = []
+  let offered = 0
+  let completed = 0
+  let golden: number | null = null
+  let victory: number | null = null
+  let magicSpawned = 0
+  let magicOnTime = 0
+  for (const e of events) {
+    switch (e.name) {
+      case 'quest:offered':
+        tally(e.templateId).offered += 1
+        if (inWindow(e)) offered += 1
+        if (e.ultimate === true && golden === null) golden = e.tick
+        break
+      case 'quest:accepted':
+        open.set(String(e.questId), e.tick)
+        if (e.templateId === MAGIC_TEMPLATE) magicSpawned += 1
+        break
+      case 'quest:completed':
+      case 'quest:failed': {
+        const done = e.name === 'quest:completed'
+        const t = tally(e.templateId)
+        if (done) t.completed += 1
+        else t.failed += 1
+        if (done && inWindow(e)) completed += 1
+        if (done && e.templateId === MAGIC_TEMPLATE) magicOnTime += 1
+        const from = open.get(String(e.questId))
+        if (from !== undefined) {
+          spans.push([from, e.tick])
+          open.delete(String(e.questId))
+        }
+        break
+      }
+      case 'quest:declined':
+        tally(e.templateId).declined += 1
+        break
+      case 'game:victory':
+        victory ??= e.tick
+        break
+      default:
+        break
+    }
+  }
+  for (const from of open.values()) spans.push([from, endTick])
+  const lo = QUEST_PLATEAU.fromMin * TICKS_PER_DAY
+  const hi = QUEST_PLATEAU.toMin * TICKS_PER_DAY
+  return {
+    questsOffered30: offered,
+    questsCompleted30: completed,
+    questActive7to13: spans.some(([a, b]) => a <= hi && b >= lo) ? 1 : 0,
+    goldenReleaseOfferedMin: minutesOf(golden),
+    victoryMin: minutesOf(victory),
+    magicSpawned,
+    magicOnTime,
+    questsByTemplate: byTemplate,
+  }
+}
+
+/** Per-template counts summed over runs, in first-seen order. */
+export function questTallies(
+  runs: readonly Pick<RunMetrics, 'questsByTemplate'>[],
+): [string, QuestTally][] {
+  const out = new Map<string, QuestTally>()
+  for (const r of runs) {
+    for (const [k, t] of Object.entries(r.questsByTemplate ?? {})) {
+      const sum = out.get(k) ?? {
+        offered: 0,
+        completed: 0,
+        failed: 0,
+        declined: 0,
+      }
+      sum.offered += t.offered
+      sum.completed += t.completed
+      sum.failed += t.failed
+      sum.declined += t.declined
+      out.set(k, sum)
+    }
+  }
+  return [...out.entries()]
+}
+
+/** `offered 14 · completed 9 · failed 4 · declined 1` */
+export function tallyText(t: QuestTally): string {
+  return `offered ${t.offered} · completed ${t.completed} · failed ${t.failed} · declined ${t.declined}`
 }
 
 /** What the seven windows read (a RunMetrics, or the medians; null = never). */
@@ -409,14 +650,19 @@ export interface GateInputs {
   livesLost: number | null
   shelfStallS: number | null
   holdBayEventsPer10MinL1: number | null
+  /** M7 (gated behind SIM_FEATURES.quests). */
+  questsOffered30: number | null
+  questsCompleted30: number | null
+  /** Run length; a quest window on a run shorter than QUEST_WINDOW_MIN is informational. Absent = full. */
+  minutes?: number
 }
 
 const le = (v: number | null, max: number): boolean => v !== null && v <= max
 
 /**
- * The seven playtest-1 windows (spec §7, plan.md §6.9.2) against
- * economy.pacingTargets. `override` (e.g. "informational (delegating)")
- * notes every window, so none gates.
+ * The seven playtest-1 windows (spec §7, plan.md §6.9.2) and the two M7
+ * quest rows (spec-build2 §7.3) against economy.pacingTargets. `override`
+ * (e.g. "informational (delegating)") notes every window, so none gates.
  */
 export function checkMetrics(
   m: GateInputs,
@@ -477,10 +723,28 @@ export function checkMetrics(
         m.holdBayEventsPer10MinL1 !== null &&
         m.holdBayEventsPer10MinL1 >= t.holdBayEventsPer10MinMin,
     },
+    {
+      key: 'questsOfferedBy30MinMin',
+      metric: 'questsOffered30',
+      target: `≥ ${t.questsOfferedBy30MinMin} by ${QUEST_WINDOW_MIN} min`,
+      value: m.questsOffered30,
+      pass:
+        m.questsOffered30 !== null &&
+        m.questsOffered30 >= t.questsOfferedBy30MinMin,
+    },
+    {
+      key: 'questsCompletedBy30MinMin',
+      metric: 'questsCompleted30',
+      target: `≥ ${t.questsCompletedBy30MinMin} by ${QUEST_WINDOW_MIN} min`,
+      value: m.questsCompleted30,
+      pass:
+        m.questsCompleted30 !== null &&
+        m.questsCompleted30 >= t.questsCompletedBy30MinMin,
+    },
   ]
   return checks.map((c) => ({
     ...c,
-    note: override ?? windowNote(c.key, features),
+    note: override ?? windowNote(c.key, features, m.minutes ?? null),
   }))
 }
 
@@ -511,6 +775,11 @@ export interface MedianMetrics extends GateInputs {
   sorterWrongToss: number | null
   sorterMissed: number | null
   hires: number | null
+  questActive7to13: number | null
+  goldenReleaseOfferedMin: number | null
+  victoryMin: number | null
+  magicSpawned: number | null
+  magicOnTime: number | null
 }
 
 /** Medians of the gated metrics + the informational ones. */
@@ -537,6 +806,13 @@ export function medianMetrics(runs: readonly RunMetrics[]): MedianMetrics {
     sorterWrongToss: pick('sorterWrongToss'),
     sorterMissed: pick('sorterMissed'),
     hires: pick('hires'),
+    questsOffered30: pick('questsOffered30'),
+    questsCompleted30: pick('questsCompleted30'),
+    questActive7to13: pick('questActive7to13'),
+    goldenReleaseOfferedMin: pick('goldenReleaseOfferedMin'),
+    victoryMin: pick('victoryMin'),
+    magicSpawned: pick('magicSpawned'),
+    magicOnTime: pick('magicOnTime'),
   }
 }
 
@@ -562,15 +838,19 @@ export interface GateSummary {
   /** SIM_FEATURES when the gate ran (which windows were gated). */
   features: SimFeatures
   /** Printed only: hold density over the run, malware share at the end, the build-2 rows. */
-  informational: {
-    key: string
-    target: string
-    median: number | null
-    note: string
-  }[]
+  informational: InfoRow[]
   /** M6: the seven medians against a previous gate JSON (`--baseline`); absent without one. */
   baseline?: BaselineCompare
   pass: boolean
+}
+
+/** One printed-only row; `text` (when set) is shown instead of the median (counts like `9/10 seeds`). */
+export interface InfoRow {
+  key: string
+  target: string
+  median: number | null
+  note: string
+  text?: string
 }
 
 export function seedResult(
@@ -612,7 +892,7 @@ export function summarise(
   const delegating = meta.policy === 'delegating'
   const medians = medianMetrics(runs.map((r) => r.metrics))
   const checks = checkMetrics(
-    medians,
+    { ...medians, minutes: meta.minutes },
     meta.targets,
     features,
     delegating ? DELEGATING_NOTE : null,
@@ -621,7 +901,12 @@ export function summarise(
   const build2 = 'build 2 — informational'
   const people =
     windowNote('payrollShareOfGrossMax', features) ?? 'informational'
-  const informational = [
+  const quests = features.quests ? 'informational' : build2
+  const metrics = runs.map((r) => r.metrics)
+  const plateau = metrics.filter((m) => m.questActive7to13 === 1).length
+  const magicOffered = metrics.reduce((n, m) => n + (m.magicSpawned ?? 0), 0)
+  const magicOnTime = metrics.reduce((n, m) => n + (m.magicOnTime ?? 0), 0)
+  const informational: InfoRow[] = [
     {
       key: 'holdBayEventsPer10Min',
       target: 'whole run',
@@ -711,29 +996,42 @@ export function summarise(
       note: build2,
     },
     {
-      key: 'questsOfferedBy30MinMin',
-      target: `≥ ${t.questsOfferedBy30MinMin} by 30 min`,
-      median: null,
-      note: build2,
-    },
-    {
-      key: 'questsCompletedBy30MinMin',
-      target: `≥ ${t.questsCompletedBy30MinMin} by 30 min`,
-      median: null,
-      note: build2,
-    },
-    {
       key: 'goldenReleaseOfferedMaxMin',
-      target: `≤ ${t.goldenReleaseOfferedMaxMin} min`,
-      median: null,
-      note: build2,
+      target: `≤ ${t.goldenReleaseOfferedMaxMin} min (seeds 1-10 × 35 min, --minutes 35)`,
+      median: medians.goldenReleaseOfferedMin,
+      note: features.quests ? 'informational (M9)' : build2,
     },
     {
       key: 'victoryMaxMin',
-      target: `≤ ${t.victoryMaxMin} min`,
-      median: null,
-      note: build2,
+      target: `≤ ${t.victoryMaxMin} min (seeds 1-3 × 45 min, the long test)`,
+      median: medians.victoryMin,
+      note: features.quests ? 'informational (M9)' : build2,
     },
+    ...(features.quests
+      ? [
+          {
+            key: 'questActive7to13',
+            target: `a quest active between minutes ${QUEST_PLATEAU.fromMin} and ${QUEST_PLATEAU.toMin} on ≥ ${QUEST_PLATEAU.seedsMin}/10 seeds (plan-build2 §8.4)`,
+            median: medians.questActive7to13,
+            note: quests,
+            text: `${plateau}/${metrics.length} seeds`,
+          },
+          {
+            key: 'magicOnTime',
+            target: 'golden parcels delivered on time / spawned (all seeds)',
+            median: medians.magicOnTime,
+            note: quests,
+            text: `${magicOnTime}/${magicOffered}`,
+          },
+          ...questTallies(metrics).map(([id, tl]) => ({
+            key: `quest:${id}`,
+            target: 'per template, all seeds',
+            median: null,
+            note: quests,
+            text: tallyText(tl),
+          })),
+        ]
+      : []),
   ]
   return {
     version: 1,
@@ -789,14 +1087,19 @@ export function withinBand(
   return Math.abs(value - base) <= tol * Math.abs(base) + 1e-9
 }
 
-/** The seven windows' medians of `g` against those of `base` (a previous GateSummary JSON). */
+/**
+ * The seven playtest-1 windows' medians of `g` against those of `base` (a
+ * previous GateSummary JSON); later gated rows (the M7 quest rows) are not
+ * compared.
+ */
 export function compareBaseline(
   g: Pick<GateSummary, 'checks'>,
   base: Pick<GateSummary, 'checks' | 'dataHash'>,
   file: string,
   tol: number = BASELINE_TOLERANCE,
 ): BaselineCompare {
-  const rows = g.checks.map((c): BaselineRow => {
+  const p1 = g.checks.filter((c) => PLAYTEST1_KEYS.includes(c.key))
+  const rows = p1.map((c): BaselineRow => {
     const b = base.checks.find((x) => x.key === c.key)?.value ?? null
     const v = c.value
     const deltaPct =
@@ -885,6 +1188,9 @@ const GATE_COLS: readonly {
         .map((x) => count(x))
         .join('/'),
   },
+  { head: 'qOff', w: 4, cell: (m) => count(m.questsOffered30) },
+  { head: 'qDone', w: 5, cell: (m) => count(m.questsCompleted30) },
+  { head: 'q7-13', w: 5, cell: (m) => count(m.questActive7to13) },
 ]
 
 /** An integer count (a median of counts may end in .5). */
@@ -948,9 +1254,8 @@ export function formatGate(g: GateSummary): string[] {
     )
   }
   for (const i of g.informational) {
-    lines.push(
-      `  info ${i.key}: median ${num(i.median, 3)} (${i.target}) — ${i.note}`,
-    )
+    const shown = i.text ?? `median ${num(i.median, 3)}`
+    lines.push(`  info ${i.key}: ${shown} (${i.target}) — ${i.note}`)
   }
   if (g.baseline) {
     lines.push(
@@ -1035,7 +1340,7 @@ export function gateMarkdown(g: GateSummary, cmd: string): string {
     ...g.informational.map((i) =>
       mdRow([
         `\`${i.key}\``,
-        num(i.median, 3),
+        i.text ?? num(i.median, 3),
         i.target,
         i.note,
         ...(b ? [''] : []),

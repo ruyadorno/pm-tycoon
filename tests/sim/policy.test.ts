@@ -17,6 +17,15 @@
 // posting an ad or firing; the `delegating` kind hires the best sorter at
 // L2, never Tosses by hand while it is on duty and Clears only what it
 // tagged `looks clean`.
+//
+// Build 2, M7 (spec-build2 §7.2 quests row, §7.3; design-m7 §5.1-§5.2): the
+// policy accepts every quest offer and rushes the golden parcel's origin
+// (tests/sim/quests-policy.long.test.ts has the rule and the quest rows); the
+// windows here hold with the quest layer on, and the report gates the two
+// quest rows (informational below 30 minutes), prints the Golden Release /
+// victory rows as informational (M9), the 7-13 minute plateau, the magic
+// on-time count and the per-template counts; --baseline compares only the
+// seven playtest-1 rows.
 
 import { describe, expect, it } from 'vitest'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
@@ -43,17 +52,26 @@ import type {
   VehicleType,
 } from '../../src/sim/types.ts'
 import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
-import { parseCli, runSeed, UsageError } from '../../tools/sim/cli.ts'
+import {
+  parseCli,
+  questsLine,
+  runSeed,
+  UsageError,
+} from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
 import type { GateCheck, RecordedEvent } from '../../tools/sim/report.ts'
 import {
   baselineLine,
+  checkMetrics,
   compareBaseline,
   computeMetrics,
   DELEGATING_NOTE,
   gateMarkdown,
   median,
+  questMetrics,
+  questTallies,
   summarise,
+  windowNote,
   withinBand,
 } from '../../tools/sim/report.ts'
 import {
@@ -305,10 +323,16 @@ describe('competent policy (spec §7) [gate]', () => {
       )
       expect(t?.tick, `parcel ${String(h.id)}`).toBe(h.tick)
     }
-    expect(r.rows.every((row) => row.held === 0)).toBe(true)
+    // A minute row is built inside its last tick, before the policy's next
+    // step: only parcels held on that very tick may show (M7: seed 3 holds
+    // #283 on tick 16800, the minute-28 boundary, and Tosses it at once).
+    for (const row of r.rows) {
+      const heldNow = held.filter((h) => h.tick === row.tick).length
+      expect(row.held, `minute ${row.min}`).toBeLessThanOrEqual(heldNow)
+    }
   }, 60_000)
 
-  it('the playtest-1 gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on)', () => {
+  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows)', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -325,6 +349,7 @@ describe('competent policy (spec §7) [gate]', () => {
       levels: true,
       payroll: true,
       people: true,
+      quests: true,
     })
     expect(g.checks.map((c) => [c.key, c.note])).toEqual([
       ['firstDeliveryS', null],
@@ -334,6 +359,8 @@ describe('competent policy (spec §7) [gate]', () => {
       ['maxLivesLost', null],
       ['maxShelfStallS', null],
       ['holdBayEventsPer10MinMin', null],
+      ['questsOfferedBy30MinMin', null],
+      ['questsCompletedBy30MinMin', null],
     ])
     expect(g.checks.filter((c) => !c.pass)).toEqual([])
     expect(g.pass).toBe(true)
@@ -664,6 +691,19 @@ const meta = (policy: string) => ({
 const ev = (name: string, extra: Record<string, unknown>): RecordedEvent =>
   ({ tick: 1, name, ...extra }) as RecordedEvent
 
+/** A minute as a tick. */
+const at = (min: number): number => Math.round(min * TICKS_PER_DAY)
+
+/** A recorded quest event. */
+const q = (
+  tick: number,
+  name: string,
+  questId: string,
+  templateId: string,
+  extra: Record<string, unknown> = {},
+): RecordedEvent =>
+  ({ tick, name, questId, templateId, ...extra }) as RecordedEvent
+
 const check = (key: GateCheck['key'], value: number | null): GateCheck => ({
   key,
   metric: 'firstDeliveryS',
@@ -698,7 +738,7 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     ).toBeNull()
   })
 
-  it('the competent gate prints the people rows and the five unbuilt build-2 keys as informational; no delegating row', () => {
+  it('the competent gate prints the people rows, the unbuilt build-2 key, the M9 quest rows and the M7 quest printout as informational; no delegating row', () => {
     const g = summarise(
       runs().map((r) => r.result),
       meta('competent'),
@@ -709,16 +749,117 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
       `≤ ${targets.payrollShareOfGrossMax}`,
     )
     expect(info.sorterDecisions?.median).toBe(0)
-    for (const k of [
-      'firstOverseasClearedAfterLevel3MaxMin',
-      'questsOfferedBy30MinMin',
-      'questsCompletedBy30MinMin',
-      'goldenReleaseOfferedMaxMin',
-      'victoryMaxMin',
-    ]) {
-      expect(info[k]?.note, k).toBe('build 2 — informational')
+    expect(info.firstOverseasClearedAfterLevel3MaxMin?.note).toBe(
+      'build 2 — informational',
+    )
+    // Gated since M7: checks, not informational rows.
+    expect(info.questsOfferedBy30MinMin).toBeUndefined()
+    expect(info.questsCompletedBy30MinMin).toBeUndefined()
+    // The sim caps at L2 until M9: no Golden Release, no victory.
+    for (const k of ['goldenReleaseOfferedMaxMin', 'victoryMaxMin']) {
+      expect(info[k], k).toMatchObject({
+        median: null,
+        note: 'informational (M9)',
+      })
     }
+    const n = runs().filter(
+      (r) => r.result.metrics.questActive7to13 === 1,
+    ).length
+    expect(info.questActive7to13?.text).toBe(`${n}/10 seeds`)
+    expect(info.magicOnTime?.text).toMatch(/^\d+\/\d+$/)
+    expect(info['quest:magic_parcel']?.text).toMatch(
+      /^offered \d+ · completed \d+ · failed \d+ · declined \d+$/,
+    )
     expect(info.delegatingLivesLost).toBeUndefined()
+  })
+
+  it('quest rows from the events: offers / completions by 30 min, the 7-13 minute plateau, Golden Release / victory minutes, magic counts, per-template tallies', () => {
+    const events = [
+      q(at(3), 'quest:offered', 'q1', 'magic_parcel', { ultimate: false }),
+      q(at(3), 'quest:accepted', 'q1', 'magic_parcel'),
+      q(at(4), 'quest:completed', 'q1', 'magic_parcel'),
+      q(at(6), 'quest:offered', 'q2', 'rush_district', { ultimate: false }),
+      q(at(6), 'quest:accepted', 'q2', 'rush_district'),
+      q(at(6.9), 'quest:failed', 'q2', 'rush_district', { reason: 'timeout' }),
+      q(at(9), 'quest:offered', 'q3', 'big_haul', { ultimate: false }),
+      q(at(10), 'quest:declined', 'q3', 'big_haul', { reason: 'expired' }),
+      q(at(29), 'quest:offered', 'q4', 'golden_release', { ultimate: true }),
+      q(at(29), 'quest:accepted', 'q4', 'golden_release'),
+      q(at(30), 'quest:completed', 'q4', 'golden_release'),
+      { tick: at(30), name: 'game:victory', day: 30 } as RecordedEvent,
+      q(at(31), 'quest:offered', 'q5', 'rush_district', { ultimate: false }),
+      q(at(31), 'quest:accepted', 'q5', 'rush_district'),
+      q(at(31.5), 'quest:completed', 'q5', 'rush_district'),
+    ]
+    const stats = makeSim(1).state.stats
+    const m = computeMetrics(1, 35, events, [], stats)
+    expect(m).toMatchObject({
+      questsOffered30: 4, // q5 at 31:00 is past the window
+      questsCompleted30: 2, // q1, q4 (q5 at 31:30 is not)
+      questActive7to13: 0, // q2 ended at 6:54; q3 was never accepted
+      goldenReleaseOfferedMin: 29,
+      victoryMin: 30,
+      magicSpawned: 1,
+      magicOnTime: 1,
+    })
+    expect(m.questsByTemplate).toEqual({
+      magic_parcel: { offered: 1, completed: 1, failed: 0, declined: 0 },
+      rush_district: { offered: 2, completed: 1, failed: 1, declined: 0 },
+      big_haul: { offered: 1, completed: 0, failed: 0, declined: 1 },
+      golden_release: { offered: 1, completed: 1, failed: 0, declined: 0 },
+    })
+    // An interval touching minute 7 counts; one still open at the end runs to it.
+    const touching = [
+      q(at(6), 'quest:accepted', 'q1', 'rush_district'),
+      q(at(7), 'quest:failed', 'q1', 'rush_district', { reason: 'timeout' }),
+    ]
+    expect(questMetrics(touching, at(30)).questActive7to13).toBe(1)
+    const open = [q(at(12.9), 'quest:accepted', 'q1', 'rush_district')]
+    expect(questMetrics(open, at(30)).questActive7to13).toBe(1)
+    expect(questMetrics(open, at(12)).questActive7to13).toBe(1)
+    const late = [q(at(13.1), 'quest:accepted', 'q1', 'rush_district')]
+    expect(questMetrics(late, at(30)).questActive7to13).toBe(0)
+    expect(
+      questTallies([m, m]).find(([id]) => id === 'rush_district')?.[1],
+    ).toEqual({ offered: 4, completed: 2, failed: 2, declined: 0 })
+  })
+
+  it('the quest rows gate behind SIM_FEATURES.quests and print informational below 30 minutes (the quick gate)', () => {
+    const inputs = {
+      firstDeliveryS: 40,
+      firstMalwareCaughtS: 100,
+      level2Min: 12,
+      truckAfterLevel2Min: 2,
+      livesLost: 0,
+      shelfStallS: 0,
+      holdBayEventsPer10MinL1: 7,
+      questsOffered30: 3,
+      questsCompleted30: 2,
+    }
+    const notes = (minutes: number | undefined, quests = true) =>
+      Object.fromEntries(
+        checkMetrics({ ...inputs, minutes }, targets, {
+          ...SIM_FEATURES,
+          quests,
+        }).map((c) => [c.key, [c.note, c.pass]]),
+      )
+    expect(notes(30)).toMatchObject({
+      questsOfferedBy30MinMin: [null, false], // 3 < 4
+      questsCompletedBy30MinMin: [null, true],
+    })
+    expect(notes(undefined).questsOfferedBy30MinMin).toEqual([null, false])
+    expect(notes(20)).toMatchObject({
+      questsOfferedBy30MinMin: ['informational (minutes too short)', false],
+      questsCompletedBy30MinMin: ['informational (minutes too short)', true],
+      level2Min: [null, true],
+    })
+    expect(notes(30, false).questsOfferedBy30MinMin?.[0]).toBe(
+      'informational (M7)',
+    )
+    expect(windowNote('questsOfferedBy30MinMin', SIM_FEATURES, 29)).toBe(
+      'informational (minutes too short)',
+    )
+    expect(windowNote('maxLivesLost', SIM_FEATURES, 1)).toBeNull()
   })
 
   it("the delegating summary notes every window 'informational (delegating)', passes on invariants alone and prints delegatingLivesLost", () => {
@@ -753,6 +894,7 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
         check('firstDeliveryS', 43.3),
         check('level2Min', 12.28),
         check('maxLivesLost', 0),
+        check('questsOfferedBy30MinMin', 6), // M7: never compared
       ],
     }
     const b = compareBaseline(now, base, 'docs/gate/latest.json')
@@ -778,6 +920,19 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     )
     expect(md).toContain('playtest-1 rows within ±5 %: yes')
   }, 60_000)
+
+  it('cli: the per-run quests line (offers / completions by 30 min, the plateau, magic, per template)', () => {
+    const r = runSeed(data, 1, 30, createPolicy)
+    const m = r.result.metrics
+    const line = questsLine(r)
+    expect(line).toContain(
+      `# quests: ${m.questsOffered30} offered · ${m.questsCompleted30} completed by 30 min`,
+    )
+    expect(line).toContain(`magic ${m.magicOnTime}/${m.magicSpawned} on time`)
+    for (const [id, t] of Object.entries(m.questsByTemplate)) {
+      expect(line).toContain(`${id} ${t.completed}/${t.offered}`)
+    }
+  }, 30_000)
 
   it('cli: --policy competent|delegating|none, --baseline only with --gate', () => {
     expect(parseCli(['--policy', 'delegating']).policy).toBe('delegating')

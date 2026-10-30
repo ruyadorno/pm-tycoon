@@ -150,7 +150,8 @@ export function pickerHeight(options: readonly ZoneOption[]): number {
 
 /**
  * Tooltip/toast text for a command failure reason (plan.md §5 strings; M6
- * people reasons, spec-build2 §8 / design-m6 §6.3). Pass `data` for the
+ * people reasons, spec-build2 §8 / design-m6 §6.3; M7 quest reasons,
+ * design-m7 §6.2). Pass `data` for the
  * unlock levels (`Opens at Lv 2`, `Second desk opens at Lv 3`, from
  * employees.json holdStation / desks.rows); without it those read without a
  * number, so code never hard-codes a level.
@@ -188,6 +189,10 @@ export function failText(
     }
     case 'desk-exists':
       return 'That desk is already placed'
+    case 'quest-active':
+      return 'Finish the current job first'
+    case 'quest-expired':
+      return 'That job is no longer on the board'
     default:
       return 'Not possible right now'
   }
@@ -282,6 +287,7 @@ export function addTapZone(
     .rectangle(Math.round(r.x), Math.round(r.y), r.w, r.h, THEME.shadow, 0)
     .setOrigin(0, 0)
     .setInteractive()
+    .setData('id', id)
   let down = false
   z.on('pointerdown', () => {
     down = true

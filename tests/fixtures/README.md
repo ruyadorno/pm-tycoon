@@ -6,8 +6,9 @@ data hash of the tables it was made with. `__pm.load` refuses a fixture with a s
 scenario its shot needs.
 
 After any change to `src/data/*.json`, the sim state shape, a save-version bump (`STATE_VERSION` in
-`src/sim/types.ts`; `Sim.load` refuses any other version, plan.md R9 / plan-build2 R19 — 3 since M6), or a sim rule
-that changes a seeded run, regenerate all of them (and the Title's attract snapshot, `node tools/fixtures/attract.ts` →
+`src/sim/types.ts`; `Sim.load` refuses any other version, plan.md R9 / plan-build2 R19 — 4 since M7), a sim rule
+that changes a seeded run, or a change to the policy (M7: it accepts every quest offer and rushes the golden parcel's
+origin), regenerate all of them (and the Title's attract snapshot, `node tools/fixtures/attract.ts` →
 `src/assets/attract.json`, which follows the same rule):
 
 ```sh
@@ -29,7 +30,7 @@ expectations the shots read, and its `regenerate` field holds the command that r
 | `holdbay-full.json` | The policy runs until 90 s, then nobody Tosses. The Hold Bay fills to its cap, and the next flagged parcel waits dark in slot 1 (`lane:stalled {holdBayFull}`). Load it without the policy. | `warehouse-stalled` |
 | `malware-cleared.json` | The first malware that reaches the Hold Bay is Cleared. The snapshot is taken 3 s before that parcel is loaded from the shelf. With `?policy=1`, `life:lost` fires `fixture.lifeLostInS` later and the card reads "Cleared by you". | `lost-life` |
 | `one-life.json` | The same run, with two debug malware deliveries first (1 life left). The cleared parcel's delivery ends the game `fixture.gameOverInS` later. | `game-over` |
-| `level-up.json` | A plain run stopped 3 s before its level-up: lifetime earned just under the $2,000 L2 threshold (`fixture.lifetime`). With `?policy=1`, `level:up {2}` fires `fixture.levelUpInS` later, then `region:unlocked industrial`. | `level-up`, `industrial-unlocked`, `newspaper`, `shield-popover`, `warehouse-tier2` |
+| `level-up.json` | A plain run stopped 3 s before its level-up, or right after the last payout before the crossing one when two land in those 3 s (M7, seed 7: a bounty and a delivery; 2 s): lifetime earned just under the $2,000 L2 threshold (`fixture.lifetime`), one payout to go. With `?policy=1`, `level:up {2}` fires `fixture.levelUpInS` later, then `region:unlocked industrial`. | `level-up`, `industrial-unlocked`, `newspaper`, `shield-popover`, `warehouse-tier2` |
 | `payroll-short.json` | The policy run 2 s before the day-4 payday with the balance patched to $0 (the one patch, in `fixture.patched`; not replay-exact). Load it without the policy: `payroll:short` names every worker (`fixture.unpaid`). | `payroll-short` |
 | `l2-lane.json` | A plain run 40 s after the policy placed the Shaky shaker in slot 4: L2, tier 2, four live slots, a truck. Load it with `?policy=1`. | `warehouse-l2` |
 | `people-l3.json` | A plain run: the competent policy past L2 until the shaker is in and the balance covers desk 2, then `debugForceLevel 3` (the playtest cap is still L2, so Docks go live without M8's clearance — shots only), the Metal detector in slot 3 removed, desk 2 placed there, `postAd inspector` until a charisma-2 applicant shows up (`fixture.ads`), that one and the best other inspector hired into desk 2, 5 s of the policy. Desk 1 seats the start inspector; desk 2's two stations read their own p plus the colleague's charisma bonus, the readout the mean (`fixture.desks`, `fixture.charismaInspector`). Load it with or without `?policy=1`. | `warehouse-two-desks` |

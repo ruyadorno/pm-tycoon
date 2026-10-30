@@ -6,6 +6,8 @@ import { Sfx } from '../../src/audio/sfx.ts'
 import { asContext, FakeAudioContext, FakeNode } from './fake-audio.ts'
 
 const data = defaultAudioData()
+/** The one-shot sounds of sfx.json: audio.md §7's eighteen + build 2's questDone (design-m7 §6.9). */
+const ONE_SHOTS: readonly string[] = SFX_NAMES
 
 function setup(
   o: {
@@ -44,12 +46,24 @@ function setup(
 }
 
 describe('Sfx', () => {
-  it('renders exactly the 18 one-shot sounds of audio.md §7 (ride and hat belong to the band)', () => {
+  it('renders exactly the one-shot sounds of audio.md §7 + questDone (ride and hat belong to the band)', () => {
     const { sfx } = setup()
-    expect(sfx.names().toSorted()).toEqual([...SFX_NAMES].toSorted())
+    expect(sfx.names().toSorted()).toEqual([...ONE_SHOTS].toSorted())
     expect(Object.keys(data.sfx).toSorted()).toEqual(
-      [...SFX_NAMES, 'ride', 'hat'].toSorted(),
+      [...ONE_SHOTS, 'ride', 'hat'].toSorted(),
     )
+  })
+
+  it('questDone (build 2 M7): a two-step rising chime, rendered and played on the sfx bus', () => {
+    const t = setup()
+    const p = data.sfx.questDone as number[]
+    // zzfx 1.4.0 order: frequency 660, pitchJump +330 at 0.08 s (the second, higher step), repeatTime 0.16
+    expect(p[2]).toBe(660)
+    expect(p[10]).toBeGreaterThan(0)
+    expect(p[11]).toBeGreaterThan(0)
+    expect(t.sfx.has('questDone')).toBe(true)
+    expect(t.sfx.play('questDone')).toBe(true)
+    expect(t.ctx.played()).toHaveLength(1)
   })
 
   it('plays nothing before the unlock gesture, even on a running context, and does not count it', () => {
@@ -117,14 +131,14 @@ describe('Sfx', () => {
     const eager = setup()
     const lazy = setup({ render: false })
     expect(lazy.sfx.names()).toEqual([])
-    expect(lazy.sfx.pending()).toHaveLength(SFX_NAMES.length)
+    expect(lazy.sfx.pending()).toHaveLength(ONE_SHOTS.length)
     expect(lazy.sfx.play('buy')).toBe(true)
     expect(lazy.sfx.names()).toEqual(['buy'])
     lazy.sfx.render()
     expect(lazy.sfx.pending()).toEqual([])
     expect(lazy.sfx.names().toSorted()).toEqual(eager.sfx.names().toSorted())
     // each name keeps its table-order seed, so the render order never changes a sample
-    for (const name of SFX_NAMES) {
+    for (const name of ONE_SHOTS) {
       const a = eager.sfx.buffer(name)!.getChannelData(0)
       const b = lazy.sfx.buffer(name)!.getChannelData(0)
       expect(b.length, name).toBe(a.length)

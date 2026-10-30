@@ -15,6 +15,7 @@ import type {
   DistrictId,
   Parcel,
   Pips,
+  Quest,
   Role,
   Size,
   Vehicle,
@@ -437,4 +438,36 @@ export function feeder(
     }
     return fed
   }
+}
+
+// M7 quest helpers (design-m7 §7) ----------------------------------------------------
+
+/** Push the regular offer scheduler out of reach (tests that offer by hand). */
+export function noOffers(sim: Sim): Sim {
+  sim.state.quests.nextOfferTick = 1e12
+  return sim
+}
+
+/** debug.offerQuest(templateId) now; returns the offer (throws when refused). */
+export function offerQuest(sim: Sim, templateId: string): Quest {
+  const res = sim.dispatch({ kind: 'debugOfferQuest', templateId })
+  if (!res.ok) throw new Error(`offerQuest ${templateId}: ${res.reason}`)
+  const q = sim.state.quests.offer
+  if (!q) throw new Error(`offerQuest ${templateId}: no offer`)
+  return q
+}
+
+/** Accept the open offer; returns the (now active) quest object. */
+export function acceptOffer(sim: Sim): Quest {
+  const q = sim.state.quests.offer
+  if (!q) throw new Error('acceptOffer: no offer')
+  const res = sim.dispatch({ kind: 'acceptQuest', questId: q.id })
+  if (!res.ok) throw new Error(`acceptOffer ${q.templateId}: ${res.reason}`)
+  return q
+}
+
+/** Offer `templateId` by hand and accept it. */
+export function startQuest(sim: Sim, templateId: string): Quest {
+  offerQuest(sim, templateId)
+  return acceptOffer(sim)
 }

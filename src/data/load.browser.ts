@@ -12,6 +12,7 @@ import machines from './machines.json'
 import map from './map.json'
 import parcels from './parcels.json'
 import puns from './puns.json'
+import quests from './quests.json'
 import vehicles from './vehicles.json'
 import { applyConfig, buildGameData, DataError } from './index.ts'
 import type { GameData, RawGameData } from './types.ts'
@@ -29,6 +30,7 @@ export function rawGameData(): RawGameData {
     parcels,
     economy,
     levels,
+    quests,
     puns,
     map,
   })

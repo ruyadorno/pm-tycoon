@@ -10,6 +10,10 @@
 // (?policy=1 stays competent), and ?level=N forces level N on every fresh
 // player's game (forceLevelParam: Boot's new sim, then each New game through
 // SIM_REPLACED) before any scene, the policy or the director hears it.
+// M7 (design-m7 §6.10): ?quest=<id> offers that quest (debug.offerQuest) on
+// the same fresh games, after ?level= (so a level-scaled goal reads the
+// forced level) and before ?fastForward=; the HUD opens a standing offer's
+// card when it starts (a swap leaves the chip pulsing).
 import Phaser from 'phaser'
 import type { AudioDirector, SimLookups } from '../audio/director.ts'
 import {
@@ -184,6 +188,32 @@ export function forceLevelParam(
   return res
 }
 
+/**
+ * ?quest=<templateId> (debug builds; design-m7 §6.10, plan-build2 §8.4
+ * task 6): offer that quest on a fresh player's game through the ViewSim's
+ * debug.offerQuest — a logged sim command (debugOfferQuest), so replays and
+ * saves stay exact. Fresh = tick 0 with nothing but ?level='s
+ * debugForceLevel in the command log (Boot's own new sim and every New
+ * game; never a Continue, a __pm.load or the attract sim — the caller skips
+ * it). null when nothing was asked, the sim is not fresh, a quest is active,
+ * that template is already offered, or the build has no debug facet; a
+ * refusal (an unknown id) is returned and warned about, never thrown.
+ */
+export function offerQuestParam(
+  vs: ViewSim,
+  sim: Sim,
+  templateId: string | null,
+): CommandResult | null {
+  if (templateId === null || !vs.debug) return null
+  if (sim.state.tick !== 0) return null
+  if (sim.commandLog.some((e) => e.cmd.kind !== 'debugForceLevel')) return null
+  const qs = sim.state.quests
+  if (qs.active !== null || qs.offer?.templateId === templateId) return null
+  const res = vs.debug.offerQuest(templateId)
+  if (!res.ok) console.warn(`quest=${templateId}: refused (${res.reason})`)
+  return res
+}
+
 /** The ground bake needs a 3072-px texture; refuse below 4096 (city-view.md §1.2). */
 export const MIN_TEXTURE_SIZE = 4096
 
@@ -313,6 +343,14 @@ export class BootScene extends Phaser.Scene {
     if (p.level !== null)
       game.events.on(SIM_REPLACED, (e: SimReplaced) => {
         if (!e.attract) forceLevelParam(e.viewSim, e.sim, p.level)
+      })
+    // ?quest=<id> (M7): after ?level= (registered after its listener too),
+    // before the fast-forward; the HUD reads the standing offer at create.
+    const quest = debugEnabled() ? p.quest : null
+    if (!resume.game) offerQuestParam(vs, sim, quest)
+    if (quest !== null)
+      game.events.on(SIM_REPLACED, (e: SimReplaced) => {
+        if (!e.attract) offerQuestParam(e.viewSim, e.sim, quest)
       })
     const waitFrom = performance.now()
     const audio = await (this.audioModule ?? importAudio())

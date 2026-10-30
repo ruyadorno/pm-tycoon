@@ -18,6 +18,7 @@ export type PanelFrame = Extract<
   | 'ui_panel'
   | 'ui_panel_dark'
   | 'ui_card_held'
+  | 'ui_card_gold'
   | 'ui_tooltip'
   | 'ui_tag'
   | 'ui_tab'
@@ -28,13 +29,15 @@ export type PanelFrame = Extract<
 
 export type BarFrame = Extract<FrameName, `ui_bar_${string}`>
 
-export type BarColour = 'green' | 'amber' | 'red' | 'blue'
+/** `gold`: quest progress and the Golden Release (spec-build2 §3.1, M7). */
+export type BarColour = 'green' | 'amber' | 'red' | 'blue' | 'gold'
 
 export const BAR_FILL: Record<BarColour, BarFrame> = {
   green: 'ui_bar_fill_green',
   amber: 'ui_bar_fill_amber',
   red: 'ui_bar_fill_red',
   blue: 'ui_bar_fill_blue',
+  gold: 'ui_bar_fill_gold',
 }
 
 /** A `frame` nine-slice at the integer rect (x, y, w, h), origin (0, 0). */

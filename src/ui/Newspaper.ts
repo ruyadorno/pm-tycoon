@@ -5,7 +5,9 @@
 // puns.json companyName) with `Day N` / `Lv N` in its corners, a double rule,
 // a 48×48 picture at the left (level → the level's `wh_ext_tN`, incident →
 // `parcel_m_mal`, region → the region's hero building, walkout →
-// `worker_s_idle_0`, M6 hired → the role's worker idle frame), the headline wrapped at 236 px (at most 4 lines, the
+// `worker_s_idle_0`, M6 hired → the role's worker idle frame, M7 quest →
+// the item's picture or `ic_quest`, M7 star → `ic_star`), the headline
+// wrapped at 236 px (at most 4 lines, the
 // last one ellipsized) and an `OK` button bottom-right. It never pauses the
 // sim; it dismisses on OK, on a tap anywhere on it, or after 6 s on screen.
 // One paper at a time; later ones wait in a queue of 3 (the oldest waiting
@@ -62,8 +64,19 @@ const OK_H = 44
 /** Opaque cut-off for the box-filtered picture (pixel art has no soft edges). */
 const ALPHA_CUT = 128
 
-/** M6 `hired`: a ★ applicant joined (spec-build2 §2.5, stars only). */
-export type NewsKind = 'level' | 'incident' | 'region' | 'walkout' | 'hired'
+/**
+ * M6 `hired`: a ★ applicant joined (spec-build2 §2.5, stars only). M7
+ * (design-m7 §6.7): `quest` a quest completed, `star` a quest reward put a
+ * ★ applicant in the pool (headlines: questText.newsHeadline).
+ */
+export type NewsKind =
+  | 'level'
+  | 'incident'
+  | 'region'
+  | 'walkout'
+  | 'hired'
+  | 'quest'
+  | 'star'
 
 export interface NewsItem {
   kind: NewsKind
@@ -114,7 +127,8 @@ const ROLE_NOUN: Readonly<Record<Role, string>> = {
 
 /**
  * M6 (spec-build2 §2.5 "a one-line hired item for star applicants only"):
- * `Star hire: Wren joins as a sorter` (m5x7 has no ★ glyph).
+ * `Star hire: Wren joins as a sorter`. m5x7 has a ★ glyph since M7 (the
+ * quest papers and cards use it); this headline keeps the word on purpose.
  */
 export function starHireHeadline(name: string, role: Role): string {
   return `Star hire: ${name} joins as ${ROLE_NOUN[role] ?? 'staff'}`
@@ -124,13 +138,20 @@ export function starHireHeadline(name: string, role: Role): string {
  * The picture frame for a paper (city-view §8.2): the warehouse tier the
  * level brings (levels.json warehouseTier → `wh_ext_tN`), the malware parcel,
  * the region's hero building, the worker's idle frame (M6 `hired`: the
- * sorter's own variant for a sorter). Null when the atlas has no such frame
- * (the box then stays empty).
+ * sorter's own variant for a sorter), M7 `quest`: `ref.picture` when the
+ * atlas has it, else `ic_quest`; M7 `star`: `ic_star` (16-px frames are
+ * drawn unscaled in the box). Null when the atlas has no such frame (the box
+ * then stays empty).
  */
 export function newsPicture(
   kind: NewsKind,
   data: Pick<GameData, 'levels' | 'buildings'>,
-  ref: { level?: number; district?: string; role?: Role } = {},
+  ref: {
+    level?: number
+    district?: string
+    role?: Role
+    picture?: string
+  } = {},
 ): string | null {
   switch (kind) {
     case 'level': {
@@ -152,6 +173,13 @@ export function newsPicture(
           ? frameOrNull('worker_sorter_s_idle_0')
           : null) ?? frameOrNull('worker_s_idle_0')
       )
+    case 'quest':
+      return (
+        (ref.picture ? frameOrNull(ref.picture) : null) ??
+        frameOrNull('ic_quest')
+      )
+    case 'star':
+      return frameOrNull('ic_star')
   }
 }
 

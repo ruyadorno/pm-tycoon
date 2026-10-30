@@ -44,6 +44,8 @@
     "gameOverDelayS": 0.5,
     "gameOverTempo": 72,
     "gameOverVel": 70,
-    "gameOverHoldS": 3
+    "gameOverHoldS": 3,
+    "victoryVel": 95,
+    "victoryHoldS": 2.5
   }
 }

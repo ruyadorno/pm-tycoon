@@ -40,6 +40,9 @@ export function deliverParcel(sim: Sim, v: Vehicle | null, p: Parcel): void {
   p.vehicleId = null
   p.reservedBy = null
   p.trace.push({ tick: s.tick, what: 'delivered', ref: p.dest })
+  // M7: a delivered golden parcel is no longer alive (spawn.magicAlive is
+  // the one count; magic.ts adds, this removes).
+  if (p.magic) s.spawn.magicAlive = Math.max(0, s.spawn.magicAlive - 1)
   s.stats.deliveries += 1
   if (s.stats.firstDeliveryTick === null) s.stats.firstDeliveryTick = s.tick
   sim.emit('parcel:delivered', {

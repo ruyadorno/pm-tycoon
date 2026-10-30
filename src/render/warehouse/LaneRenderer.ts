@@ -41,6 +41,14 @@
 // there and its art is packed, and the rack lamp wears a small yellow `S`
 // while an active sorter is on duty. State-derived each frame from
 // `ViewSim.holdStation` (stationLook).
+//
+// M7 (spec-build2 §3.3, design-m7 §6.8): the quest's golden parcel rides
+// the lane as `parcel_<size>_magic` (parcelFrame(size, dark, magic); the
+// frame is a shared `parcel` class, home world, drawn from the front
+// parcels layer) and skips every checker visibly: the sim seats it done at
+// once, so it glides through the slot, and the machine there keeps its
+// idle frame (machineScanning) — no scan, no catch, never dark. Shelf minis
+// are unchanged.
 import Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type { LaneNode, Parcel, Size, Strain } from '../../sim/types.ts'
@@ -216,8 +224,25 @@ const STAMP_GREY = PALETTE.grey3
 
 const SIZE_KEY: Record<Size, string> = { S: 's', M: 'm', L: 'l', XL: 'xl' }
 
-export const parcelFrame = (size: Size, dark = false): string =>
-  `parcel_${SIZE_KEY[size]}${dark ? '_mal' : ''}`
+/**
+ * A parcel's lane frame: `parcel_<size>`, `_mal` once flagged dark, or the
+ * golden `_magic` (M7, design-m7 §6.8; magic parcels are never flagged, so
+ * dark wins only in an impossible state).
+ */
+export const parcelFrame = (size: Size, dark = false, magic = false): string =>
+  `parcel_${SIZE_KEY[size]}${dark ? '_mal' : magic ? '_magic' : ''}`
+
+/**
+ * A checker slot scans while one of its stations holds a parcel it rolls.
+ * M7 (B2 §3.3): checkers skip the magic parcel, so a station holding it
+ * leaves the machine idle while the parcel glides through.
+ */
+export function machineScanning(
+  stations: readonly { parcelId: number | null }[],
+  isMagic: (parcelId: number) => boolean,
+): boolean {
+  return stations.some((s) => s.parcelId !== null && !isMagic(s.parcelId))
+}
 export const miniFrame = (size: Size): string => `parcel_mini_${SIZE_KEY[size]}`
 const flipFrames = (size: Size): string[] =>
   [0, 1, 2, 3, 4, 5].map((i) => `parcel_${SIZE_KEY[size]}_flip_f${i}`)
@@ -375,6 +400,8 @@ interface PSprite {
   node: string | null
   at: Point
   bay: number | null
+  /** M7: the quest's golden parcel (parcel_<size>_magic). */
+  magic: boolean
   actions: Action[]
   running: boolean
   tween: Phaser.Tweens.Tween | null
@@ -1498,7 +1525,7 @@ export class LaneRenderer {
     if (!p) return null
     const img = this.acquire()
     if (!img) return null
-    img.setFrame(parcelFrame(p.size)).setPosition(at.x, at.y)
+    img.setFrame(parcelFrame(p.size, false, p.magic)).setPosition(at.x, at.y)
     const rec: PSprite = {
       id,
       img,
@@ -1507,6 +1534,7 @@ export class LaneRenderer {
       node,
       at: { ...at },
       bay: null,
+      magic: p.magic,
       actions: [],
       running: false,
       tween: null,
@@ -1619,7 +1647,7 @@ export class LaneRenderer {
     rec.dark = dark
     rec.catching = false
     rec.strain = dark ? strain : null
-    rec.img.setFrame(parcelFrame(rec.size, dark))
+    rec.img.setFrame(parcelFrame(rec.size, dark, rec.magic))
     if (dark && strain) {
       const f = frameOrNull(`ic_strain_${strain}`)
       if (f && !rec.icon) {
@@ -2022,7 +2050,10 @@ export class LaneRenderer {
     for (const node of this.vs.lane.nodes()) {
       const v = this.slots.get(node.id)
       if (!v?.machine) continue
-      const busy = node.stations.some((s) => s.parcelId !== null)
+      const busy = machineScanning(
+        node.stations,
+        (id) => this.vs.parcel(id)?.magic === true,
+      )
       let f = v.idleFrame
       if (busy && v.scanFrames.length > 0) {
         const k = Math.floor(this.machinePhase / (1000 / v.scanFps))

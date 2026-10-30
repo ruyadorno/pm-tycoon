@@ -43,7 +43,7 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 ## Code rules
 
 - `src/sim/**` and `src/data/**` are headless: no Phaser, DOM, Date.now, performance.now, Math.random, timers; 10 ticks/s;
-  seeded PRNG only (`tools/check-sim-purity.mjs` enforces it, and also keeps `src/ui/layout.ts`, `src/render/warehouse/RoomLayout.ts`,
+  seeded PRNG only (`tools/check-sim-purity.mjs` enforces it, and also keeps `src/ui/{layout,questText}.ts`, `src/render/warehouse/RoomLayout.ts`,
   `src/render/{decayPhase,cityFx,quality,vehicleDepth,AttractCamera,atlases,frames}.ts`, `src/input/GestureClassifier.ts`, `src/audio/{chords,leadsheet,arranger}.ts` and `src/metrics/playtest.ts` free of Phaser/DOM value
   imports so Vitest can load them under Node). Scenes only read sim state and call the `ViewSim` facade
   (`src/sim/view-api.ts`), which builds a `Command` and calls `Sim.dispatch`; rendering never mutates sim state.

@@ -6,7 +6,7 @@
 // - The TTF must match FONT_SHA256; it is registered with GlobalFonts and
 //   ASCII 32..126 plus '·' and '×' (both in the TTF) are rendered at 16 px,
 //   alpha thresholded at 128 (1-bit). DRAWN adds the UI symbols the view
-//   specs print but the TTF lacks (– — − … → ▲ ▼ ▬ ▸ ▾ ✕), pixel-drawn in
+//   specs print but the TTF lacks (– — − … → ▲ ▼ ▬ ▸ ▾ ✕ ★), pixel-drawn in
 //   m5x7's metrics, so BitmapText never silently drops a character.
 //   Glyphs are white (#ffffff) so BitmapText tints land on exact palette
 //   colours; the sheet is packed into the `world` atlas by `art:atlas` as the
@@ -77,6 +77,23 @@ export const DRAWN: readonly (readonly [
   [0x25b8, 3, 0, 6, ['#.', '##', '#.']], // ▸ ("District ▸")
   [0x25be, 4, 0, 8, ['###', '.#.']], // ▾ ("Any ▾")
   [0x2715, 6, 0, 5, ['#...#', '.#.#.', '..#..', '.#.#.', '#...#']], // ✕ close
+  // build 2 M7 (design-m7 §6.1): ★ for the ticker's star-applicant line
+  // ("… — ★ applicant in the inspector pool"); cap height, 7 px wide
+  [
+    0x2605,
+    8,
+    0,
+    4,
+    [
+      '...#...',
+      '..###..',
+      '#######',
+      '.#####.',
+      '..###..',
+      '.##.##.',
+      '.#...#.',
+    ],
+  ], // ★ star
 ]
 
 /** sheet layout: 16 cells per row, 10x16 cells, glyph bbox at cell + (1, 1) */

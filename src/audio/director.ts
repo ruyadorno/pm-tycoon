@@ -686,6 +686,10 @@ export class AudioDirector {
       'region:unlocked',
       'lane:stalled',
       'lane:resumed',
+      // build 2 M7 (design-m7 §6.9)
+      'quest:offered',
+      'quest:completed',
+      'game:victory',
     ]
     const fns = names.map((name) => {
       const fn = (payload?: unknown) => this.#onSim(name, payload ?? {})
@@ -801,6 +805,15 @@ export class AudioDirector {
       case 'lane:resumed':
         this.#setLoop('stallAlarm', false)
         break
+      case 'quest:offered':
+        this.sfx.play('bell')
+        break
+      case 'quest:completed':
+        this.sfx.play('questDone')
+        break
+      case 'game:victory':
+        this.#victory()
+        break
       default:
         this.log.info(`hook ${name}: no audio`)
     }
@@ -888,6 +901,33 @@ export class AudioDirector {
           if (!this.#hidden) band.resume()
         }),
       band.secPerBeat * 1000 * this.config.lifeLost.pauseBeats,
+    )
+  }
+
+  /**
+   * game:victory (build 2, B2 §3.4, design-m7 §6.9): the victory tag, a big-band ending in the key. While the
+   * band plays it drops out like the tape-stop (music gain → 0, band.pause(), no tape sfx) and comes back in
+   * where it paused when the tag's hold ends; a tag that cannot play (inactive, still loading) leaves the band
+   * alone.
+   */
+  #victory(): void {
+    const ctx = this.ctx
+    const band = this.band
+    const g = this.#music?.gain
+    if (!this.stingers.victoryTag()) return
+    if (!ctx || !band || !g || band.state !== 'started') return
+    this.#cancelTapeStop()
+    g.cancelScheduledValues(ctx.currentTime)
+    g.setTargetAtTime(0, ctx.currentTime, this.config.lifeLost.rampS / 3)
+    band.pause()
+    this.#tapeTimer = setTimeout(
+      () =>
+        this.#guard('victory resume', () => {
+          this.#tapeTimer = null
+          this.#restoreMusicGain()
+          if (!this.#hidden) band.resume()
+        }),
+      (this.config.lookAheadS + this.stingers.victoryTagSeconds()) * 1000,
     )
   }
 

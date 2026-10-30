@@ -408,7 +408,7 @@ export function framesTs(
     '  readonly dockPose: readonly [number, number]',
     '}',
     '',
-    '/** per exterior frame (manifest wh_ext bayLights / dockPose, frameAnchors overrides) */',
+    '/** per exterior frame (manifest warehouse-ext bayLights / dockPose, frameAnchors overrides) */',
     'export const WH_ANCHORS: Readonly<Partial<Record<FrameName, WarehouseAnchorSet>>> = {',
   )
   for (const [f, a] of Object.entries(warehouseAnchorTable(m))) {

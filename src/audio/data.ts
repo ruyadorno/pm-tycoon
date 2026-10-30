@@ -92,13 +92,19 @@ export interface AudioConfig {
     gameOverTempo: number
     gameOverVel: number
     gameOverHoldS: number
+    /** build 2 M7 victory tag (B2 §3.4, design-m7 §6.9) */
+    victoryVel: number
+    victoryHoldS: number
   }
 }
 
 /** zzfx parameter arrays by name (audio.md §7). */
 export type SfxTable = Record<string, number[]>
 
-/** The 18 one-shot SFX of audio.md §7 (plus the two brush voices, which only the band plays). */
+/**
+ * The 18 one-shot SFX of audio.md §7 + build 2's questDone (design-m7 §6.9), plus the two brush voices, which
+ * only the band plays.
+ */
 export const SFX_NAMES = [
   'tap',
   'sheetOpen',
@@ -118,6 +124,7 @@ export const SFX_NAMES = [
   'grumble',
   'regionUnlocked',
   'deny',
+  'questDone',
 ] as const
 export const BRUSH_NAMES = ['ride', 'hat'] as const
 

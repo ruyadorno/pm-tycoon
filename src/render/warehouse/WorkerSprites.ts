@@ -485,7 +485,10 @@ export class WorkerSprites {
     this.updateUnpaid(nodes, station)
   }
 
-  /** Scanning: the inspector's own station holds a parcel; the sorter's clock runs. */
+  /**
+   * Scanning: the inspector's own station holds a parcel (not the M7 golden
+   * one, which checkers skip: design-m7 §6.8); the sorter's clock runs.
+   */
   private busy(
     w: Worker,
     nodes: ReadonlyMap<string, LaneNode>,
@@ -494,7 +497,8 @@ export class WorkerSprites {
     if (w.leaving) return false
     if (w.station) return station?.working === true
     const n = nodes.get(w.nodeId)
-    return n ? (stationOf(n, w.id, w.seat)?.parcelId ?? null) !== null : false
+    const id = n ? (stationOf(n, w.id, w.seat)?.parcelId ?? null) : null
+    return id !== null && this.vs.parcel(id)?.magic !== true
   }
 
   /** ic_alert over every desk (and the station) with an unpaid person (§1.6, §7.4). */

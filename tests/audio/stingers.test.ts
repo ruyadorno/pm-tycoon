@@ -96,6 +96,39 @@ describe('Stingers', () => {
     expect(b.by('vibes2').at(-1)).toBe(81)
   })
 
+  it('victory tag in F (design-m7 §6.9): Imaj7 vi7 ii7 V7 on piano2 + bass2 roots, I6/9 landing, trumpet2 5-1-3-5-8', () => {
+    const { st, played, by, log } = setup()
+    expect(st.victoryTag()).toBe(true)
+    // piano2: four voice-led voicings (A-form, 3 5 7 9 / 7 9 3 5 / 7 9 3 13) then the I6/9 stab A3 C4 D4 G4
+    expect(by('piano2')).toEqual([
+      57, 60, 64, 67, 60, 64, 65, 69, 58, 62, 65, 69, 58, 62, 64, 69, 57, 60,
+      62, 67,
+    ])
+    // bass2 roots F2 D2 G2 C2, then F2 under the landing
+    expect(by('bass2')).toEqual([41, 38, 43, 36, 41])
+    // trumpet2 fanfare C4 F4 A4 C5 over the ii–V bar, F5 on the landing
+    expect(by('trumpet2')).toEqual([60, 65, 69, 72, 77])
+    // two beats per chord at the sheet tempo, from now + lookAheadS (not quantized: the band drops out)
+    const spb = 60 / (sheets['semver-swing']?.tempo ?? 126)
+    const start = 10 + config.lookAheadS
+    const bassTimes = played
+      .filter((p) => p.inst === 'bass2')
+      .map((p) => p.time - start)
+    bassTimes.forEach((t, k) => expect(t).toBeCloseTo(k * 2 * spb, 6))
+    const trumpet = played.filter((p) => p.inst === 'trumpet2')
+    trumpet.forEach((p, k) =>
+      expect(p.time - start).toBeCloseTo((4 + k) * spb, 6),
+    )
+    expect(trumpet.map((p) => p.velocity)).toEqual([95, 95, 95, 95, 101])
+    // five piano chord entries in the log (the four changes + the landing)
+    expect(log.notes('piano2')).toHaveLength(5)
+    expect(st.victoryTagSeconds()).toBeCloseTo(
+      8 * spb +
+        (config.stingers as unknown as { victoryHoldS: number }).victoryHoldS,
+      6,
+    )
+  })
+
   it('cash chord: root-3rd-5th-7th with the root in C4-B4, velocity by size; late = root + 5th', () => {
     const a = setup({ chord: parseChord('Gm7') })
     a.st.cashChord(2, true)
@@ -157,6 +190,7 @@ describe('Stingers', () => {
         t.st.oops()
         t.st.defused()
         t.st.cashChord(3, true)
+        t.st.victoryTag()
         for (const p of t.played) {
           const [lo, hi] = VENDORED[p.inst] as [number, number]
           expect(p.note, `${key} ${sym} ${p.inst}`).toBeGreaterThanOrEqual(lo)
@@ -172,6 +206,7 @@ describe('Stingers', () => {
     expect(a.played).toHaveLength(0)
     const b = setup({ loaded: false })
     expect(b.st.minorTag()).toBe(false)
+    expect(b.st.victoryTag()).toBe(false)
     expect(b.played).toHaveLength(0)
     expect(
       b.log.entries().some((e) => 'info' in e && /loading/.test(e.info)),

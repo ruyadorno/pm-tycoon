@@ -5402,7 +5402,7 @@
       "chosenCandidate": 2
     },
     {
-      "id": "ru_farm",
+      "id": "ru_peer_pasture",
       "class": "building3x3",
       "source": "pixellab",
       "canvas": [192, 224],
@@ -5410,9 +5410,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "rural",
-      "coversBuildings": ["ru_peer_pasture", "ru_dev_dairy", "ru_range_ranch"],
       "priority": "P2",
-      "subject": "farmstead with a farmhouse, barn and fenced pasture",
+      "subject": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -5420,92 +5419,296 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1000,
-            "prompt": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "54588ade-8bfb-5735-b862-e9d6b81cd17b",
-            "source_image_id": "54588ade-8bfb-5735-b862-e9d6b81cd17b"
-          },
-          "jobId": "d479940c-2315-4e13-ae6e-7e8c05fa88e7",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "f728baf59ca6164970a32357b2bb88daf383667b04d0e4c5e675c3f15ff13007",
-          "at": "2026-10-29T08:15:37.029Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1002,
-            "prompt": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "33e83709-49c9-58e5-a19a-d8cd1255e30e",
-            "source_image_id": "33e83709-49c9-58e5-a19a-d8cd1255e30e"
-          },
-          "jobId": "417e94f5-702d-47f7-9bd3-081c3ae79605",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "0d0a164bf5cae1c942ab4f241fa58d88a28bb9ed168e06aff2025a3fdbe933f6",
-          "at": "2026-10-29T08:15:42.057Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": false,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
               "max_colors": 21
             },
             "seed": 1001,
-            "prompt": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "323c9919-1063-55c3-a3d9-e142bc0f2dde",
-            "source_image_id": "323c9919-1063-55c3-a3d9-e142bc0f2dde"
+            "prompt": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f406fb74-a314-5a98-ac6a-62f74431f19b",
+            "source_image_id": "f406fb74-a314-5a98-ac6a-62f74431f19b"
           },
-          "jobId": "19442bdb-b8fc-49c8-9121-709381491239",
+          "jobId": "2e2862d5-1dc8-4202-8900-6e9ba206fc0a",
           "seed": 1001,
           "candidate": 1,
           "cost": 9,
           "downloadUrl": "",
-          "sha256": "31a83f8398239ab9dfc65d72c64ec4b444379546748fcc5645f39ef9a393b6a5",
-          "at": "2026-10-29T08:15:41.955Z"
+          "sha256": "426e4a0941282fff9af782eb797b91ec6ccf532eeea9022a00a651abf0a2310b",
+          "at": "2026-10-30T05:39:04.318Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "6c33abef-708c-5184-9df1-0ba753a04a92",
+            "source_image_id": "6c33abef-708c-5184-9df1-0ba753a04a92"
+          },
+          "jobId": "440c9cd0-d3a2-4981-86fa-2081abdeddb8",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "13bdcca0aec4e8f4cf75a91c61b54a76ebc101740c9441c3958c722b388ba0f8",
+          "at": "2026-10-30T05:39:04.318Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "farm with a wide fenced green cow pasture taking up most of the plot, three black and white cows grazing, a small rust-orange gambrel-roof barn and a round blue water trough in the back corner, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "36d45c60-62c4-5338-9ed4-1a98b4908294",
+            "source_image_id": "36d45c60-62c4-5338-9ed4-1a98b4908294"
+          },
+          "jobId": "f0a302bf-0d78-44ff-bd57-9ee84473c067",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "3db1ded2e76528e70afd44acea155726809058d647ea1e48c7d9c9df1a8fa75a",
+          "at": "2026-10-30T05:39:04.318Z"
         }
       ],
       "rejects": [
         {
-          "candidate": 0,
-          "reason": "similar",
+          "candidate": 1,
+          "reason": "thick dirt cliff under the plot, purple-roof house",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         },
         {
           "candidate": 2,
-          "reason": "blue roofs",
+          "reason": "cows small, dirt rim, crowded back row",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "ffda8d497e3e66c3eddbdf2cd125716f8c28c66d9135c4865db0ba84b993c365",
-      "chosenCandidate": 1
+      "note": "agent pick #0 (2026-10-30): wide fenced cow pasture with three grazing cows, a small orange gambrel barn and the blue trough in the back corner; flattest plot of the three",
+      "finalSha256": "25b4ce68efba0ed120ecae58635780ef1963fae593f5d49de5c845c8b220fc7a",
+      "chosenCandidate": 0
     },
     {
-      "id": "ru_barn",
+      "id": "ru_dev_dairy",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "subject": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "682f5e39-ebb3-5f01-ae18-fa4587eb779e",
+            "source_image_id": "682f5e39-ebb3-5f01-ae18-fa4587eb779e"
+          },
+          "jobId": "85eda11b-8109-41ec-bd30-ff8286bdf5cc",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "61943536f14d3a6a6126d050c39806ea5f9040ef2d00a202f9e7b2671521cf06",
+          "at": "2026-10-30T05:39:04.318Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "14ab7247-cfd9-5451-9ddc-6f7c93d8af0f",
+            "source_image_id": "14ab7247-cfd9-5451-9ddc-6f7c93d8af0f"
+          },
+          "jobId": "223b5979-ae7e-4a94-8b17-bb70d691cb8c",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "9fabeeb3a42b0a936c69bb012e5d9831cb1e102b050eaf2f784f1f9416f18be3",
+          "at": "2026-10-30T05:39:04.318Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "large dairy barn painted white with big black cow spots, a long grey metal roof, a tall white milk silo with a domed top beside it and shiny steel milk churns by the door, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9adaac18-6689-5a1d-aae2-3ae9be5e5d97",
+            "source_image_id": "9adaac18-6689-5a1d-aae2-3ae9be5e5d97"
+          },
+          "jobId": "f071729c-9576-4115-b3f8-2193c189c8b1",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "72479917f3693cc4b803e700066186325371dcf3ab293fb629e84c6f7480ea30",
+          "at": "2026-10-30T05:39:04.318Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "plain grey silo, barn reads less dairy",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "gambrel roof would echo ru_hay_barn",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): white dairy barn with big black cow spots, grey gable roof, a cow-spotted milk silo and steel churns; fills the 3x3 plot",
+      "finalSha256": "4a34c1db8cd46a8d486eed825531ae9c8fc68d02edbe750472e4561d33159994",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "ru_range_ranch",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "subject": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9aeb612a-b277-5385-a54e-b553e04fc4b0",
+            "source_image_id": "9aeb612a-b277-5385-a54e-b553e04fc4b0"
+          },
+          "jobId": "a782fede-96f1-445b-b3a6-e2c4e607fc45",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "76e1d6454fbdec26f24bf8f9283699e82886aecec8a4d8f5a8330ce8fa4de7a9",
+          "at": "2026-10-30T05:39:04.318Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "3afd9794-d79e-5acc-b32c-37abd09c1c66",
+            "source_image_id": "3afd9794-d79e-5acc-b32c-37abd09c1c66"
+          },
+          "jobId": "241bcd75-1b8a-454c-af69-abe898f4ea1b",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "4b92f66290e5ab14d317ba4add6c466c2fcd460c42f93c87b45dc607a689eb35",
+          "at": "2026-10-30T05:39:04.318Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "cattle ranch with a long low brown log ranch house with a green roof, a round corral of white wooden rails, and a tall wooden ranch gate arch over the entrance, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "88ed1b2d-363c-5180-bd19-ad425fe447f7",
+            "source_image_id": "88ed1b2d-363c-5180-bd19-ad425fe447f7"
+          },
+          "jobId": "632c0e22-f4cd-40f7-a293-f892041d3ea0",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "ccd7e1d0c696e4d7322d79c86405f73b3dc51b1284f444158075360ab4684bbf",
+          "at": "2026-10-30T05:39:20.994Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "round island base, gate small",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "busy, gate partly hidden by the fence",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): log ranch house with a green roof, a round white-rail corral and the wooden gate arch at the front; most readable gate",
+      "finalSha256": "b2184ee3ceed89179f85060036044f2fede7754b23868250ebfdd05cbf7856c7",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "ru_optional_orchard",
       "class": "building2x2",
       "source": "pixellab",
       "canvas": [128, 160],
@@ -5513,9 +5716,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "rural",
-      "coversBuildings": ["ru_hay_barn", "ru_caret_mill", "ru_semver_stables"],
       "priority": "P2",
-      "subject": "wooden barn with a gambrel roof and hay bales",
+      "subject": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -5523,92 +5725,92 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1001,
-            "prompt": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "e33ba0c6-3331-5108-8454-b43c8dd4053b",
-            "source_image_id": "e33ba0c6-3331-5108-8454-b43c8dd4053b"
-          },
-          "jobId": "9f316aac-0128-41d0-9b5b-e26f636e190d",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "abb4ca1164b4a9f601a51220904de555648fdbf1a050de65b5b18f827b2d715d",
-          "at": "2026-10-29T08:15:47.460Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "f382aca9-38b9-50cd-aaa4-2c85352eb12a",
-            "source_image_id": "f382aca9-38b9-50cd-aaa4-2c85352eb12a"
-          },
-          "jobId": "fa2f5057-e852-4827-9e27-19fe306e68c7",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "04a96a578cb37c03a8b6e7063ec8f3d3dcfad9dad041655c5438bdc3f3e860bb",
-          "at": "2026-10-29T08:15:52.788Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
             "seed": 1000,
-            "prompt": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "8367a06c-0cb5-5b8b-b7f6-837171593766",
-            "source_image_id": "8367a06c-0cb5-5b8b-b7f6-837171593766"
+            "prompt": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "24d27220-bae5-5f04-82ba-9737b93a74ac",
+            "source_image_id": "24d27220-bae5-5f04-82ba-9737b93a74ac"
           },
-          "jobId": "e9c75af6-5878-4a94-8ea6-1808fd92f929",
+          "jobId": "e9dd4dff-4f00-4a2e-9677-04fdd097feef",
           "seed": 1000,
           "candidate": 0,
           "cost": 6,
           "downloadUrl": "",
-          "sha256": "f4bf1d49488928b3efb79ffac1606987b4904a41594a266a5862363e1cb17006",
-          "at": "2026-10-29T08:15:47.364Z"
+          "sha256": "bca5f03a7d12adccaa21c71214f2a32fcba3c517262c4026a154dca38277595c",
+          "at": "2026-10-30T05:39:37.303Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "87c8949a-12d4-5509-918a-895712e13cd4",
+            "source_image_id": "87c8949a-12d4-5509-918a-895712e13cd4"
+          },
+          "jobId": "dd59db11-f13a-407c-9198-6a5796817a03",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "d27d51838ffe684680725b7b23d954ce95e895d700464f740c0e10ae7d05dea4",
+          "at": "2026-10-30T05:39:42.683Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "orchard of round fruit trees full of orange and yellow fruit in neat rows on grass, a small green wooden fruit stand with a striped awning at the front, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "cc1411cb-f13b-5a29-8319-17002a4d07d3",
+            "source_image_id": "cc1411cb-f13b-5a29-8319-17002a4d07d3"
+          },
+          "jobId": "59e3f207-1d49-40dc-81de-50b8e8839441",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "e006748c143768f9ed2d6f19c4f4c29f371c98eb4f02bb2456d9680501b988f1",
+          "at": "2026-10-30T05:39:48.152Z"
         }
       ],
       "rejects": [
         {
           "candidate": 0,
-          "reason": "purple roof, odd for a barn in full colour",
+          "reason": "the house dominates, few rows",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         },
         {
-          "candidate": 2,
-          "reason": "grey roof",
+          "candidate": 1,
+          "reason": "dense trees but a big stone house",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "a315d1f9d77a4957a5f1f7829cc9671c0801772964bbeecf572fc0d74f3204aa",
-      "chosenCandidate": 1
+      "note": "agent pick #2 (2026-10-30): rows of fruit trees around a farmhouse with the striped-awning fruit stand at the front; the most orchard of the three",
+      "finalSha256": "a58eb6e5e71f30c1bdb3fcb7b982f46adabf62ab85b2791caaa43ed42aa856dc",
+      "chosenCandidate": 2
     },
     {
-      "id": "ru_orchard",
+      "id": "ru_hay_barn",
       "class": "building2x2",
       "source": "pixellab",
       "canvas": [128, 160],
@@ -5616,9 +5818,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "rural",
-      "coversBuildings": ["ru_optional_orchard", "ru_grain_coop", "ru_tilde_tractors"],
       "priority": "P2",
-      "subject": "small orchard of fruit trees with a shed",
+      "subject": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -5626,92 +5827,500 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1001,
-            "prompt": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "dc554cfa-a135-5cf1-a69d-4849023b9da2",
-            "source_image_id": "dc554cfa-a135-5cf1-a69d-4849023b9da2"
-          },
-          "jobId": "5eee88e8-89dd-43c1-bca2-b598e3abe380",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "4554c4c2c64009ed45f0a78d64d9c074c438543fcf8a2926f20992164faab2d9",
-          "at": "2026-10-29T08:15:52.983Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
             "seed": 1000,
-            "prompt": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "d9626aa1-3e74-5d87-8fdd-c63a38388c9d",
-            "source_image_id": "d9626aa1-3e74-5d87-8fdd-c63a38388c9d"
+            "prompt": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "551abcd4-d64b-5125-a2f0-9abb10bcb285",
+            "source_image_id": "551abcd4-d64b-5125-a2f0-9abb10bcb285"
           },
-          "jobId": "a90bfb42-d2d6-4834-a845-c34e94d34371",
+          "jobId": "10fca228-cc34-488a-aa6c-5eee5600e103",
           "seed": 1000,
           "candidate": 0,
           "cost": 6,
           "downloadUrl": "",
-          "sha256": "366744b3490e64e2c38ad4cd7fa925011d6a397a9403688d4f1a08d9dc3eff00",
-          "at": "2026-10-29T08:15:52.883Z"
+          "sha256": "42b8d5e0bd0ca6ed38183172008445f852b7b55bc436c288991d394c03ae1c2d",
+          "at": "2026-10-30T05:39:48.193Z"
         },
         {
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f9b7e599-8952-500b-872e-4b7673e2174e",
+            "source_image_id": "f9b7e599-8952-500b-872e-4b7673e2174e"
+          },
+          "jobId": "7548d1c8-d80c-41d5-971c-518b1ed3ca05",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "c02da97bf22e3b735135fb9a90dd1955b80e11b6f5d1c91591eeaa1fa1aafb7d",
+          "at": "2026-10-30T05:39:48.229Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
             "seed": 1002,
-            "prompt": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "b633c6da-df0b-5c43-bc88-961c32b5f4c3",
-            "source_image_id": "b633c6da-df0b-5c43-bc88-961c32b5f4c3"
+            "prompt": "tall rust-orange wooden hay barn with a white-trimmed gambrel roof and a big open hayloft door full of golden hay, round yellow hay bales stacked in front, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f6b00ba8-f84d-540f-85af-dd00f7cb6b19",
+            "source_image_id": "f6b00ba8-f84d-540f-85af-dd00f7cb6b19"
           },
-          "jobId": "ed0a0fcb-6812-43ed-9f02-9c73d5b41fef",
+          "jobId": "1b9ab32d-15a9-401e-9553-91769f345ebc",
           "seed": 1002,
           "candidate": 2,
           "cost": 6,
           "downloadUrl": "",
-          "sha256": "5051bbcac0dcdeb6d91e56fbc502fe03990e4d6cd20d6a2516fb6d2d5a1656c0",
-          "at": "2026-10-29T08:16:14.414Z"
+          "sha256": "8ba381a4dcbb663857393f0cd14ba14b414fbe8a14d02cfc265156250059eedd",
+          "at": "2026-10-30T05:39:52.930Z"
         }
       ],
       "rejects": [
         {
           "candidate": 0,
-          "reason": "crop rows, reads as a farm",
+          "reason": "small on the 2x2 plot (97 px)",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "good, slightly smaller",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        }
+      ],
+      "note": "agent pick #2 (2026-10-30): tall orange gambrel barn with a white trim, open hayloft full of hay and big round bales in front; largest on the plot",
+      "finalSha256": "a88068df18e4d499f90031d7664277fc415a4c6f0e94cab049b9f5c8b0a3b36b",
+      "chosenCandidate": 2
+    },
+    {
+      "id": "ru_grain_coop",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "subject": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "8ca89bf3-497e-5523-81e0-575001b1ca5b",
+            "source_image_id": "8ca89bf3-497e-5523-81e0-575001b1ca5b"
+          },
+          "jobId": "fec794fc-32f4-41a5-8733-5441900d52be",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "b306338e437ddc4ca8eab0727240d2e3ef382f58eeb27e5b589749c526fa677b",
+          "at": "2026-10-30T05:40:03.189Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "a8848d74-5642-556a-b679-76acb0830734",
+            "source_image_id": "a8848d74-5642-556a-b679-76acb0830734"
+          },
+          "jobId": "b495946f-52cc-4465-abe8-4a28bdd38efd",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "7d29925392e8cd0a071d3f97be32696241ee651ef5f825c084676b7abe77975c",
+          "at": "2026-10-30T05:40:08.603Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "grain co-op with three tall connected cylindrical corrugated steel grain silos with cone roofs and a small blue office shed, a yellow grain elevator leaning against the silos, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "3e0dd3b1-db4e-5784-8881-94771191a424",
+            "source_image_id": "3e0dd3b1-db4e-5784-8881-94771191a424"
+          },
+          "jobId": "2f90d2a8-d119-498a-b3dd-751d5da501ef",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "3d5109ed6f1559e72638bc384af03f8c8975f74dfe28321078c313093d94f732",
+          "at": "2026-10-30T05:40:14.149Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "big grey shed hides the silos",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
         },
         {
           "candidate": 2,
-          "reason": "house-led",
+          "reason": "good, a bit narrower",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "665ae40873ce2004085071513fc38119610b92f4ab4bf298d89c51e911a87b19",
+      "note": "agent pick #0 (2026-10-30): three corrugated steel silos with cone roofs, the yellow grain elevator and a small blue office; widest on the plot",
+      "finalSha256": "a2f3deb6669aa1d39fbc5de5659a63a58e24956b4b0a5a78a62ebd6ab17f7edd",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "ru_caret_mill",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "subject": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "a9ac9bbe-64a1-5ef8-b7e1-48be06c5d8fa",
+            "source_image_id": "a9ac9bbe-64a1-5ef8-b7e1-48be06c5d8fa"
+          },
+          "jobId": "8b2f2143-0342-44a0-86ff-b35c8a52313f",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "fe960cd8d06a720565127838fc1c204b27334e13c5f55dc025d92cb9af3022a6",
+          "at": "2026-10-30T05:40:19.401Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "95330fdb-b8e9-5839-a585-b1313a73670c",
+            "source_image_id": "95330fdb-b8e9-5839-a585-b1313a73670c"
+          },
+          "jobId": "7087c498-8f64-42d7-a6c2-d20b5ef85198",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "c2091b882e816dd62b4763fd85c878c6022ed8dc899db28e49dccbe5b1c72102",
+          "at": "2026-10-30T05:40:18.490Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "tall white wooden windmill tower with four big brown lattice sails and a pointed cap on a round stone base, a small flour shed with a rust-orange roof beside it, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f032b45d-2098-5dc9-9195-f4911e7e57db",
+            "source_image_id": "f032b45d-2098-5dc9-9195-f4911e7e57db"
+          },
+          "jobId": "8535917b-5aa4-48eb-aec0-aa4690688e78",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "3dd78a069e121c49da49d773b98b06d13f125ca94f4c9512c74989d5e812dd96",
+          "at": "2026-10-30T05:40:18.882Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "small (101 px)",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "bold sails but a narrower plot",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): white windmill with four lattice sails and a pointed orange cap beside a small flour shed; fills the plot with a fence",
+      "finalSha256": "be628040c1f6383d1d4051fc1467b121d834f80059e78c4972713c5ee9fd46c1",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "ru_tilde_tractors",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "subject": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "21d45640-cd75-5bf0-af1e-49679a9b81b3",
+            "source_image_id": "21d45640-cd75-5bf0-af1e-49679a9b81b3"
+          },
+          "jobId": "5f4abd95-ced4-4339-9937-8774c6a399be",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "b8ac0e0778251511f6ded4ef1e72e75e11b9b1e445eb5af59bbc11ef5e087427",
+          "at": "2026-10-30T05:40:24.099Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "53198a96-bd14-59c8-bf49-7e1aba0607cb",
+            "source_image_id": "53198a96-bd14-59c8-bf49-7e1aba0607cb"
+          },
+          "jobId": "41bb07ab-27a8-4e3e-8f31-073046863b20",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "44860dd3661c98cad74ebc7a3d447ead5308851d1c5dcd0bfa0564a3344bbc15",
+          "at": "2026-10-30T05:40:21.878Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "tractor repair workshop, a wide open-front corrugated metal garage with a bright green farm tractor parked inside, a plain yellow sign board without text, a stack of black tyres, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "fa02f211-7d97-5873-b4cf-2bb6314e8eb3",
+            "source_image_id": "fa02f211-7d97-5873-b4cf-2bb6314e8eb3"
+          },
+          "jobId": "10f8772e-9088-48b7-ac21-5b5b35fdb09d",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "f7d4636fc82198a0db0b487649c7ec6e0f1635059e75c37ea51c5da2b62e4731",
+          "at": "2026-10-30T05:40:34.134Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "small on the plot, no sign",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "dark interior, tractor less clear",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        }
+      ],
+      "note": "agent pick #1 (2026-10-30): open corrugated garage with the green tractor inside, the yellow sign board and stacked tyres on a concrete apron",
+      "finalSha256": "d6dc07c8ea604f7465f1b9eaf0d42a20851902df36e4972c0218d0ed85c74618",
       "chosenCandidate": 1
     },
     {
-      "id": "ru_farmhouse",
+      "id": "ru_semver_stables",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "subject": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9a85c2cb-1060-5c14-b8f8-235b9b6081ac",
+            "source_image_id": "9a85c2cb-1060-5c14-b8f8-235b9b6081ac"
+          },
+          "jobId": "649479c2-f837-494d-8b65-16560d6acd19",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "8775156405ebaff17654395b68634cd78cb4dc660713ffac7af6fef7732aba01",
+          "at": "2026-10-30T05:40:45.242Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "44453de2-a132-5250-8479-dc36a62258d8",
+            "source_image_id": "44453de2-a132-5250-8479-dc36a62258d8"
+          },
+          "jobId": "fd2ed5dd-e01f-49f9-90d5-1bbc63ef770f",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "db9ea4ca3b5889751e9f80900b52a3463753f262d022693209a0270146d0971c",
+          "at": "2026-10-30T05:40:45.149Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "long low wooden horse stables with a row of brown half doors with horse heads looking out, a pale green roof with a small cupola and a weathervane, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "69632877-96f2-5d97-aec3-f8602462bfa3",
+            "source_image_id": "69632877-96f2-5d97-aec3-f8602462bfa3"
+          },
+          "jobId": "99ab95a9-e598-49dd-8f6a-cdcd0486f880",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "765810e5aac716048fc8acc0749ebf2eb6e7924693612ea39480227c6cdcfc47",
+          "at": "2026-10-30T05:40:34.789Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "pale roof, horses clear",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "good, lopsided base",
+          "by": "claude",
+          "at": "2026-10-30T05:42:13.319Z"
+        }
+      ],
+      "note": "agent pick #2 (2026-10-30): long wooden stables with horse heads in the half doors, green roof, a cupola and a rooster weathervane",
+      "finalSha256": "843e8929310a846826dcd80fea9162050dc804746b6e9fe6bde613bdc0f77830",
+      "chosenCandidate": 2
+    },
+    {
+      "id": "ru_farmhouse_once",
       "class": "building1x1",
       "source": "pixellab",
       "canvas": [64, 96],
@@ -5719,9 +6328,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "rural",
-      "coversBuildings": ["ru_farmhouse_once"],
       "priority": "P2",
-      "subject": "small farmhouse with a porch",
+      "subject": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -5729,88 +6337,88 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1000,
-            "prompt": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "7e42083c-ec63-53b4-b034-8511bc28c170",
-            "source_image_id": "7e42083c-ec63-53b4-b034-8511bc28c170"
-          },
-          "jobId": "0f9d5d21-8cb9-4753-8ca8-ecc84f35b895",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "b00dab4e816db6f67d4d5d4fbaf82aadfe41971a1777331d55ff4f838d8efcde",
-          "at": "2026-10-29T08:16:19.810Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "4b0b5b90-a609-544f-a697-2fec912655a1",
-            "source_image_id": "4b0b5b90-a609-544f-a697-2fec912655a1"
-          },
-          "jobId": "ce9c4f6e-a5e2-4541-9e1c-85bb6457a4bd",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "efa2615e80c6c2dfa66183657dfe0e687988d745f20649d32f78db75cba85136",
-          "at": "2026-10-29T08:16:30.255Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
             "seed": 1001,
-            "prompt": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "18b6f9ec-d8e2-5476-85ea-984589fde7cb",
-            "source_image_id": "18b6f9ec-d8e2-5476-85ea-984589fde7cb"
+            "prompt": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "e61ba1e2-670e-5ad2-8303-91d0e8195c8c",
+            "source_image_id": "e61ba1e2-670e-5ad2-8303-91d0e8195c8c"
           },
-          "jobId": "0c6d98eb-a2b7-4c99-a593-4cfd1c47c0b4",
+          "jobId": "22c6d9b1-0491-4234-8702-6a416a4ed8e6",
           "seed": 1001,
           "candidate": 1,
           "cost": 5,
           "downloadUrl": "",
-          "sha256": "f1419a8e79c01db5a89670f0da56d06e83a4fdfe60bd1cff8a563270ce61d1c8",
-          "at": "2026-10-29T08:16:25.313Z"
+          "sha256": "1e5709956eac8ea90d0999d87ac2d0fc0f5fe001df92274c501cbbf61a00e501",
+          "at": "2026-10-30T05:40:49.820Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "043f6875-b063-5677-90e7-d9bd8b355807",
+            "source_image_id": "043f6875-b063-5677-90e7-d9bd8b355807"
+          },
+          "jobId": "8d304467-8bbe-4d52-8107-1c79ee628988",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0c363b774ad846a14ee84364aa296a019c27c08366998dafcd350a5eca9bc632",
+          "at": "2026-10-30T05:40:49.898Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "small white farmhouse with a steep rust-orange roof, a covered front porch with a rocking chair and a tall brick chimney, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "dfe4158e-7683-59e8-8b4d-d7a888433c35",
+            "source_image_id": "dfe4158e-7683-59e8-8b4d-d7a888433c35"
+          },
+          "jobId": "b2f50faa-41ea-4d97-ad4a-eeb1e14787c6",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "969669a1c648dd9fffbc4379f783b1a58a9932ca93960d48512381bc2097b187",
+          "at": "2026-10-30T05:40:49.516Z"
         }
       ],
       "rejects": [
         {
           "candidate": 1,
-          "reason": "porch smaller",
+          "reason": "a little smaller",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         },
         {
           "candidate": 2,
-          "reason": "tan, flatter",
+          "reason": "small (72 px)",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T05:42:13.319Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "3223d189d17ebc25dd759c2dd8ad0147ed105c3da9d01b9d3d4a2d8ca52c9e6d",
+      "note": "agent pick #0 (2026-10-30): white farmhouse with a steep orange roof, covered porch and a tall brick chimney; tallest of the three on the 1x1 plot",
+      "finalSha256": "be287e7670810f6829dc1e630facce89b75f87a937a0ee8d7ed088eb2ee3578b",
       "chosenCandidate": 0
     },
     {
@@ -7434,6 +8042,22 @@
       "finalSha256": "ddd666dea2ed5df5bb8a14e2f3625f43ef32ee69f0b32318d8b12c4b5c410187"
     },
     {
+      "id": "hay_bale",
+      "class": "prop",
+      "source": "procedural",
+      "canvas": [64, 128],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "rural",
+      "priority": "P2",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M7 (plan-build2 §6 Rural props): three round straw bales (two side by side, one on top) with twine bands; prop rule like fence",
+      "finalSha256": "c366a832952f2a5751a771231971ffbfedf7a216af3926f2e74da2a47b4c9829"
+    },
+    {
       "id": "bollard",
       "class": "prop",
       "source": "procedural",
@@ -7808,6 +8432,283 @@
           "dockPose": [4, 166]
         }
       }
+    },
+    {
+      "id": "wh_ext_t3",
+      "class": "warehouse-ext",
+      "source": "pixellab",
+      "canvas": [256, 256],
+      "footprint": [4, 4],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "subject": "L3 regional depot: red-orange brick, two open loading bays on the SW wall with an amber lamp each, flat parapet roof, a two-storey brick office at the front corner; no ground, no apron (B2 §6.1)",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "red-orange brick regional parcel depot building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, two big open loading dock doors side by side on the left (south-west) wall near its far end, a small amber lamp above each door, a flat roof with a low parapet, rooftop vents and a water tank, a two-storey brick office block with tall white-framed windows built into the front corner, solid established family business look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "red-orange brick regional parcel depot building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, two big open loading dock doors side by side on the left (south-west) wall near its far end, a small amber lamp above each door, a flat roof with a low parapet, rooftop vents and a water tank, a two-storey brick office block with tall white-framed windows built into the front corner, solid established family business look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "445d26e7-b693-5d54-8a2c-43a5c6c805c7",
+            "source_image_id": "445d26e7-b693-5d54-8a2c-43a5c6c805c7"
+          },
+          "jobId": "8095347d-d086-49f1-a580-377751df8ce1",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "f3454225d7dc75f1c9d74fa40e13e881a1eecdebb5c1db7616cf2a3bf21f0520",
+          "at": "2026-10-30T05:42:25.040Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "red-orange brick regional parcel depot building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, two big open loading dock doors side by side on the left (south-west) wall near its far end, a small amber lamp above each door, a flat roof with a low parapet, rooftop vents and a water tank, a two-storey brick office block with tall white-framed windows built into the front corner, solid established family business look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "red-orange brick regional parcel depot building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, two big open loading dock doors side by side on the left (south-west) wall near its far end, a small amber lamp above each door, a flat roof with a low parapet, rooftop vents and a water tank, a two-storey brick office block with tall white-framed windows built into the front corner, solid established family business look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "8d86551f-2c9d-527c-b213-261efc67f292",
+            "source_image_id": "8d86551f-2c9d-527c-b213-261efc67f292"
+          },
+          "jobId": "24a19796-85a2-4ddd-8f44-73ec3268cbff",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "44045d581ed1a3d201c3ca0ae347fd494ac9c30be4832bee3721b258c09be12e",
+          "at": "2026-10-30T05:42:25.040Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "red-orange brick regional parcel depot building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, two big open loading dock doors side by side on the left (south-west) wall near its far end, a small amber lamp above each door, a flat roof with a low parapet, rooftop vents and a water tank, a two-storey brick office block with tall white-framed windows built into the front corner, solid established family business look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "red-orange brick regional parcel depot building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, two big open loading dock doors side by side on the left (south-west) wall near its far end, a small amber lamp above each door, a flat roof with a low parapet, rooftop vents and a water tank, a two-storey brick office block with tall white-framed windows built into the front corner, solid established family business look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b60c3035-7f2e-5470-bb9b-f8bad3b45625",
+            "source_image_id": "b60c3035-7f2e-5470-bb9b-f8bad3b45625"
+          },
+          "jobId": "f88672e9-3157-4c42-a8a6-650b6ec3afdd",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "ee5f565fec4c4b0e8a354821867bb8adee2463cffe149e08f5b545dc225a9fe8",
+          "at": "2026-10-30T05:42:25.040Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "good but inset (248 px wide) and a smaller office",
+          "by": "claude",
+          "at": "2026-10-30T05:43:51.291Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "the bays are shuttered (L3 has two live docks), no office block",
+          "by": "claude",
+          "at": "2026-10-30T05:43:51.291Z"
+        }
+      ],
+      "note": "agent pick #1 (2026-10-30): brick depot with two open bays (hazard-striped jambs, an amber lamp over each) at the far end of the SW wall, a two-storey brick office at the front corner, rooftop water tank; fills the 256x128 diamond",
+      "finalSha256": "7983d88039949df2916356cf576953fb9712be553b938328ba4742105c4e888c",
+      "chosenCandidate": 1,
+      "bayLights": [[23,128], [61,148]],
+      "dockPose": [4, 185]
+    },
+    {
+      "id": "wh_ext_t4",
+      "class": "warehouse-ext",
+      "source": "pixellab",
+      "canvas": [256, 256],
+      "footprint": [4, 4],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "subject": "L4 distribution centre: an edit of the chosen wh_ext_t3 (prompts.ts EDIT_OF) — light grey / blue steel cladding, a third bay with its lamp, a plain logo board on the roof edge; same footprint and base",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "edit-image-pro-flash",
+          "endpoint": "/edit-image-pro-flash",
+          "params": {
+            "method": "text",
+            "description": "repaint as a big modern steel distribution centre: light grey and blue steel cladding instead of the brick, add a third loading dock door with its own small amber lamp in the row next to the two doors on the left wall, add a big plain blue and yellow company logo board without any text on the roof edge above the doors, keep exactly the same building shape, base corners and camera angle, no ground",
+            "no_background": true,
+            "seed": 1000,
+            "prompt": "repaint as a big modern steel distribution centre: light grey and blue steel cladding instead of the brick, add a third loading dock door with its own small amber lamp in the row next to the two doors on the left wall, add a big plain blue and yellow company logo board without any text on the roof edge above the doors, keep exactly the same building shape, base corners and camera angle, no ground",
+            "image_id": "e6c410dd-260a-550f-bb95-aa043816adfe",
+            "source_image_id": "e6c410dd-260a-550f-bb95-aa043816adfe"
+          },
+          "jobId": "148a28c2-13d4-4c85-939a-76a06e895706",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "f15752db2e6cb3127a03aa60f275a701fa81ea93d7668937cf35418b703d4d07",
+          "at": "2026-10-30T05:43:54.574Z"
+        },
+        {
+          "tool": "edit-image-pro-flash",
+          "endpoint": "/edit-image-pro-flash",
+          "params": {
+            "method": "text",
+            "description": "repaint as a big modern steel distribution centre: light grey and blue steel cladding instead of the brick, add a third loading dock door with its own small amber lamp in the row next to the two doors on the left wall, add a big plain blue and yellow company logo board without any text on the roof edge above the doors, keep exactly the same building shape, base corners and camera angle, no ground",
+            "no_background": true,
+            "seed": 1001,
+            "prompt": "repaint as a big modern steel distribution centre: light grey and blue steel cladding instead of the brick, add a third loading dock door with its own small amber lamp in the row next to the two doors on the left wall, add a big plain blue and yellow company logo board without any text on the roof edge above the doors, keep exactly the same building shape, base corners and camera angle, no ground",
+            "image_id": "7aec9a35-c65c-58e9-bda3-b12da07de6c6",
+            "source_image_id": "7aec9a35-c65c-58e9-bda3-b12da07de6c6"
+          },
+          "jobId": "73e339a1-b6d9-4f11-a07f-1570ad56c7b2",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "fed428b3929b335eaada3ea1280464d3d285e6dbac0e9b807095e6dab7251309",
+          "at": "2026-10-30T05:43:54.575Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "same geometry but washed-out walls, the logo board less clear",
+          "by": "claude",
+          "at": "2026-10-30T05:45:11.343Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): edit of wh_ext_t3 #1: grey steel cladding with blue bands, a third open bay with its amber lamp, a blue and yellow logo board on the roof edge; same footprint, office and water tank",
+      "finalSha256": "b5f5d2ef299795bfa10424a621a1c8d502bc2b99f6ef1857ff73b04613a6f0bb",
+      "chosenCandidate": 0,
+      "bayLights": [[19,133], [47,148], [76,160]],
+      "dockPose": [4, 186]
+    },
+    {
+      "id": "wh_ext_t5",
+      "class": "warehouse-ext",
+      "source": "pixellab",
+      "canvas": [256, 256],
+      "footprint": [4, 4],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "subject": "L5 tycoon HQ: glass and white steel, three bays with an amber lamp each, a blue glass office tower at the front corner with a pink / purple neon parcel-box sign (no letters); no ground, no apron",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "gleaming glass and white steel company headquarters building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, three loading dock doors in a row on the left (south-west) wall near its far end, a small amber lamp above each door, a tall blue glass office tower three storeys high at the front corner, a big glowing pink and purple neon sign shaped like a parcel box on the tower roof without any letters, rooftop garden with small trees, proud tycoon look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#00ffff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "gleaming glass and white steel company headquarters building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, three loading dock doors in a row on the left (south-west) wall near its far end, a small amber lamp above each door, a tall blue glass office tower three storeys high at the front corner, a big glowing pink and purple neon sign shaped like a parcel box on the tower roof without any letters, rooftop garden with small trees, proud tycoon look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "366675ff-ad1d-5e47-82e6-60f0648df6b1",
+            "source_image_id": "366675ff-ad1d-5e47-82e6-60f0648df6b1"
+          },
+          "jobId": "079949c7-449b-4bf3-9bd4-a7291b443e24",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "86b6a76e295fcae3b461ba1d863931684a4ee951d246c316f3d10180a1d1af20",
+          "at": "2026-10-30T05:42:25.040Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "gleaming glass and white steel company headquarters building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, three loading dock doors in a row on the left (south-west) wall near its far end, a small amber lamp above each door, a tall blue glass office tower three storeys high at the front corner, a big glowing pink and purple neon sign shaped like a parcel box on the tower roof without any letters, rooftop garden with small trees, proud tycoon look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#00ffff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "gleaming glass and white steel company headquarters building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, three loading dock doors in a row on the left (south-west) wall near its far end, a small amber lamp above each door, a tall blue glass office tower three storeys high at the front corner, a big glowing pink and purple neon sign shaped like a parcel box on the tower roof without any letters, rooftop garden with small trees, proud tycoon look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "256d05bf-b9a8-5938-a056-b7a92b16a880",
+            "source_image_id": "256d05bf-b9a8-5938-a056-b7a92b16a880"
+          },
+          "jobId": "a7d0d18a-43b2-42e6-954e-a7c2c13f1d2f",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "8858211261332ba5dbdf345d7f9ca613eb911e6aa22087ed375b300c57c04599",
+          "at": "2026-10-30T05:42:25.040Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "gleaming glass and white steel company headquarters building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, three loading dock doors in a row on the left (south-west) wall near its far end, a small amber lamp above each door, a tall blue glass office tower three storeys high at the front corner, a big glowing pink and purple neon sign shaped like a parcel box on the tower roof without any letters, rooftop garden with small trees, proud tycoon look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#00ffff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "gleaming glass and white steel company headquarters building seen from a 2:1 isometric angle, its rectangular base fills the whole 256x128 isometric diamond footprint: the front corner of the walls touches the bottom centre of the picture and the left and right corners of the walls touch the left and right edges of the picture, three loading dock doors in a row on the left (south-west) wall near its far end, a small amber lamp above each door, a tall blue glass office tower three storeys high at the front corner, a big glowing pink and purple neon sign shaped like a parcel box on the tower roof without any letters, rooftop garden with small trees, proud tycoon look, no ground, no pavement, no lot, no apron, no shadow outside the walls, nothing below the walls, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "dc6529e4-c74b-5903-ac0c-206e474c44bb",
+            "source_image_id": "dc6529e4-c74b-5903-ac0c-206e474c44bb"
+          },
+          "jobId": "236141dc-c8ef-4409-b1ae-a8840ee5054b",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "fabc0fbd81c6d922e04e485ac92a8c61dad4fa5338ce66d64519511d3db2ebfa",
+          "at": "2026-10-30T05:42:25.040Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "good tower but the purple box sign does not read as neon",
+          "by": "claude",
+          "at": "2026-10-30T05:43:51.291Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "odd L-shaped left wall, squiggles like text on the tower glass",
+          "by": "claude",
+          "at": "2026-10-30T05:43:51.291Z"
+        }
+      ],
+      "note": "agent pick #2 (2026-10-30): glass HQ: a blue glass tower with gold trim at the front corner, a pink neon parcel-box sign on a dark board, rooftop garden, three bays with amber lamps on the SW wall",
+      "finalSha256": "4ab203880f84cf1f99bdef561aaaadcc58e66f46b415829efc2625bd364196f6",
+      "chosenCandidate": 2,
+      "bayLights": [[18,156], [36,167], [55,177]],
+      "dockPose": [6, 192]
     },
     {
       "id": "fx_dust",
@@ -11535,6 +12436,22 @@
       "finalSha256": "bcbc6892fd718453e8e6ea30efeb3c803c99dc76fa84f1289fa72cec0092294b"
     },
     {
+      "source": "procedural",
+      "variants": [],
+      "district": "ui",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "magic_ring",
+      "class": "fx",
+      "canvas": [16, 16],
+      "frames": ["_0", "_1", "_2", "_3"],
+      "note": "build 2 M7 (design-m7 §6.1, §6.8): the magic parcel countdown beside ic_magic — rush_ring geometry in the gold ramp, _0 = full, _3 = a quarter left (cityFx magicRingStep)",
+      "finalSha256": "f90a30779414ac5c041fd90277b97e296e3f9b4cd42814684fe2200a9f5907af"
+    },
+    {
       "id": "fx_smoke",
       "class": "fx",
       "source": "procedural",
@@ -12536,6 +13453,38 @@
       "finalSha256": "2a1130eb934ba882b730b52447c85935416058d2ac65d1bc93e7a1c65a64bc66"
     },
     {
+      "source": "procedural",
+      "variants": [],
+      "district": "ui",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ic_quest",
+      "class": "icon16",
+      "canvas": [16, 16],
+      "frames": [""],
+      "note": "build 2 M7 (design-m7 §6.1, B2 §3.1): the job board — a clipboard with a gold ★ (QuestCard masthead, HUD quest chip, district-panel quest row, newspaper quest picture)",
+      "finalSha256": "cd847dbfbca08e263e1a0d5295ea5f806286b8df80d479bdcb60cb6bbac3e604"
+    },
+    {
+      "source": "procedural",
+      "variants": [],
+      "district": "ui",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ic_magic",
+      "class": "icon16",
+      "canvas": [16, 16],
+      "frames": [""],
+      "note": "build 2 M7 (B2 §3.3): the golden parcel at 16 px (gold box, pink ribbon + bow, 1-px sparkle; matches parcel_s_magic) over the magic parcel's A and B, on its hops and the quest chip",
+      "finalSha256": "20edeab008eb0bddc08fdd7ad7a5164c22921618f2720417b91fc84b00f6f205"
+    },
+    {
       "id": "ui_panel",
       "class": "ui",
       "source": "procedural",
@@ -12582,6 +13531,22 @@
       "rejects": [],
       "note": "16x16 nine-slice, 4 px corners",
       "finalSha256": "0bf600f0edd9e356ddd37e23d82a0175c54421393e4edc400acab4ba05dfa346"
+    },
+    {
+      "source": "procedural",
+      "variants": [],
+      "district": "ui",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ui_card_gold",
+      "class": "ui",
+      "canvas": [16, 16],
+      "frames": [""],
+      "note": "build 2 M7 (design-m7 §6.1): 16x16 nine-slice, 4 px corners — ui_panel inside a 2-px gold ramp border (QuestCard ultimate / complete, VictoryCard)",
+      "finalSha256": "1499c84eb215fa20361bdf20281a59ea6371f96c0d59f8342d27e48c18be2ea0"
     },
     {
       "id": "ui_btn",
@@ -12960,6 +13925,22 @@
       "finalSha256": "e0f674f9fadbcd2e44e6c5f6cb1125379d14b059454532639083daee62adc04c"
     },
     {
+      "source": "procedural",
+      "variants": [],
+      "district": "ui",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ui_bar_fill_gold",
+      "class": "ui",
+      "canvas": [8, 8],
+      "frames": [""],
+      "note": "build 2 M7 (design-m7 §6.1): the quest progress fill (HUD chip, QuestCard), 3-slice like ui_bar_fill_*",
+      "finalSha256": "172d36a49421fed5c8d938146206767165b92d6b3f8d94e44faa53339e502a21"
+    },
+    {
       "variants": [],
       "placeholder": false,
       "approved": false,
@@ -13107,7 +14088,7 @@
       "gen": [],
       "rejects": [],
       "note": "glyph sheet from vlr font:build (art/final/font/m5x7.png); canvas 0x0 = variable",
-      "finalSha256": "3ec1e1531211c841e558e8a5312c008e92fbfdd084639cf5c9807e0ae812f702"
+      "finalSha256": "ed705a783c74757773be2e1e78be8da459aa72fce16e458a877e8604a73d543f"
     }
   ],
   "batches": [
@@ -13425,6 +14406,33 @@
       "usd": 0,
       "balanceBefore": 2988,
       "balanceAfter": 2966
+    },
+    {
+      "at": "2026-10-30T05:41:37.426Z",
+      "ids": ["ru_peer_pasture", "ru_dev_dairy", "ru_range_ranch", "ru_optional_orchard", "ru_hay_barn", "ru_grain_coop", "ru_caret_mill", "ru_tilde_tractors", "ru_semver_stables", "ru_farmhouse_once"],
+      "tool": "create-image-pro-flash",
+      "generations": 204,
+      "usd": 0,
+      "balanceBefore": 2966,
+      "balanceAfter": 2762
+    },
+    {
+      "at": "2026-10-30T05:43:33.057Z",
+      "ids": ["wh_ext_t3", "wh_ext_t5"],
+      "tool": "create-image-pro-flash",
+      "generations": 54,
+      "usd": 0,
+      "balanceBefore": 2762,
+      "balanceAfter": 2708
+    },
+    {
+      "at": "2026-10-30T05:44:49.463Z",
+      "ids": ["wh_ext_t4"],
+      "tool": "edit-image-pro-flash",
+      "generations": 18,
+      "usd": 0,
+      "balanceBefore": 2708,
+      "balanceAfter": 2690
     }
   ],
   "retired": [
@@ -13998,6 +15006,382 @@
         {
           "candidate": 2,
           "reason": "small",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "ru_farm",
+      "class": "building3x3",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T05:42:18.708Z",
+      "reason": "superseded: shared Rural locked scenery replaced by one unique sprite per buildings.json id (build 2 M7, B2 §6.5)",
+      "replacedBy": ["ru_peer_pasture", "ru_dev_dairy", "ru_range_ranch"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "54588ade-8bfb-5735-b862-e9d6b81cd17b",
+            "source_image_id": "54588ade-8bfb-5735-b862-e9d6b81cd17b"
+          },
+          "jobId": "d479940c-2315-4e13-ae6e-7e8c05fa88e7",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "f728baf59ca6164970a32357b2bb88daf383667b04d0e4c5e675c3f15ff13007",
+          "at": "2026-10-29T08:15:37.029Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "33e83709-49c9-58e5-a19a-d8cd1255e30e",
+            "source_image_id": "33e83709-49c9-58e5-a19a-d8cd1255e30e"
+          },
+          "jobId": "417e94f5-702d-47f7-9bd3-081c3ae79605",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "0d0a164bf5cae1c942ab4f241fa58d88a28bb9ed168e06aff2025a3fdbe933f6",
+          "at": "2026-10-29T08:15:42.057Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "farmstead with a farmhouse, barn and fenced pasture, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "323c9919-1063-55c3-a3d9-e142bc0f2dde",
+            "source_image_id": "323c9919-1063-55c3-a3d9-e142bc0f2dde"
+          },
+          "jobId": "19442bdb-b8fc-49c8-9121-709381491239",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "31a83f8398239ab9dfc65d72c64ec4b444379546748fcc5645f39ef9a393b6a5",
+          "at": "2026-10-29T08:15:41.955Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "similar",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "blue roofs",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "ru_barn",
+      "class": "building2x2",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T05:42:18.710Z",
+      "reason": "superseded: shared Rural locked scenery replaced by one unique sprite per buildings.json id (build 2 M7, B2 §6.5)",
+      "replacedBy": ["ru_hay_barn", "ru_caret_mill", "ru_semver_stables"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "e33ba0c6-3331-5108-8454-b43c8dd4053b",
+            "source_image_id": "e33ba0c6-3331-5108-8454-b43c8dd4053b"
+          },
+          "jobId": "9f316aac-0128-41d0-9b5b-e26f636e190d",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "abb4ca1164b4a9f601a51220904de555648fdbf1a050de65b5b18f827b2d715d",
+          "at": "2026-10-29T08:15:47.460Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f382aca9-38b9-50cd-aaa4-2c85352eb12a",
+            "source_image_id": "f382aca9-38b9-50cd-aaa4-2c85352eb12a"
+          },
+          "jobId": "fa2f5057-e852-4827-9e27-19fe306e68c7",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "04a96a578cb37c03a8b6e7063ec8f3d3dcfad9dad041655c5438bdc3f3e860bb",
+          "at": "2026-10-29T08:15:52.788Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "wooden barn with a gambrel roof and hay bales, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "8367a06c-0cb5-5b8b-b7f6-837171593766",
+            "source_image_id": "8367a06c-0cb5-5b8b-b7f6-837171593766"
+          },
+          "jobId": "e9c75af6-5878-4a94-8ea6-1808fd92f929",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "f4bf1d49488928b3efb79ffac1606987b4904a41594a266a5862363e1cb17006",
+          "at": "2026-10-29T08:15:47.364Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "purple roof, odd for a barn in full colour",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "grey roof",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "ru_orchard",
+      "class": "building2x2",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T05:42:18.710Z",
+      "reason": "superseded: shared Rural locked scenery replaced by one unique sprite per buildings.json id (build 2 M7, B2 §6.5)",
+      "replacedBy": ["ru_optional_orchard", "ru_grain_coop", "ru_tilde_tractors"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "dc554cfa-a135-5cf1-a69d-4849023b9da2",
+            "source_image_id": "dc554cfa-a135-5cf1-a69d-4849023b9da2"
+          },
+          "jobId": "5eee88e8-89dd-43c1-bca2-b598e3abe380",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "4554c4c2c64009ed45f0a78d64d9c074c438543fcf8a2926f20992164faab2d9",
+          "at": "2026-10-29T08:15:52.983Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "d9626aa1-3e74-5d87-8fdd-c63a38388c9d",
+            "source_image_id": "d9626aa1-3e74-5d87-8fdd-c63a38388c9d"
+          },
+          "jobId": "a90bfb42-d2d6-4834-a845-c34e94d34371",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "366744b3490e64e2c38ad4cd7fa925011d6a397a9403688d4f1a08d9dc3eff00",
+          "at": "2026-10-29T08:15:52.883Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "small orchard of fruit trees with a shed, a chunky group of buildings that fills most of a 128x64 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b633c6da-df0b-5c43-bc88-961c32b5f4c3",
+            "source_image_id": "b633c6da-df0b-5c43-bc88-961c32b5f4c3"
+          },
+          "jobId": "ed0a0fcb-6812-43ed-9f02-9c73d5b41fef",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "5051bbcac0dcdeb6d91e56fbc502fe03990e4d6cd20d6a2516fb6d2d5a1656c0",
+          "at": "2026-10-29T08:16:14.414Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "crop rows, reads as a farm",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "house-led",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "ru_farmhouse",
+      "class": "building1x1",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T05:42:18.710Z",
+      "reason": "superseded: shared Rural locked scenery replaced by one unique sprite per buildings.json id (build 2 M7, B2 §6.5)",
+      "replacedBy": ["ru_farmhouse_once"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "7e42083c-ec63-53b4-b034-8511bc28c170",
+            "source_image_id": "7e42083c-ec63-53b4-b034-8511bc28c170"
+          },
+          "jobId": "0f9d5d21-8cb9-4753-8ca8-ecc84f35b895",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "b00dab4e816db6f67d4d5d4fbaf82aadfe41971a1777331d55ff4f838d8efcde",
+          "at": "2026-10-29T08:16:19.810Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "4b0b5b90-a609-544f-a697-2fec912655a1",
+            "source_image_id": "4b0b5b90-a609-544f-a697-2fec912655a1"
+          },
+          "jobId": "ce9c4f6e-a5e2-4541-9e1c-85bb6457a4bd",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "efa2615e80c6c2dfa66183657dfe0e687988d745f20649d32f78db75cba85136",
+          "at": "2026-10-29T08:16:30.255Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "small farmhouse with a porch, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, grassy yard, 1 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "18b6f9ec-d8e2-5476-85ea-984589fde7cb",
+            "source_image_id": "18b6f9ec-d8e2-5476-85ea-984589fde7cb"
+          },
+          "jobId": "0c6d98eb-a2b7-4c99-a593-4cfd1c47c0b4",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "f1419a8e79c01db5a89670f0da56d06e83a4fdfe60bd1cff8a563270ce61d1c8",
+          "at": "2026-10-29T08:16:25.313Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "porch smaller",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "tan, flatter",
           "by": "claude",
           "at": "2026-10-29T08:27:16.840Z"
         }

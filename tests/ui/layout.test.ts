@@ -1,6 +1,7 @@
 // city-view.md §4 / plan.md §6.9.1: computeLayout at W ∈ {320, 360, 393, 430},
 // zoom ∈ {1, 2}, safeBottom ∈ {0, 34} returns non-overlapping rects and every
-// button's hit box is ≥ 44/zoom logical px on both axes.
+// button's hit box is ≥ 44/zoom logical px on both axes. M7 (design-m7
+// §6.4): the same holds with the quest chip in row B (L.questTargets).
 import { describe, expect, it } from 'vitest'
 import {
   BTN_H,
@@ -11,7 +12,10 @@ import {
   computeLayout,
   contains,
   overlaps,
+  QUEST_CHIP_W,
+  type FixedTargetName,
   type Rect,
+  type Target,
   type TargetName,
 } from '../../src/ui/layout.ts'
 
@@ -29,7 +33,7 @@ for (const W of WIDTHS)
         for (const H of HEIGHTS) cases.push([W, H, st, sb, zoom])
 
 const ROW_A: TargetName[] = ['money', 'lives', 'mood']
-const BOTTOM_BAR: TargetName[] = [
+const BOTTOM_BAR: FixedTargetName[] = [
   'speedPause',
   'speed1',
   'speed2',
@@ -183,4 +187,112 @@ describe('buttonColumn (Title card, city-view.md §9.5)', () => {
         expect(overlaps(col[i]!.hit, col[i + 1]!.hit)).toBe(false)
     },
   )
+})
+
+const hitChecks = (
+  L: ReturnType<typeof computeLayout>,
+  targets: Record<string, Target>,
+): void => {
+  const min = L.minHit
+  for (const [name, t] of Object.entries(targets)) {
+    expect(t.hit.w, `${name}.hit.w`).toBeGreaterThanOrEqual(min)
+    expect(t.hit.h, `${name}.hit.h`).toBeGreaterThanOrEqual(min)
+    expect(inside(t.hit, t.rect), `${name} hit contains rect`).toBe(true)
+    expect(t.hit.x, `${name} left edge`).toBeGreaterThanOrEqual(0)
+    expect(t.hit.x + t.hit.w, `${name} right edge`).toBeLessThanOrEqual(L.W)
+  }
+}
+const disjoint = (
+  L: ReturnType<typeof computeLayout>,
+  targets: Record<string, Target>,
+): void => {
+  const boxes: [string, Rect][] = [
+    ...Object.entries(targets).map(([n, t]) => [n, t.hit] as [string, Rect]),
+    ['chips', { x: 0, y: L.chip.hitY, w: L.W, h: L.chip.hitH }],
+  ]
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const [an, a] = boxes[i]!
+      const [bn, b] = boxes[j]!
+      expect(overlaps(a, b), `${an} vs ${bn}`).toBe(false)
+    }
+}
+
+describe('M7 quest chip in row B (design-m7 §6.4)', () => {
+  it.each([
+    [360, 604, 178, 98],
+    [393, 659, 211, 131],
+    [430, 932, 248, 168],
+  ])(
+    'W=%i H=%i: the chip sits at x %i (116 px, 4 px left of the shield), the level bar shrinks to %i px',
+    (W, H, chipX, barW) => {
+      for (const st of [0, 47]) {
+        const L = computeLayout(W, H, st, 0, 1)
+        expect(L.questChip.rect).toEqual({
+          x: chipX,
+          y: st + 24,
+          w: QUEST_CHIP_W,
+          h: 24,
+        })
+        expect(L.questChip.rect.x + L.questChip.rect.w + 4).toBe(
+          L.shield.rect.x,
+        )
+        expect(L.levelBarChip).toEqual({ x: 76, y: st + 29, w: barW, h: 14 })
+        expect(L.levelBarChip.x + L.levelBarChip.w + 4).toBe(chipX)
+        // The full bar is unchanged while no chip shows.
+        expect(L.levelBar.w).toBe(W - 138)
+        // The level cell's hit box ends where the chip's begins; the chip's
+        // runs to the shield's.
+        expect(L.levelChip.hit.x).toBe(0)
+        expect(L.levelChip.hit.x + L.levelChip.hit.w).toBe(L.questChip.hit.x)
+        expect(L.questChip.hit.x + L.questChip.hit.w).toBe(L.shield.hit.x)
+        expect(L.questChip.hit.y).toBe(L.level.hit.y)
+        expect(L.questChip.hit.h).toBe(L.level.hit.h)
+        expect(L.questTargets.questChip).toBe(L.questChip)
+        expect(L.questTargets.level).toBe(L.levelChip)
+      }
+    },
+  )
+
+  it.each([
+    [360, 604],
+    [393, 659],
+    [430, 932],
+  ])(
+    'W=%i H=%i: with the chip, no two hit boxes overlap and each is >= 44/zoom',
+    (W, H) => {
+      for (const zoom of ZOOMS)
+        for (const st of SAFE_TOPS)
+          for (const sb of SAFE_BOTTOMS) {
+            const L = computeLayout(W, H, st, sb, zoom)
+            hitChecks(L, L.questTargets)
+            disjoint(L, L.questTargets)
+            // The chip and the shortened bar stay inside row B, clear of the shield.
+            expect(inside(L.rowB, L.questChip.rect)).toBe(true)
+            expect(overlaps(L.questChip.rect, L.shield.rect)).toBe(false)
+            expect(overlaps(L.questChip.rect, L.levelBarChip)).toBe(false)
+          }
+    },
+  )
+
+  it.each(cases)(
+    'W=%i H=%i st=%i sb=%i zoom=%i: questTargets keep the tap rules',
+    (W, H, st, sb, zoom) => {
+      const L = computeLayout(W, H, st, sb, zoom)
+      hitChecks(L, L.questTargets)
+      disjoint(L, L.questTargets)
+      expect(L.levelBarChip.w).toBeGreaterThan(0)
+    },
+  )
+
+  it('with the chip, a tap lands in exactly one target or none', () => {
+    const L = computeLayout(393, 659, 0, 34, 1)
+    for (let y = 0; y < 659; y += 3)
+      for (let x = 0; x < 393; x += 3) {
+        const hits = Object.values(L.questTargets).filter((t) =>
+          contains(t.hit, x, y),
+        )
+        expect(hits.length).toBeLessThanOrEqual(1)
+      }
+  })
 })

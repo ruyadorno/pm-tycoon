@@ -1,5 +1,5 @@
-// The tick loop (plan.md §6.4): one call = 100 ms of sim time, twelve steps
-// in a fixed order. Each step is a named function over (sim, ctx); later
+// The tick loop (plan.md §6.4): one call = 100 ms of sim time, thirteen
+// steps in a fixed order (M7 adds `quests` between `levels` and `day`). Each step is a named function over (sim, ctx); later
 // milestones replace the TODO bodies with calls into src/sim/systems/*.ts
 // (keep the order — the rng stream depends on it). Commands never run inside
 // a tick: they apply immediately in Sim.dispatch.
@@ -12,6 +12,7 @@ import { laneStep } from './systems/lane.ts'
 import { levelsStep } from './systems/levels.ts'
 import { paydayStep } from './systems/payroll.ts'
 import { peopleDayStep } from './systems/people.ts'
+import { questsStep } from './systems/quests.ts'
 import { driftStep, waitingStep } from './systems/satisfaction.ts'
 import { holdStationStep } from './systems/sorter.ts'
 import { spawnStep } from './systems/spawn.ts'
@@ -97,7 +98,18 @@ export function levels(sim: Sim, _ctx: TickContext): void {
 }
 
 /**
- * 11. On the day boundary: payroll and walkouts, the applicant pools (M6,
+ * 11. Quests (M7, systems/quests.ts): the active quest's derived values, day
+ * close, completion / fail and progress; offer expiry; the ultimate quest
+ * from its level on; a regular offer when due (one quest-stream draw — never
+ * state.rng). After `levels` (a level:up offers the ultimate the same tick),
+ * before `day` (a boundary closes onTimeRateDay with all of its deliveries).
+ */
+export function quests(sim: Sim, ctx: TickContext): void {
+  questsStep(sim, ctx)
+}
+
+/**
+ * 12. On the day boundary: payroll and walkouts, the applicant pools (M6,
  * applicant stream only), drift, escalation,
  * dock:occupancy, daysSinceIncident, day:ended, the MinuteRow, then the
  * per-day counters reset.
@@ -111,9 +123,9 @@ export function day(sim: Sim, ctx: TickContext): void {
   peopleDayStep(sim)
   driftStep(sim)
   // Malware escalation needs no state: malwareShare() derives it from the
-  // day count and stats.levelTick (§5.4): + postVictoryPerDay at every day
-  // boundary from the first one after the counter capped at
-  // economy.playtestMaxLevel, up to malware.cap.
+  // day count and stats.victoryTick / stats.levelTick (§5.4, spec-build2
+  // §3.4): + postVictoryPerDay at every day boundary after Victory (or after
+  // the counter capped below the last level), up to malware.cap.
   for (const d of s.lane.docks) {
     sim.emit('dock:occupancy', {
       dockId: d.id,
@@ -140,7 +152,7 @@ export function day(sim: Sim, ctx: TickContext): void {
   }
 }
 
-/** 12. Delete terminal parcels (delivered / tossed / cleared). */
+/** 13. Delete terminal parcels (delivered / tossed / cleared). */
 export function gc(sim: Sim, _ctx: TickContext): void {
   const parcels = sim.state.parcels
   for (const key of Object.keys(parcels)) {
@@ -163,6 +175,7 @@ export const TICK_STEPS: readonly (readonly [string, TickStep])[] = [
   ['clearance', clearance],
   ['waiting', waiting],
   ['levels', levels],
+  ['quests', quests],
   ['day', day],
   ['gc', gc],
 ]
@@ -185,6 +198,12 @@ export function buildMinuteRow(sim: Sim): MinuteRow {
   const hold = laneNode(s.lane, s.lane.holdBayNodeId)
   const bays = s.lane.docks
   const busy = bays.reduce((sum, d) => sum + d.busyTicksThisDay, 0)
+  // Cumulative completions: the previous row + this minute's (the history
+  // keeps the last QUEST_HISTORY_MAX records, far more than a minute holds).
+  const prev = st.minutes.at(-1)?.questsDone ?? 0
+  const done = s.quests.history.filter(
+    (r) => r.outcome === 'completed' && r.tick > s.tick - TICKS_PER_DAY,
+  ).length
   return {
     min: s.day,
     tick: s.tick,
@@ -206,5 +225,7 @@ export function buildMinuteRow(sim: Sim): MinuteRow {
     dockPct: bays.length === 0 ? 0 : dockPct(busy / bays.length),
     fleet: s.vehicles.length,
     lives: s.economy.lives,
+    quest: s.quests.active?.templateId ?? null,
+    questsDone: prev + done,
   }
 }

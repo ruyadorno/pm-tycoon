@@ -26,6 +26,10 @@
 // (the HUD's PlaytestRecorder, registry REG_PLAYTEST; null before the HUD
 // exists), downloadPlaytest() saves it as playtest.json (the summary card's
 // Blob + <a download>), and metrics().playtest carries its live counters.
+// M7 (design-m7 §6.10, plan-build2 §8.4 task 6): quests() is the ViewSim's
+// quests() (offer / active slots with their derived fields, history,
+// vouchers, victory) — a plain-data read for e2e; the debug offer is
+// `sim.debug.offerQuest(id)` (Boot's ?quest=<id> calls it).
 import Phaser from 'phaser'
 import type { AudioDebugApi, AudioDirector } from '../audio/director.ts'
 import type { Stepper } from '../boot/stepper.ts'
@@ -41,7 +45,7 @@ import {
 import type { Command, CommandResult } from '../sim/commands.ts'
 import type { SimEventName, SimEventPayloads } from '../sim/events.ts'
 import { replay, Sim, stateHash, type SimSnapshot } from '../sim/sim.ts'
-import type { ViewSim } from '../sim/view-api.ts'
+import type { QuestsView, ViewSim } from '../sim/view-api.ts'
 import { downloadJson } from '../ui/SummaryCard.ts'
 import { installDrawCallCounter, overlayStats, REG_OVERLAY } from './overlay.ts'
 import { type Params, worldSceneKey } from './params.ts'
@@ -132,6 +136,8 @@ export interface PmApi {
    * City (B2 §6.1 check); returns the new state (false without a City).
    */
   debugLotCorners(on?: boolean): boolean
+  /** M7: the current sim's quest slots, history, vouchers and victory (ViewSim.quests()). */
+  quests(): QuestsView
 }
 
 declare global {
@@ -351,6 +357,9 @@ export function installDebugApi(
         setLotCorners?(on: boolean): boolean
       } | null
       return city?.setLotCorners?.(on) ?? false
+    },
+    quests() {
+      return (game.registry.get(REG.viewSim) as ViewSim).quests()
     },
   }
   window.__pm = pm

@@ -329,12 +329,102 @@ export class Stingers {
     )
   }
 
-  /** Build 2: the big-band victory tag. Logs only in playtest 1. */
+  /** The victory stinger's audio.json numbers (B2 §3.4, design-m7 §6.9). */
+  #victoryCfg(): VictoryStingerConfig {
+    return this.#d.config.stingers
+  }
+
+  /** Length of the victory tag in seconds: two bars at the sheet tempo + the I6/9 hold. */
+  victoryTagSeconds(): number {
+    return VICTORY_BEATS * this.#spb() + this.#victoryCfg().victoryHoldS
+  }
+
+  /**
+   * Victory (build 2, B2 §3.4, design-m7 §6.9): the big-band I–vi–ii–V tag — Imaj7 vi7 ii7 V7 two beats each,
+   * piano2 voice-led voicings over bass2 roots (F2 D2 G2 C2 in F) — landing on the I6/9 (piano2 [4,7,9,14] on
+   * the F3 octave + the bass2 root) held `victoryHoldS`, with a trumpet2 fanfare 5–1–3–5 as quarter notes over
+   * the ii–V bar whose 8 lands with the I6/9 and holds (C4 F4 A4 C5 → F5 in F). Every degree is relative to the
+   * key root. Starts `lookAheadS` from now at the sheet tempo in seconds, not on the Transport grid: the
+   * director drops the band out for it (director.ts #victory) and brings it back after `victoryTagSeconds()`.
+   * True when scheduled.
+   */
   victoryTag(): boolean {
-    this.#d.log.info(
-      'stinger victoryTag (build 2 stub)',
-      this.#d.ctx?.currentTime ?? 0,
+    const v = this.#victoryCfg()
+    const spb = this.#spb()
+    const root = this.#keyRoot()
+    const chords = [
+      this.#chordOnKey(0, 'maj7'),
+      this.#chordOnKey(9, 'm7'),
+      this.#chordOnKey(2, 'm7'),
+      this.#chordOnKey(7, '7'),
+    ]
+    const notes: Note[] = []
+    voiceSequence(chords, 55, 64).forEach((voicing, k) => {
+      for (const midi of voicing) {
+        notes.push({
+          inst: 'piano2',
+          midi,
+          at: k * 2 * spb,
+          dur: spb * 1.8,
+          vel: v.victoryVel - 10,
+          g: k,
+        })
+      }
+      notes.push({
+        inst: 'bass2',
+        midi: placeNear((chords[k] as Chord).root, 41, 36, 47),
+        at: k * 2 * spb,
+        dur: spb * 1.8,
+        vel: v.victoryVel - 5,
+      })
+    })
+    const land = VICTORY_BEATS * spb
+    const stabRoot = placeNear(root, 50, 48, 59) // F3
+    for (const iv of [4, 7, 9, 14]) {
+      notes.push({
+        inst: 'piano2',
+        midi: stabRoot + iv,
+        at: land,
+        dur: v.victoryHoldS,
+        vel: v.victoryVel - 5,
+        g: VICTORY_BEATS,
+      })
+    }
+    notes.push({
+      inst: 'bass2',
+      midi: placeNear(root, 41, 36, 47), // F2
+      at: land,
+      dur: v.victoryHoldS,
+      vel: v.victoryVel,
+    })
+    // the fanfare: 5 1 3 5 on beats 1-4 of the ii–V bar, the 8 on the landing (the tonic in C4–B4 = F4)
+    const tonic = placeNear(root, 65, 60, 71)
+    ;[-5, 0, 4, 7].forEach((iv, k) =>
+      notes.push({
+        inst: 'trumpet2',
+        midi: tonic + iv,
+        at: (VICTORY_BEATS - 4 + k) * spb,
+        dur: spb * 0.85,
+        vel: v.victoryVel,
+      }),
     )
-    return false
+    notes.push({
+      inst: 'trumpet2',
+      midi: tonic + 12,
+      at: land,
+      dur: v.victoryHoldS,
+      vel: v.victoryVel + 6,
+    })
+    const now = this.#d.ctx?.currentTime ?? 0
+    return this.#play('victoryTag', now + this.#d.config.lookAheadS, notes)
   }
 }
+
+/** Beats before the victory tag lands: I vi ii V, two beats each. */
+const VICTORY_BEATS = 8
+
+/** audio.json `stingers` keys of the victory tag (build 2 M7). */
+type VictoryStingerConfig = Pick<
+  AudioConfig['stingers'],
+  'victoryVel' | 'victoryHoldS'
+>

@@ -88,8 +88,62 @@ describe('city-view §8.2: a 48×48 picture by kind', () => {
   })
 })
 
+describe('design-m7 §6.7: quest-complete and ★ papers', () => {
+  it("quest → the item's picture when the atlas has it, else ic_quest; star → ic_star", () => {
+    expect(np.newsPicture('quest', data)).toBe('ic_quest')
+    expect(np.newsPicture('quest', data, { picture: 'ic_star' })).toBe(
+      'ic_star',
+    )
+    expect(np.newsPicture('quest', data, { picture: 'no_such_frame' })).toBe(
+      'ic_quest',
+    )
+    expect(np.newsPicture('star', data)).toBe('ic_star')
+    // 16-px icons are drawn as they are in the 48-px box (never scaled).
+    expect(np.fitBox(16, 16, np.PICTURE_PX)).toEqual({ w: 16, h: 16 })
+  })
+
+  it('every quest headline (questText.newsHeadline) fits the 236-px box in m5x7', async () => {
+    const { readFileSync } = await import('node:fs')
+    const xml = readFileSync(
+      new URL('../../src/assets/m5x7.xml', import.meta.url),
+      'utf8',
+    )
+    const adv = new Map<number, number>()
+    for (const m of xml.matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+      adv.set(Number(m[1]), Number(m[2]))
+    const width = (s: string): number =>
+      [...s].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
+    const { newsHeadline } = await import('../../src/ui/questText.ts')
+    const { createViewSim } = await import('../../src/sim/view-api.ts')
+    const { noOffers, offerQuest, quietSim } = await import('../sim/helpers.ts')
+    const ids = [...data.quests.templates.map((t) => t.id), 'golden_release']
+    const kinds = new Set<string>()
+    for (const id of ids) {
+      const sim = noOffers(quietSim(1))
+      offerQuest(sim, id)
+      const base = createViewSim(sim).quests().offer!
+      for (const d of data.districts) {
+        const q =
+          base.target === null
+            ? base
+            : { ...base, target: d.id, targetName: d.flavour }
+        const n = newsHeadline(data, q, q.reward)
+        kinds.add(n.kind)
+        const lines = np.wrapHeadline(n.text, np.HEADLINE_W, 4, width)
+        expect(lines.join(' '), n.text).toBe(n.text)
+        expect(lines.length).toBeLessThanOrEqual(np.HEADLINE_MAX_LINES)
+        // A queued paper of either kind carries its picture.
+        expect(np.newsPicture(n.kind, data)).toBe(
+          n.kind === 'star' ? 'ic_star' : 'ic_quest',
+        )
+      }
+    }
+    expect(kinds).toEqual(new Set(['quest', 'star']))
+  })
+})
+
 describe('spec-build2 §2.5: a one-line "hired" item for star applicants only', () => {
-  it('"Star hire: Wren joins as a sorter" (m5x7 has no ★ glyph)', () => {
+  it('"Star hire: Wren joins as a sorter" (the word, not the ★ glyph)', () => {
     expect(np.starHireHeadline('Wren', 'sorter')).toBe(
       'Star hire: Wren joins as a sorter',
     )

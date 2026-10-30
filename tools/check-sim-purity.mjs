@@ -7,6 +7,7 @@ const HEADLESS_DIRS = ['src/sim', 'src/data']
 const HEADLESS_FILES = ['src/render/iso.ts']
 const PHASER_FREE = [
   'src/ui/layout.ts',
+  'src/ui/questText.ts',
   'src/render/warehouse/RoomLayout.ts',
   'src/render/decayPhase.ts',
   'src/render/cityFx.ts',

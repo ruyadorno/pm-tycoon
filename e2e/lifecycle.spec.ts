@@ -9,6 +9,8 @@
 // view per sim vehicle, no camera fade running, no console error.
 //   - City ↔ Warehouse 50 times with 1–4 frames between switches, and a
 //     camera pan request (a chip tap) during the City's exit pan;
+//   - a storm across the first quest offer (3:00) under the policy: no
+//     QuestCard opens by itself (design-m7 §6.5);
 //   - the same storms during a level-up (fixture level-up.json), a catch
 //     moment (forced flag), the lost-life card (malware-cleared.json) and
 //     with the Garage open;
@@ -322,6 +324,47 @@ test.describe('lifecycle', () => {
     expect(gameMs, 'switch time in game ms').toBeLessThan(1000)
     await restInCity(page)
     expectAtRest(await invariants(page), 'after the switch')
+    expect(consoleErrors).toEqual([])
+  })
+
+  test('the first quest offer (3:00) lands mid-storm under the policy: no card opens', async ({
+    page,
+    consoleErrors,
+  }) => {
+    await openGame(page)
+    // Two seconds short of the first offer (quests.json offer.firstOfferDay),
+    // then storm across it: the policy accepts the offer on its tick, and the
+    // HUD never auto-opens the QuestCard while a policy drives the stepper
+    // (design-m7 §6.5), so the modal stack stays empty.
+    const left = await page.evaluate(() => {
+      const api = window.__pm!
+      const n = api.quests().nextOfferInTicks
+      if (n !== null && n > 20) api.advance((n - 20) * 100)
+      return api.quests().nextOfferInTicks
+    })
+    expect(left, 'the first offer is still ahead').not.toBeNull()
+    let answered = false
+    for (let i = 0; i < 120 && !answered; i++) {
+      await storm(page, 1)
+      answered = await page.evaluate(() => {
+        const qs = window.__pm!.quests()
+        return qs.active !== null || qs.history.length > 0
+      })
+    }
+    expect(answered, 'the first offer came and the policy took it').toBe(true)
+    await restInCity(page)
+    expectAtRest(await invariants(page), 'after the first offer')
+    expect(
+      await page.evaluate(
+        () =>
+          (
+            window.__pm!.game.scene.getScene('HUD') as unknown as {
+              questCard: { isOpen: boolean }
+            }
+          ).questCard.isOpen,
+      ),
+      'no QuestCard under the policy',
+    ).toBe(false)
     expect(consoleErrors).toEqual([])
   })
 

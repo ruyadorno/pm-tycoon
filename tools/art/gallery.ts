@@ -74,7 +74,7 @@ const INTERIOR = new Set([
 export function categoryOf(e: ManifestEntry): Category {
   if (e.class.startsWith('vehicle-')) return 'vehicles'
   if (INTERIOR.has(e.class)) return 'warehouse-interior'
-  if (e.id === 'wh_ext' || /^sign_(days|locked|pop)$/.test(e.id)) {
+  if (e.class === 'warehouse-ext' || /^sign_(days|locked|pop)$/.test(e.id)) {
     return 'warehouse-exterior'
   }
   if (e.id.startsWith('mood_')) return 'procedural'

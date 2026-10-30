@@ -368,6 +368,26 @@ export function starDaysLeft(leavesOnDay: number, tick: number): number {
 }
 
 /**
+ * The name the ★ applicant of `def` has (or will have) in its pool: the
+ * waiting one's (matched by `starKey`), else the def's name, renamed
+ * (freshName, "Vera 2") when an employee already holds it. Pure — the quest
+ * reward announces this name before addStarApplicant places it.
+ */
+export function starApplicantName(
+  s: SimState,
+  def: Pick<StarApplicantDef, 'role' | 'name'>,
+): string {
+  const waiting = s.applicants[def.role].find(
+    (a) => a.star && (a.starKey ?? a.name) === def.name,
+  )
+  if (waiting) return waiting.name
+  const staff = s.employees.map((e) => e.name)
+  return staff.includes(def.name)
+    ? freshName([def.name], [...staff, ...takenNames(s)])
+    : def.name
+}
+
+/**
  * A ★ applicant joins its role's pool (M7 quest rewards): free to hire,
  * leaves at the day boundary starLeavesOnDay (≥ starExpiryDays after it
  * arrives); inserted after the stars already waiting; the last regular
@@ -389,10 +409,7 @@ export function addStarApplicant(sim: Sim, def: StarApplicantDef): Applicant {
     sim.emit('applicants:refreshed', { role, reason: 'star' })
     return waiting
   }
-  const staff = s.employees.map((e) => e.name)
-  const name = staff.includes(def.name)
-    ? freshName([def.name], [...staff, ...takenNames(s)])
-    : def.name
+  const name = starApplicantName(s, def)
   // A regular holding that name anywhere is re-rolled in place (new id).
   for (const r of ROLES) {
     const list = s.applicants[r]

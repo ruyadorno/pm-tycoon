@@ -45,6 +45,14 @@
 // class plus a sorter hired at L2 who takes over the Hold Bay: no hand
 // Tosses while it is on duty, every `looks clean` parcel Cleared.
 //
+// Build 2, M7 (spec-build2 §7.2 "quests" row; design-m7 §5.1): questPolicyStep,
+// right after REHIRE (and the delegating sorter hire) — accept every offer at
+// once (the Golden Release as soon as no quest is active), and rush the
+// golden parcel's origin while it waits there unrushed (on its spawn tick:
+// the accept spawns it, so accept and rush land in the same step). It never
+// declines, abandons or rushes the destination (the sim's magic-first
+// outbound rule covers B). Both kinds share it.
+//
 // Prices come from src/data; the buffer, the counts and dockBlockedHireS are
 // the policy's own parameters (spec §7 wording), not balance numbers.
 
@@ -54,6 +62,7 @@ import {
   delegatingHireSorter,
   delegatingHoldBay,
 } from './policies/delegating.ts'
+import { isRushed } from './systems/dispatch.ts'
 import { rehireFee } from './systems/payroll.ts'
 import { hireFeeOf, salaryOf } from './systems/people.ts'
 import { SIM_FEATURES } from './features.ts'
@@ -164,6 +173,31 @@ export function weakestCounter(sim: Sim): CheckerDef | null {
   return best ? machineDef(sim, best.counter) : null
 }
 
+/**
+ * B2 §7.2 quests: accept every offer at once (the ultimate as soon as no
+ * quest is active); while the active magic parcel waits at its origin and
+ * the origin is not rushed, rush it (on its spawn tick — accept and rush
+ * happen in the same step). Nothing else changes: never declines, abandons
+ * or rushes the destination. Shared by the competent and the delegating
+ * policy (design-m7 §5.1).
+ */
+export function questPolicyStep(sim: Sim): void {
+  const qs = sim.state.quests
+  if (qs.offer !== null && qs.active === null) {
+    sim.dispatch({ kind: 'acceptQuest', questId: qs.offer.id })
+  }
+  const pr = qs.active?.progress
+  if (pr?.kind !== 'magicParcel' || pr.parcelId === null) return
+  const origin = pr.origin
+  const p = sim.state.parcels[String(pr.parcelId)]
+  if (origin === null || p?.state !== 'waiting' || isRushed(sim, origin)) {
+    return
+  }
+  // A `no-vehicle` failure is `applied`: the flag stays up and the
+  // dispatcher retargets the first vehicle that frees (§4.1).
+  sim.dispatch({ kind: 'rush', buildingId: origin })
+}
+
 class CompetentPolicy implements Policy {
   readonly name: PolicyKind
   readonly #sim: Sim
@@ -186,6 +220,7 @@ class CompetentPolicy implements Policy {
         POLICY_PARAMS.purchaseBuffer,
       )
     }
+    if (SIM_FEATURES.quests) questPolicyStep(sim)
     this.#opening()
     this.#bikes()
     if (SIM_FEATURES.levels) this.#level2()

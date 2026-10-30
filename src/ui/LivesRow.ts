@@ -1,13 +1,16 @@
 // Lives row (city-view.md §4.1, §3.3, §9.3; spec §10): five 16x16 slots with
 // 2-px gaps, `ic_life_on` for each life and `ic_life_off` for the rest (start
-// 3, cap 5, so slots 4–5 are empty outlines until the build-2 magic parcels).
+// 3, cap 5: slots 4–5 light when a magic parcel or a quest reward brings the
+// count above 3 — M7, spec-build2 §3.3, `life:gained`).
 // Shared by the HUD top bar and the lost-life card.
 //
 // loseLife(n) plays the §3.3 step-3 beat on the rightmost lit slot: its fuse
 // lights (`ic_life_fuse_0/1` alternating, 400 ms), then the slot empties under
 // an `fx_puff` (4 frames) — FUSE_STEPS below is the frame plan, stepped by a
-// scene-clock timer so the frozen test clock drives it too. Phaser is a
-// type-only import (the plan is unit-tested under Node).
+// scene-clock timer so the frozen test clock drives it too. gainLife(n) (M7,
+// design-m7 §6.5) blinks the newly lit slot(s) on/off three times at the same
+// step (GAIN_STEPS; no scale, frames only). Phaser is a type-only import (the
+// plans are unit-tested under Node).
 import type Phaser from 'phaser'
 import type { FrameName } from '../render/frames.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
@@ -65,6 +68,36 @@ export function fusingSlot(
   const n = Math.floor(lives)
   if (!(n < shown) || n < 0 || n >= slots) return null
   return n
+}
+
+/**
+ * M7 (design-m7 §6.5): the newly lit slot blinks `ic_life_on` / `ic_life_off`
+ * three times, one entry per FUSE_STEP_MS, and ends lit.
+ */
+export const GAIN_STEPS: readonly FrameName[] = [
+  'ic_life_on',
+  'ic_life_off',
+  'ic_life_on',
+  'ic_life_off',
+  'ic_life_on',
+  'ic_life_off',
+  'ic_life_on',
+]
+
+/**
+ * The slots that light when the count rises from `shown` to `lives` (left to
+ * right; empty when nothing visible changes, e.g. at the cap).
+ */
+export function gainingSlots(
+  lives: number,
+  shown: number,
+  slots = LIFE_SLOTS,
+): number[] {
+  const to = Math.min(slots, Math.floor(lives))
+  const from = Math.max(0, Math.floor(shown))
+  const out: number[] = []
+  for (let i = from; i < to; i++) out.push(i)
+  return out
 }
 
 export class LivesRow {
@@ -140,6 +173,38 @@ export class LivesRow {
     this.anim = this.scene.time.addEvent({
       delay: FUSE_STEP_MS,
       repeat: FUSE_STEPS.length - 1,
+      callback: apply,
+    })
+    return this
+  }
+
+  /**
+   * M7 (`life:gained`): show `lives` filled slots, the newly lit one(s)
+   * blinking on/off three times (GAIN_STEPS). Falls back to set() when no
+   * slot lights (a gain at the cap, or a first set).
+   */
+  gainLife(lives: number): this {
+    const from = this.lives
+    this.set(lives)
+    const lit = from < 0 ? [] : gainingSlots(lives, from, this.slots.length)
+    const imgs = lit
+      .map((i) => this.slots[i])
+      .filter((x): x is Phaser.GameObjects.Image => x !== undefined)
+    if (imgs.length === 0) return this
+    let step = 0
+    const apply = (): void => {
+      const f = GAIN_STEPS[step]
+      if (!f) {
+        this.stopAnim()
+        return
+      }
+      for (const img of imgs) img.setFrame(f)
+      step++
+    }
+    apply()
+    this.anim = this.scene.time.addEvent({
+      delay: FUSE_STEP_MS,
+      repeat: GAIN_STEPS.length - 1,
       callback: apply,
     })
     return this

@@ -31,6 +31,13 @@
 //   it parks `inactive` instead (goInactive), as it does right after its
 //   next unload (docks.ts) and when it reaches the lot with nothing aboard
 //   (it never queues for a dock with nothing to unload).
+// - M7, the magic parcel (design-m7 Q7, a VIP): it rides first — the
+//   outbound sort key is magic 0, a rushed destination 1, the rest 2 (then
+//   spawn tick, id), so its region is the leg's target region — and the stop
+//   holding it is the leg's first stop (the rest nearest-neighbour from
+//   there). At its origin it is reserved and picked up first too (after a
+//   vehicle's earlier reservations, which it keeps), and a pickup that
+//   leaves it behind does not clear the building's rush flag.
 
 import type { CommandResult, FailReason } from '../commands.ts'
 import {
@@ -95,7 +102,8 @@ export function outboundEligible(sim: Sim, v: Vehicle, p: Parcel): boolean {
 
 /**
  * §4.5 step 1, the outbound set: unreserved shelf parcels passing the
- * filters, rushed destinations first, then oldest spawn (then id); the first
+ * filters, a magic parcel first (M7), rushed destinations next, then oldest
+ * spawn (then id); the first
  * candidate's region is the target region; fill with candidates to it, then
  * to any other permitted region, until the units are full.
  */
@@ -108,8 +116,8 @@ export function outboundSet(sim: Sim, v: Vehicle): number[] {
         p !== null && p.reservedBy === null && outboundEligible(sim, v, p),
     )
     .toSorted((a, b) => {
-      const ra = isRushed(sim, a.dest) ? 0 : 1
-      const rb = isRushed(sim, b.dest) ? 0 : 1
+      const ra = a.magic ? 0 : isRushed(sim, a.dest) ? 1 : 2
+      const rb = b.magic ? 0 : isRushed(sim, b.dest) ? 1 : 2
       if (ra !== rb) return ra - rb
       if (a.spawnedTick !== b.spawnedTick) return a.spawnedTick - b.spawnedTick
       return a.id - b.id
@@ -230,7 +238,17 @@ export function hasCollectable(sim: Sim, v: Vehicle): boolean {
   return collectCandidates(sim, v, originTile(v), true).length > 0
 }
 
-/** Reserve the fitting unreserved parcels of a building, oldest first. */
+/**
+ * A building's waiting ids in pickup order: the golden parcel first (M7, the
+ * VIP rule of design Q7 at the origin too), then oldest first.
+ */
+function pickupOrder(sim: Sim, waiting: readonly number[]): number[] {
+  const magic = waiting.filter((id) => parcelOf(sim, id)?.magic === true)
+  if (magic.length === 0) return waiting.slice()
+  return [...magic, ...waiting.filter((id) => !magic.includes(id))]
+}
+
+/** Reserve the fitting unreserved parcels of a building, the golden one first, then oldest first. */
 export function reserveAt(
   sim: Sim,
   v: Vehicle,
@@ -240,7 +258,7 @@ export function reserveAt(
   if (!st) return []
   let free = freeUnits(sim, v)
   const ids: number[] = []
-  for (const id of st.waiting) {
+  for (const id of pickupOrder(sim, st.waiting)) {
     const p = parcelOf(sim, id)
     if (!p || !fits(sim, v, p, free)) continue
     p.reservedBy = v.id
@@ -551,33 +569,42 @@ export function goInactive(sim: Sim, v: Vehicle): void {
   }
 }
 
-/** §4.5 step 3: deliver stops in nearest-neighbour order from `from` (ties → lower building id). */
+/**
+ * §4.5 step 3: deliver stops in nearest-neighbour order from `from` (ties →
+ * lower building id); M7: the stop holding a magic parcel goes first.
+ */
 export function deliveryStops(sim: Sim, v: Vehicle, from: TileXY): Stop[] {
-  const groups: { buildingId: BuildingId; ids: number[] }[] = []
+  const groups: { buildingId: BuildingId; ids: number[]; magic: boolean }[] = []
   for (const id of v.cargo) {
     const p = parcelOf(sim, id)
     if (!p) continue
     const g = groups.find((x) => x.buildingId === p.dest)
-    if (g) g.ids.push(id)
-    else groups.push({ buildingId: p.dest, ids: [id] })
+    if (g) {
+      g.ids.push(id)
+      if (p.magic) g.magic = true
+    } else groups.push({ buildingId: p.dest, ids: [id], magic: p.magic })
   }
   const stops: Stop[] = []
   let cur = from
   while (groups.length > 0) {
-    let bi = 0
-    let bd = Number.POSITIVE_INFINITY
-    groups.forEach((g, i) => {
-      const d = sim.paths.distance(cur, anchorOf(sim.data, g.buildingId))
-      const better =
-        d < bd ||
-        (d === bd &&
-          buildingOrder(sim.data, g.buildingId) <
-            buildingOrder(sim.data, (groups[bi] as typeof g).buildingId))
-      if (better) {
-        bi = i
-        bd = d
-      }
-    })
+    // The magic parcel's stop first (a VIP), else the nearest.
+    let bi = groups.findIndex((g) => g.magic)
+    if (bi < 0) {
+      bi = 0
+      let bd = Number.POSITIVE_INFINITY
+      groups.forEach((g, i) => {
+        const d = sim.paths.distance(cur, anchorOf(sim.data, g.buildingId))
+        const better =
+          d < bd ||
+          (d === bd &&
+            buildingOrder(sim.data, g.buildingId) <
+              buildingOrder(sim.data, (groups[bi] as typeof g).buildingId))
+        if (better) {
+          bi = i
+          bd = d
+        }
+      })
+    }
     const g = groups.splice(bi, 1)[0] as (typeof groups)[number]
     const tile = anchorOf(sim.data, g.buildingId)
     const hub = districtDef(sim.data, districtOf(sim.data, g.buildingId))
@@ -639,7 +666,9 @@ function pickupAt(sim: Sim, v: Vehicle, buildingId: BuildingId): void {
   const st = s.buildings[buildingId]
   if (!st) return
   const def = typeOf(sim, v)
-  const mine = st.waiting.filter((id) => parcelOf(sim, id)?.reservedBy === v.id)
+  const mine = pickupOrder(sim, st.waiting).filter(
+    (id) => parcelOf(sim, id)?.reservedBy === v.id,
+  )
   const picked: number[] = []
   const take = (id: number): void => {
     const p = parcelOf(sim, id)
@@ -660,7 +689,7 @@ function pickupAt(sim: Sim, v: Vehicle, buildingId: BuildingId): void {
   }
   for (const id of mine) take(id)
   v.reserved = v.reserved.filter((id) => !picked.includes(id))
-  for (const id of st.waiting.slice()) {
+  for (const id of pickupOrder(sim, st.waiting)) {
     const free = freeUnits(sim, v)
     if (fits(sim, v, parcelOf(sim, id), free)) take(id)
   }
@@ -679,7 +708,10 @@ function pickupAt(sim: Sim, v: Vehicle, buildingId: BuildingId): void {
   }
   if (picked.length > 0) {
     v.collectedThisLeg = true
-    if (st.rushUntilTick !== null) clearRush(sim, buildingId) // served
+    // Served — unless the golden parcel still waits there (M7): the bell
+    // stays up and the next dispatcher pass sends another vehicle.
+    const magicLeft = st.waiting.some((id) => parcelOf(sim, id)?.magic)
+    if (st.rushUntilTick !== null && !magicLeft) clearRush(sim, buildingId)
   }
   if (v.rushBuildingId === buildingId) v.rushBuildingId = null
 }

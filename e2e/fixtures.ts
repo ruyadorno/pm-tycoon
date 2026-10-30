@@ -9,7 +9,10 @@
 //   - titleUp(page) / gameUp(page) (build 2, B2 §5): the Title is up over
 //     the attract city (or, with attract = false, the ?attract=0 Title), and
 //     the player's game is in after Continue / New game (ready, HUD up, the
-//     Title gone, no attract sim).
+//     Title gone, no attract sim);
+//   - questUi(page) (M7, design-m7 §6.3-§6.6): the quest slots as
+//     __pm.quests() reads them and the HUD's QuestCard / QuestChip /
+//     VictoryCard / QUEST COMPLETE stamp, its modal depth and holds.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -65,6 +68,185 @@ export async function gameUp(
     null,
     { timeout: timeoutMs },
   )
+}
+
+/** A quest slot as the e2e specs read it (a slice of the ViewSim's QuestView). */
+export interface QuestSlotInfo {
+  id: string
+  templateId: string
+  status: string
+  kind: string
+  name: string
+  target: string | null
+  goal: number
+  /** The value last sent in quest:progress (the chip's count). */
+  value: number
+  ticksLeft: number | null
+  route: { origin: string; dest: string } | null
+  /** magicParcel only: the golden parcel's id. */
+  parcelId: number | null
+}
+
+/** The sim's quest slots and the HUD's quest UI (M7). */
+export interface QuestUi {
+  offer: QuestSlotInfo | null
+  active: QuestSlotInfo | null
+  /** The newest history record. */
+  last: { id: string; templateId: string; outcome: string } | null
+  nextOfferInTicks: number | null
+  victory: boolean
+  card: {
+    open: boolean
+    mode: string | null
+    questId: string | null
+    title: string | null
+    gold: boolean
+    buttons: string[]
+  }
+  chip: {
+    visible: boolean
+    icon: string
+    pulse: boolean
+    barText: string
+    label: string
+    tone: string
+  }
+  victoryCard: boolean
+  /** The QUEST COMPLETE stamp is on screen. */
+  stamp: boolean
+  modalDepth: number
+  holds: string[]
+  paused: boolean
+}
+
+export function questUi(page: Page): Promise<QuestUi> {
+  return page.evaluate((): QuestUi => {
+    const api = window.__pm!
+    const qs = api.quests()
+    const slot = (q: (typeof qs)['offer']): QuestSlotInfo | null =>
+      q === null
+        ? null
+        : {
+            id: q.id,
+            templateId: q.templateId,
+            status: q.status,
+            kind: q.kind,
+            name: q.name,
+            target: q.target,
+            goal: q.goal,
+            value: q.emittedValue,
+            ticksLeft: q.ticksLeft,
+            route: q.route,
+            parcelId:
+              q.progress.kind === 'magicParcel' ? q.progress.parcelId : null,
+          }
+    const hud = api.game.scene.getScene('HUD') as unknown as {
+      questCard: {
+        isOpen: boolean
+        mode: string | null
+        questId: string | null
+        model: { title: string; gold: boolean; buttons: string[] } | null
+      }
+      questChip: {
+        current: {
+          visible: boolean
+          icon: string
+          pulse: boolean
+          barText: string
+          label: string
+          tone: string
+        }
+      }
+      victoryCard: { isOpen: boolean }
+      questStamp: unknown
+      holds: Set<string>
+      modalDepth(): number
+    }
+    const card = hud.questCard
+    const m = card.model
+    const c = hud.questChip.current
+    const last = qs.history[qs.history.length - 1] ?? null
+    return {
+      offer: slot(qs.offer),
+      active: slot(qs.active),
+      last: last
+        ? { id: last.id, templateId: last.templateId, outcome: last.outcome }
+        : null,
+      nextOfferInTicks: qs.nextOfferInTicks,
+      victory: qs.victory,
+      card: {
+        open: card.isOpen,
+        mode: card.mode,
+        questId: card.questId,
+        title: m?.title ?? null,
+        gold: m?.gold ?? false,
+        buttons: m ? [...m.buttons] : [],
+      },
+      chip: {
+        visible: c.visible,
+        icon: c.icon,
+        pulse: c.pulse,
+        barText: c.barText,
+        label: c.label,
+        tone: c.tone,
+      },
+      victoryCard: hud.victoryCard.isOpen,
+      stamp: hud.questStamp !== null && hud.questStamp !== undefined,
+      modalDepth: hud.modalDepth(),
+      holds: [...hud.holds].toSorted(),
+      paused: api.stepper.paused,
+    }
+  })
+}
+
+/**
+ * M7: `sim.debug.offerQuest(templateId)` (the `?quest=` command), then —
+ * unless `accept` is false — `sim.quest.accept` on that offer: the sim's own
+ * logged commands. Returns the quest id (asserts both succeeded).
+ */
+export async function debugQuest(
+  page: Page,
+  templateId: string,
+  accept = true,
+): Promise<string> {
+  const r = await page.evaluate(
+    ([t, a]) => {
+      const vs = window.__pm!.sim
+      const o = vs.debug!.offerQuest(t as string)
+      if (!o.ok) return { id: null, reason: `offer: ${o.reason}` }
+      const id = vs.quests().offer?.id ?? null
+      if (!a || id === null) return { id, reason: null }
+      const res = vs.quest.accept(id)
+      return { id, reason: res.ok ? null : `accept: ${res.reason}` }
+    },
+    [templateId, accept] as const,
+  )
+  expect(r.reason, `debug quest ${templateId}`).toBeNull()
+  expect(r.id, `debug quest ${templateId} has an id`).not.toBeNull()
+  return r.id!
+}
+
+/**
+ * M7 shortcut to the Golden Release's end (shots and e2e only — a page
+ * mutation, so __pm.replay() no longer matches): the active ultimate's
+ * counters are set to its goal (60 delivered, all on time, no malware), so
+ * the next quests step completes it — quest:completed, the victory ticker
+ * line and game:victory, as in play. Sim-only (100-ms steps).
+ */
+export async function finishUltimate(
+  page: Page,
+): Promise<{ ok: boolean; day: number | null; tick: number }> {
+  return page.evaluate(async () => {
+    const api = window.__pm!
+    const a = api.core.state.quests.active
+    if (!a || a.progress.kind !== 'ultimate')
+      throw new Error('finishUltimate: the Golden Release is not active')
+    a.progress.delivered = a.goal
+    a.progress.onTime = a.goal
+    a.progress.malware = 0
+    const w = await api.waitEvent('game:victory', 2_000)
+    return { ok: w.ok, day: w.payload?.day ?? null, tick: api.sim.tick }
+  })
 }
 
 export interface PmHelpers {

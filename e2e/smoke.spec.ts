@@ -49,7 +49,15 @@
 //      sorter applicant, who walks in to the stand under the rack lamp's S;
 //      the Title's New game with ?level=3&policy=delegating is a fresh L3
 //      game driven by the delegating policy (the attract sim untouched).
-//      The save is version 3 (types.ts STATE_VERSION since M6).
+//      The save is version 4 (types.ts STATE_VERSION since M7).
+//   M7 (plan-build2 §8.4 tasks 4-6; design-m7 §3.4, §6.4, §6.10) — quests:
+//      under ?policy=1 the first offer comes at 3:00 (tick 1800, state.day 3)
+//      and the policy accepts it on that step — __pm.quests().active, the
+//      QuestChip in row B, the replay still matches (offers draw on the quest
+//      stream); the Title's New game with ?level=2&quest=rush_district is a
+//      fresh L2 game whose log starts debugForceLevel, debugOfferQuest (the
+//      L2 goal: 10 deliveries), the attract sim untouched.
+//      e2e/quests.spec.ts has the card / chip / magic / victory flows.
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, gameUp, test, titleUp, type PmHelpers } from './fixtures.ts'
@@ -79,8 +87,8 @@ const LEVEL_UP_FIXTURE = 'tests/fixtures/level-up.json'
 const MAX_DRAW_CALLS = 8
 /** src/sim/save.ts SAVE_KEY (build 2: save v2, plan-build2 §8.2 task 9). */
 const SAVE_KEY = 'pm.save.v2'
-/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (3 since M6, design-m6 §2.1). */
-const SAVE_VERSION = 3
+/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (4 since M7, design-m7 §2.5). */
+const SAVE_VERSION = 4
 /** A new game at seed 7 without the policy (the player's own buys). */
 const NEW_URL = '/?seed=7&debug=1&skipTitle=1&audio=0'
 
@@ -1442,6 +1450,102 @@ test.describe('M6 people smoke', () => {
     )
     expect(m.level).toBeGreaterThanOrEqual(3)
     expect(m.lives, 'still in the game').toBeGreaterThan(0)
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+test.describe('M7 quests smoke', () => {
+  test('the policy accepts the 3:00 offer: __pm.quests().active, the chip; the replay matches', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(M1_URL)
+    await pm.freeze()
+    // quests.json offer.firstOfferDay 3 → tick 1800 (design-m7 Q3).
+    await pm.advance(179_000)
+    let qs = await page.evaluate(() => window.__pm!.quests())
+    expect(qs.offer, 'no offer before 3:00').toBeNull()
+    expect(qs.active).toBeNull()
+    expect(qs.history).toEqual([])
+    expect(qs.nextOfferInTicks).toBeGreaterThan(0)
+    await pm.advance(2_000)
+    await pm.settle(10)
+    qs = await page.evaluate(() => window.__pm!.quests())
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      const acc = api.core.commandLog.find((e) => e.cmd.kind === 'acceptQuest')
+      const hud = api.game.scene.getScene('HUD') as unknown as {
+        questChip: { current: { visible: boolean; barText: string } }
+      }
+      return {
+        acceptTick: acc?.tick ?? null,
+        chip: hud.questChip.current,
+      }
+    })
+    console.log(
+      `smoke: 3:00 quest ${qs.active?.templateId ?? '-'} ${JSON.stringify(st)}`,
+    )
+    expect(qs.active, 'the policy accepted the 3:00 offer').not.toBeNull()
+    expect(qs.active!.offeredTick).toBe(1800)
+    expect(qs.offer).toBeNull()
+    expect(st.acceptTick).toBeGreaterThanOrEqual(1800)
+    expect(st.acceptTick).toBeLessThanOrEqual(1801)
+    expect(st.chip.visible, 'the QuestChip shows in row B').toBe(true)
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('Title → New game with ?level=2&quest=rush_district: the L2 offer on the fresh game, the attract sim untouched', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    const url = '/?seed=7&debug=1&audio=0&level=2&quest=rush_district'
+    await page.goto(url)
+    await page.evaluate(() => localStorage.clear())
+    await page.goto(url)
+    await titleUp(page)
+    const attract = await page.evaluate(() => {
+      const s = window.__pm!.attractSim!
+      return {
+        logged: s.commandLog.some((e) => e.cmd.kind === 'debugOfferQuest'),
+        quest: window.__pm!.params.quest,
+      }
+    })
+    expect(attract).toEqual({ logged: false, quest: 'rush_district' })
+    await tapTarget(page, pm, 'Title', 'title:new-game')
+    await gameUp(page)
+    await pm.freeze()
+    await pm.settle(10)
+    const game = await page.evaluate(() => {
+      const api = window.__pm!
+      const qs = api.quests()
+      return {
+        level: api.sim.level,
+        log: api.core.commandLog.map((e) => ({ tick: e.tick, cmd: e.cmd })),
+        offer: qs.offer
+          ? {
+              templateId: qs.offer.templateId,
+              goal: qs.offer.goal,
+              offeredTick: qs.offer.offeredTick,
+            }
+          : null,
+      }
+    })
+    console.log(`smoke: New game under ?quest= ${JSON.stringify(game)}`)
+    expect(game).toEqual({
+      level: 2,
+      log: [
+        { tick: 0, cmd: { kind: 'debugForceLevel', level: 2 } },
+        {
+          tick: 0,
+          cmd: { kind: 'debugOfferQuest', templateId: 'rush_district' },
+        },
+      ],
+      offer: { templateId: 'rush_district', goal: 10, offeredTick: 0 },
+    })
     expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

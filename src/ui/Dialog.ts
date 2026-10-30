@@ -153,11 +153,30 @@ export class Dialog {
     this.opts.onCancel?.()
   }
 
-  /** Re-fit to a new canvas size (pass L from computeLayout, or {W, H}). */
+  /**
+   * Re-fit to a new canvas size (pass L from computeLayout, or {W, H}) and
+   * stay on top: a card that rebuilt its own camera on the same resize
+   * (VictoryCard, SummaryCard) added it after this one, so call this after
+   * the cards' relayouts.
+   */
   relayout(L: { W: number; H: number }): void {
     if (!this.open) return
     this.cam.setSize(Math.round(L.W), Math.round(L.H))
     this.layout(Math.round(L.W), Math.round(L.H))
+    this.raise()
+  }
+
+  /**
+   * Draw last again: move this dialog's camera to the end of the scene's
+   * camera list (kept in place, so its id — the ignore masks — stays).
+   */
+  raise(): void {
+    if (!this.open) return
+    const list = this.scene.cameras.cameras
+    const i = list.indexOf(this.cam)
+    if (i < 0 || i === list.length - 1) return
+    list.splice(i, 1)
+    list.push(this.cam)
   }
 
   /** Close without running either callback. */

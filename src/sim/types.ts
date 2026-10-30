@@ -11,7 +11,9 @@ import type {
   DistrictId,
   GameData,
   PipsDef,
+  QuestGoalDef,
   RoleId,
+  StarApplicantDef,
 } from '../data/types.ts'
 
 export type { BuildingId, DistrictId } from '../data/types.ts'
@@ -26,6 +28,11 @@ export const TICKS_PER_DAY = 600
 /** Seconds (from the data tables) → whole ticks. */
 export function ticksFromS(s: number): number {
   return Math.round(s * TICKS_PER_S)
+}
+
+/** In-game days (from the data tables) → whole ticks. */
+export function daysToTicks(d: number): number {
+  return Math.round(d * TICKS_PER_DAY)
 }
 
 // §6.4 verbatim ----------------------------------------------------------------
@@ -53,9 +60,11 @@ export interface TilePos {
  * The state / snapshot / save version (plan.md R9, spec-build2 §8): a
  * state-shape change bumps it; Sim.load and the Title refuse any other value
  * (no migrations). 2 = build 2 (`pm.save.v2`); 3 = M6 people (applicants,
- * roles with pips, the Hold Bay station, the wanted list; same save key).
+ * roles with pips, the Hold Bay station, the wanted list; same save key);
+ * 4 = M7 quests (state.quests, nextId.quest, stats.victoryTick, the
+ * MinuteRow quest columns; same save key).
  */
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 
 export interface SimState {
   version: typeof STATE_VERSION
@@ -84,6 +93,8 @@ export interface SimState {
    * sorter's certainty list.
    */
   wanted: string[]
+  /** M7 (spec-build2 §3): the quest slots, scheduler, history, vouchers, the quest rng stream. */
+  quests: QuestsState
   /** Key String(id); terminal parcels are removed at the end of the tick (gc). */
   parcels: Record<string, Parcel>
   lane: Lane
@@ -96,6 +107,8 @@ export interface SimState {
     checker: number
     /** M6: applicant ids (own id space; never an Employee id). */
     applicant: number
+    /** M7: quest ids 'q<n>' (offer order). */
+    quest: number
   }
 }
 
@@ -518,6 +531,119 @@ export interface ApplicantPools {
   driver: Applicant[]
 }
 
+// Quests (M7, spec-build2 §3; design-m7 §2.1) ------------------------------------
+
+export type QuestGoalKind = QuestGoalDef['kind'] | 'ultimate'
+export type QuestFailReason =
+  | 'timeout'
+  | 'abandoned'
+  | 'malware'
+  | 'unavailable'
+export type QuestOutcome =
+  | 'completed'
+  | 'failed'
+  | 'declined'
+  | 'expired'
+  | 'abandoned'
+  | 'withdrawn'
+
+/** Per-kind counters (the quest observer and the quest step write them; nothing else does). */
+export type QuestProgress =
+  | { kind: 'deliveriesFrom'; count: number }
+  | { kind: 'satisfactionAtLeast'; start: number; satisfaction: number }
+  | {
+      kind: 'magicParcel'
+      parcelId: number | null
+      origin: BuildingId | null
+      dest: BuildingId | null
+      deliveredTick: Tick | null
+      onTime: boolean
+    }
+  | { kind: 'tossStreak'; streak: number; best: number }
+  | {
+      kind: 'onTimeRateDay'
+      dayStartTick: Tick
+      deliveries: number
+      onTime: number
+      bestPct: number
+    }
+  | { kind: 'deliveriesOfSize'; count: number }
+  | { kind: 'holdDecisions'; count: number; resets: number }
+  | { kind: 'overseasCleared'; count: number }
+  | { kind: 'detectionAllStrains'; sinceTick: Tick | null; minPct: number }
+  | { kind: 'ultimate'; delivered: number; onTime: number; malware: number }
+
+/** A resolved reward (level arrays read at offer time). */
+export interface QuestReward {
+  /** 0 = none; counts toward lifetime earned (spec-build2 §7.3, Q-B2-12). */
+  cash: number
+  /** 0 = none; capped at economy.lives.cap. */
+  lives: number
+  /** 0 = none; to the quest's target district, outside the daily cap. */
+  satisfaction: number
+  star: StarApplicantDef | null
+  /** A machines.json checker id (a free machine), or null. */
+  voucher: string | null
+  /** The ultimate quest only. */
+  victory: boolean
+}
+
+export interface Quest {
+  /** 'q<n>' from nextId.quest (offer order). */
+  id: string
+  /** quests.json id, or the levels.json ultimateQuest.id. */
+  templateId: string
+  ultimate: boolean
+  status: 'offered' | 'active'
+  /** District quests only. */
+  target: DistrictId | null
+  /** The goal number of design-m7 §3.3 (count, satisfaction, %, 1 for magic). */
+  goal: number
+  reward: QuestReward
+  offeredTick: Tick
+  /** null for the ultimate quest (no expiry). */
+  expiresTick: Tick | null
+  acceptedTick: Tick | null
+  /** null while offered. */
+  deadlineTick: Tick | null
+  /** The value last sent in quest:progress. */
+  emittedValue: number
+  progress: QuestProgress
+}
+
+export interface QuestRecord {
+  id: string
+  templateId: string
+  outcome: QuestOutcome
+  tick: Tick
+  reason: QuestFailReason | null
+}
+
+export interface QuestsState {
+  /**
+   * mulberry32 word of the QUEST stream (rng.ts RngCell, Sim.questRng) —
+   * never state.rng: offers and magic routes leave the main stream alone.
+   */
+  rng: number
+  /** The one open offer. */
+  offer: Quest | null
+  /** The active quest (quests.offer.maxActive = 1). */
+  active: Quest | null
+  /** Earliest regular offer (start: firstOfferDay days). */
+  nextOfferTick: Tick
+  /** Earliest (re-)offer of the ultimate quest (start 0). */
+  ultimateNextTick: Tick
+  /** state.day at the last offer (spec-build2 §8). */
+  lastOfferDay: number | null
+  /** Newest last, at most QUEST_HISTORY_MAX (the oldest dropped). */
+  history: QuestRecord[]
+  /** Free machines (machines.json checker ids) held for the BuySheet, oldest first. */
+  vouchers: string[]
+}
+
+/** state.quests.history bound (a state bound, not balance). */
+export const QUEST_HISTORY_MAX = 50
+
 export interface Economy {
   /** Integer $; never negative (§7.2). */
   balance: number
@@ -577,6 +703,8 @@ export interface RunStats {
   holdBayEvents: number
   /** One row per in-game minute, appended on the day boundary (tick.ts). */
   minutes: MinuteRow[]
+  /** M7: tick the Golden Release completed (game:victory); null before. */
+  victoryTick: Tick | null
 }
 
 // Defined here (named in §6.4) --------------------------------------------------
@@ -617,6 +745,10 @@ export interface MinuteRow {
   /** Vehicles owned. */
   fleet: number
   lives: number
+  /** M7: the active quest's template id at the minute's end, or null. */
+  quest: string | null
+  /** M7: cumulative quest completions. */
+  questsDone: number
 }
 
 /** Everything the lost-life card shows (§10); also the life:lost `report`. */
@@ -689,11 +821,13 @@ export function liveSlotIds(lane: Lane): string[] {
 
 /**
  * §5.4 malware share for a new parcel now: baseShare + perLevel × (level − 1),
- * + postVictoryPerDay for every day boundary after the level counter capped
- * at economy.playtestMaxLevel (counted from stats.levelTick, so no extra
- * state), capped at malware.cap; overseas-bound parcels × overseasMult.
- * TODO(build 2): the same escalation after Victory (needs the victory tick).
- * (Ignores the first-90 s / first-8-parcels grace: that is spawn.ts's rule.)
+ * + postVictoryPerDay for every day boundary after the escalation start,
+ * capped at malware.cap; overseas-bound parcels × overseasMult. The start
+ * (spec-build2 §3.4, design-m7 §2.2 — the only definition): the Victory tick
+ * (stats.victoryTick), else — only while economy.playtestMaxLevel is below
+ * the last levels.json row — the tick the level counter capped there
+ * (stats.levelTick). Derived from the state (no extra field). (Ignores the
+ * first-90 s / first-8-parcels grace: that is spawn.ts's rule.)
  */
 export function malwareShare(
   state: SimState,
@@ -702,9 +836,13 @@ export function malwareShare(
 ): number {
   const m = data.parcels.malware
   let share = m.baseShare + m.perLevel * (state.level.level - 1)
-  const capTick = state.stats.levelTick[String(data.economy.playtestMaxLevel)]
-  if (capTick !== undefined) {
-    const firstDay = Math.floor(capTick / TICKS_PER_DAY) + 1
+  const cap = data.economy.playtestMaxLevel
+  const lastRow = data.levels.reduce((n, l) => Math.max(n, l.level), 0)
+  const from =
+    state.stats.victoryTick ??
+    (cap < lastRow ? state.stats.levelTick[String(cap)] : undefined)
+  if (from !== undefined) {
+    const firstDay = Math.floor(from / TICKS_PER_DAY) + 1
     share += m.postVictoryPerDay * Math.max(0, state.day - firstDay + 1)
   }
   share = Math.min(m.cap, share)

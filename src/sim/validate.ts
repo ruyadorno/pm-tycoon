@@ -3,7 +3,7 @@
 // cross-references and conservation identity (sim.ts). A save with the
 // running data hash can still be damaged (a flipped digit that stays valid
 // JSON, a hand-edited payload, a build that changed the state shape without
-// bumping `version` — types.ts STATE_VERSION, 3 since M6, the only value
+// bumping `version` — types.ts STATE_VERSION, 4 since M7, the only value
 // accepted); every field the tick and the command handlers read must
 // then have its type, its enum value or a data id, or tick() throws on the
 // first frame after Continue. Problems here make the Title discard the
@@ -15,6 +15,7 @@
 import type { GameData } from '../data/types.ts'
 import { roadGraph } from './roads.ts'
 import { FACE_LOOKS, ROLES } from './systems/people.ts'
+import { QUEST_KINDS } from './systems/quests.ts'
 import { STATE_VERSION, type SimState } from './types.ts'
 
 type Add = (m: string) => void
@@ -173,6 +174,15 @@ const price = num(0, MAX_PRICE)
 
 const maxId = (xs: number[]): number => xs.reduce((m, x) => Math.max(m, x), 0)
 
+/** M7: a quest id 'q<n>'. */
+const questId: Check = (v, path, add) => {
+  if (typeof v !== 'string' || !/^q[1-9]\d*$/.test(v)) {
+    add(`${path}: ${JSON.stringify(v)} is not a quest id q<n>`)
+    return false
+  }
+  return true
+}
+
 /**
  * Why `state` cannot be run by this build's systems (empty = runnable):
  * field types, enum values and data ids, plus the few relations the
@@ -251,6 +261,88 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
   })
   const stationFixture: Check = (v, path, a) =>
     v === null || v === 'sorter_arm' || id(v, path, a)
+
+  // M7 quests (design-m7 §2.4).
+  const ultimateIds = data.levels.flatMap((l) =>
+    l.ultimateQuest ? [l.ultimateQuest.id] : [],
+  )
+  const templateId = oneOf([
+    ...data.quests.templates.map((x) => x.id),
+    ...ultimateIds,
+  ])
+  const checkerId = oneOf(data.machines.checkers.map((c) => c.id))
+  const PROGRESS: Record<string, Record<string, Check>> = {
+    deliveriesFrom: { count },
+    satisfactionAtLeast: {
+      start: num(-MAX_PRICE, MAX_PRICE),
+      satisfaction: num(-MAX_PRICE, MAX_PRICE),
+    },
+    magicParcel: {
+      parcelId: nullable(id),
+      origin: nullable(building),
+      dest: nullable(building),
+      deliveredTick: nullable(tick),
+      onTime: bool,
+    },
+    tossStreak: { streak: count, best: count },
+    onTimeRateDay: {
+      dayStartTick: tick,
+      deliveries: count,
+      onTime: count,
+      bestPct: int(0, 100),
+    },
+    deliveriesOfSize: { count },
+    holdDecisions: { count, resets: count },
+    overseasCleared: { count },
+    detectionAllStrains: { sinceTick: nullable(tick), minPct: int(0, 100) },
+    ultimate: { delivered: count, onTime: count, malware: count },
+  }
+  const progress: Check = (v, path, a) => {
+    if (!isObj(v)) {
+      a(`${path}: not an object`)
+      return false
+    }
+    if (!oneOf(QUEST_KINDS)(v.kind, `${path}.kind`, a)) return false
+    return obj(PROGRESS[v.kind as string] ?? {})(v, path, a)
+  }
+  const quest = obj({
+    id: questId,
+    templateId,
+    ultimate: bool,
+    status: oneOf(['offered', 'active']),
+    target: nullable(district),
+    goal: num(0, MAX_COUNT),
+    reward: obj({
+      cash: money,
+      lives: count,
+      satisfaction: num(0, MAX_PRICE),
+      star: nullable(
+        obj({ role: oneOf(ROLES), name: str, pips: rec(int(0, 5)) }),
+      ),
+      voucher: nullable(checkerId),
+      victory: bool,
+    }),
+    offeredTick: tick,
+    expiresTick: nullable(tick),
+    acceptedTick: nullable(tick),
+    deadlineTick: nullable(tick),
+    emittedValue: num(-MAX_PRICE, MAX_PRICE),
+    progress,
+  })
+  const questRecord = obj({
+    id: questId,
+    templateId,
+    outcome: oneOf([
+      'completed',
+      'failed',
+      'declined',
+      'expired',
+      'abandoned',
+      'withdrawn',
+    ]),
+    tick,
+    reason: nullable(oneOf(['timeout', 'abandoned', 'malware', 'unavailable'])),
+  })
 
   const shape = obj({
     // Build 2 only (plan.md R9): a version-1 state never loads.
@@ -361,6 +453,16 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       driver: arr(applicant),
     }),
     wanted: arr(str),
+    quests: obj({
+      rng: int(0, 0xffffffff),
+      offer: nullable(quest),
+      active: nullable(quest),
+      nextOfferTick: tick,
+      ultimateNextTick: tick,
+      lastOfferDay: nullable(count),
+      history: arr(questRecord),
+      vouchers: arr(checkerId),
+    }),
     parcels: rec(
       obj({
         id,
@@ -473,6 +575,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       payrollPaid: money,
       holdBayEvents: count,
       minutes: arr(obj({ min: count, tick })),
+      victoryTick: nullable(tick),
     }),
     lastLostLife: nullable(
       obj({ tick, parcelId: id, label: str, path: arr(obj({ tick })) }),
@@ -483,6 +586,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       employee: id,
       checker: id,
       applicant: id,
+      quest: id,
     }),
   })
   if (!shape(state, 'state', add) || out.length > 0) return out
@@ -544,5 +648,17 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
   )
   if (n.applicant <= applicantMax)
     add(`state.nextId.applicant: ${n.applicant} ≤ applicant ${applicantMax}`)
+  // M7: the slots hold the status they name; quest ids below nextId.quest.
+  const qs = s.quests
+  if (qs.offer !== null && qs.offer.status !== 'offered')
+    add(`state.quests.offer.status: ${qs.offer.status} ≠ offered`)
+  if (qs.active !== null && qs.active.status !== 'active')
+    add(`state.quests.active.status: ${qs.active.status} ≠ active`)
+  const questMax = maxId(
+    [qs.offer, qs.active, ...qs.history].flatMap((q) =>
+      q === null ? [] : [Number(q.id.slice(1))],
+    ),
+  )
+  if (n.quest <= questMax) add(`state.nextId.quest: ${n.quest} ≤ q${questMax}`)
   return out
 }

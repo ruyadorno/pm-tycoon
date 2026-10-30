@@ -104,8 +104,8 @@ overrules any line by number.
 - **Retune — truck price $1,300 → $1,200** (gate row `truckAfterLevel2MaxMin`, §7.6 "truck late → lower its price"):
   with COUNTERS' $150 at L1 and decoy 0.22, the quick-gate truck landed +5.18 min after L2; after: +3.86 (quick), +2.10
   (full median); 80 seeds > 4 min: 29/80 → 12/80. Sell refund becomes $600. UI tests now read prices from data.
-- **`malware.postVictoryPerDay` stays 0.01** (a 0.005 retune was tried and reverted by the sim review: at the final
-  config it moved no gate row).
+- **`malware.postVictoryPerDay` stayed 0.01 in playtest 1** (a 0.005 retune was tried and reverted by the sim review:
+  at the final config it moved no gate row). Superseded in M7: 0.005, see "Run decisions and deviations (M7 — quests)".
 - **`public/configs/spicy.json` decoyShare 0.2 → 0.3**: the plan's literal 0.20 is now below the base 0.22; the schema
   test asserts both spicy levers sit above the base tables.
 - **Residual risk (author)**: the "no lost life in 30 min" window is dice at D ≈ 0.97–0.99 with the post-cap escalation
@@ -407,3 +407,83 @@ the spec section it settles.
 - **Art (M6)**: 207 PixelLab generations (machines `battery_checker`, `xray`, `sorter_arm`; the ten Low-density uniques,
   fogged until M9); the four old Low-density scenery rows retired with `decide.ts --retire`; `lr_exact_pin`'s finial is
   orange (red is reserved for danger, STYLE.md).
+
+## Run decisions and deviations (M7 — quests)
+
+Design defaults Q1–Q22 of the M7 contract (B2 §3 gaps), as coded:
+
+- **Q1** `clean_sweep`: a wrong Toss resets the streak (B2 §3.2 table); the quest fails only on its deadline (fail-on-break
+  would fail nearly always under Toss-everything). **Q2** `night_shift`: a `holdBayFull` stall resets the count to 0.
+- **Q3** "from day 3" = `state.day` 3 → the first offer at 3:00 sim time (HUD "Day 4"), clear of the 2:00 scripted
+  malware and the onboarding.
+- **Q4** `rush_district` / `cheer_up` flavour lines carry a `{district}` placeholder (the targets vary).
+- **Q5** the magic parcel's A = the live building with the highest static `send` (ties by the quest RNG); **Q6** A and B
+  exclude truck-only (`hardRule`) districts so a bike can make 120 s; B within 20 road tiles of the lot (Q-B2-13).
+- **Q7** the magic parcel rides first in its vehicle's outbound set and is its first stop (a VIP rule in
+  `dispatch.ts`; B2 §3.3 has no outbound rule and the newest shelf parcel would miss 120 s).
+- **Q8** an expired offer behaves like a Decline (`declineCooldownDays`); **Q9** new event `life:gained`.
+- **Q10** all quest frames are in `world` (`ic_quest`, `ic_magic`, `magic_ring_*` packed into both; `ui_card_gold`,
+  `ui_bar_fill_gold` world) — the HUD binds world only (M5 rule over B2 §6.8's wording). A ★ glyph was added to m5x7.
+- **Q11** the chip shows `✕` (m5x7 has no `✗`); the Golden Release chip reads `41/60` with `0✕ 94%`, time left on the
+  card. **Q12** the ultimate quest's name lives in `puns.ultimateQuestName`.
+- **Q13** the Golden Release counts local deliveries and non-malware overseas clearances; a malware clearance counts as
+  malware delivered and fails it. **Q14** `onTimeRateDay` counts only full days after accept, malware excluded.
+- **Q15** at L5 an open regular offer is withdrawn for the ultimate; an active regular quest finishes first.
+- **Q16** `malwareShare` escalates from `stats.victoryTick` (endless, B2 §3.4); the at-cap rule applies only while the
+  level cap is below the last level.
+- **Q17** `STATE_VERSION` 4. **Q18** the voucher reward is built (sim + BuySheet `FREE` row) though no template ships one.
+- **Q19** the QuestCard sits on the modal stack without holding the sim; it never auto-opens while a policy drives the
+  stepper. **Q20** `cheer_up` targets the live district with the highest satisfaction below 50 (closest to 60).
+- **Q21/R-rng** offers and magic routes draw on their own quest stream (`state.quests.rng`, `QUEST_RNG_SALT`): with no
+  quest accepted a run reproduces M6 exactly. **Q22** the magic parcel lives in the active quest's progress (one copy).
+- The victory stinger is the I–vi–ii–V tag over a 5–1–3–5 → 8 trumpet fanfare; the band ramps down for it and resumes.
+- Policy (B2 §7.2): `questPolicyStep` accepts every offer on the step it appears (the Golden Release once nothing is
+  active) and rushes the magic parcel's origin; never declines, abandons or rushes B. Gate rows `questsOfferedBy30Min`
+  and `questsCompletedBy30Min` are gated behind `SIM_FEATURES.quests` (informational on runs shorter than 30 min).
+
+Balance retunes taken at the M7 integration (B2 §7.3: one line per change, naming its gate row; seeds 1–10 × 30 min):
+
+- **Retune — `malware.postVictoryPerDay` 0.01 → 0.005** (gate row `maxLivesLost`). Quest cash brings L2 about half a
+  minute earlier (median 12.28 → 11.72 min), so the at-cap escalation runs longer (≈ 6 % more malware). Seeds losing a
+  life: M6 2/10; M7 at 0.01 6/10 (median 0.5, FAIL); M7 at 0.005 4/10 (median 0, PASS). 320-seed sweep: 111 → 86 seeds
+  losing ≥ 1 life. **Lever-order deviation**: B2 §7.3 puts "quests too rich (levels early) → `reward.cash` arrays"
+  ahead of values; `rush_district.reward.cash` was not tried. The key also sets the endless escalation after Victory
+  (B2 §3.4), which the M8/M9 design pins at +0.01/day — **open for M9**: split an at-cap rate off
+  `postVictoryPerDay`, or restore 0.01 after a `reward.cash` retune.
+- **Retune — `on_time_day` rate 0.95 → 0.85, `minDeliveries` 8 → 6** (gate row `questsCompletedBy30MinMin`; B2 §3.2
+  "completable by the competent policy on a median seed"). At the spec numbers a qualifying day happened on 0.5–13 % of
+  days: 1 of 11 offers completed on seeds 1–10. Now 4 of 11.
+- **Retune — `big_haul` count 5 → 3** (same rows). About 2.3 XL parcels are delivered per 4-day window: 0 of 8 offers
+  completed at the spec's 5. Now 2 of 8 (3 of 8 before the review fixes below moved seed 4).
+- Gate after these retunes and the review fixes: every median passes — first delivery 43.3 s, scripted catch 178.3 s,
+  L2 11.72 min, truck +1.54 min, lives 0 (4/10 seeds lose one), shelf stall 0, Hold Bay 6.78/10 min at L1, quests
+  offered 6 and completed 3.5. `vlr sim:delegating` PASS (informational): lives median 0.5, quests 6.5 / 4.
+- **Open — `cheer_up` is unreachable** (B2 §3.2 bound). 0 of 8 offers completed on seeds 1–10 (delegating 0 of 8).
+  Targets start at 36–48 satisfaction and gain at most +7 in 5 days (the +4/day positive cap less the drift toward 50;
+  the policy never helps a district), against the +12–24 needed for 60. Each offer holds the only slot for 5 days plus
+  the interval. Not retuned in M7 (the data is frozen after the integration): candidates are `goal.value` 55 or a
+  longer `limitDays`, with a line naming `questsCompletedBy30MinMin`.
+
+M7 review fixes (rules the M7 contract did not state, or stated against the spec):
+
+- **The ultimate and the regular scheduler** (B2 §3.1, §3.4; the contract's "ultimate: unchanged" gap). While the
+  Golden Release is pending (its level reached, no Victory) no regular template is offered, including during its
+  cooldown after a fail. Any end of the ultimate sets `nextOfferTick ≥ tick + intervalDays`. Before this, a regular quest
+  took the slot on the tick the ultimate failed and delayed its re-offer by 3–5 days, and endless play got a regular
+  offer on the victory tick.
+- **The golden parcel at its origin** (extends Q7). It is reserved and picked up first, after a vehicle's earlier
+  reservations. A pickup that leaves it behind no longer clears the building's rush flag, so the next dispatcher pass
+  sends another vehicle.
+- **City markers follow the parcel** (B2 §3.3 "while it is alive", over design §6.8's "countdown running"). A late,
+  failed or abandoned Special delivery keeps the gold `ic_magic` on A and B with an empty ring until the parcel is
+  delivered (`QuestsView.magic`).
+- **Game over keeps the golden parcel's delivery.** The quest counters still stop at game over, but the observer
+  records the magic delivery. Before this, the active quest named a parcel that gc had removed, so the audit failed and
+  the save loader refused the snapshot. A continued run (`continueWithOneLife`) judges the delivery.
+- **★ reward names** (`starApplicantName`). `quest:completed`, the stamp, the paper and both ticker lines carry the name
+  the pool gives the applicant, which is "Vera 2" when an employee is already called Vera.
+- **The Golden Release waiting behind an active quest** (design §4). The chip pulses, and the active card's flavour row
+  reads `The Golden Release is waiting — finish or abandon this job to take it.` in gold, with Abandon one tap away.
+  Auto-open still waits until the slot frees.
+- **Resize with a confirm open.** `Dialog.relayout` re-raises its camera. The HUD re-fits the New-game confirm after the
+  Victory and Summary cards rebuild their cameras, and the QuestCard re-fits its Abandon confirm.

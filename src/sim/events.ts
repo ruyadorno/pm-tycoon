@@ -11,6 +11,8 @@ import type {
   Fixture,
   LostLifeReport,
   Pips,
+  QuestFailReason,
+  QuestReward,
   Role,
   Size,
   Strain,
@@ -46,6 +48,10 @@ export type TickerKind =
   | 'mood'
   | 'daily'
   | 'filler'
+  /** M7: quest offered / completed / ★ applicant lines (gold). */
+  | 'quest'
+  /** M7: a quest timed out or failed (grey). */
+  | 'questFailed'
 
 export interface VehicleRef {
   id: number
@@ -124,7 +130,20 @@ export interface SimEventPayloads {
     malware: boolean
   }
   'parcel:handedOff': { id: number; hub: DistrictId; lockedValue: number }
-  'parcel:cleared': { id: number; paid: number; malware: boolean }
+  /**
+   * An overseas clearance (§5.6; emitted from M8's systems/hubs.ts): `hub` =
+   * the destination hub, `buildingId` = the pier / terminal (p.dest),
+   * `onTime` = the hand-off was on time ((clearTick − clearance ticks) −
+   * spawnedTick ≤ onTimeMaxS). Declared in full here (design-m7 §3.1).
+   */
+  'parcel:cleared': {
+    id: number
+    paid: number
+    malware: boolean
+    hub: DistrictId
+    buildingId: BuildingId
+    onTime: boolean
+  }
   // vehicles / docks (§4.6, §6.5)
   'vehicle:bought': VehicleRef
   'vehicle:parked': VehicleRef
@@ -192,11 +211,36 @@ export interface SimEventPayloads {
   'game:over': NoPayload
   'satisfaction:changed': { district: DistrictId; value: number; delta: number }
   'ticker:news': { text: string; kind: TickerKind }
-  /** build 2 */
-  'quest:offered': { questId: string }
-  'quest:accepted': { questId: string }
-  'quest:completed': { questId: string }
-  'quest:failed': { questId: string }
+  /** M7 quests (spec-build2 §3, §8; design-m7 §3.1). */
+  'quest:offered': {
+    questId: string
+    templateId: string
+    target: DistrictId | null
+    ultimate: boolean
+  }
+  'quest:accepted': { questId: string; templateId: string }
+  /** Declined by the player, expired unanswered, or withdrawn by the sim. */
+  'quest:declined': {
+    questId: string
+    templateId: string
+    reason: 'declined' | 'expired' | 'withdrawn'
+  }
+  /** The active quest's value changed (design-m7 §3.3 value / goal table). */
+  'quest:progress': { questId: string; value: number; target: number }
+  'quest:completed': {
+    questId: string
+    templateId: string
+    reward: QuestReward
+  }
+  'quest:failed': {
+    questId: string
+    templateId: string
+    reason: QuestFailReason
+  }
+  /** The Golden Release completed (spec-build2 §3.4). */
+  'game:victory': { day: number }
+  /** ADDITION (M7, design-m7 Q9): lives went up (a magic parcel, a quest reward). */
+  'life:gained': { lives: number; delta: number; reason: 'magic' | 'quest' }
   /** day = completed in-game days (= state.day after the clock step). */
   'day:ended': { day: number }
   // additions beyond §11 (default — confirm, plan.md §14 Q16)
@@ -310,8 +354,12 @@ export const SIM_EVENT_NAMES = [
   'ticker:news',
   'quest:offered',
   'quest:accepted',
+  'quest:declined',
+  'quest:progress',
   'quest:completed',
   'quest:failed',
+  'game:victory',
+  'life:gained',
   'day:ended',
   'building:rushed',
   'building:rushCleared',

@@ -60,6 +60,24 @@
 // follow sim.revision, which a command or tick bumps only after its events —
 // so the Garage badge is also re-read on the next frame (garageDirty).
 //
+// M7 quests (spec-build2 §3, plan-build2 §8.4 task 4, design-m7 §6.5): the
+// QuestChip sits in row B between a shortened level bar (the `Lv N coming
+// soon` suffix drops) and the shield while a quest is offered or active; a
+// tap opens the QuestCard (offer: Accept / Later / Decline; active:
+// Abandon / Close) on the modal stack without holding the sim. A new offer
+// opens the card by itself when nothing else is up in the city
+// (questCardAutoOpens; otherwise the chip pulses and it retries).
+// quest:completed plays the gold `QUEST COMPLETE +$300` stamp rising from the
+// toast lane at the money cell, turns an open card to its complete state and
+// queues a quest / ★ paper; life:gained blinks the newly lit bomb slot (4–5
+// light above 3) and toasts `+1 life — 4 of 5`; the district panel shows the
+// quest row of its district; game:victory holds the sim ('victory') and opens
+// the VictoryCard (Continue / New game / Run summary, whose Back returns to
+// it). Quest ticker lines are the sim's (ticker:news 'quest' | 'questFailed',
+// tinted by the Ticker). The questDone SFX is the audio director's. Event
+// handlers mark the chip dirty and it re-reads quests() next frame (the
+// ViewSim cache follows sim.revision, bumped after the tick's events).
+//
 // M4 (plan.md §12.7 tasks 1-2, §12.9): the PlaytestRecorder
 // (src/metrics/playtest.ts) follows the sim from create (resumed from
 // pm.playtest.v1 when this is the same run as the save, a fresh profile
@@ -113,7 +131,7 @@ import {
   type PlaytestDevice,
 } from '../metrics/playtest.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
-import { STAMP_MS } from '../render/cityFx.ts'
+import { STAMP_MS, STAMP_RISE_MS, stampPose } from '../render/cityFx.ts'
 import { buildingSprite } from '../render/frames.ts'
 import { footprintAnchor, originX } from '../render/iso.ts'
 import { roomPlacement } from '../render/warehouse/RoomLayout.ts'
@@ -124,8 +142,8 @@ import type {
 } from '../sim/events.ts'
 import type { OnboardingSave } from '../sim/save.ts'
 import type { Sim } from '../sim/sim.ts'
-import type { Role, VehicleType } from '../sim/types.ts'
-import type { ViewSim } from '../sim/view-api.ts'
+import type { QuestReward, Role, VehicleType } from '../sim/types.ts'
+import type { QuestView, ViewSim } from '../sim/view-api.ts'
 import { Button } from '../ui/Button.ts'
 import { Dialog } from '../ui/Dialog.ts'
 import { DistrictPanel } from '../ui/DistrictPanel.ts'
@@ -144,6 +162,7 @@ import {
   isEarned,
   levelLabel,
   levelProgress,
+  lifeGainedToast,
   LIVES_TAP_TEXT,
   lockedRegionText,
   moneyTapText,
@@ -154,6 +173,7 @@ import {
   nowPlayingText,
   paydayToast,
   payrollShortLine,
+  questCardAutoOpens,
   regionOpenLine,
   setZoneRect,
   speedSegment,
@@ -203,6 +223,14 @@ import {
   step2Text,
 } from '../ui/Onboarding.ts'
 import { addBar, addPanel, BAR_H, setBarFill } from '../ui/Panel.ts'
+import { QuestCard, type QuestCardMode } from '../ui/QuestCard.ts'
+import { QuestChip, questChipModel } from '../ui/QuestChip.ts'
+import {
+  newsHeadline,
+  questBlockedBy,
+  questWaitingOn,
+  stampText,
+} from '../ui/questText.ts'
 import { TICKS_PER_S } from '../sim/types.ts'
 import { PausedCard } from '../ui/PausedCard.ts'
 import { RotateCard, wantsRotateCard } from '../ui/RotateCard.ts'
@@ -219,6 +247,7 @@ import { SummaryCard, type SummaryMode } from '../ui/SummaryCard.ts'
 import {
   addText,
   CAP_TOP,
+  ellipsize,
   formatMoney,
   formatMoneyDelta,
   formatPct,
@@ -233,6 +262,8 @@ import {
   Ticker,
 } from '../ui/Ticker.ts'
 import { Toast, toastDuration } from '../ui/Toast.ts'
+import { VictoryCard, victoryModel } from '../ui/VictoryCard.ts'
+import { failText } from '../ui/ZonePicker.ts'
 import { GARAGE_SHEET_ID, toggleGarage } from './GarageSheet.ts'
 
 // Game events (plan.md §5; the M1 cross-scene contract).
@@ -325,7 +356,21 @@ export const PAUSE_MENU_HINT_TEXT = 'Paused — tap pause again for the menu'
 export const NEW_GAME_CONFIRM_TITLE = 'Start a new game?'
 export const NEW_GAME_CONFIRM_TEXT = 'This run and its save will be lost.'
 
-type Hold = 'lostLife' | 'gameOver' | 'hidden' | 'rotate' | 'summary'
+type Hold =
+  | 'lostLife'
+  | 'gameOver'
+  | 'hidden'
+  | 'rotate'
+  | 'summary'
+  /** M7: the VictoryCard (B2 §3.4 "modal, pauses"). */
+  | 'victory'
+
+// M7 (design-m7 §6.5).
+/** game:victory → the VictoryCard after the completion stamp has risen. */
+export const VICTORY_DELAY_MS = STAMP_RISE_MS
+/** The stamp's pill: text inset and height. */
+const QUEST_STAMP_PAD = 4
+const QUEST_STAMP_H = 18
 
 function reducedMotion(): boolean {
   try {
@@ -350,6 +395,8 @@ const D = {
   paper: PAPER_DEPTH,
   audioHint: 36,
   floats: 40,
+  /** M7: the QUEST COMPLETE stamp, above the top bar and the floats. */
+  questStamp: 41,
   popScrim: 6999,
   pop: 7000,
   tooltip: 9500,
@@ -529,6 +576,32 @@ export class HudScene extends Phaser.Scene {
   private pauseHinted = false
   private newGameDialog: Dialog | null = null
 
+  // M7
+  private questChip!: QuestChip
+  private questCard!: QuestCard
+  private victoryCard!: VictoryCard
+  /** Re-read quests() next frame (after the event's revision bump). */
+  private questDirty = false
+  /** The chip shows: the level bar is the short one (L.levelBarChip). */
+  private chipShown = false
+  /** An offer waiting to open its card by itself (questCardAutoOpens). */
+  private questAutoOpen: { id: string; force: boolean } | null = null
+  /**
+   * The quest slots as last read (by id): quest:completed fires after the
+   * quest left its slot, and a ViewSim read inside the tick may be stale.
+   */
+  private questSeen = new Map<string, QuestView>()
+  /** The rising QUEST COMPLETE stamp (ms on the HUD clock). */
+  private questStamp: {
+    root: Phaser.GameObjects.Container
+    ms: number
+  } | null = null
+  private victoryTimer: Phaser.Time.TimerEvent | null = null
+  /** The summary card was opened from the VictoryCard (its Back returns there). */
+  private summaryFromVictory = false
+  /** The next syncQuests is create()'s (a standing offer opens its card). */
+  private questBootSync = true
+
   constructor() {
     super('HUD')
   }
@@ -597,6 +670,14 @@ export class HudScene extends Phaser.Scene {
     this.newGameDialog = null
     this.garageDirty = false
     this.staffNames = new Map()
+    this.questDirty = false
+    this.chipShown = false
+    this.questAutoOpen = null
+    this.questSeen = new Map()
+    this.questStamp = null
+    this.victoryTimer = null
+    this.summaryFromVictory = false
+    this.questBootSync = true
   }
 
   create(): void {
@@ -646,7 +727,9 @@ export class HudScene extends Phaser.Scene {
       onSummary: () => this.openSummary('run'),
     })
     this.rotate = new RotateCard(this, this.L.W, this.L.H)
-    this.district = new DistrictPanel(this, this.L, this.vs)
+    this.district = new DistrictPanel(this, this.L, this.vs, {
+      onQuest: (id) => this.openQuestCardFor(id),
+    })
     this.shield = new ShieldPopover(this, this.L, this.vs)
     this.flash = this.add
       .rectangle(0, 0, this.L.W, this.L.H, THEME.danger, 1)
@@ -679,6 +762,22 @@ export class HudScene extends Phaser.Scene {
       companyName: this.gd.puns.companyName,
       depth: D.paper,
       onShown: () => this.game.events.emit('ui:sfx', { name: PAPER_SFX }),
+    })
+    this.questCard = new QuestCard(this, this.L, this.gd, {
+      onAccept: (id) => this.onQuestAccept(id),
+      onLater: () => this.closeQuestCard(),
+      onDecline: (id) => this.onQuestDecline(id),
+      onAbandon: (id) => this.onQuestAbandon(id),
+      onClose: () => this.closeQuestCard(),
+      // The Golden Release offered while a regular quest runs (design-m7 §4):
+      // its card says so, and the active card (the chip's) names it.
+      blockedBy: (q) => questBlockedBy(this.vs.quests(), q),
+      waitingOn: (q) => questWaitingOn(this.vs.quests(), q),
+    })
+    this.victoryCard = new VictoryCard(this, this.L, this.gd, {
+      onContinue: () => this.continueAfterVictory(),
+      onNewGame: () => this.confirmNewGame(),
+      onSummary: () => this.openVictorySummary(),
     })
 
     this.autosave = new Autosave({
@@ -744,8 +843,11 @@ export class HudScene extends Phaser.Scene {
       this.garageDirty = false
       this.applyGarageBadge()
     }
+    if (this.questDirty) this.refreshQuest()
+    if (this.questAutoOpen) this.tryAutoOpenQuest()
     if (time >= this.pollAt) {
       this.pollAt = time + POLL_MS
+      this.refreshQuest(false)
       this.refreshShield()
       this.refreshWarehouseBtn()
       this.refreshChipActive()
@@ -780,6 +882,7 @@ export class HudScene extends Phaser.Scene {
     )
     this.onboarding.update(time)
     this.updateLevelAnim(delta)
+    this.updateQuestStamp(delta)
     this.updateFlash(time)
     this.updateTopShake(time)
     this.updateFlagArrow(time)
@@ -847,6 +950,7 @@ export class HudScene extends Phaser.Scene {
       this.levelBarText,
       this.shieldIcon,
       this.shieldText,
+      this.questChip.root,
     ]
   }
 
@@ -870,7 +974,8 @@ export class HudScene extends Phaser.Scene {
       modalCount() === 0 &&
       !this.lostCard.isOpen() &&
       !this.overCard.isOpen() &&
-      !this.summary.isOpen()
+      !this.summary.isOpen() &&
+      !this.victoryCard.isOpen
     this.flagArrow.setVisible(show)
     if (!show) return
     const r = this.L.warehouse.rect
@@ -933,13 +1038,18 @@ export class HudScene extends Phaser.Scene {
     })
   }
 
-  /** Close the panels a modal card must not sit under; sleep the Garage. */
-  private prepareModal(): void {
+  /**
+   * Close the panels a modal card must not sit under; sleep the Garage. The
+   * QuestCard goes too (an offer stays in its slot), unless it is the card
+   * being opened (`keepQuest`).
+   */
+  private prepareModal(keepQuest = false): void {
     if (this.garageOpen()) this.scene.sleep('Garage')
     this.closeMood()
     this.shield?.close()
     if (this.district?.isOpen()) this.district.close()
     this.hideTooltip()
+    if (!keepQuest) this.closeQuestCard()
   }
 
   private openNextLostCard(): void {
@@ -1140,13 +1250,24 @@ export class HudScene extends Phaser.Scene {
     this.autosave.savePlaytest()
   }
 
-  /** `Keep playing` (the last running speed) / `Back` (the game-over card). */
+  /**
+   * `Keep playing` (the last running speed) / `Back` (the game-over card, or
+   * the VictoryCard it was opened from).
+   */
   private closeSummary(mode: SummaryMode): void {
     if (!this.summary.isOpen()) return
     this.newGameDialog?.destroy()
     this.newGameDialog = null
     this.summary.close()
     this.release('summary')
+    if (this.summaryFromVictory) {
+      this.summaryFromVictory = false
+      if (!this.vs.gameOver) {
+        this.openVictory()
+        return
+      }
+      this.release('victory')
+    }
     if (mode === 'over' || this.vs.gameOver) {
       if (!this.overCard.isOpen()) this.openGameOver()
       return
@@ -1156,10 +1277,18 @@ export class HudScene extends Phaser.Scene {
 
   /** `New game` on the summary: straight after a game over, else confirmed. */
   private summaryNewGame(mode: SummaryMode): void {
-    if (mode === 'over' || this.vs.gameOver) {
+    if ((mode === 'over' && !this.summaryFromVictory) || this.vs.gameOver) {
       this.newGame()
       return
     }
+    this.confirmNewGame()
+  }
+
+  /**
+   * `New game` during a live run (the summary's, the VictoryCard's): a
+   * confirm Dialog first, then the game-over card's new-game path.
+   */
+  private confirmNewGame(): void {
     if (this.newGameDialog) return
     this.newGameDialog = new Dialog(this, {
       title: NEW_GAME_CONFIRM_TITLE,
@@ -1270,6 +1399,297 @@ export class HudScene extends Phaser.Scene {
   private rememberLabel(id: number): void {
     const label = this.vs.parcel(id)?.label
     if (label) this.heldLabels.set(id, label)
+  }
+
+  // ---------------------------------------------------------------- M7: quests
+
+  /**
+   * Re-read the quest slots (next frame after a quest event, and at 2 Hz):
+   * the chip (and the level bar it shortens), an open card, the district
+   * panel's quest row (`district`: the panel re-reads itself at 2 Hz).
+   * Remembers the quests in the slots by id for quest:completed.
+   */
+  private refreshQuest(district = true): void {
+    this.questDirty = false
+    const qs = this.vs.quests()
+    // Only the slots: a quest that left them was handled by its event.
+    this.questSeen.clear()
+    if (qs.offer) this.questSeen.set(qs.offer.id, qs.offer)
+    if (qs.active) this.questSeen.set(qs.active.id, qs.active)
+    const m = questChipModel(qs, this.gd)
+    this.questChip.set(m)
+    if (m.visible !== this.chipShown) {
+      this.chipShown = m.visible
+      if (!this.topShake) this.layoutTopBar()
+    }
+    const card = this.questCard
+    if (card.isOpen && card.mode !== 'complete') {
+      const id = card.questId
+      const q =
+        qs.active?.id === id ? qs.active : qs.offer?.id === id ? qs.offer : null
+      card.refresh(q, this.vs.tick)
+    }
+    if (district) this.refreshDistrict()
+  }
+
+  /**
+   * A new offer opens its card once nothing else is up (questCardAutoOpens);
+   * it stops trying when the offer is gone, accepted or already on screen.
+   */
+  private tryAutoOpenQuest(): void {
+    const want = this.questAutoOpen
+    if (!want) return
+    const qs = this.vs.quests()
+    const q = qs.offer
+    if (!q || q.id !== want.id || this.vs.gameOver) {
+      this.questAutoOpen = null
+      return
+    }
+    if (this.questCard.isOpen) {
+      if (this.questCard.questId === q.id) this.questAutoOpen = null
+      return
+    }
+    const ok = questCardAutoOpens({
+      modals: modalCount(),
+      onboardingStep: this.onboarding.activeStep,
+      view: this.view,
+      held: this.holds.size > 0 || this.paused.isOpen(),
+      paperVisible: this.paperBusy(),
+      blocked: q.ultimate && qs.active !== null,
+      force: want.force,
+      policy: this.stepper.policy !== null,
+    })
+    if (!ok) return
+    this.questAutoOpen = null
+    this.openQuestCard(q)
+  }
+
+  /**
+   * A paper is up, queued or held for the level-up moment: a new offer's
+   * card waits for it (both sit above the bottom bar).
+   */
+  private paperBusy(): boolean {
+    const q = this.paper.queue
+    return (
+      this.paper.isVisible() ||
+      q.current !== null ||
+      q.waiting.length > 0 ||
+      this.paperHoldMs > 0 ||
+      this.heldPapers.length > 0 ||
+      this.pendingPapers.length > 0
+    )
+  }
+
+  /** The chip: the active quest's card (Abandon), else the offer's. */
+  private onQuestChipTap(): void {
+    const qs = this.vs.quests()
+    const q = qs.active ?? qs.offer
+    if (!q) return
+    if (this.questCard.isOpen && this.questCard.questId === q.id) {
+      this.closeQuestCard()
+      return
+    }
+    this.openQuestCard(q)
+  }
+
+  /** The district panel's quest row: that quest's card. */
+  private openQuestCardFor(id: string): void {
+    const qs = this.vs.quests()
+    const q =
+      qs.active?.id === id ? qs.active : qs.offer?.id === id ? qs.offer : null
+    if (q) this.openQuestCard(q)
+  }
+
+  private openQuestCard(q: QuestView): void {
+    if (this.vs.gameOver || this.holds.size > 0) return
+    this.prepareModal(true)
+    if (this.questAutoOpen?.id === q.id) this.questAutoOpen = null
+    const mode: QuestCardMode = q.status === 'active' ? 'active' : 'offer'
+    this.questCard.open(q, mode, this.vs.tick, this.vs.day + 1)
+  }
+
+  private closeQuestCard(): void {
+    if (this.questCard.isOpen) this.questCard.close()
+  }
+
+  /** Accept: the chip takes over; a refusal shakes the card (or closes it when the offer is gone). */
+  private onQuestAccept(id: string): void {
+    const r = this.vs.quest.accept(id)
+    this.questDirty = true
+    if (r.ok) {
+      this.closeQuestCard()
+      return
+    }
+    const text = failText(r.reason, this.gd)
+    if (r.reason === 'quest-expired' || r.reason === 'invalid') {
+      this.closeQuestCard()
+      this.toast.show(text, true)
+      return
+    }
+    this.questCard.deny(text)
+  }
+
+  private onQuestDecline(id: string): void {
+    this.vs.quest.decline(id)
+    this.questDirty = true
+    this.closeQuestCard()
+  }
+
+  /** Abandon (the card confirmed it): no penalty (Q-B2-7), the card closes. */
+  private onQuestAbandon(_id: string): void {
+    this.vs.quest.abandon()
+    this.questDirty = true
+    this.closeQuestCard()
+  }
+
+  /**
+   * quest:completed (spec-build2 §3.1): an open card on that quest turns to
+   * its complete state, the gold stamp rises at the money cell and a quest
+   * (or ★ applicant) paper follows. The quest has left its slot already: its
+   * last view comes from questSeen (no paper when it was never seen).
+   */
+  private onQuestCompleted(p: SimEventPayloads['quest:completed']): void {
+    this.questDirty = true
+    const q = this.questSeen.get(p.questId) ?? null
+    this.questSeen.delete(p.questId)
+    if (q && this.questCard.isOpen && this.questCard.questId === p.questId)
+      this.questCard.showComplete(q, p.reward)
+    this.showQuestStamp(p.reward)
+    if (!q) return
+    const h = newsHeadline(this.gd, q, p.reward)
+    this.queuePaper({ kind: h.kind, headline: h.text, level: this.vs.level })
+  }
+
+  /**
+   * The `QUEST COMPLETE +$300` stamp: dark text on the gold ui_tag pill,
+   * left-aligned at the money cell, rising from the toast lane's top with
+   * the level stamp's pose (cityFx.stampPose: 24 px / 1.2 s, hold, fade).
+   */
+  private showQuestStamp(r: QuestReward): void {
+    this.questStamp?.root.destroy()
+    this.questStamp = null
+    const text = stampText(this.gd, r)
+    if (!text) return
+    const t = addText(this, QUEST_STAMP_PAD, 0, text)
+    t.setY(textTop(0, QUEST_STAMP_H))
+    const bg = addPanel(
+      this,
+      0,
+      0,
+      Math.round(t.width) + 2 * QUEST_STAMP_PAD,
+      QUEST_STAMP_H,
+      'ui_tag',
+    )
+    const root = this.add
+      .container(this.L.money.rect.x, this.L.toast.y, [bg, t])
+      .setDepth(D.questStamp)
+    this.questStamp = { root, ms: 0 }
+    this.updateQuestStamp(0)
+  }
+
+  private updateQuestStamp(delta: number): void {
+    const st = this.questStamp
+    if (!st) return
+    st.ms += Math.max(0, Math.min(delta, 100))
+    const pose = stampPose(st.ms)
+    if (!pose) {
+      st.root.destroy()
+      this.questStamp = null
+      return
+    }
+    const dy = reducedMotion() ? 0 : pose.dy
+    st.root
+      .setPosition(this.L.money.rect.x, this.L.toast.y + dy)
+      .setAlpha(pose.alpha)
+  }
+
+  /** life:gained (magic parcel / quest reward): slots 4–5 light, a toast. */
+  private onLifeGained(p: SimEventPayloads['life:gained']): void {
+    this.lives.gainLife(p.lives)
+    this.toast.show(
+      lifeGainedToast(p.lives, p.delta, this.gd.economy.lives.cap),
+    )
+    if (this.saveSoon !== 'final') this.saveSoon = 'save'
+  }
+
+  /** game:victory (spec-build2 §3.4): hold now, the VictoryCard once the stamp has risen. */
+  private onVictory(): void {
+    this.hold('victory')
+    this.questDirty = true
+    // Persist the victory right after this tick.
+    if (this.saveSoon !== 'final') this.saveSoon = 'save'
+    if (this.victoryTimer || this.victoryCard.isOpen) return
+    this.victoryTimer = this.time.delayedCall(
+      reducedMotion() ? 0 : VICTORY_DELAY_MS,
+      () => {
+        this.victoryTimer = null
+        this.openVictory()
+      },
+    )
+  }
+
+  private openVictory(): void {
+    if (this.victoryCard.isOpen) return
+    if (this.vs.gameOver) {
+      this.release('victory')
+      return
+    }
+    this.prepareModal()
+    const s = getSim(this).state
+    this.victoryCard.open(
+      victoryModel(
+        {
+          day: s.day,
+          lifetimeEarned: s.economy.lifetimeEarned,
+          deliveries: s.stats.deliveries,
+          malwareMissed: s.stats.malwareMissed,
+          defused: s.lane.quarantine.malware,
+          lives: s.economy.lives,
+          level: s.level.level,
+          victoryTick: s.stats.victoryTick ?? s.tick,
+        },
+        this.gd,
+      ),
+    )
+    this.hold('victory')
+  }
+
+  /** `Continue` (endless): the card closes and the sim runs on. */
+  private continueAfterVictory(): void {
+    this.victoryCard.close()
+    this.release('victory')
+  }
+
+  /** `Run summary` from the VictoryCard: its `Back` returns to the card. */
+  private openVictorySummary(): void {
+    this.victoryCard.close()
+    this.summaryFromVictory = true
+    this.openSummary('over')
+  }
+
+  /**
+   * create / WAKE / Sim swap: the chip from quests(), the card closed, a
+   * stale victory screen or stamp gone (the victory shows on its event
+   * only). At create a standing offer opens its card (a reload, Boot's
+   * `?quest=` offer, made before the HUD listened); after a swap (__pm.load,
+   * a fixture) the chip just pulses, so a swap leaves the modal stack empty.
+   */
+  private syncQuests(): void {
+    const boot = this.questBootSync
+    this.questBootSync = false
+    this.questSeen.clear()
+    this.closeQuestCard()
+    this.questStamp?.root.destroy()
+    this.questStamp = null
+    this.victoryTimer?.remove(false)
+    this.victoryTimer = null
+    if (this.victoryCard.isOpen) this.victoryCard.close()
+    this.summaryFromVictory = false
+    this.release('victory')
+    const qs = this.vs.quests()
+    this.questAutoOpen =
+      boot && qs.offer && !qs.active ? { id: qs.offer.id, force: true } : null
+    this.refreshQuest()
   }
 
   // ---------------------------------------------------------------- step 2
@@ -1428,8 +1848,10 @@ export class HudScene extends Phaser.Scene {
       modalCount() > 0 ||
       this.lostTimer !== null ||
       this.overTimer !== null ||
+      this.victoryTimer !== null ||
       this.lostCard.isOpen() ||
-      this.overCard.isOpen()
+      this.overCard.isOpen() ||
+      this.victoryCard.isOpen
     )
   }
 
@@ -1592,7 +2014,7 @@ export class HudScene extends Phaser.Scene {
       f = this.levelTarget
     }
     this.levelFrac = f
-    setBarFill(this.levelFill, this.L.levelBar.w, f)
+    setBarFill(this.levelFill, this.levelBarRect().w, f)
   }
 
   // ---------------------------------------------------------------- M3: audio
@@ -1708,6 +2130,12 @@ export class HudScene extends Phaser.Scene {
     this.overCard.relayout(L)
     this.paper.relayout(L)
     this.summary.relayout(L)
+    this.questCard.relayout(L)
+    this.victoryCard.relayout(L)
+    // The VictoryCard / SummaryCard rebuilt their cameras above an open
+    // New-game confirm: re-fit it and put it back on top (it is still the
+    // top modal, so Enter would confirm it unseen).
+    this.newGameDialog?.relayout(L)
     this.audioHint?.destroy()
     this.audioHint = null
     this.refreshAudioHint()
@@ -1780,6 +2208,8 @@ export class HudScene extends Phaser.Scene {
       ),
     }
     for (const z of Object.values(this.zones)) z.setDepth(c)
+    this.questChip = new QuestChip(this).setDepth(c)
+    this.questChip.onTap(() => this.onQuestChipTap())
     this.layoutTopBar()
   }
 
@@ -1793,20 +2223,29 @@ export class HudScene extends Phaser.Scene {
     this.lives.setPosition(L.lives.rect.x, st + 4)
     this.layoutMood()
     this.levelText.setPosition(L.level.rect.x, textTop(L.rowB.y, L.rowB.h))
-    const bar = L.levelBar
+    const bar = this.levelBarRect()
     const by = bar.y + Math.floor((bar.h - BAR_H) / 2)
     this.levelTrack.setPosition(bar.x, by).setSize(bar.w, BAR_H)
     this.levelFill.setPosition(bar.x, by)
     this.levelFrac = -1
     this.refreshLevel()
     this.layoutShield()
+    this.questChip.setRect(L.questChip.rect, L.questChip.hit)
     if (this.zones) {
       setZoneRect(this.zones.money, L.money.hit)
       setZoneRect(this.zones.lives, L.lives.hit)
       setZoneRect(this.zones.mood, L.mood.hit)
-      setZoneRect(this.zones.level, L.level.hit)
+      setZoneRect(
+        this.zones.level,
+        this.chipShown ? L.levelChip.hit : L.level.hit,
+      )
       setZoneRect(this.zones.shield, L.shield.hit)
     }
+  }
+
+  /** The level bar: the short one while the quest chip shows (design-m7 §6.4). */
+  private levelBarRect(): Rect {
+    return this.chipShown ? this.L.levelBarChip : this.L.levelBar
   }
 
   private layoutMood(): void {
@@ -1932,21 +2371,26 @@ export class HudScene extends Phaser.Scene {
 
   private refreshLevel(): void {
     const vs = this.vs
+    const compact = this.chipShown
     const p = levelProgress(
       this.gd,
       vs.level,
       vs.lifetimeEarned,
       vs.nextThreshold,
+      { compact },
     )
     this.levelText.setText(levelLabel(this.gd, vs.level))
-    const bar = this.L.levelBar
+    const bar = this.levelBarRect()
     this.levelTarget = p.frac
     // The level-up sweep owns the fill until it ends (updateLevelAnim).
     if (this.levelAnim === null && p.frac !== this.levelFrac) {
       this.levelFrac = p.frac
       setBarFill(this.levelFill, bar.w, p.frac)
     }
-    this.levelBarText.setText(p.text)
+    const t = this.levelBarText
+    t.setText(
+      compact ? ellipsize(p.text, bar.w, (x) => t.setText(x).width) : p.text,
+    )
     this.levelBarText.setPosition(
       Math.round(bar.x + (bar.w - this.levelBarText.width) / 2),
       textTop(bar.y, bar.h),
@@ -2691,7 +3135,8 @@ export class HudScene extends Phaser.Scene {
     if (
       this.lostCard.isOpen() ||
       this.overCard.isOpen() ||
-      this.summary.isOpen()
+      this.summary.isOpen() ||
+      this.victoryCard.isOpen
     ) {
       this.autoPaused = false
       this.release('hidden')
@@ -2814,6 +3259,29 @@ export class HudScene extends Phaser.Scene {
           this.simKinds.add(p.kind)
           this.pendingLines.push({ text: p.text, kind: p.kind, src: 'sim' })
         },
+        // M7 quests: the chip / card / district row re-read quests() next
+        // frame (questDirty); the lines are the sim's ticker:news.
+        'quest:offered': (p) => {
+          this.questDirty = true
+          this.questAutoOpen = { id: p.questId, force: false }
+        },
+        'quest:accepted': () => {
+          this.questDirty = true
+        },
+        'quest:declined': (p) => {
+          this.questDirty = true
+          if (this.questAutoOpen?.id === p.questId) this.questAutoOpen = null
+        },
+        'quest:progress': () => {
+          this.questDirty = true
+        },
+        'quest:failed': (p) => {
+          this.questDirty = true
+          this.questSeen.delete(p.questId)
+        },
+        'quest:completed': (p) => this.onQuestCompleted(p),
+        'life:gained': (p) => this.onLifeGained(p),
+        'game:victory': () => this.onVictory(),
       },
       () => this.syncAll(),
     )
@@ -2968,8 +3436,12 @@ export class HudScene extends Phaser.Scene {
       // The cards sit on the shared modal stack: pop them with the scene.
       this.lostCard.destroy()
       this.overCard.destroy()
+      this.questCard.destroy()
+      this.victoryCard.destroy()
+      this.questChip.destroy()
       this.lostTimer = null
       this.overTimer = null
+      this.victoryTimer = null
     })
   }
 
@@ -3018,6 +3490,7 @@ export class HudScene extends Phaser.Scene {
     if (this.onboarding) this.refreshStep1()
     this.heldLabels.clear()
     for (const it of vs.holdBay.items) this.rememberLabel(it.parcelId)
+    this.syncQuests()
     // Cards follow the sim: a game-over state (a reload, __pm.load of a
     // fixture) shows its screen; a live one closes a stale screen.
     if (vs.gameOver) {

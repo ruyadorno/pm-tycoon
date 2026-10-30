@@ -7,6 +7,8 @@
 // `people` (build 2, M6: applicants, stats, the Hold Bay sorter, drivers)
 // gates nothing in the sim — the state shape cannot be toggled — but
 // tools/sim/report.ts reads it for the people rows and the delegating policy.
+// `quests` (build 2, M7: offers, goal counters, rewards, the magic parcel,
+// the Golden Release) gates the quests tick step and its event observer.
 // tools/sim/report.ts reads the same flags so a gate window whose system is
 // not built yet prints as informational instead of failing.
 
@@ -16,6 +18,7 @@ export const SIM_FEATURES = {
   levels: true,
   payroll: true,
   people: true,
+  quests: true,
 }
 
 export type SimFeature = keyof typeof SIM_FEATURES
@@ -27,4 +30,5 @@ export const FEATURE_MILESTONE: Record<SimFeature, string> = {
   levels: 'M3',
   payroll: 'M3',
   people: 'M6',
+  quests: 'M7',
 }

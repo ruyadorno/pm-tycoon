@@ -14,7 +14,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 - [x] M5 foundations + the author's fixes: logo + attract title, slab, bike, hop, modern port art, two atlases + hashed URLs, save v2, report §6 rough edges (commit `M5: …`)
 - [x] M6 people: applicants, pips, charisma, salaries, desk 2, the Hold Bay sorter, drivers, hire sheets, faces, policies (commit `M6: …`)
-- [ ] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
+- [x] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
 - [ ] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
 - [ ] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
 - [ ] M10 playtest-2 build: metrics v2, summary card v2, shots, report, Pages deploy, hand-off (commit `M10: …`)
@@ -29,7 +29,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 ## Gate results
 
-Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M6 commit (data 6225dd3d; the table below is playtest 1's, the M6 medians are in the M6 entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
+Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M7 commit (data 20c5e42e; the table below is playtest 1's, the build-2 medians are in the newest entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
 
 | Gate                                                          | Window           | Median    | Min / max     | Pass                        |
 | ------------------------------------------------------------- | ---------------- | --------- | ------------- | --------------------------- |
@@ -47,7 +47,41 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M6 — people — 2026-10-30 05:21 UTC — DONE at (this commit; sha recorded in the M7 entry)
+## M7 — quests — 2026-10-30 08:20 UTC — DONE at (this commit; sha recorded in the M8 entry)
+
+Built: `quests.json` (B2 §9) + `systems/quests.ts` (offer scheduler from day 3 every 2 days, 1-day decline/expiry
+cooldown, one active quest, the Golden Release from `levels.json ultimateQuest` with no expiry; ten templates' goal
+counters from sim events with a no-double-count property test; rewards: cash → lifetime earned, lives up to 5,
+satisfaction outside the daily cap, ★ applicants through people.ts, vouchers; no penalty on fail — Q-B2-7) on its own
+RNG stream, `systems/magic.ts` (the golden parcel: busiest sender → another live district within 20 road tiles,
+checkers/sorter/Arm skip it, 120-s countdown, on time +1 life + $150), `game:victory` + `stats.victoryTick` + endless
+escalation from victory, `STATE_VERSION` 4; QuestCard (offer / active / complete; gold frame for the ultimate),
+QuestChip in the level row, VictoryCard (TYCOON, run stats, Continue / New game / Run summary), the district panel quest
+row, ticker lines, the QUEST COMPLETE stamp + `questDone` SFX, the victory stinger, life slots 4–5, gold `ic_magic`
+markers and rings in the city, the golden parcel in the lane, the voucher FREE row; the policy's quest rule; `?quest=`,
+`debug.offerQuest`, `__pm.quests()`.
+Gate: PASS (data 20c5e42e, Δ vs M6): first delivery 43.3 s (0 %), scripted catch 178.3 s (0 %), L2 11.72 min (−4.6 %),
+truck +1.54 min (−20.2 %, earlier = better), lives 0 (4/10 seeds lose one), shelf stall 0 s, Hold Bay 6.78/10 min
+(−1.3 %); quests offered by 30 min 6 (≥ 4), completed 3.5 (≥ 2); a quest active in minutes 7–13 on 10/10 seeds
+(the L1 plateau has content); golden parcels on time 10/10. Retunes (decisions.md M7): `postVictoryPerDay` 0.01 →
+0.005 (row maxLivesLost 0.5 → 0), `big_haul` count 5 → 3 and `on_time_day` 0.95/8 → 0.85/6 (row
+questsCompletedBy30MinMin, B2 §3.2 reachability). Delegating (informational): lives 0.5, quests 6.5 / 4.
+Tests: {TESTS} (vitest, outside the long sweeps); e2e: full `vlr e2e` 100 passed / 0 failed; `vlr check` 118 s. Draw
+calls: city 3, warehouse 6. Atlases: world 72.2 %, interior 29.0 %.
+Shots: `quest-offer` (+360×604) — JOB BOARD "Rush hour · Node Heights · Reward $120", Accept · Later · Decline;
+`quest-chip` — gold bar 4/10, `1d 18h`; `magic-parcel` — gold `2:00` chip, markers + rings over A and B;
+`quest-complete` — gold stamp "QUEST COMPLETE +1 life +$150", toast "+1 life — 4 of 5", the Special Delivery paper;
+`district-panel-quest` — "Rush hour · 1/6 · 2d 11h"; `victory-card` (+360×604) — TYCOON, six stats, three buttons. All
+in the STYLE.md look; cosmetic: two money floats overlap on the quest-complete frame.
+Deviations from spec-core.md / B2: design defaults Q1–Q22 (decisions.md "Run decisions and deviations (M7 — quests)");
+the retunes above.
+Open for the author: `cheer_up` is never completed by the policy (0/8; a human steering zones can) — candidates for the
+M9 balance pass: `goal.value` 55 or a longer `limitDays`; `postVictoryPerDay` 0.005 also halves the endless ramp after
+Victory (revisit at M9 when the cap reaches 5); G5 Rural — `art/contact/rural@4x.png`; tiers — `art/contact/tiers@4x.png`
+(t3–t5 exteriors, used from M8/M9).
+Next: M8 L3 Regional
+
+## M6 — people — 2026-10-30 05:21 UTC — DONE at 1f0b631
 
 Built: the people layer of B2 §2 — `employees.json` B2 §9 (roles with pip tables, applicants, desks, hold station),
 `systems/people.ts` (three applicants per role on their own RNG stream, daily refresh, pips → numbers, salaries and
@@ -181,7 +215,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 ## Art approvals pending
 
 - G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
-- G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural, Airport, Park & civic, Docks pending
+- G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural presented at M7 — `art/contact/rural@4x.png` (ten uniques, agent picks); Airport, Park & civic, Docks pending
 - G6 tiers 3–5 + machines + people (build 2): people + machines presented at M6 — `art/contact/people@4x.png` (agent picks `battery_checker`, `xray`, `sorter_arm`; procedural faces, pips, ★, `worker_sorter`, `hold_station`); tiers pending (M8–M9)
 
 - G1 palette + STYLE.md: drawn 2026-10-29 (M0), presented in the end-of-run report — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
@@ -191,7 +225,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Cost spent
 
-- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); run total 333; $0 credits
+- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); run total 609; $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)
 - Retro Diffusion: $0 (expected; only with RD_API_KEY and after the author read its ToS)

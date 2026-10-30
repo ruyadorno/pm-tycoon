@@ -351,32 +351,39 @@ export interface WarehouseAnchorSet {
 
 /**
  * WH_ANCHORS for frames.generated.ts (cityFx warehouseAnchors reads it), one
- * entry per exterior frame: { wh_ext_t1: the row's bayLights / dockPose,
- * wh_ext_t2: its frameAnchors._t2 override, else the row's, … }; {} when
- * the row carries none.
+ * entry per exterior frame of every warehouse-ext row: { wh_ext_t1: the
+ * row's bayLights / dockPose, wh_ext_t2: its frameAnchors._t2 override, else
+ * the row's, wh_ext_t3: the wh_ext_t3 row's (build 2 M7: tiers 3-5 are rows
+ * of their own, one frame each), … }; a row without anchors adds nothing.
  */
 export function warehouseAnchorTable(
   m: Manifest,
 ): Record<string, WarehouseAnchorSet> {
   const out: Record<string, WarehouseAnchorSet> = {}
-  const e = m.entries.find((x) => x.class === 'warehouse-ext')
-  if (!e?.bayLights || !e.dockPose) return out
-  const row = { bayLights: e.bayLights, dockPose: e.dockPose }
-  for (const f of e.frames) {
-    out[e.id + f] = e.frameAnchors?.[f] ?? row
+  for (const e of m.entries) {
+    if (e.class !== 'warehouse-ext' || !e.bayLights || !e.dockPose) continue
+    const row = { bayLights: e.bayLights, dockPose: e.dockPose }
+    for (const f of e.frames) {
+      out[e.id + f] = e.frameAnchors?.[f] ?? row
+    }
   }
   return out
 }
 
+/** the tier-1 exterior row (wh_ext: frames _t1, _t2) */
+export const WH_EXT_ID = 'wh_ext'
+
 /**
- * The warehouse exterior's city anchors (cityFx BAY_LIGHTS /
+ * The tier-1 warehouse exterior's city anchors (cityFx BAY_LIGHTS /
  * DOCK_POSE_CANVAS), read from the wh_ext row; null when the row lacks them.
  */
 export function warehouseAnchors(m: Manifest): {
   bayLights: [number, number][]
   dockPose: [number, number]
 } | null {
-  const e = m.entries.find((x) => x.class === 'warehouse-ext')
+  const e =
+    m.entries.find((x) => x.id === WH_EXT_ID) ??
+    m.entries.find((x) => x.class === 'warehouse-ext')
   if (!e?.bayLights || !e.dockPose) return null
   return { bayLights: e.bayLights, dockPose: e.dockPose }
 }

@@ -43,6 +43,17 @@ export const CHIP_H = 24
 export const CHIP_PAD_X = 6
 export const CHIP_GAP = 4
 export const TOUCH_CSS_PX = 44
+/**
+ * M7 quest chip in row B (design-m7 §6.4): ic_quest 16 + 2 + the 60-px
+ * progress bar + 4 + a 34-px time label, right of the level bar, 4 px left
+ * of the shield.
+ */
+export const QUEST_CHIP_W = 116
+export const QUEST_CHIP_ICON = 16
+export const QUEST_CHIP_BAR_W = 60
+export const QUEST_CHIP_LABEL_W = 34
+/** Gap between the level bar and the chip, and between the chip and the shield. */
+export const QUEST_CHIP_GAP = 4
 
 export interface Rect {
   x: number
@@ -70,6 +81,11 @@ export type TargetName =
   | 'warehouse'
   | 'garage'
   | 'followClose'
+  /** M7: only while a quest is offered or active (Layout.questTargets). */
+  | 'questChip'
+
+/** The always-on targets (the quest chip comes and goes: Layout.questTargets). */
+export type FixedTargetName = Exclude<TargetName, 'questChip'>
 
 export interface Layout {
   W: number
@@ -90,6 +106,13 @@ export interface Layout {
   level: Target
   levelBar: Rect
   shield: Target
+  /**
+   * M7 (design-m7 §6.4): the quest chip in row B and, while it shows, the
+   * shortened level bar and the level cell's hit box (0 … chip.x).
+   */
+  questChip: Target
+  levelBarChip: Rect
+  levelChip: Target
   ticker: Rect
   tickerDay: Rect
   toast: Rect
@@ -116,8 +139,13 @@ export interface Layout {
   garage: Target
   /** The city area visible between the top HUD and the chips row. */
   world: Rect
-  /** Every fixed tap target, keyed by name (chips are dynamic: see `chip`). */
-  targets: Record<TargetName, Target>
+  /**
+   * Every fixed tap target, keyed by name (chips are dynamic: see `chip`),
+   * as laid out while no quest chip shows.
+   */
+  targets: Record<FixedTargetName, Target>
+  /** The same while the quest chip shows: `level` → levelChip, + questChip. */
+  questTargets: Record<TargetName, Target>
 }
 
 export const rect = (x: number, y: number, w: number, h: number): Rect => ({
@@ -216,6 +244,25 @@ export function computeLayout(
     rect(shieldX, st + ROW_H, SHIELD_W, ROW_H),
     rect(W - shieldHitW, bHitY, shieldHitW, bHitH),
   )
+  // M7: the quest chip between the level bar and the shield (row B). Its hit
+  // box runs from the chip to the shield's hit box; the level cell keeps the
+  // rest of the row (both grow down like the other row-B targets).
+  const qx = shieldX - QUEST_CHIP_GAP - QUEST_CHIP_W
+  const shieldHitX = W - shieldHitW
+  const questChip = target(
+    rect(qx, st + ROW_H, QUEST_CHIP_W, ROW_H),
+    rect(qx, bHitY, Math.max(0, shieldHitX - qx), bHitH),
+  )
+  const levelBarChip = rect(
+    levelBar.x,
+    levelBar.y,
+    Math.max(0, qx - QUEST_CHIP_GAP - levelBar.x),
+    levelBar.h,
+  )
+  const levelChip = target(
+    rect(MARGIN, st + ROW_H, Math.max(0, qx - 2 * MARGIN), ROW_H),
+    rect(0, bHitY, qx, bHitH),
+  )
   const ticker = rect(0, st + TOP_BAR_H, W, TICKER_H)
   const tickerDay = rect(0, st + TOP_BAR_H, TICKER_DAY_W, TICKER_H)
   const toast = rect(12, st + HUD_TOP_H + 4, W - 24, TOAST_H)
@@ -282,7 +329,7 @@ export function computeLayout(
   const worldY = st + HUD_TOP_H
   const world = rect(0, worldY, W, Math.max(0, chips.y - worldY))
 
-  const targets: Record<TargetName, Target> = {
+  const targets: Record<FixedTargetName, Target> = {
     money,
     lives,
     mood,
@@ -295,6 +342,11 @@ export function computeLayout(
     warehouse,
     garage,
     followClose,
+  }
+  const questTargets: Record<TargetName, Target> = {
+    ...targets,
+    level: levelChip,
+    questChip,
   }
 
   return {
@@ -314,6 +366,9 @@ export function computeLayout(
     level,
     levelBar,
     shield,
+    questChip,
+    levelBarChip,
+    levelChip,
     ticker,
     tickerDay,
     toast,
@@ -331,6 +386,7 @@ export function computeLayout(
     garage,
     world,
     targets,
+    questTargets,
   }
 }
 

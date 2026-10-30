@@ -271,7 +271,11 @@ describe('AudioDirector: boot cost (audio.md §3.1: zzfx renders < 5 ms at boot)
     expect(d.playNamed('levelUp')).toBe(false) // context still resuming
     vi.runAllTimers()
     expect(d.sfx.pending()).toEqual([])
-    expect(d.sfx.names()).toHaveLength(18)
+    // every one-shot of sfx.json (build 2 M7 adds questDone); ride and hat belong to the band
+    expect(d.sfx.names()).toHaveLength(
+      Object.keys(base.sfx).filter((n) => n !== 'ride' && n !== 'hat').length,
+    )
+    expect(d.sfx.names()).toContain('questDone')
     expect(d.state().sfxRenderMs).toBeGreaterThanOrEqual(0)
     expect(d.state().errors).toEqual([])
   })
@@ -397,6 +401,59 @@ describe('AudioDirector: loop throttles (audio.md §7)', () => {
     expect(played(d, 'hiss')).toBe(1)
     vi.advanceTimersByTime(4000) // next tick, 4.1 s after the chained hiss
     expect(played(d, 'hiss')).toBe(2)
+  })
+})
+
+describe('AudioDirector: quests and victory (build 2 M7, design-m7 §6.9)', () => {
+  it('quest:offered rings the bell, quest:completed plays questDone', async () => {
+    const { d, sim } = await unlocked()
+    sim.emit('quest:offered', {
+      questId: 'q1',
+      templateId: 'rush_district',
+      target: 'downtown',
+      ultimate: false,
+    })
+    expect(played(d, 'bell')).toBe(1)
+    sim.emit('quest:completed', { questId: 'q1', templateId: 'rush_district' })
+    expect(played(d, 'questDone')).toBe(1)
+  })
+
+  it('game:victory plays the victory tag (a log line while the stinger set still loads)', async () => {
+    const { d, sim } = await unlocked()
+    const tag = vi.spyOn(d.stingers, 'victoryTag')
+    sim.emit('game:victory', { day: 31 })
+    expect(tag).toHaveBeenCalledTimes(1)
+    expect(
+      d.log
+        .entries()
+        .some((e) => 'info' in e && /stinger victoryTag skipped/.test(e.info)),
+    ).toBe(true)
+  })
+
+  it('game:victory drops the playing band out for the tag and brings it back after the hold', async () => {
+    const { d, sim } = await unlocked()
+    const band = d.band as Band
+    vi.spyOn(d.stingers, 'victoryTag').mockReturnValue(true)
+    vi.spyOn(d.stingers, 'victoryTagSeconds').mockReturnValue(5)
+    const pause = vi.spyOn(band, 'pause')
+    const resume = vi.spyOn(band, 'resume')
+    tone.T.state = 'started'
+    sim.emit('game:victory', { day: 31 })
+    expect(pause).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(5000)
+    expect(resume).not.toHaveBeenCalled() // lookAheadS still to go
+    vi.advanceTimersByTime(base.config.lookAheadS * 1000 + 1)
+    expect(resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('game:victory leaves the band alone when the tag cannot play', async () => {
+    const { d, sim } = await unlocked()
+    const band = d.band as Band
+    vi.spyOn(d.stingers, 'victoryTag').mockReturnValue(false)
+    const pause = vi.spyOn(band, 'pause')
+    tone.T.state = 'started'
+    sim.emit('game:victory', { day: 31 })
+    expect(pause).not.toHaveBeenCalled()
   })
 })
 

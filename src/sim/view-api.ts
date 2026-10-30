@@ -27,7 +27,11 @@ import type {
   LoadingDock,
   Parcel,
   Pips,
+  Quest,
+  QuestGoalKind,
+  QuestRecord,
   Role,
+  SimState,
   Size,
   Strain,
   Tick,
@@ -43,6 +47,7 @@ import {
   TICKS_PER_S,
 } from './types.ts'
 import { holdBays } from './systems/lane.ts'
+import { liveMagicParcel } from './systems/magic.ts'
 import { ticksToPayday } from './systems/payroll.ts'
 import {
   deskNodeOf,
@@ -54,6 +59,13 @@ import {
   sorterNumbers,
   starDaysLeft,
 } from './systems/people.ts'
+import {
+  questFlavour,
+  questLimitTicks,
+  questName,
+  questProgress01,
+  questTicksLeft,
+} from './systems/quests.ts'
 import { paidValue } from './value.ts'
 
 export {
@@ -63,6 +75,13 @@ export {
   laneCatchRate,
   laneRatePerMin,
 } from './detection.ts'
+/** M7: the sim's single quest-text formatters (UI text uses these). */
+export {
+  questFlavour,
+  questName,
+  questValue,
+  rewardSummary,
+} from './systems/quests.ts'
 
 /** What the city view reads per frame (city-view.md §2). */
 export interface VehicleSnapshot {
@@ -292,6 +311,52 @@ export interface LaneView {
 }
 
 /**
+ * M7 (design-m7 §3.8): a quest slot as the UI reads it — the state object's
+ * fields (shared, read-only) plus derived ones.
+ */
+export interface QuestView extends Quest {
+  /** Template name (or puns.ultimateQuestName). */
+  name: string
+  /** puns.quests line with `{district}` filled. */
+  flavour: string
+  kind: QuestGoalKind
+  /** 0..1 (design-m7 §3.3); 0 for an offer. */
+  progress01: number
+  /** Offer: until it expires (null: the ultimate); active: until the deadline. */
+  ticksLeft: number | null
+  /** The time the quest gives (limitDays, the magic countdown, the ultimate's days). */
+  limitTicks: number
+  /** The target district's flavour name, or null. */
+  targetName: string | null
+  /** The magic parcel's A → B once accepted, else null. */
+  route: { origin: BuildingId; dest: BuildingId } | null
+}
+
+export interface QuestsView {
+  offer: QuestView | null
+  active: QuestView | null
+  history: readonly QuestRecord[]
+  vouchers: readonly string[]
+  /** Ticks until the next regular offer is due; null while an offer / active quest exists. */
+  nextOfferInTicks: number | null
+  victory: boolean
+  /** stats.victoryTick (the VictoryCard input). */
+  victoryTick: Tick | null
+  /**
+   * The golden parcel still on its way, or null — outlives a failed or
+   * abandoned Special delivery (B2 §3.3: the city marks A and B "while it is
+   * alive").
+   */
+  magic: { parcelId: number; origin: BuildingId; dest: BuildingId } | null
+}
+
+export interface QuestActions {
+  accept(questId: string): CommandResult
+  decline(questId: string): CommandResult
+  abandon(): CommandResult
+}
+
+/**
  * Debug-build helpers for shots / tests (each dispatches a debug command):
  * forceFlagNext — the next checker roll flags its parcel on `strain`;
  * fillHoldBay — every free bay gets a freshly flagged parcel (malware and
@@ -304,6 +369,8 @@ export interface ViewSimDebug {
   forceMalwareDelivery(): CommandResult
   /** M6: level up to `level` now (past the playtest cap; shots and tests). */
   forceLevel(level: number): CommandResult
+  /** M7: offer this quest template (or the ultimate id) now (`?quest=`). */
+  offerQuest(templateId: string): CommandResult
 }
 
 export interface ViewSim {
@@ -367,6 +434,11 @@ export interface ViewSim {
   rehireDriver(id: number): CommandResult
   /** economy.continueWithOneLife (playtest flag) after game over. */
   grantLife(): CommandResult
+  /** M7: the quest slots, history and vouchers (cached per sim revision). */
+  quests(): QuestsView
+  readonly quest: QuestActions
+  /** M7: the Golden Release is done (economy.victory). */
+  readonly victory: boolean
   /** Present only with `{debug: true}`. */
   readonly debug: ViewSimDebug | null
 }
@@ -476,6 +548,51 @@ function applicantView(
   }
 }
 
+function questView(sim: Sim, q: Quest): QuestView {
+  const data = sim.data
+  const pr = q.progress
+  return {
+    ...q,
+    name: questName(data, q.templateId),
+    flavour: questFlavour(data, q),
+    kind: pr.kind,
+    progress01: questProgress01(sim, q),
+    ticksLeft: questTicksLeft(sim, q),
+    limitTicks: questLimitTicks(data, q),
+    targetName:
+      q.target === null
+        ? null
+        : (data.districts.find((d) => d.id === q.target)?.flavour ?? null),
+    route:
+      pr.kind === 'magicParcel' && pr.origin !== null && pr.dest !== null
+        ? { origin: pr.origin, dest: pr.dest }
+        : null,
+  }
+}
+
+function questsView(sim: Sim): QuestsView {
+  const s = sim.state
+  const qs = s.quests
+  return {
+    offer: qs.offer === null ? null : questView(sim, qs.offer),
+    active: qs.active === null ? null : questView(sim, qs.active),
+    history: qs.history,
+    vouchers: qs.vouchers,
+    nextOfferInTicks:
+      qs.offer !== null || qs.active !== null
+        ? null
+        : Math.max(0, qs.nextOfferTick - s.tick),
+    victory: s.economy.victory,
+    victoryTick: s.stats.victoryTick,
+    magic: magicOf(s),
+  }
+}
+
+function magicOf(s: SimState): QuestsView['magic'] {
+  const p = liveMagicParcel(s)
+  return p ? { parcelId: p.id, origin: p.origin, dest: p.dest } : null
+}
+
 function personView(sim: Sim, e: Employee): PersonView {
   const s = sim.state
   const data = sim.data
@@ -538,6 +655,7 @@ export function createViewSim(
     }
     return pCache.list
   }
+  let qCache: { sim: Sim; rev: number; view: QuestsView } | null = null
   let tileIndex: { data: GameData; idx: Int32Array; w: number } | null = null
 
   const node = (id: string): LaneNode | null => laneNode(st().lane, id)
@@ -616,8 +734,16 @@ export function createViewSim(
         fillHoldBay: () => run({ kind: 'debugFillHoldBay' }),
         forceMalwareDelivery: () => run({ kind: 'debugMalwareDelivery' }),
         forceLevel: (level) => run({ kind: 'debugForceLevel', level }),
+        offerQuest: (templateId) =>
+          run({ kind: 'debugOfferQuest', templateId }),
       }
     : null
+
+  const quest: QuestActions = {
+    accept: (questId) => run({ kind: 'acceptQuest', questId }),
+    decline: (questId) => run({ kind: 'declineQuest', questId }),
+    abandon: () => run({ kind: 'abandonQuest' }),
+  }
 
   const buildingIndex = (data: GameData) => {
     if (tileIndex && tileIndex.data === data) return tileIndex
@@ -903,6 +1029,17 @@ export function createViewSim(
       return run({ kind: 'rehire', employeeId: e.id })
     },
     grantLife: () => run({ kind: 'continueWithOneLife' }),
+    quests() {
+      const sim = get()
+      if (!qCache || qCache.sim !== sim || qCache.rev !== sim.revision) {
+        qCache = { sim, rev: sim.revision, view: questsView(sim) }
+      }
+      return qCache.view
+    },
+    quest,
+    get victory() {
+      return st().economy.victory
+    },
     debug,
   }
 }

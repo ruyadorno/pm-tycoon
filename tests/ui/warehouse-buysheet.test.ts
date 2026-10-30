@@ -5,7 +5,11 @@
 // plan.md §5 (failure reason strings); design-m6 §6.2 / spec-build2 §2.4
 // (desk rows from employees.json desks.rows: "Inspection desk" free,
 // "Second desk $400" locked below Lv 3, "Move desk (N) here" per placed
-// desk, placeDesk(node, index)).
+// desk, placeDesk(node, index)); design-m7 §6.8 / spec-build2 §3.1 (a
+// checker held as a quest voucher reads a gold `FREE` tag and stays enabled
+// at any balance; the lane draws the golden parcel as `parcel_s_magic` and
+// its checkers skip it — LaneRenderer's pure helpers, the warehouse half of
+// the M7 world lane).
 // Pure helpers only; Phaser is stubbed because the module imports the
 // Button kit.
 import { describe, expect, it, vi } from 'vitest'
@@ -28,6 +32,8 @@ const { computeLayout, HUD_TOP_H } = await import('../../src/ui/layout.ts')
 const { dataFixture, fund, makeSim } = await import('../sim/helpers.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { frameOrNull } = await import('../../src/render/frames.ts')
+const { textTop } = await import('../../src/ui/text.ts')
+const lane = await import('../../src/render/warehouse/LaneRenderer.ts')
 
 const data = dataFixture()
 const def = (id: string) => {
@@ -358,5 +364,117 @@ describe('§8 the BuySheet opens on empty live slots only', () => {
     expect(bs.isEmptyLiveSlot(node('shelf'))).toBe(false)
     expect(bs.isEmptyLiveSlot(null)).toBe(false)
     expect(bs.deskNode(vs.lane.nodes())?.id).toBe('slot1')
+  })
+})
+
+describe('design-m7 §6.8 quest vouchers: a gold FREE tag, enabled at any balance', () => {
+  const md = def('metal_detector')
+
+  it('a voucher machine reads FREE at price 0; other rows keep their prices', () => {
+    const rows = bs.buyRows(data, 1, [], ['metal_detector'])
+    const row = rows.find((r) => r.id === 'metal_detector')
+    expect(row).toMatchObject({
+      kind: 'machine',
+      price: 0,
+      priceText: bs.VOUCHER_TEXT,
+      voucher: true,
+      locked: false,
+    })
+    expect(bs.VOUCHER_TEXT).toBe('FREE')
+    // The detail lines do not change: it is the same machine.
+    const plain = bs.buyRows(data, 1, []).find((r) => r.id === 'metal_detector')
+    expect(row?.lines).toEqual(plain?.lines)
+    expect(row?.name).toBe(md.name)
+    expect(plain).toMatchObject({ price: md.price, priceText: `$${md.price}` })
+    expect(plain?.voucher).toBeUndefined()
+    // Same rows in the same order (the sheet height never moves).
+    expect(rows.map((r) => r.id)).toEqual(
+      bs.buyRows(data, 1, []).map((r) => r.id),
+    )
+  })
+
+  it('the voucher row is enabled at $0 and below; the plain row is poor there', () => {
+    const row = bs
+      .buyRows(data, 1, [], ['metal_detector'])
+      .find((r) => r.id === 'metal_detector')
+    const plain = bs.buyRows(data, 1, []).find((r) => r.id === 'metal_detector')
+    if (!row || !plain) throw new Error('no metal detector row')
+    expect(bs.rowState(row, 0)).toBe('ok')
+    expect(bs.rowState(row, -250)).toBe('ok')
+    expect(bs.rowState(plain, 0)).toBe('poor')
+  })
+
+  it('a voucher for a locked machine changes nothing (the sim refuses it as locked)', () => {
+    const rows = bs.buyRows(data, 1, [], ['shaky_shaker'])
+    const shaker = rows.find((r) => r.id === 'shaky_shaker')
+    expect(shaker).toMatchObject({
+      locked: true,
+      price: def('shaky_shaker').price,
+    })
+    expect(shaker?.voucher).toBeUndefined()
+    expect(shaker && bs.rowState(shaker, 1_000_000)).toBe('locked')
+    // At its level the same voucher makes it free.
+    const l2 = bs.buyRows(data, 2, [], ['shaky_shaker'])
+    expect(l2.find((r) => r.id === 'shaky_shaker')).toMatchObject({
+      locked: false,
+      price: 0,
+      priceText: 'FREE',
+      voucher: true,
+    })
+  })
+
+  it('the FREE tag sits on the name line, clear of the detail lines', () => {
+    expect(textTop(bs.VOUCHER_TAG_Y, bs.VOUCHER_TAG_H)).toBe(bs.ROW_LINE_Y[0])
+    expect(bs.VOUCHER_TAG_Y + bs.VOUCHER_TAG_H).toBeLessThanOrEqual(
+      bs.ROW_LINE_Y[1],
+    )
+    expect(bs.VOUCHER_TAG_RIGHT).toBeGreaterThanOrEqual(4) // inside the 4-px button frame
+  })
+
+  it('through the facade: vs.quests().vouchers drives the row; Buy at $0 spends the voucher, not money', () => {
+    const sim = makeSim(1)
+    sim.state.economy.balance = 0
+    sim.state.quests.vouchers.push('metal_detector')
+    const vs = createViewSim(sim)
+    const rowOf = () =>
+      bs
+        .buyRows(data, vs.level, [], vs.quests().vouchers)
+        .find((r) => r.id === 'metal_detector')
+    const row = rowOf()
+    expect(row?.priceText).toBe('FREE')
+    expect(row && bs.rowState(row, vs.money)).toBe('ok')
+    expect(vs.lane.buyMachine('metal_detector', 'slot2')).toEqual({ ok: true })
+    expect(vs.money).toBe(0)
+    expect(vs.quests().vouchers).toEqual([])
+    const after = rowOf()
+    expect(after?.priceText).toBe(`$${md.price}`)
+    expect(after && bs.rowState(after, vs.money)).toBe('poor')
+  })
+})
+
+describe('design-m7 §6.8 the golden parcel in the lane (LaneRenderer)', () => {
+  it('parcelFrame: parcel_s_magic for the magic parcel; _mal once dark; plain otherwise', () => {
+    expect(lane.parcelFrame('S', false, true)).toBe('parcel_s_magic')
+    expect(lane.parcelFrame('S')).toBe('parcel_s')
+    expect(lane.parcelFrame('S', true)).toBe('parcel_s_mal')
+    expect(lane.parcelFrame('M', true, true)).toBe('parcel_m_mal')
+  })
+
+  it('every magic frame the lane can ask for is packed (shared parcel class, home world)', () => {
+    for (const size of ['S', 'M', 'L', 'XL'] as const) {
+      const f = lane.parcelFrame(size, false, true)
+      expect(frameOrNull(f)).toBe(f)
+    }
+  })
+
+  it('a checker scans for the parcels it rolls, never for the magic one it skips', () => {
+    const magic = new Set([7])
+    const isMagic = (id: number) => magic.has(id)
+    expect(lane.machineScanning([{ parcelId: null }], isMagic)).toBe(false)
+    expect(lane.machineScanning([{ parcelId: 3 }], isMagic)).toBe(true)
+    expect(lane.machineScanning([{ parcelId: 7 }], isMagic)).toBe(false)
+    expect(
+      lane.machineScanning([{ parcelId: 7 }, { parcelId: 3 }], isMagic),
+    ).toBe(true)
   })
 })

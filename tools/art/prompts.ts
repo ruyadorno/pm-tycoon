@@ -166,7 +166,18 @@ export const GROUP_SUBJECTS = new Set([
   'in_rimraf_yard',
   'dk_containers',
   'cv_stadium',
+  // build 2 M7 (B2 §6.5): the Rural uniques drawn as a yard of several parts
+  'ru_peer_pasture',
+  'ru_range_ranch',
+  'ru_optional_orchard',
 ])
+
+/**
+ * Buildings whose one unique feature is a farm machine (build 2 M7, B2 §6.5:
+ * the tractor in Tilde Tractor Repair): CITY_SUFFIX without its 'no
+ * vehicles' (it keeps road vehicles off the other plots).
+ */
+export const VEHICLE_OK = new Set(['ru_tilde_tractors'])
 
 /** the build-2 modern port rows (B2 §6.4) */
 export const PORT_IDS = new Set([
@@ -306,6 +317,18 @@ export interface Prompt {
  */
 export const EDIT_OF: Record<string, { source: string; description: string }> =
   {
+    // build 2 M7 (B2 §6.6): tier 4 keeps tier 3's footprint and bays
+    wh_ext_t4: {
+      source: 'wh_ext_t3',
+      description:
+        'repaint as a big modern steel distribution centre: light grey and ' +
+        'blue steel cladding instead of the brick, add a third loading dock ' +
+        'door with its own small amber lamp in the row next to the two ' +
+        'doors on the left wall, add a big plain blue and yellow company ' +
+        'logo board without any text on the roof edge above the doors, keep ' +
+        'exactly the same building shape, base corners and camera angle, ' +
+        'no ground',
+    },
     shelf_t2: {
       source: 'shelf_t1',
       description:
@@ -459,6 +482,71 @@ function proFlashImage(
   }
 }
 
+/** an EDIT_OF row: edit-image-pro-flash on the source's chosen candidate */
+function editPrompt(
+  e: ManifestEntry,
+  ed: { source: string; description: string },
+): Prompt {
+  const [W, H] = e.canvas
+  return {
+    tool: 'edit-image-pro-flash',
+    endpoint: '/edit-image-pro-flash',
+    recipe: 'image',
+    text: ed.description,
+    params: {
+      method: 'text',
+      description: ed.description,
+      no_background: true,
+    },
+    attach: ['edit_source'],
+    editOf: ed.source,
+    cost: proFlashCost(W, H) === 5 ? 5 : 9,
+    perCall: 1,
+  }
+}
+
+/**
+ * The warehouse exterior's footprint sentence (B2 §6.1): the walls' base
+ * fills the 4x4 diamond, the front corner on the canvas bottom centre.
+ */
+const EXTERIOR_BASE =
+  'seen from a 2:1 isometric angle, its rectangular base fills the whole ' +
+  '256x128 isometric diamond footprint: the front corner of the walls ' +
+  'touches the bottom centre of the picture and the left and right corners ' +
+  'of the walls touch the left and right edges of the picture'
+
+/** tier 1 (the wh_ext row; its _t2 is the followUp edit) */
+const EXTERIOR_T1 =
+  `corrugated tin delivery warehouse building ${EXTERIOR_BASE}, a row ` +
+  'of three loading dock doors on the left (south-west) wall near its ' +
+  'far end, the first door open and two shuttered, a small amber lamp ' +
+  'above each door, low pitched roof, small office annex built into ' +
+  'the front corner, scrappy start-up look'
+
+/**
+ * Tiers 3 and 5 (build 2 M7, B2 §6.6 / spec §8: L3 brick with 2 bays, L5
+ * glass HQ with a neon sign); tier 4 is EDIT_OF wh_ext_t3. The bays stay at
+ * the far end of the south-west wall, each with its amber lamp (the city
+ * hangs the bay lights there: manifest bayLights).
+ */
+export const EXTERIOR_SUBJECTS: Record<string, string> = {
+  wh_ext_t3:
+    `red-orange brick regional parcel depot building ${EXTERIOR_BASE}, ` +
+    'two big open loading dock doors side by side on the left ' +
+    '(south-west) wall near its far end, a small amber lamp above each ' +
+    'door, a flat roof with a low parapet, rooftop vents and a water tank, ' +
+    'a two-storey brick office block with tall white-framed windows built ' +
+    'into the front corner, solid established family business look',
+  wh_ext_t5:
+    `gleaming glass and white steel company headquarters building ${EXTERIOR_BASE}, ` +
+    'three loading dock doors in a row on the left (south-west) wall near ' +
+    'its far end, a small amber lamp above each door, a tall blue glass ' +
+    'office tower three storeys high at the front corner, a big glowing ' +
+    'pink and purple neon sign shaped like a parcel box on the tower roof ' +
+    'without any letters, rooftop garden with small trees, proud tycoon ' +
+    'look',
+}
+
 export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
   const [W, H] = e.canvas
   const subject =
@@ -491,7 +579,11 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
         : `${subject}${smoke}, ${what} ${fw}x${fw / 2} isometric diamond plot, ` +
           `${YARD[e.district ?? ''] ?? 'small paved yard'}, ` +
           `${storeysFor(e)} storeys, bright cheerful ` +
-          `city-builder style${CITY_SUFFIX}`
+          `city-builder style${
+            VEHICLE_OK.has(e.id)
+              ? CITY_SUFFIX.replace('no vehicles, ', '')
+              : CITY_SUFFIX
+          }`
       const side = Math.max(W, H)
       const style = ctx.style ?? 'auto'
       if (
@@ -518,22 +610,22 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
       // v3 (build 2, F2 / B2 §6.1): no apron. v2 ('standing in the middle
       // of a 256x128 isometric diamond concrete lot') drew its own lot,
       // never on the grid; the slab is now ground-bake tiles (lot_slab),
-      // so the walls must stand on the 4x4 footprint diamond itself
+      // so the walls must stand on the 4x4 footprint diamond itself.
+      // Tiers 3-5 (build 2 M7, B2 §6.6): wh_ext_t3 / _t5 are their own
+      // rows with the same footprint sentence; wh_ext_t4 is an edit of the
+      // chosen wh_ext_t3 (EDIT_OF), like t2 of t1.
+      const ed = EDIT_OF[e.id]
+      if (ed) return editPrompt(e, ed)
       const text =
-        'corrugated tin delivery warehouse building seen from a 2:1 ' +
-        'isometric angle, its rectangular base fills the whole 256x128 ' +
-        'isometric diamond footprint: the front corner of the walls touches ' +
-        'the bottom centre of the picture and the left and right corners ' +
-        'of the walls touch the left and right edges of the picture, a row ' +
-        'of three loading dock doors on the left (south-west) wall near its ' +
-        'far end, the first door open and two shuttered, a small amber lamp ' +
-        'above each door, low pitched roof, small office annex built into ' +
-        'the front corner, scrappy start-up look, no ground, no pavement, no ' +
-        'lot, no apron, no shadow outside the walls, nothing below the walls' +
+        (EXTERIOR_SUBJECTS[e.id] ?? EXTERIOR_T1) +
+        ', no ground, no pavement, no lot, no apron, no shadow outside the ' +
+        'walls, nothing below the walls' +
         EXTERIOR_SUFFIX
       const anchor = ctx.style === 'anchor' ? anchorFor(e, anchors) : null
+      const p = proFlashImage(e, text, [], anchor, ctx.key ?? wantsKey(e))
+      if (e.id !== 'wh_ext') return p
       return {
-        ...proFlashImage(e, text, [], anchor, ctx.key ?? wantsKey(e)),
+        ...p,
         followUp: {
           endpoint: '/edit-image-pro-flash',
           frame: '_t2',
@@ -651,24 +743,7 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
     }
     default: {
       const ed = EDIT_OF[e.id]
-      if (ed) {
-        const [W2, H2] = e.canvas
-        return {
-          tool: 'edit-image-pro-flash',
-          endpoint: '/edit-image-pro-flash',
-          recipe: 'image',
-          text: ed.description,
-          params: {
-            method: 'text',
-            description: ed.description,
-            no_background: true,
-          },
-          attach: ['edit_source'],
-          editOf: ed.source,
-          cost: proFlashCost(W2, H2) === 5 ? 5 : 9,
-          perCall: 1,
-        }
-      }
+      if (ed) return editPrompt(e, ed)
       // machines, fixtures, desk, shelves: Pro Flash at the class canvas;
       // desk / shelf ask for the key background so they fill their canvas
       // (transparent ones drew a 26-px desk, a 158-px shelf)

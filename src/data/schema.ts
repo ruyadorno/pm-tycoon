@@ -29,6 +29,7 @@ export const DATA_FILES: readonly DataFileName[] = [
   'parcels',
   'economy',
   'levels',
+  'quests',
   'puns',
   'map',
 ]
@@ -478,6 +479,112 @@ const levels = arr(
   1,
 )
 
+// quests.json (spec-build2 §3.2, §9; design-m7 §1.5) ------------------------------
+
+const QUEST_GOAL_KINDS = [
+  'deliveriesFrom',
+  'satisfactionAtLeast',
+  'magicParcel',
+  'tossStreak',
+  'onTimeRateDay',
+  'deliveriesOfSize',
+  'holdDecisions',
+  'overseasCleared',
+  'detectionAllStrains',
+] as const
+const QUEST_TARGETS = ['district:mostWaiting', 'district:satisfactionBelow']
+
+/** A number, or one per level (1..5 entries; crossCheck caps them at the level count). */
+function levelScaled(item: Check): Check {
+  const list = arr(item, 1, 5)
+  return (v, p, out) => (Array.isArray(v) ? list(v, p, out) : item(v, p, out))
+}
+
+const goalKind = str
+const QUEST_GOALS: Record<(typeof QUEST_GOAL_KINDS)[number], Check> = {
+  deliveriesFrom: obj({ kind: goalKind, count: levelScaled(int(1)) }),
+  satisfactionAtLeast: obj({ kind: goalKind, value: num(0, 100) }),
+  magicParcel: obj({ kind: goalKind, maxRoadTiles: int(1) }),
+  tossStreak: obj({ kind: goalKind, count: levelScaled(int(1)) }),
+  onTimeRateDay: obj({ kind: goalKind, rate: prob, minDeliveries: int(1) }),
+  deliveriesOfSize: obj({
+    kind: goalKind,
+    size: oneOf(SIZES),
+    count: levelScaled(int(1)),
+  }),
+  holdDecisions: obj({
+    kind: goalKind,
+    count: levelScaled(int(1)),
+    noStall: bool,
+  }),
+  overseasCleared: obj({
+    kind: goalKind,
+    hub: snakeId,
+    count: levelScaled(int(1)),
+  }),
+  detectionAllStrains: obj({
+    kind: goalKind,
+    rate: prob,
+    holdDays: num(Number.MIN_VALUE),
+  }),
+}
+
+/** Discriminated on `kind`: an unknown kind is "…goal.kind: expected one of …". */
+const questGoal: Check = (v, p, out) => {
+  if (!isRecord(v)) return fail(out, p, `expected an object, got ${show(v)}`)
+  if (!oneOf(QUEST_GOAL_KINDS)(v.kind, `${p}.kind`, out)) return false
+  return QUEST_GOALS[v.kind as (typeof QUEST_GOAL_KINDS)[number]](v, p, out)
+}
+
+const questReward = obj(
+  {},
+  {
+    cash: levelScaled(money),
+    satisfaction: int(1, 100),
+    lives: int(1),
+    starApplicant: obj(
+      {
+        role: oneOf(['inspector', 'sorter', 'driver']),
+        name: str,
+        pips: rec(null, int(0, 5)),
+      },
+      { affinity: oneOf(['none', ...VEHICLES]) },
+    ),
+    voucher: snakeId,
+  },
+)
+
+const quests = obj({
+  offer: obj({
+    firstOfferDay: nonNeg,
+    intervalDays: nonNeg,
+    declineCooldownDays: nonNeg,
+    offerExpiresDays: pos,
+    // The engine runs one quest slot: more is a schema error, not a clamp.
+    maxActive: int(1, 1),
+  }),
+  templates: arr(
+    obj(
+      {
+        id: snakeId,
+        name: str,
+        unlockLevel: lvl,
+        goal: questGoal,
+        weight: nonNeg,
+      },
+      {
+        target: oneOf(QUEST_TARGETS),
+        targetArg: num(0, 100),
+        condition: str,
+        requires: oneOf(['firstToss']),
+        limitDays: pos,
+        reward: questReward,
+      },
+    ),
+    1,
+  ),
+})
+
 const puns = obj({
   cleanLabels: arr(str, 1),
   malwareLabels: rec(STRAINS, arr(str)),
@@ -489,6 +596,15 @@ const puns = obj({
   tossHint: str,
   wantedTitle: str,
   tickerFiller: arr(str, 1),
+  quests: rec(null, str),
+  tickerQuest: obj({
+    offered: str,
+    completed: str,
+    failed: str,
+    star: str,
+    victory: str,
+  }),
+  ultimateQuestName: str,
 })
 
 const segment = {
@@ -559,6 +675,7 @@ const SHAPES: Record<DataFileName, Check> = {
   parcels,
   economy,
   levels,
+  quests,
   puns,
   map: mapShape,
 }
@@ -951,7 +1068,126 @@ function crossCheck(d: Tables, out: Problems): void {
       bad(`puns.decoyLabels.${s}`, `empty list for strain "${s}"`)
   }
 
+  checkQuests(d, nLevels, checkerIds, out)
   checkMap(d, districtIds, buildingIds, out)
+}
+
+/**
+ * quests.json relations (spec-build2 §3.2, §9; design-m7 §1.5): ids, levels,
+ * the magic parcel's one copy of its numbers, targets, conditions, rewards,
+ * the flavour and ticker lines.
+ */
+function checkQuests(
+  d: Tables,
+  nLevels: number,
+  checkerIds: Set<string>,
+  out: Problems,
+): void {
+  const bad = (path: string, msg: string): void => {
+    out.push(`${path}: ${msg}`)
+  }
+  const ultimateIds = d.levels.flatMap((l) =>
+    l.ultimateQuest ? [l.ultimateQuest.id] : [],
+  )
+  const ids = uniqueIds(d.quests.templates, 'quests.templates', out)
+  const overseas = (id: string): boolean =>
+    d.districts.some((x) => x.id === id && x.kind === 'overseas')
+  const scaledLen = (path: string, v: number | number[] | undefined): void => {
+    if (Array.isArray(v) && v.length > nLevels)
+      bad(path, `${v.length} entries, more than the ${nLevels} levels`)
+  }
+  d.quests.templates.forEach((t, i) => {
+    const p = `quests.templates[${i}]`
+    if (ultimateIds.includes(t.id))
+      bad(`${p}.id`, `"${t.id}" is a levels.json ultimateQuest id`)
+    if (t.unlockLevel > nLevels)
+      bad(`${p}.unlockLevel`, `level ${t.unlockLevel} does not exist`)
+    const g = t.goal
+    if (g.kind === 'magicParcel') {
+      if (t.limitDays !== undefined || t.reward !== undefined)
+        bad(
+          p,
+          "the magic parcel's clock and payout live in parcels.json magic (no limitDays / reward here)",
+        )
+    } else {
+      if (t.limitDays === undefined) bad(`${p}.limitDays`, 'missing')
+      if (t.reward === undefined) bad(`${p}.reward`, 'missing')
+      else if (Object.keys(t.reward).length === 0)
+        bad(`${p}.reward`, 'needs at least one field')
+    }
+    // Targets: deliveriesFrom needs a district rule; satisfactionAtLeast
+    // needs satisfactionBelow with targetArg below the goal; nothing else
+    // takes one.
+    if (g.kind === 'deliveriesFrom') {
+      if (t.target === undefined)
+        bad(`${p}.target`, 'deliveriesFrom needs a district:* target')
+    } else if (g.kind === 'satisfactionAtLeast') {
+      if (t.target !== 'district:satisfactionBelow')
+        bad(
+          `${p}.target`,
+          'satisfactionAtLeast needs "district:satisfactionBelow"',
+        )
+      else if (t.targetArg === undefined)
+        bad(`${p}.targetArg`, 'missing (district:satisfactionBelow)')
+      else if (!(g.value > t.targetArg))
+        bad(
+          `${p}.goal.value`,
+          `${g.value} is not above targetArg ${t.targetArg}`,
+        )
+    } else if (t.target !== undefined) {
+      bad(`${p}.target`, `goal "${g.kind}" takes no target`)
+    }
+    if (t.targetArg !== undefined && t.target !== 'district:satisfactionBelow')
+      bad(`${p}.targetArg`, 'only with "district:satisfactionBelow"')
+    if (t.condition !== undefined && t.condition !== 'livesBelowCap') {
+      const m = /^hubLive:(.+)$/.exec(t.condition)
+      if (!m)
+        bad(
+          `${p}.condition`,
+          `expected "livesBelowCap" or "hubLive:<overseas id>", got "${t.condition}"`,
+        )
+      else if (!overseas(m[1]!))
+        bad(`${p}.condition`, `"${m[1]}" is not an overseas district`)
+    }
+    if (g.kind === 'overseasCleared' && !overseas(g.hub))
+      bad(`${p}.goal.hub`, `"${g.hub}" is not an overseas district`)
+    if ('count' in g) scaledLen(`${p}.goal.count`, g.count)
+    const r = t.reward
+    if (r) {
+      scaledLen(`${p}.reward.cash`, r.cash)
+      if (r.voucher !== undefined && !checkerIds.has(r.voucher))
+        bad(`${p}.reward.voucher`, `unknown checker "${r.voucher}"`)
+      const star = r.starApplicant
+      if (star) {
+        const sp = `${p}.reward.starApplicant`
+        const stats: readonly string[] = d.employees.roles[star.role].stats
+        const keys = Object.keys(star.pips)
+        if (
+          keys.length !== stats.length ||
+          stats.some((s) => !keys.includes(s))
+        )
+          bad(
+            `${sp}.pips`,
+            `expected the ${star.role} stats ${JSON.stringify(stats)}, got ${JSON.stringify(keys)}`,
+          )
+        for (const [k, v] of Object.entries(star.pips)) {
+          const [lo, hi] = k === 'charisma' ? [0, 2] : [1, 5]
+          if (v < lo || v > hi)
+            bad(`${sp}.pips.${k}`, `${v} is outside ${lo}..${hi}`)
+        }
+        if (star.affinity !== undefined && star.role !== 'driver')
+          bad(`${sp}.affinity`, 'only drivers have an affinity')
+      }
+    }
+  })
+  for (const id of [...ids, ...ultimateIds])
+    if (d.puns.quests[id] === undefined)
+      bad('puns.quests', `missing the line for "${id}"`)
+  for (const [k, line] of Object.entries(d.puns.tickerQuest)) {
+    const need = k === 'victory' ? '{company}' : '{name}'
+    if (!line.includes(need))
+      bad(`puns.tickerQuest.${k}`, `must contain ${need}`)
+  }
 }
 
 /** employees.json relations (spec-build2 §2, §9) and puns.peopleNames. */

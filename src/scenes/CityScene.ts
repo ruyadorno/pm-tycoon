@@ -54,6 +54,16 @@
 // at full size. Debug: setLotCorners() marks the lot footprint's four iso
 // corners (the city-lot-zoom2 shot).
 //
+// M7 (spec-build2 §3.3, design-m7 §6.8): while the golden parcel is alive
+// its origin A and destination B both wear the gold `ic_magic` with the
+// `magic_ring_<step>` draining with the quest's countdown (empty once it is
+// over — late, failed or abandoned; cityFx.magicMarkers over the active
+// quest and QuestsView.magic) (BuildingView.setMagic), refreshed on
+// quest:accepted / completed / failed (on the next frame, once the sim's
+// revision has moved), every REFRESH_MS and on syncAll; the previous pair
+// is cleared. Its pickup and delivery
+// hops fly `ic_magic` instead of `ic_parcel_s` (cityFx.hopIcon).
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -106,7 +116,9 @@ import {
   DOCK_POSE_DEPTH,
   dustFrame,
   fadeK,
+  hopIcon,
   levelStampText,
+  magicMarkers,
   moodFor,
   SMOKE_PHASE_MS,
   SMOKE_PUFFS,
@@ -348,6 +360,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private warehouseAnchor = { x: 0, y: 0 }
   private warehouseTier = 0
   private dockLights: Phaser.GameObjects.Image[] = []
+  /** Lamps on the current exterior frame (t3 has two bays): extra lights hide. */
+  private bayLightCount = Number.POSITIVE_INFINITY
   private signText: Phaser.GameObjects.BitmapText | null = null
   private sign: Phaser.GameObjects.Image | null = null
   /** Scorched building id → the tick its one-day scorch ends (§3.3). */
@@ -356,6 +370,9 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private zoneDistrict: string | null = null
 
   private dirty = new Set<string>()
+  /** M7: buildings wearing the magic marker (A, B), and a refresh is due. */
+  private magicIds: string[] = []
+  private magicDirty = false
   private refreshAcc = 0
   private queueN = 0
   private stalled = false
@@ -414,6 +431,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.shuttingDown = false
     this.lockState = new Map()
     this.dirty = new Set()
+    this.magicIds = []
+    this.magicDirty = false
     this.popOnCreate = new Set()
     this.dockLights = []
     this.warehouse = null
@@ -517,6 +536,18 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         // §9.6: fx_dust construction → wh_ext_t<tier> + the LEVEL stamp.
         'level:up': (p) => this.onLevelUp(p.level),
         'life:lost': (p) => this.onLifeLost(p),
+        // M7 §6.8: the magic markers follow the active quest. Read on the
+        // next frame — the facade's quests() cache keys on sim.revision,
+        // which moves only after the emitting tick / command.
+        'quest:accepted': () => {
+          this.magicDirty = true
+        },
+        'quest:completed': () => {
+          this.magicDirty = true
+        },
+        'quest:failed': () => {
+          this.magicDirty = true
+        },
       },
       () => this.syncAll(),
     )
@@ -1108,9 +1139,11 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     const { bayLights } = warehouseAnchors(name)
     const left = this.warehouseAnchor.x - WH_CANVAS / 2
     const top = this.warehouseAnchor.y - WH_CANVAS
+    this.bayLightCount = bayLights.length
     this.dockLights.forEach((img, i) => {
-      const p = bayLights[i] ?? bayLights[bayLights.length - 1]
+      const p = bayLights[i]
       if (p) img.setPosition(left + p[0], top + p[1])
+      else img.setVisible(false)
     })
   }
 
@@ -1388,6 +1421,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.stalled = this.vs.lane.stalled !== null
     this.syncMoods()
     this.refreshMarkers()
+    this.refreshMagic()
     this.refreshAttractStops()
   }
 
@@ -1395,6 +1429,22 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private refreshMarkers(): void {
     for (const view of this.buildings.values()) this.refreshBuilding(view)
     this.dirty.clear()
+  }
+
+  /**
+   * M7 (B2 §3.3, design-m7 §6.8): `ic_magic` + its countdown ring on A and B
+   * while the golden parcel is alive; the pair that no longer applies is
+   * cleared.
+   */
+  private refreshMagic(): void {
+    this.magicDirty = false
+    const qs = this.vs.quests()
+    const m = magicMarkers(qs.active, qs.magic)
+    const ids = m ? [m.origin, m.dest] : []
+    for (const id of this.magicIds)
+      if (!ids.includes(id)) this.buildings.get(id)?.setMagic(null)
+    if (m) for (const id of ids) this.buildings.get(id)?.setMagic(m.remaining01)
+    this.magicIds = ids
   }
 
   private refreshBuilding(view: BuildingView): void {
@@ -1493,10 +1543,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       if (v) this.refreshBuilding(v)
     }
     this.dirty.clear()
+    if (this.magicDirty) this.refreshMagic()
     this.refreshAcc += delta
     if (this.refreshAcc >= REFRESH_MS) {
       this.refreshAcc = 0
       this.refreshMarkers()
+      this.refreshMagic()
       this.refreshTooltip()
       if (this.scorched.size > 0) this.refreshScorch()
       // The demo city never makes a sound (B2 §5).
@@ -1546,7 +1598,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     const red = this.queueN > 0 || this.stalled
     const blinkOn = !this.stalled || Math.floor(now / LIGHT_BLINK_MS) % 2 === 0
     this.dockLights.forEach((img, i) => {
-      if (i >= docks) {
+      // A frame with fewer lamps than docks (t3: two bays) hides the rest.
+      if (i >= docks || i >= this.bayLightCount) {
         img.setVisible(false)
         return
       }
@@ -1613,7 +1666,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.dirty.add(p.origin)
     const b = this.buildings.get(p.origin)
     if (!b) return
-    const icon = `ic_parcel_${p.size.toLowerCase()}`
+    // M7 §6.8: the golden parcel hops as ic_magic.
+    const icon = hopIcon(p)
     this.popups.pickup(
       this.viewRect,
       b.id,
@@ -1642,14 +1696,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     const v = p.vehicleId !== null ? this.vehicles.get(p.vehicleId) : undefined
     if (v) {
       const c = v.bodyCentre()
-      this.popups.hop(
-        this.viewRect,
-        c.x,
-        c.y,
-        b.door.x,
-        b.door.y,
-        `ic_parcel_${p.size.toLowerCase()}`,
-      )
+      this.popups.hop(this.viewRect, c.x, c.y, b.door.x, b.door.y, hopIcon(p))
     }
     this.popups.delivered(
       this.viewRect,

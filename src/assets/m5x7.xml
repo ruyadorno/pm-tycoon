@@ -5,7 +5,7 @@
   <pages>
     <page id="0" file="m5x7.png"/>
   </pages>
-  <chars count="108">
+  <chars count="109">
     <char id="32" x="1" y="1" width="0" height="0" xoffset="0" yoffset="0" xadvance="5" page="0" chnl="15"/>
     <char id="33" x="11" y="1" width="1" height="7" xoffset="0" yoffset="4" xadvance="2" page="0" chnl="15"/>
     <char id="34" x="21" y="1" width="3" height="2" xoffset="0" yoffset="4" xadvance="4" page="0" chnl="15"/>
@@ -114,5 +114,6 @@
     <char id="9656" x="91" y="97" width="2" height="3" xoffset="0" yoffset="6" xadvance="3" page="0" chnl="15"/>
     <char id="9662" x="101" y="97" width="3" height="2" xoffset="0" yoffset="8" xadvance="4" page="0" chnl="15"/>
     <char id="10005" x="111" y="97" width="5" height="5" xoffset="0" yoffset="5" xadvance="6" page="0" chnl="15"/>
+    <char id="9733" x="121" y="97" width="7" height="7" xoffset="0" yoffset="4" xadvance="8" page="0" chnl="15"/>
   </chars>
 </font>

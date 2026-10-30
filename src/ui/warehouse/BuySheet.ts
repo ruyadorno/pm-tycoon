@@ -47,6 +47,12 @@
 // closes the sheet (the scene animates the fixture from
 // lane:fixturePlaced/Moved). `highlight` (a machines.json id, pm:goto's
 // highlight) pulses that row.
+//
+// M7 (spec-build2 §3.1, design-m7 §6.8): a checker row whose id is in the
+// quest vouchers (`vs.quests().vouchers`) shows a gold `FREE` tag (a
+// `ui_tag` pill) instead of its price and stays enabled at any balance —
+// buyMachine spends the voucher, not money. Locked rows ignore vouchers (the
+// sim refuses them too). A `quest:completed` (a voucher reward) rebuilds.
 import type Phaser from 'phaser'
 import {
   bindSim,
@@ -62,7 +68,7 @@ import type { HireTarget, LaneNode, Pips, Role } from '../../sim/types.ts'
 import type { ViewSim } from '../../sim/view-api.ts'
 import { Button } from '../Button.ts'
 import { HUD_BOTTOM_H } from '../layout.ts'
-import type { PanelFrame } from '../Panel.ts'
+import { addPanel, type PanelFrame } from '../Panel.ts'
 import { Sheet } from '../Sheet.ts'
 import { addText, ellipsize, formatMoney, formatPct, textTop } from '../text.ts'
 import { PALETTE, THEME } from '../theme.ts'
@@ -143,6 +149,15 @@ export function unlockText(data: GameData, level: number): string {
   const s = `Unlocks at Lv ${level}`
   return level > data.economy.playtestMaxLevel ? `${s} · coming soon` : s
 }
+
+/** The price tag of a checker row paid by a quest voucher (design-m7 §6.8). */
+export const VOUCHER_TEXT = 'FREE'
+/** The voucher tag: a `ui_tag` pill around the text (row-local px). */
+export const VOUCHER_PAD_X = 4
+export const VOUCHER_TAG_Y = 4
+export const VOUCHER_TAG_H = 15
+/** Gap between the voucher tag's right edge and the row button's. */
+export const VOUCHER_TAG_RIGHT = 6
 
 /** `$150`, or `free` for a zero price (the desk, employees.json deskPrice). */
 export function priceText(price: number): string {
@@ -334,6 +349,8 @@ export interface BuyRow {
   locked: boolean
   /** Desk rows: the employees.json desks.rows index. */
   index?: number
+  /** M7: a quest voucher pays for this machine (price 0, `FREE`). */
+  voucher?: boolean
 }
 
 /** A placed desk (for its `Move desk here` row). */
@@ -357,22 +374,26 @@ export function deskRowId(index: number): string {
  * The BuySheet rows (warehouse-view.md §2.1, §6; design-m6 §6.2): unlocked
  * checkers in machines.json order; one row per open desks.rows entry — place
  * it (unplaced) or `Move desk here` (placed; numbered once two are placed);
- * then the locked checkers and desks by unlock level (stable).
+ * then the locked checkers and desks by unlock level (stable). M7: an
+ * unlocked checker held as a quest voucher (`vouchers`, machines.json ids)
+ * costs 0 and reads `FREE` (design-m7 §6.8).
  */
 export function buyRows(
   data: GameData,
   level: number,
   placed: readonly DeskInfo[],
+  vouchers: readonly string[] = [],
 ): BuyRow[] {
   const machines: BuyRow[] = data.machines.checkers.map((def) => {
     const locked = def.unlockLevel > level
     const speed = perMinText(def.processS)
-    return {
+    const voucher = !locked && vouchers.includes(def.id)
+    const row: BuyRow = {
       kind: 'machine',
       id: def.id,
       name: def.name,
-      price: def.price,
-      priceText: priceText(def.price),
+      price: voucher ? 0 : def.price,
+      priceText: voucher ? VOUCHER_TEXT : priceText(def.price),
       lines: [
         catchLine(def),
         locked ? `${speed} · ${unlockText(data, def.unlockLevel)}` : speed,
@@ -380,6 +401,8 @@ export function buyRows(
       unlockLevel: def.unlockLevel,
       locked,
     }
+    if (voucher) row.voucher = true
+    return row
   })
   const desks: BuyRow[] = []
   const lockedDesks: BuyRow[] = []
@@ -426,9 +449,13 @@ export function buyRows(
 
 export type RowState = 'ok' | 'locked' | 'poor'
 
-/** ok, locked (level gate) or poor (price above the balance, §2.5). */
+/**
+ * ok, locked (level gate) or poor (price above the balance, §2.5); a
+ * voucher row is ok at any balance (M7: the sim spends the voucher).
+ */
 export function rowState(row: BuyRow, balance: number): RowState {
   if (row.locked) return 'locked'
+  if (row.voucher === true) return 'ok'
   return row.price > balance ? 'poor' : 'ok'
 }
 
@@ -899,7 +926,11 @@ interface RowView {
   model: BuyRow
   btn: Button
   price: Phaser.GameObjects.BitmapText
-  parts: (Phaser.GameObjects.Image | Phaser.GameObjects.BitmapText)[]
+  parts: (
+    | Phaser.GameObjects.Image
+    | Phaser.GameObjects.BitmapText
+    | Phaser.GameObjects.NineSlice
+  )[]
 }
 
 export class BuySheet extends WarehouseSheet {
@@ -929,6 +960,8 @@ export class BuySheet extends WarehouseSheet {
       'worker:fired': dirty,
       'worker:walkedOut': dirty,
       'desk:placed': dirty,
+      // M7: a voucher reward lands in quests.vouchers (design-m7 §6.8).
+      'quest:completed': dirty,
     })
   }
 
@@ -962,7 +995,12 @@ export class BuySheet extends WarehouseSheet {
         meanP: f.checker.pMatch,
       })
     }
-    return buyRows(this.vs.data, this.vs.level, placed)
+    return buyRows(this.vs.data, this.vs.level, placed, this.vouchers())
+  }
+
+  /** M7: machines.json ids held as quest vouchers (oldest first). */
+  private vouchers(): readonly string[] {
+    return this.vs.quests().vouchers
   }
 
   /** Screen rect of row `i` while open (e2e taps). */
@@ -1013,7 +1051,20 @@ export class BuySheet extends WarehouseSheet {
       icon.setOrigin(0, 0)
       const name = addText(sc, ROW_TEXT_X, ROW_LINE_Y[0], m.name)
       const price = addText(sc, 0, ROW_LINE_Y[0], m.priceText)
-      price.setX(btn.btnWidth - 8 - Math.round(price.width))
+      const parts: RowView['parts'] = [icon, name]
+      if (m.voucher === true) {
+        // M7: a gold FREE tag (ui_tag pill, dark text) instead of the price.
+        const tw = Math.round(price.width)
+        const w = tw + 2 * VOUCHER_PAD_X
+        const x = btn.btnWidth - VOUCHER_TAG_RIGHT - w
+        const tag = addPanel(sc, x, VOUCHER_TAG_Y, w, VOUCHER_TAG_H, 'ui_tag')
+        price.setPosition(
+          x + VOUCHER_PAD_X,
+          textTop(VOUCHER_TAG_Y, VOUCHER_TAG_H),
+        )
+        btn.add(tag)
+        parts.push(tag)
+      } else price.setX(btn.btnWidth - 8 - Math.round(price.width))
       const l2 = addText(sc, ROW_TEXT_X, ROW_LINE_Y[1], m.lines[0], {
         tint: MUTED,
       })
@@ -1021,7 +1072,8 @@ export class BuySheet extends WarehouseSheet {
         tint: m.locked ? RED_TEXT : MUTED,
       })
       btn.add([icon, name, price, l2, l3])
-      this.rows.push({ model: m, btn, price, parts: [icon, name, l2, l3] })
+      parts.push(l2, l3)
+      this.rows.push({ model: m, btn, price, parts })
     })
     this.update()
   }

@@ -22,7 +22,8 @@
 //
 // The queue is pure (TickerQueue, dailyLine) and unit-tested, as are the M2
 // lines the HUD pushes (stallLine, defusedLine, incidentLine — city-view
-// §3.2, §8.1); Phaser is a type-only import.
+// §3.2, §8.1) and the per-kind tint (M7: quest lines gold, a failed quest
+// grey — tickerTint); Phaser is a type-only import.
 import type Phaser from 'phaser'
 import type { TickerKind } from '../sim/events.ts'
 import type { Layout } from './layout.ts'
@@ -144,6 +145,20 @@ export class TickerQueue {
     for (let i = this.waiting.length - 1; i >= 0; i--)
       if (pred(this.waiting[i] as QueuedLine)) this.waiting.splice(i, 1)
   }
+}
+
+/**
+ * The line's tint by kind (M7, design-m7 §6.5): quest lines gold, a failed
+ * quest grey (spec-build2 §3.1 "a grey ticker line"); everything else the
+ * strip's light text, as before.
+ */
+export const TICKER_TINT: Readonly<Partial<Record<TickerLineKind, number>>> = {
+  quest: THEME.gold,
+  questFailed: THEME.textMuted,
+}
+
+export function tickerTint(kind: TickerLineKind): number {
+  return TICKER_TINT[kind] ?? THEME.textLight
 }
 
 /** The §2 daily summary: `Day 3: 14 delivered, $312 earned, payroll $28`. */
@@ -366,7 +381,7 @@ export class Ticker {
   private start(): void {
     const item = this.queue.current
     if (!item) return
-    this.line.setText(item.text)
+    this.line.setText(item.text).setTint(tickerTint(item.kind))
     this.x = this.L.ticker.x + this.L.ticker.w
     this.line.setX(Math.round(this.x)).setVisible(true)
   }

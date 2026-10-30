@@ -38,8 +38,8 @@ import { sceneTarget, settleUntil, tapTarget, worlds } from './warehouse.ts'
 
 const NEW_GAME = 'title:new-game'
 const SAVE_KEY = 'pm.save.v2'
-/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (3 since M6, design-m6 §2.1). */
-const SAVE_VERSION = 3
+/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (4 since M7, design-m7 §2.5). */
+const SAVE_VERSION = 4
 /** plan-build2 §6 "Draw-call budget": city 3 (measured), warehouse 7. */
 const CITY_DRAW_CALLS = 3
 const WAREHOUSE_DRAW_CALLS = 7

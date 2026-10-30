@@ -11,6 +11,8 @@
 //                            scaffold, dust, dust settling, reveal
 //   ring      16x16 _0.._8  decay coin ring, _0 = full, _8 = empty
 //   rush_ring 16x16 _0.._3  rush timer ring, _0 = full, _3 = a quarter left
+//   magic_ring 16x16 _0.._3 the magic parcel's countdown (build 2 M7,
+//                           design-m7 §6.1): rush_ring geometry, gold ramp
 
 import type { DrawCtx } from './draw-api.ts'
 import { registerDrawer } from './drawers.ts'
@@ -471,6 +473,7 @@ const FRAME_SETS: Record<string, (i: number) => Grid> = {
   fx_dust: dust,
   ring: (i) => coinRing(i, 8, ['gold1', 'gold2', 'gold0'], true),
   rush_ring: (i) => coinRing(i, 4, ['blue1', 'blue2', 'blue0'], false),
+  magic_ring: (i) => coinRing(i, 4, ['gold1', 'gold2', 'gold0'], false),
 }
 
 for (const [id, build] of Object.entries(FRAME_SETS)) {

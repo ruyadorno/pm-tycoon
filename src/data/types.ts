@@ -355,6 +355,65 @@ export interface EconomyData {
 
 // levels.json ---------------------------------------------------------------
 
+// quests.json (spec-build2 §3.2, §9) -----------------------------------------------
+
+/** A number, or one per level (index min(level, len) − 1, read at offer time). */
+export type LevelScaled = number | number[]
+export type QuestTargetRule =
+  | 'district:mostWaiting'
+  | 'district:satisfactionBelow'
+export type QuestCondition = 'livesBelowCap' | `hubLive:${string}`
+export type QuestRequirement = 'firstToss'
+
+export type QuestGoalDef =
+  | { kind: 'deliveriesFrom'; count: LevelScaled }
+  | { kind: 'satisfactionAtLeast'; value: number }
+  | { kind: 'magicParcel'; maxRoadTiles: number }
+  | { kind: 'tossStreak'; count: LevelScaled }
+  | { kind: 'onTimeRateDay'; rate: number; minDeliveries: number }
+  | { kind: 'deliveriesOfSize'; size: SizeId; count: LevelScaled }
+  | { kind: 'holdDecisions'; count: LevelScaled; noStall: boolean }
+  | { kind: 'overseasCleared'; hub: DistrictId; count: LevelScaled }
+  | { kind: 'detectionAllStrains'; rate: number; holdDays: number }
+
+export interface QuestRewardDef {
+  cash?: LevelScaled
+  satisfaction?: number
+  lives?: number
+  starApplicant?: StarApplicantDef
+  /** A machines.json checkers[].id: a free machine. */
+  voucher?: string
+}
+
+export interface QuestTemplateDef {
+  id: string
+  name: string
+  unlockLevel: number
+  target?: QuestTargetRule
+  targetArg?: number
+  condition?: QuestCondition
+  requires?: QuestRequirement
+  goal: QuestGoalDef
+  /** Absent only for magicParcel (its clock is parcels.json magic.countdownS). */
+  limitDays?: number
+  /** Absent only for magicParcel (its payout is parcels.json magic). */
+  reward?: QuestRewardDef
+  weight: number
+}
+
+export interface QuestOfferDef {
+  firstOfferDay: number
+  intervalDays: number
+  declineCooldownDays: number
+  offerExpiresDays: number
+  maxActive: number
+}
+
+export interface QuestsData {
+  offer: QuestOfferDef
+  templates: QuestTemplateDef[]
+}
+
 export interface UltimateQuestDef {
   id: string
   days: number
@@ -394,6 +453,18 @@ export interface PunsData {
   tossHint: string
   wantedTitle: string
   tickerFiller: string[]
+  /** M7: template id (and the ultimate id) → flavour line; `{district}` = the target's flavour. */
+  quests: Record<string, string>
+  /** M7 ticker lines: `{name}`, `{reward}`, `{role}`, `{company}`. */
+  tickerQuest: {
+    offered: string
+    completed: string
+    failed: string
+    star: string
+    victory: string
+  }
+  /** M7: the ultimate quest's display name (levels.json has no name field). */
+  ultimateQuestName: string
 }
 
 // map.json ------------------------------------------------------------------
@@ -505,6 +576,8 @@ export interface GameData {
   parcels: ParcelsData
   economy: EconomyData
   levels: LevelDef[]
+  /** M7 (spec-build2 §3, §9). */
+  quests: QuestsData
   puns: PunsData
   map: MapData
   /** dataHash of the (config-merged) raw tables; saves store it (plan.md §6.4). */

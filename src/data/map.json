@@ -119,6 +119,8 @@
     {"frame":"fence","tile":[15,4],"region":"rural"},
     {"frame":"fence","tile":[6,12],"region":"rural"},
     {"frame":"fence","tile":[8,12],"region":"rural"},
+    {"frame":"hay_bale","tile":[8,10],"region":"rural"},
+    {"frame":"hay_bale","tile":[7,6],"region":"rural"},
     {"frame":"tree_round","tile":[21,7],"region":"lowres"},
     {"frame":"tree_round","tile":[25,8],"region":"lowres"},
     {"frame":"tree_round","tile":[29,8],"region":"lowres"},

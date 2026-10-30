@@ -2,7 +2,7 @@
 // validates the shape (isCommand), runs the handler — which validates the
 // rules and applies the change immediately, or returns a stable failure
 // reason without touching state or the rng — and logs successful commands.
-// Build-2 commands not built yet (buyDock, acceptQuest) return 'locked'. A
+// Build-2 commands not built yet (buyDock) return 'locked'. A
 // handler that changes state while reporting a failure marks it `applied`
 // (logged for replay). The `debug*` kinds back ViewSim.debug (debug builds
 // only; logged like any command, so __pm.replay stays exact).
@@ -11,6 +11,10 @@
 // a desks.rows index, touchHeld (the sorter's player grace), the Sorter Arm
 // in the Hold Bay station (buyMachine / removeFixture on the Hold Bay node)
 // and debugForceLevel. Commands draw only on the applicant stream.
+// M7 quests (spec-build2 §3, §8; design-m7 §3.2): acceptQuest /
+// declineQuest / abandonQuest / debugOfferQuest delegate to
+// systems/quests.ts (an Accept of the magic parcel draws only on the quest
+// stream); buyMachine spends a quest voucher before money.
 
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import { machineChecker } from './detection.ts'
@@ -51,6 +55,12 @@ import {
   restartSorterClock,
   ROLES,
 } from './systems/people.ts'
+import {
+  abandonQuest,
+  acceptQuest,
+  debugOfferQuest,
+  declineQuest,
+} from './systems/quests.ts'
 import { playerGraceTicks, SORTER_ARM_ID } from './systems/sorter.ts'
 import { parkingTile, sellVehicle } from './systems/vehicles.ts'
 
@@ -80,8 +90,12 @@ export type Command =
   /** build 2 */
   | { kind: 'buyDock'; index: number }
   | { kind: 'continueWithOneLife' }
-  /** build 2 */
+  /** M7: accept the open offer. */
   | { kind: 'acceptQuest'; questId: string }
+  /** M7: decline the open offer (not the ultimate: Later only). */
+  | { kind: 'declineQuest'; questId: string }
+  /** M7: give up the active quest (no penalty). */
+  | { kind: 'abandonQuest' }
   /** Debug builds (ViewSim.debug.forceFlagNext): the next checker roll flags on `strain`. */
   | { kind: 'debugForceFlag'; strain: Strain }
   /** Debug builds (ViewSim.debug.fillHoldBay): fill every free bay with flagged parcels. */
@@ -90,6 +104,8 @@ export type Command =
   | { kind: 'debugMalwareDelivery' }
   /** Debug builds (ViewSim.debug.forceLevel): level up to `level` now, past the playtest cap. */
   | { kind: 'debugForceLevel'; level: number }
+  /** Debug builds (ViewSim.debug.offerQuest, ?quest=): offer this template (or the ultimate) now. */
+  | { kind: 'debugOfferQuest'; templateId: string }
 
 export type CommandKind = Command['kind']
 export type CommandOf<K extends CommandKind> = Extract<Command, { kind: K }>
@@ -116,6 +132,8 @@ export const FAIL_REASONS = [
   'station-locked',
   'station-occupied',
   'desk-locked',
+  'quest-active',
+  'quest-expired',
   'invalid',
 ] as const
 export type FailReason = (typeof FAIL_REASONS)[number]
@@ -163,10 +181,13 @@ const FIELDS: { [K in CommandKind]: Record<string, FieldType> } = {
   buyDock: { index: 'int' },
   continueWithOneLife: {},
   acceptQuest: { questId: 'string' },
+  declineQuest: { questId: 'string' },
+  abandonQuest: {},
   debugForceFlag: { strain: 'string' },
   debugFillHoldBay: {},
   debugMalwareDelivery: {},
   debugForceLevel: { level: 'int' },
+  debugOfferQuest: { templateId: 'string' },
 }
 
 /** Exactly one of {nodeId: string}, {station: 'hold'}, {vehicleId: safe int}. */
@@ -295,7 +316,10 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     if (def.unlockLevel > sim.state.level.level) return fail('locked')
     const node = slotTarget(sim, cmd.nodeId)
     if (typeof node === 'string') return fail(node)
-    if (sim.state.economy.balance < def.price) {
+    // M7: a quest voucher pays for it (price 0, the first matching one).
+    const vouchers = sim.state.quests.vouchers
+    const voucher = vouchers.indexOf(def.id)
+    if (voucher < 0 && sim.state.economy.balance < def.price) {
       return fail('insufficient-funds')
     }
     const checker: Checker = machineChecker(
@@ -303,8 +327,12 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
       nextCheckerId(sim.state),
       sim.state.tick,
     )
+    if (voucher >= 0) {
+      vouchers.splice(voucher, 1)
+      checker.price = 0 // a gift: removing it refunds nothing
+    }
     placeFixture(sim, node, { kind: 'machine', checker })
-    sim.debit(def.price, 'purchase')
+    if (voucher < 0) sim.debit(def.price, 'purchase')
     sim.emit('lane:fixturePlaced', {
       nodeId: node.id,
       fixture: structuredClone(node.fixture as Fixture),
@@ -501,9 +529,16 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     return OK
   },
 
-  acceptQuest() {
-    // build 2: quests (spec §5.5, §8 ultimate quest).
-    return fail('locked')
+  acceptQuest(sim, cmd) {
+    return acceptQuest(sim, cmd.questId)
+  },
+
+  declineQuest(sim, cmd) {
+    return declineQuest(sim, cmd.questId)
+  },
+
+  abandonQuest(sim) {
+    return abandonQuest(sim)
   },
 
   debugForceFlag(sim, cmd) {
@@ -531,6 +566,10 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     }
     forceLevel(sim, cmd.level)
     return OK
+  },
+
+  debugOfferQuest(sim, cmd) {
+    return debugOfferQuest(sim, cmd.templateId)
   },
 }
 

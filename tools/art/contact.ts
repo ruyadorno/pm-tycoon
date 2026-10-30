@@ -22,6 +22,12 @@
 //   art/contact/lowres@4x.png             M6 / G5 (build 2): `node
 //     tools/art/contact.ts lowres` — the ten Low-density uniques on their
 //     map positions (colour and the _locked look they ship with until M9).
+//   art/contact/rural@4x.png              M7 / G5 (build 2): `node
+//     tools/art/contact.ts rural` — the ten Rural uniques the same way, plus
+//     the fence and hay_bale props.
+//   art/contact/tiers@4x.png              M7 / G6 (build 2): `node
+//     tools/art/contact.ts tiers` — wh_ext_t1 … _t5 on the lot slab, and
+//     tiers 3-5 at 2x with their manifest bay lights / dock pose marked.
 // Never writes art/final, the manifest or public/.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -1521,6 +1527,120 @@ export function lowresSheet(m: Manifest): string {
   return out.replace(ROOT, '')
 }
 
+// ---------------------------------------------------------------------------
+// M7 (build 2): art/contact/rural@4x.png and art/contact/tiers@4x.png
+
+/** the ten Rural uniques (buildings.json district rural) */
+export function ruralIds(): string[] {
+  const rows = dataJson('buildings.json') as { id: string; district: string }[]
+  return rows.filter((r) => r.district === 'rural').map((r) => r.id)
+}
+
+export function ruralSheet(m: Manifest): string {
+  const S = 2
+  const closeups: Block[] = [...ruralIds(), 'fence', 'hay_bale'].flatMap(
+    (id) => {
+      const e = entry(m, id)
+      if (!e) return []
+      const blocks = e.class.startsWith('building')
+        ? buildingBlock(m, e, finals(m, id, id))
+        : propBlock(m, e, finals(m, id, id))
+      return blocks.map((b) => ({
+        cv: b.cv,
+        label: b.label.replace(/^PH /, `${id} `),
+      }))
+    },
+  )
+  const sections: Section[] = [
+    {
+      title:
+        'Rural (Pasture Peer Fields) on the map, tiles x 2-20, y 2-20 (2x = ' +
+        'camera zoom 2): colour (live from M9)',
+      blocks: [
+        {
+          cv: regionScene(m, 'rural', 2, 2, 19, 19, false),
+          label: 'in colour',
+        },
+      ],
+    },
+    {
+      title: 'as shipped until M9: the _locked frames',
+      blocks: [
+        {
+          cv: regionScene(m, 'rural', 2, 2, 19, 19, true),
+          label: '_locked',
+        },
+      ],
+    },
+    {
+      title:
+        'the ten uniques + the fence / hay_bale props (2x): colour | _locked',
+      blocks: closeups,
+    },
+  ]
+  const out = join(CONTACT, 'rural@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 2000, S))
+  return out.replace(ROOT, '')
+}
+
+/** the exterior frame of tier n (wh_ext _t1/_t2, then the wh_ext_tN rows) */
+function tierFrame(m: Manifest, n: number): Canvas | null {
+  return n <= 2 ? fin(m, 'wh_ext', `_t${n}`) : fin(m, `wh_ext_t${n}`)
+}
+
+/** a copy of `ext` with its bay lights (yellow) and dock pose (red) marked */
+function anchorMarks(m: Manifest, n: number, ext: Canvas): Canvas {
+  const id = n <= 2 ? 'wh_ext' : `wh_ext_t${n}`
+  const e = entry(m, id)
+  const set = (n <= 2 ? e?.frameAnchors?.[`_t${n}`] : undefined) ?? e
+  const out = createCanvas(ext.width, ext.height)
+  const ctx = out.getContext('2d')
+  ctx.drawImage(ext, 0, 0)
+  const mark = (x: number, y: number, c: string) => {
+    ctx.fillStyle = PALETTE.hex('outline')
+    ctx.fillRect(x - 2, y - 2, 5, 5)
+    ctx.fillStyle = PALETTE.hex(c)
+    ctx.fillRect(x - 1, y - 1, 3, 3)
+  }
+  for (const [x, y] of set?.bayLights ?? []) mark(x, y, 'yellow3')
+  if (set?.dockPose) mark(set.dockPose[0], set.dockPose[1], 'red1')
+  return out
+}
+
+export function tiersSheet(m: Manifest): string {
+  const tiers = [1, 2, 3, 4, 5]
+  const sections: Section[] = [
+    {
+      title:
+        'warehouse exteriors t1-t5 on the lot slab (1x): t1/t2 live, t3 L3 ' +
+        '(M8), t4 L4 / t5 L5 (M9)',
+      blocks: tiers.map((n) => ({
+        cv: lotScene(m, tierFrame(m, n), false),
+        label: `wh_ext_t${n}`,
+      })),
+    },
+    {
+      title:
+        'tiers 3-5 at 2x with the footprint grid; the manifest anchors ' +
+        'marked on the frame (yellow = bayLights, red = dockPose)',
+      blocks: [3, 4, 5].flatMap((n) => {
+        const ext = tierFrame(m, n)
+        if (!ext) return []
+        return [
+          { cv: scaled(lotScene(m, ext, true), 2), label: `t${n} + grid` },
+          {
+            cv: scaled(anchorMarks(m, n, ext), 2),
+            label: `t${n} anchors`,
+          },
+        ]
+      }),
+    },
+  ]
+  const out = join(CONTACT, 'tiers@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 2700, 2))
+  return out.replace(ROOT, '')
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2)
@@ -1533,9 +1653,14 @@ if (isMain) {
     console.log(`contact: ${peopleSheet(loadManifest())}`)
   } else if (cmd === 'lowres') {
     console.log(`contact: ${lowresSheet(loadManifest())}`)
+  } else if (cmd === 'rural') {
+    console.log(`contact: ${ruralSheet(loadManifest())}`)
+  } else if (cmd === 'tiers') {
+    console.log(`contact: ${tiersSheet(loadManifest())}`)
   } else {
     console.error(
-      'usage: node tools/art/contact.ts fixes [--hop <crop.png>] | people | lowres',
+      'usage: node tools/art/contact.ts fixes [--hop <crop.png>] | people | ' +
+        'lowres | rural | tiers',
     )
     process.exitCode = 1
   }

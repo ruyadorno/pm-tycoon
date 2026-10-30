@@ -20,6 +20,14 @@
 //     pm:panTo {buildingId} of the building with the most waiting parcels
 //   6 `Vehicles homed here: 2 (Dee, Pax)` (M6: the drivers' names,
 //     ellipsized before the link) + `Garage ▸` (toggleGarage)
+// M7 (spec-build2 §3.1, design-m7 §6.5): a district-targeted quest takes the
+// row after row 2 (in place of the mood note: the bar's colour and the
+// quest's own flavour already say it) — `ic_quest` + `Rush hour · 4/10 · 1d
+// 12h` (active) or `Job offer: Rush hour ▸` (offered; questText.questRowText);
+// its 44-px tap band (grown over the non-interactive rows around it) calls
+// opts.onQuest(questId) and the HUD opens the QuestCard. The quest comes from
+// vs.quests() (the offer or active quest whose target is this district), so
+// the sheet's tallest case (Industrial with every row) stays at M5's height.
 // Locked regions replace rows 2–6 with `Unlocks at Lv 2 — $2,000 lifetime
 // earned`, the trucks-only line for Industrial and the locked sign art.
 // Opening emits pm:panTo {regionId, cover} so the City centres the label in
@@ -28,7 +36,13 @@
 // (the oldest age ticks without an event).
 import type Phaser from 'phaser'
 import type { DistrictDef, GameData } from '../data/types.ts'
-import type { DistrictStats, Trend, ViewSim } from '../sim/view-api.ts'
+import type {
+  DistrictStats,
+  QuestsView,
+  QuestView,
+  Trend,
+  ViewSim,
+} from '../sim/view-api.ts'
 import type { Size, VehicleType } from '../sim/types.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { decayPhase, type DecayPhase } from '../render/decayPhase.ts'
@@ -37,6 +51,7 @@ import { toggleGarage } from '../scenes/GarageSheet.ts'
 import { Button } from './Button.ts'
 import { HUD_TOP_H, type Layout } from './layout.ts'
 import { addBar, barFrame, BAR_H, setBarFill, type BarColour } from './Panel.ts'
+import { questRowText } from './questText.ts'
 import { Sheet } from './Sheet.ts'
 import {
   addText,
@@ -99,6 +114,8 @@ export function districtContentBottom(rows: {
   waiting?: boolean
   /** Locked: the trucks-only line of a hard-rule district. */
   rule?: boolean
+  /** M7: a quest offered / active for this district (takes the mood note's row). */
+  quest?: boolean
 }): number {
   let y = TOP + ROW
   if (rows.locked) {
@@ -107,7 +124,7 @@ export function districtContentBottom(rows: {
     return y + 8 + (rows.signH ?? 0)
   }
   if (rows.satisfaction) y += ROW
-  if (rows.moodNote) y += ROW
+  if (rows.moodNote || rows.quest) y += ROW
   if (rows.favouredOrRule) y += ROW
   if (rows.missing) y += ROW
   y += ROW // earned
@@ -272,6 +289,32 @@ export function busiestBuilding(
   return best
 }
 
+// ---- M7 quest row ------------------------------------------------------------
+
+/**
+ * The quest the district panel shows for `districtId`: the active quest
+ * targeting it, else the open offer targeting it, else null.
+ */
+export function districtQuest(
+  qs: Pick<QuestsView, 'offer' | 'active'>,
+  districtId: string,
+): QuestView | null {
+  if (qs.active && qs.active.target === districtId) return qs.active
+  if (qs.offer && qs.offer.target === districtId) return qs.offer
+  return null
+}
+
+/**
+ * The quest row's 44-px tap band for a 28-px row at sheet-local `rowY`:
+ * centred on the row, grown over the non-interactive rows above and below.
+ */
+export function questTapBand(
+  rowY: number,
+  W: number,
+): { x: number; y: number; w: number; h: number } {
+  return { x: 0, y: rowY - Math.floor((TAP_ROW - ROW) / 2), w: W, h: TAP_ROW }
+}
+
 /** Make a hidden row object visible (render() hides them all first). */
 function show<T extends { setVisible(v: boolean): T }>(o: T): T {
   return o.setVisible(true)
@@ -290,6 +333,11 @@ const SIZES: readonly Size[] = ['S', 'M', 'L', 'XL']
 const REFRESH_MS = 500
 const MUTED = PALETTE.grey1
 const RED = PALETTE.red0
+
+export interface DistrictPanelOptions {
+  /** M7: the quest row was tapped (the HUD opens the QuestCard). */
+  onQuest?: (questId: string) => void
+}
 
 const AGE_TINT: Record<DecayPhase, number> = {
   plain: THEME.textDark,
@@ -331,11 +379,22 @@ export class DistrictPanel {
   private ruleText: Phaser.GameObjects.BitmapText
   private sign: Phaser.GameObjects.Image
   private signLines: Phaser.GameObjects.BitmapText[] = []
+  private questIcon: Phaser.GameObjects.Image
+  private questText: Phaser.GameObjects.BitmapText
+  private questZone: Phaser.GameObjects.Rectangle
+  private questId: string | null = null
+  private opts: DistrictPanelOptions
 
-  constructor(scene: Phaser.Scene, L: Layout, viewSim: ViewSim) {
+  constructor(
+    scene: Phaser.Scene,
+    L: Layout,
+    viewSim: ViewSim,
+    opts: DistrictPanelOptions = {},
+  ) {
     this.scene = scene
     this.L = L
     this.vs = viewSim
+    this.opts = opts
     this.sheet = new Sheet(scene, {
       height: districtFitHeight(districtContentBottom({ locked: false }), L),
       W: L.W,
@@ -392,6 +451,14 @@ export class DistrictPanel {
     this.ruleText = addText(scene, X, 0, '', { tint: RED })
     this.sign = img('sign_locked')
     for (let i = 0; i < 2; i++) this.signLines.push(addText(scene, 0, 0, ''))
+    this.questIcon = img('ic_quest')
+    this.questText = addText(scene, 0, 0, '')
+    this.questZone = addTapZone(
+      scene,
+      { x: 0, y: 0, w: L.W, h: TAP_ROW },
+      'district:quest',
+      () => this.onQuestTap(),
+    )
 
     this.sheet.add(
       this.title,
@@ -420,6 +487,9 @@ export class DistrictPanel {
       this.ruleText,
       this.sign,
       ...this.signLines,
+      this.questIcon,
+      this.questText,
+      this.questZone,
     )
 
     scene.events.on('update', this.onUpdate, this)
@@ -494,6 +564,7 @@ export class DistrictPanel {
     )
     for (const o of all)
       (o as unknown as { setVisible(v: boolean): unknown }).setVisible(false)
+    this.questId = null
     // 1 header
     let y = TOP
     show(this.title).setText(def.flavour).setY(textTop(y, ROW))
@@ -519,7 +590,9 @@ export class DistrictPanel {
       return y + 8 + Math.round(this.sign.height)
     }
 
-    // 2 satisfaction (districts only: hubs have none)
+    // 2 satisfaction (districts only: hubs have none) + the mood note, or
+    // (M7) the quest row in its place
+    let note: { icon: FrameName; text: string } | null = null
     if (stats.kind === 'district') {
       const v = stats.satisfaction
       show(this.barTrack).setPosition(X, y + Math.floor((ROW - BAR_H) / 2))
@@ -536,16 +609,19 @@ export class DistrictPanel {
           y + Math.floor((ROW - ICON) / 2),
         )
       y += ROW
-      const note = moodNote(v, data)
-      if (note) {
-        show(this.noteIcon)
-          .setFrame(note.icon)
-          .setPosition(X, y + Math.floor((ROW - ICON) / 2))
-        show(this.noteText)
-          .setText(note.text)
-          .setPosition(X + ICON + GAP, textTop(y, ROW))
-        y += ROW
-      }
+      note = moodNote(v, data)
+    }
+    const quest = districtQuest(this.vs.quests(), def.id)
+    this.questId = quest?.id ?? null
+    if (quest) y = this.renderQuest(quest, y)
+    else if (note) {
+      show(this.noteIcon)
+        .setFrame(note.icon)
+        .setPosition(X, y + Math.floor((ROW - ICON) / 2))
+      show(this.noteText)
+        .setText(note.text)
+        .setPosition(X + ICON + GAP, textTop(y, ROW))
+      y += ROW
     }
 
     // 3 favoured vehicle / hard rule
@@ -651,6 +727,31 @@ export class DistrictPanel {
       { x: bx, y, w: this.garageBtn.btnWidth, h: TAP_ROW },
     )
     return y + TAP_ROW
+  }
+
+  /** The quest row at `y`; returns the next y. */
+  private renderQuest(q: QuestView, y: number): number {
+    const W = this.L.W
+    show(this.questIcon).setPosition(X, y + Math.floor((ROW - ICON) / 2))
+    const t = show(this.questText)
+    const tx = X + ICON + GAP
+    t.setTint(q.status === 'offered' ? THEME.primary : THEME.textDark)
+    t.setText(ellipsize(questRowText(q), W - X - tx, (s) => t.setText(s).width))
+    t.setPosition(tx, textTop(y, ROW))
+    const band = questTapBand(y, W)
+    show(this.questZone).setPosition(band.x, band.y)
+    this.questZone.setSize(band.w, band.h)
+    const area = this.questZone.input?.hitArea as
+      | Phaser.Geom.Rectangle
+      | undefined
+    area?.setSize(band.w, band.h)
+    return y + ROW
+  }
+
+  private onQuestTap(): void {
+    const id = this.questId
+    if (!id) return
+    this.opts.onQuest?.(id)
   }
 
   private layoutSign(def: DistrictDef, y: number): void {

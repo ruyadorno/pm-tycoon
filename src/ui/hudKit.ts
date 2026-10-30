@@ -76,13 +76,16 @@ export function cappedBelowNext(data: GameData, level: number): boolean {
 /**
  * The level bar (city-view §4.1, spec §8): lifetime earned between this
  * level's threshold and `nextThreshold`. At `playtestMaxLevel` the bar keeps
- * counting toward the next row's threshold and says "Lv N coming soon".
+ * counting toward the next row's threshold and says "Lv N coming soon" —
+ * unless `compact` (M7, design-m7 §6.4: the quest chip shortens the bar, so
+ * the suffix goes and the HUD ellipsizes the rest to the bar).
  */
 export function levelProgress(
   data: GameData,
   level: number,
   lifetime: number,
   nextThreshold: number | null,
+  opts: { compact?: boolean } = {},
 ): LevelProgress {
   const atCap = cappedBelowNext(data, level)
   const base = data.levels.find((l) => l.level === level)?.threshold ?? 0
@@ -93,7 +96,7 @@ export function levelProgress(
   const raw = span > 0 ? (lifetime - base) / span : 1
   const frac = Math.min(1, Math.max(0, Number.isFinite(raw) ? raw : 0))
   let text = `${formatMoney(lifetime)} / ${formatMoney(nextThreshold)}`
-  if (atCap) text += ` · Lv ${level + 1} coming soon`
+  if (atCap && !opts.compact) text += ` · Lv ${level + 1} coming soon`
   return { frac, text, atCap }
 }
 
@@ -366,6 +369,58 @@ export function walkoutGroupLine(
   paydays: number,
 ): string {
   return `${joinNames(names)} walked out — unpaid ${paydays} paydays running`
+}
+
+// ---- M7 quests (spec-build2 §3, design-m7 §6.5) -------------------------------
+
+/**
+ * `life:gained` toast: `+1 life — 4 of 5` (economy.lives.cap). A gain of
+ * several reads `+2 lives — 5 of 5`.
+ */
+export function lifeGainedToast(
+  lives: number,
+  delta: number,
+  cap: number,
+): string {
+  const d = Math.max(1, Math.round(delta))
+  return `+${d} ${d === 1 ? 'life' : 'lives'} — ${Math.round(lives)} of ${cap}`
+}
+
+/** What decides whether a new offer opens its QuestCard by itself. */
+export interface QuestAutoOpen {
+  /** Entries on the shared modal stack (sheets, popovers, cards, dialogs). */
+  modals: number
+  /** The onboarding step on screen, or null. */
+  onboardingStep: number | null
+  view: 'city' | 'warehouse'
+  /** The sim is held (a lost-life / game-over / victory / Paused card…). */
+  held: boolean
+  /** A newspaper is on screen, queued or held (the card would cover it). */
+  paperVisible: boolean
+  /** The Golden Release is offered while a regular quest is still active. */
+  blocked: boolean
+  /** An offer found at create / sync (a reload, `?quest=`): ignores the tour. */
+  force: boolean
+  /**
+   * A scripted policy drives the stepper (?policy=1): it answers every offer
+   * itself, so a card would only follow the quest and stay up.
+   */
+  policy: boolean
+}
+
+/**
+ * design-m7 §6.5: a new offer opens the card in `offer` mode only when
+ * nothing modal is up, no onboarding step shows (unless forced), the city is
+ * the view (in the room the chip pulses instead — the card would cover the
+ * lane), nothing holds the sim, no paper is up and it is not the blocked
+ * ultimate. Otherwise the chip pulses and the HUD retries next frame. Never
+ * while a policy drives the stepper (?policy=1).
+ */
+export function questCardAutoOpens(o: QuestAutoOpen): boolean {
+  if (o.policy) return false
+  if (o.blocked || o.held || o.modals > 0 || o.paperVisible) return false
+  if (o.view !== 'city') return false
+  return o.force || o.onboardingStep === null
 }
 
 /** audio:nowPlaying {title} toast (audio.md §3 item 8; m5x7 has no ♪). */

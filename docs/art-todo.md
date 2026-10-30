@@ -1,5 +1,74 @@
 # Art to-do (playtest 1, build 2)
 
+## Build 2 — M7 (quests, plan-build2 §6 / §8.4, design-m7 §6.1, §6.9, B2 §3, §6.5, §6.6)
+
+Sheets: `art/contact/rural@4x.png` (`node tools/art/contact.ts rural`: the ten Rural uniques on their map
+positions, colour and the `_locked` look they ship with until M9, then each unique and the fence / hay_bale props
+close up) and `art/contact/tiers@4x.png` (`node tools/art/contact.ts tiers`: `wh_ext_t1` … `_t5` on the lot slab,
+then tiers 3-5 at 2x with the footprint grid and their manifest bay lights / dock pose marked). Atlas fill after
+M7: world 72.2 % (486 frames; 61.7 % after M6, target ≤ 75 %, R13 trigger 90 % / no pack), interior 29.0 %
+(2048×512) — plan-build2 §8.8 R13 fallback not needed (the `_locked` twins stay per building).
+
+Procedural (by design, no PixelLab id; every one packed into `world` — the HUD and `src/ui/**` bind world only):
+
+- `ic_quest` (icon16): the job board — a brown clipboard with a cream sheet and a gold ★ (QuestCard masthead, the
+  HUD quest chip, the district panel's quest row, the newspaper's quest picture).
+- `ic_magic` (icon16): the golden parcel at 16 px — gold box, pink ribbon and bow, one grey5 sparkle pixel on the
+  lid, the look of `parcel_s_magic` (which already reads gold: its body is the gold ramp with the pink ribbon).
+- `ui_card_gold` (ui 16×16 nine-slice, 4 px corners): `ui_panel` inside a 2-px gold border (gold2 lit top/left,
+  gold0 bottom/right, gold1 inner ring) — the ultimate / complete QuestCard and the VictoryCard.
+- `ui_bar_fill_gold` (ui 8×8, 3-slice): the quest progress fill, `ui_bar_fill_*` geometry in the gold ramp.
+- `magic_ring_0…3` (fx 16×16): the magic parcel's countdown, `rush_ring` geometry in the gold ramp.
+- m5x7 `★` (U+2605, `font.ts DRAWN`, 7×7 at cap height, advance 8): the ticker's star-applicant line. The M6
+  comment "m5x7 has no ★ glyph" (`src/ui/Newspaper.ts`) is out of date.
+- `hay_bale` (prop 64×128 + `_locked`, rural): three square straw bales with twine bands, the prop rule of `fence`.
+  Not placed on the map yet (`map.json` props are data; suggested tiles in the M7 report).
+- Stand-ins for the tier exteriors (`exterior.ts drawTierExt`, apron-less so they pass A04 strict): shown only for a
+  tier row without a chosen candidate.
+- Not made (the design does not need them): new life-slot frames (slots 4-5 blink `ic_life_on` / `ic_life_off`).
+
+PixelLab (agent picks, `node tools/art/decide.ts --manifest`; `approved: false` until the author's gates G5 / G6):
+
+- Rural uniques (Pro Flash, 3×3 = 9, 2×2 = 6, 1×1 = 5 per candidate), one per `buildings.json` id, shipped
+  `_locked` until M9: `ru_peer_pasture` #0 (fenced cow pasture, three cows, small orange gambrel barn, blue
+  trough), `ru_dev_dairy` #0 (white barn with big black cow spots, spotted milk silo, steel churns),
+  `ru_range_ranch` #0 (log ranch house, round white-rail corral, wooden gate arch), `ru_optional_orchard` #2 (rows
+  of fruit trees, striped-awning fruit stand), `ru_hay_barn` #2 (orange gambrel barn, open hayloft, round bales),
+  `ru_grain_coop` #0 (three corrugated silos, yellow grain elevator, blue office), `ru_caret_mill` #0 (white
+  windmill with lattice sails, flour shed), `ru_tilde_tractors` #1 (open garage with the green tractor, yellow sign
+  board, tyres), `ru_semver_stables` #2 (horse heads in the half doors, green roof, cupola, rooster weathervane),
+  `ru_farmhouse_once` #0 (white farmhouse, steep orange roof, porch, brick chimney). Prompts: `ru_peer_pasture`,
+  `ru_range_ranch`, `ru_optional_orchard` are GROUP_SUBJECTS; `ru_tilde_tractors` drops CITY_SUFFIX's "no
+  vehicles" (`prompts.ts VEHICLE_OK`: the tractor is its unique feature).
+- Retired (`decide.ts --retire … --reason`, finals deleted): `ru_farm`, `ru_barn`, `ru_orchard`, `ru_farmhouse` —
+  the shared Rural scenery, replaced by the ten uniques.
+- Warehouse exteriors (warehouse-ext 256², no apron, A04 strict), rows of their own (`wh_ext_t3`, `_t4`, `_t5`,
+  frame name = id; `wh_ext` keeps `_t1` / `_t2`); unused until M8 (t3) / M9 (t4, t5):
+  `wh_ext_t3` #1 (red-orange brick depot, two open hazard-striped bays with an amber lamp each, a two-storey brick
+  office with tall white windows at the front corner, rooftop water tank), `wh_ext_t4` = edit 0 of `wh_ext_t3` #1
+  (`prompts.ts EDIT_OF`: grey steel cladding with blue bands, a third open bay with its lamp, a blue and yellow logo
+  board on the roof edge; same footprint, office and tank), `wh_ext_t5` #2 (white steel and glass HQ, a blue glass
+  tower with gold trim at the front corner, a pink neon parcel-box sign on a dark board, rooftop garden, three bays
+  with lamps). Unlike t1 / t2 (a long shed whose west end overhangs the dock column), the three fill the 4×4
+  footprint. Manifest anchors (frames.generated `WH_ANCHORS`, cityFx `warehouseAnchors(frame)`): t3 bayLights
+  (23, 128), (61, 148), dockPose (4, 185); t4 (19, 133), (47, 148), (76, 160), dockPose (4, 186); t5 (18, 156),
+  (36, 167), (55, 177), dockPose (6, 192) — each light on an amber (orange2 / yellow1) lamp pixel
+  (tests/art/m5-art.test.ts), the docked pose ~6 px left of and ~9 px below bay 1's door base, as t1's. t3 has
+  two lights: CityScene creates one light per tier-1 bay (3) and re-uses the last point for a missing one (M8 to
+  hide the third at t3).
+
+PixelLab spend (M7 cap 300, run budget 1,500 / 300 reserve): 276 generations in 3 batches (balance 2,966 → 2,690;
+$0 credits; run spent 333 → 609): Rural 204 (30 of 30 candidates, `--batch m7-rural`), `wh_ext_t3` + `_t5` 54 (3
+candidates each, `m7-tiers`), `wh_ext_t4` 18 (2 edits, `m7-t4`). No failed jobs, no re-rolls; every id got its
+full candidate count; no PixelLab id fell back to procedural.
+
+Follow-ups: the Rural finals carry 17-18 colours (lint A12 warnings, as the Low-density ones) and `wh_ext_t5` 17.
+`ru_peer_pasture` #0 keeps a thin earth rim on the plot's front edges (all three candidates drew the pasture as a
+raised island; #0's is the thinnest). The `hay_bale` prop is not on the map (`src/data/map.json` props). The
+dock tiles (map `lot.docks`) and the docked pose were laid out for the t1 shed, whose west end overhangs the dock
+column; t3-t5 stand inside the 4×4 footprint with their bays at its west end, so M8 / M9 re-check the docked vehicle
+against them on the city (the poses above follow t1's door-relative offset).
+
 ## Build 2 — M6 (people, plan-build2 §6 / §8.3 task 8, B2 §2.6, §6.5, §6.7)
 
 Sheets: `art/contact/people@4x.png` (`node tools/art/contact.ts people`: faces, ★, pips, worker vs worker_sorter,

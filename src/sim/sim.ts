@@ -28,6 +28,7 @@ import {
   startApplicants,
   syncDesk,
 } from './systems/people.ts'
+import { observeQuestEvent, QUEST_RNG_SALT } from './systems/quests.ts'
 import { runTick } from './tick.ts'
 import { stateShapeProblems } from './validate.ts'
 import type {
@@ -40,7 +41,13 @@ import type {
   Strain,
   Tick,
 } from './types.ts'
-import { laneNode, STATE_VERSION, TICKS_PER_DAY, ticksFromS } from './types.ts'
+import {
+  daysToTicks,
+  laneNode,
+  STATE_VERSION,
+  TICKS_PER_DAY,
+  ticksFromS,
+} from './types.ts'
 
 /** Dev assertions (Node / Vitest / vite dev); vite build replaces DEV with false. */
 const DEV: boolean = import.meta.env?.DEV !== false
@@ -92,6 +99,8 @@ export class Sim {
   readonly rng: Rng
   /** M6: the applicant stream (state.applicants.rng; people.ts, design D1). */
   readonly peopleRng: Rng
+  /** M7: the quest stream (state.quests.rng; offers and magic routes, design-m7 Q21). */
+  readonly questRng: Rng
   readonly commandLog: CommandLogEntry[] = []
   /** Bumped by every tick, successful dispatch and load (view caches key on it). */
   revision = 0
@@ -110,6 +119,7 @@ export class Sim {
     this.state = createStartState(data, seed)
     this.rng = new Rng(() => this.state)
     this.peopleRng = new Rng(() => this.state.applicants)
+    this.questRng = new Rng(() => this.state.quests)
   }
 
   /** Resume a snapshot (validated: version, data hash, ids, locations). */
@@ -167,8 +177,13 @@ export class Sim {
     }
   }
 
-  /** Emit a sim event (systems use this, never events.emit directly). */
+  /**
+   * Emit a sim event (systems use this, never events.emit directly). The
+   * quest observer counts it first (systems/quests.ts: counters only — it
+   * never emits, draws or dispatches), then the taps, then the handlers.
+   */
   emit<K extends SimEventName>(name: K, payload: SimEventPayloads[K]): void {
+    observeQuestEvent(this, name, payload)
     for (const tap of this.#taps) tap(name, payload, this.state.tick)
     this.#emitDepth += 1
     try {
@@ -317,6 +332,16 @@ export function createStartState(data: GameData, seed: number): SimState {
       driver: [],
     },
     wanted: [],
+    quests: {
+      rng: (seedWord(seed) ^ QUEST_RNG_SALT) >>> 0,
+      offer: null,
+      active: null,
+      nextOfferTick: daysToTicks(data.quests.offer.firstOfferDay),
+      ultimateNextTick: 0,
+      lastOfferDay: null,
+      history: [],
+      vouchers: [],
+    },
     parcels: {},
     lane: buildStartLane(data, L1),
     stats: {
@@ -335,9 +360,17 @@ export function createStartState(data: GameData, seed: number): SimState {
       payrollPaid: 0,
       holdBayEvents: 0,
       minutes: [],
+      victoryTick: null,
     },
     lastLostLife: null,
-    nextId: { parcel: 1, vehicle: 1, employee: 1, checker: 1, applicant: 1 },
+    nextId: {
+      parcel: 1,
+      vehicle: 1,
+      employee: 1,
+      checker: 1,
+      applicant: 1,
+      quest: 1,
+    },
   }
 
   // The pre-hired inspector desk (desks.rows index 1 in start.inspector.slot)
@@ -694,6 +727,26 @@ export function auditState(state: SimState, data: GameData): string[] {
   }
   const c = conservation(state)
   if (!c.ok) add(`conservation: ${formatConservation(c)}`)
+  // M7 (design-m7 §2.4): one copy of the magic count; the active magic
+  // quest's parcel is alive or already delivered.
+  let magic = 0
+  for (const p of Object.values(state.parcels)) {
+    if (p.magic && !TERMINAL.includes(p.state)) magic += 1
+  }
+  if (state.spawn.magicAlive !== magic) {
+    add(
+      `spawn.magicAlive: ${state.spawn.magicAlive} ≠ ${magic} live magic parcels`,
+    )
+  }
+  const pr = state.quests.active?.progress
+  if (
+    pr?.kind === 'magicParcel' &&
+    pr.parcelId !== null &&
+    pr.deliveredTick === null &&
+    !state.parcels[String(pr.parcelId)]
+  ) {
+    add(`quests.active: magic parcel ${pr.parcelId} does not exist`)
+  }
   return out
 }
 

@@ -115,6 +115,22 @@ function cardHeld(): Grid {
   })
 }
 
+/**
+ * build 2 M7 (design-m7 §6.1, §6.3, §6.6): the quest / victory card — the
+ * ui_panel face inside a 2-px gold ramp border (gold2 lit on the top/left,
+ * gold0 on the bottom/right, gold1 inner ring), the panel's grey3 bevel
+ * one ring further in. NineSlice 4/4/4/4 like every 16x16 panel.
+ */
+function cardGold(): Grid {
+  return shapeGrid(N, N, roundMask(N, N, SOFT), (_x, _y, [l, t, r, b]) => {
+    const ring = Math.min(l, t, r, b)
+    if (ring === 1) return r === 1 || b === 1 ? 'gold0' : 'gold2'
+    if (ring === 2) return 'gold1'
+    if (r === 3 || b === 3) return 'grey3'
+    return 'grey5'
+  })
+}
+
 function tooltip(): Grid {
   return shapeGrid(N, N, roundMask(N, N, SOFT), (_x, _y, [, , r, b]) =>
     b === 1 || r === 1 ? 'yellow1' : 'yellow3',
@@ -360,6 +376,7 @@ const SINGLE: Record<string, () => Grid> = {
   ui_panel: panel,
   ui_panel_dark: panelDark,
   ui_card_held: cardHeld,
+  ui_card_gold: cardGold,
   ui_tooltip: tooltip,
   ui_tag: tag,
   ui_tab: tab,
@@ -381,6 +398,8 @@ const SINGLE: Record<string, () => Grid> = {
   ui_bar_fill_amber: () => barFill('yellow2', 'yellow3', 'yellow1'),
   ui_bar_fill_red: () => barFill('red1', 'red2', 'red0'),
   ui_bar_fill_blue: () => barFill('blue1', 'blue2', 'blue0'),
+  // build 2 M7: the quest chip / QuestCard progress bar (gold = reward)
+  ui_bar_fill_gold: () => barFill('gold1', 'gold2', 'gold0'),
   ui_banner: banner,
   sign_title: signTitle,
 }

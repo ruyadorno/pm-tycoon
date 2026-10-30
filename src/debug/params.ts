@@ -5,6 +5,9 @@
 // (any other truthy ?policy= stays competent), and ?level=N (debug only)
 // forces level N on every fresh player's game — Boot's own new sim and each
 // New game — through debug.forceLevel (src/scenes/BootScene.ts).
+// M7 (design-m7 §6.10, plan-build2 §8.4 task 6): ?quest=<id> (debug only)
+// offers that quests.json template (or the ultimate id, `golden_release`) on
+// every fresh player's game through debug.offerQuest, after ?level=.
 import type { PolicyKind } from '../sim/sim.ts'
 
 export type ViewName = 'city' | 'warehouse' | 'gallery'
@@ -33,6 +36,13 @@ export interface Params {
    * the last levels.json row (Boot warns).
    */
   level: number | null
+  /**
+   * ?quest=<templateId> (debug builds, design-m7 §6.10): offer that quest on
+   * a fresh game (sim command debugOfferQuest — the scheduler, unlock level,
+   * condition and requirement are skipped; replays stay exact); null when
+   * absent or blank. An unknown id is refused by the sim (Boot warns).
+   */
+  quest: string | null
   /** Install window.__pm, the overlay and 4x speed in a production build. */
   debug: boolean
   mute: boolean
@@ -90,6 +100,7 @@ export function parseParams(search: string, fallbackSeed: number): Params {
   const config = q.get('config')
   const levelArg = int(q, 'level')
   const policyArg = q.get('policy')?.trim().toLowerCase() ?? null
+  const questArg = q.get('quest')?.trim() ?? ''
   return {
     seed,
     seedFromUrl,
@@ -100,6 +111,7 @@ export function parseParams(search: string, fallbackSeed: number): Params {
     policy: flag(q, 'policy'),
     policyKind: policyArg === 'delegating' ? 'delegating' : 'competent',
     level: levelArg !== null && levelArg >= MIN_FORCED_LEVEL ? levelArg : null,
+    quest: questArg === '' ? null : questArg,
     debug: flag(q, 'debug'),
     mute: flag(q, 'mute'),
     audio: !(audioArg === '0' || audioArg === 'false'),

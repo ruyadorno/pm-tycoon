@@ -10,9 +10,12 @@
 // ignores it) tells the shots spec what to expect.
 //
 //   level-up       A PLAIN run (seed + command log, no state patching)
-//                  stopped LEVEL_LEAD_S before its level-up tick (lifetime
-//                  earned just under the L2 threshold, "lifetime $1,990";
-//                  one payout crosses it). Load WITH ?policy=1 and advance:
+//                  stopped LEVEL_LEAD_S before its level-up tick, or later:
+//                  right after the last payout before the crossing one when
+//                  two land in that window (M7: seed 7 earns a $50 bounty and
+//                  a $45 delivery in its last 3 s), so lifetime earned sits
+//                  just under the L2 threshold ("lifetime $1,990") and one
+//                  payout crosses it. Load WITH ?policy=1 and advance:
 //                  `level:up {2}` lands `fixture.levelUpInS` later (then the
 //                  region fade, the ticker line, tier 2).
 //   payroll-short  The policy until the day boundary before PAYDAY_DAY, then
@@ -36,7 +39,7 @@ import { Sim } from '../../src/sim/sim.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
 
 const SEED = 7
-/** level-up: snapshot this long before the run's level-up tick. */
+/** level-up: snapshot at most this long before the run's level-up tick. */
 const LEVEL_LEAD_S = 3
 /** payroll-short: the first payday tried (then the next ones). */
 const PAYDAY_DAY = 4
@@ -93,18 +96,31 @@ function levelUp(): void {
   const row = data.levels.find((l) => l.level === 2)
   if (!row) throw new Error('level-up: no levels.json row 2')
   // The run to its level-up tick, then the same run (deterministic) stopped
-  // LEVEL_LEAD_S before it: lifetime just under the threshold.
-  const probe = runPolicy((s) => s.state.level.level >= 2)
+  // LEVEL_LEAD_S before it — or right after the last payout before the
+  // crossing one, if later: lifetime just under the threshold, one payout to
+  // go.
+  let lastEarnTick = 0
+  let earned = 0
+  const probe = runPolicy((s) => {
+    if (s.state.economy.lifetimeEarned !== earned) {
+      earned = s.state.economy.lifetimeEarned
+      if (s.state.level.level < 2) lastEarnTick = s.state.tick
+    }
+    return s.state.level.level >= 2
+  })
   const upTick = probe.state.stats.levelTick['2']
   if (upTick === undefined) throw new Error('level-up: no level-up')
-  const snapTick = upTick - LEVEL_LEAD_S * TICKS_PER_S
+  const snapTick = Math.max(
+    upTick - LEVEL_LEAD_S * TICKS_PER_S,
+    Math.min(lastEarnTick, upTick - 1),
+  )
   const sim = runPolicy((s) => s.state.tick >= snapTick)
   if (sim.state.level.level !== 1)
     throw new Error('level-up: already levelled up at the snapshot')
   write('level-up', sim, {
     lifetime: sim.state.economy.lifetimeEarned,
     threshold: row.threshold,
-    levelUpInS: LEVEL_LEAD_S,
+    levelUpInS: (upTick - snapTick) / TICKS_PER_S,
     policy: true,
   })
 }

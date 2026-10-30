@@ -1,6 +1,8 @@
 // The city's M3 flourishes (plan.md §12.6 tasks 5 + 9; city-view.md §1.4,
 // §2, §9.6; spec-core.md §3.5, §9.2, Q33), pinned on the pure timelines the
-// scene drives its sprites from (src/render/cityFx.ts).
+// scene drives its sprites from (src/render/cityFx.ts). M7 (spec-build2
+// §3.3, design-m7 §6.8): the magic parcel's markers over A and B, its
+// countdown ring (magicRingStep: the rush ring's steps) and the gold hop.
 import { describe, expect, it } from 'vitest'
 import {
   BAY_LIGHTS,
@@ -14,10 +16,15 @@ import {
   grumbleDue,
   GRUMBLE_EVERY_MS,
   honkShown,
+  hopIcon,
   LEGACY_WH_ANCHORS,
   levelStampText,
+  magicMarkers,
+  magicRingStep,
   manifestWarehouseAnchors,
   moodFor,
+  RING_STEPS,
+  ringStep,
   SIGN_POP_MS,
   signCracked,
   signDaysText,
@@ -44,6 +51,19 @@ import {
   screenToTileF,
 } from '../../src/render/iso.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
+import { FRAMES } from '../../src/render/frames.generated.ts'
+import { ticksFromS } from '../../src/sim/types.ts'
+import { createViewSim } from '../../src/sim/view-api.ts'
+import {
+  acceptOffer,
+  noOffers,
+  offerQuest,
+  openingA,
+  quietSim,
+  runTicks,
+  runUntil,
+  startQuest,
+} from '../sim/helpers.ts'
 
 const data = buildGameData(loadRawData())
 const sat = data.economy.satisfaction
@@ -295,5 +315,161 @@ describe('Industrial smoke (§1.3): fx_smoke_f0..3 at 4 fps, 3 puffs, phase offs
       const b = data.buildings.find((x) => x.id === id)
       expect(b?.district).toBe('industrial')
     }
+  })
+})
+
+describe('M7 magic parcel in the city (B2 §3.3, design-m7 §6.8)', () => {
+  it("magicRingStep: the rush ring's 4 steps at 75 / 50 / 25 % remaining", () => {
+    expect(RING_STEPS).toBe(4)
+    expect(
+      [1, 0.76, 0.75, 0.51, 0.5, 0.26, 0.25, 0.01, 0].map(magicRingStep),
+    ).toEqual([0, 0, 1, 1, 2, 2, 3, 3, 3])
+    for (const r of [1, 0.8, 0.6, 0.4, 0.2, 0])
+      expect(magicRingStep(r)).toBe(ringStep(r))
+  })
+
+  it('out-of-range and NaN remainders clamp (full ring above 1, empty below 0 and for NaN)', () => {
+    expect(magicRingStep(2)).toBe(0)
+    expect(magicRingStep(-1)).toBe(3)
+    expect(magicRingStep(Number.NaN)).toBe(3)
+  })
+
+  it('every step has a magic_ring frame and a rush_ring twin (same geometry, gold ramp)', () => {
+    const frames: Record<string, string> = FRAMES
+    for (let k = 0; k < RING_STEPS; k++) {
+      expect(frames[`magic_ring_${k}`]).toBe(`magic_ring_${k}`)
+      expect(frames[`rush_ring_${k}`]).toBe(`rush_ring_${k}`)
+    }
+    expect(frames.ic_magic).toBe('ic_magic')
+  })
+
+  it('the hop icon is ic_magic for the golden parcel, ic_parcel_<size> otherwise', () => {
+    expect(hopIcon({ size: 'S', magic: true })).toBe('ic_magic')
+    expect(hopIcon({ size: 'S', magic: false })).toBe('ic_parcel_s')
+    expect(hopIcon({ size: 'XL', magic: false })).toBe('ic_parcel_xl')
+  })
+
+  const route = { origin: 'a', dest: 'b' }
+  const magicQ = (over: Record<string, unknown> = {}) =>
+    ({
+      progress: {
+        kind: 'magicParcel',
+        parcelId: 7,
+        origin: 'a',
+        dest: 'b',
+        deliveredTick: null,
+        onTime: false,
+      },
+      route,
+      ticksLeft: 900,
+      limitTicks: 1200,
+      ...over,
+    }) as unknown as Parameters<typeof magicMarkers>[0]
+
+  it('markers on A and B with the countdown fraction while the golden parcel is on its way', () => {
+    expect(magicMarkers(magicQ())).toEqual({
+      origin: 'a',
+      dest: 'b',
+      remaining01: 0.75,
+    })
+  })
+
+  it('no markers: no quest, no route (an offer), another kind, delivered, or the countdown over', () => {
+    expect(magicMarkers(null)).toBeNull()
+    expect(magicMarkers(magicQ({ route: null }))).toBeNull()
+    expect(
+      magicMarkers(magicQ({ progress: { kind: 'deliveriesFrom', count: 3 } })),
+    ).toBeNull()
+    expect(
+      magicMarkers(
+        magicQ({
+          progress: {
+            kind: 'magicParcel',
+            parcelId: 7,
+            origin: 'a',
+            dest: 'b',
+            deliveredTick: 50,
+            onTime: true,
+          },
+        }),
+      ),
+    ).toBeNull()
+    expect(magicMarkers(magicQ({ ticksLeft: 0 }))).toBeNull()
+    expect(magicMarkers(magicQ({ ticksLeft: null }))).toBeNull()
+  })
+
+  it('B2 §3.3 "while it is alive": past the countdown (or with no quest) the live golden parcel keeps both markers, the ring empty', () => {
+    const live = { origin: 'a', dest: 'b' }
+    expect(magicMarkers(null, live)).toEqual({
+      origin: 'a',
+      dest: 'b',
+      remaining01: 0,
+    })
+    expect(magicMarkers(magicQ({ ticksLeft: 0 }), live)?.remaining01).toBe(0)
+    // While the countdown runs the quest's ring wins.
+    expect(magicMarkers(magicQ(), live)?.remaining01).toBe(0.75)
+  })
+
+  it('through the facade: an accepted Special delivery marks its A and B, the ring drains, the markers outlive a late fail and clear on delivery', () => {
+    const sim = noOffers(quietSim(5))
+    openingA(sim)
+    const vs = createViewSim(() => sim)
+    offerQuest(sim, 'magic_parcel')
+    // An offer has no route yet: nothing in the city.
+    expect(magicMarkers(vs.quests().offer)).toBeNull()
+    expect(magicMarkers(vs.quests().active)).toBeNull()
+    acceptOffer(sim)
+    const pr = sim.state.quests.active?.progress
+    if (pr?.kind !== 'magicParcel' || pr.origin === null)
+      throw new Error('not magic')
+    // Keep the bike out of A's district: the parcel waits out its countdown.
+    const bike = sim.state.vehicles[0]
+    if (!bike) throw new Error('no bike')
+    const a = data.buildings.find((b) => b.id === pr.origin)?.district
+    sim.dispatch({
+      kind: 'setZone',
+      id: bike.id,
+      zone: a === 'highres' ? 'downtown' : 'highres',
+    })
+    const m0 = magicMarkers(vs.quests().active)
+    expect(m0).toEqual({ origin: pr.origin, dest: pr.dest, remaining01: 1 })
+    expect(magicRingStep(m0?.remaining01 ?? 0)).toBe(0)
+    const countdown = ticksFromS(data.parcels.magic.countdownS)
+    runTicks(sim, Math.round(countdown * 0.6))
+    const m = magicMarkers(vs.quests().active)
+    expect(m?.origin).toBe(pr.origin)
+    expect(m?.dest).toBe(pr.dest)
+    expect(m?.remaining01).toBeCloseTo(0.4, 2)
+    expect(magicRingStep(m?.remaining01 ?? 0)).toBe(2)
+    // Past the deadline the quest failed and left the slot, but the golden
+    // parcel is still alive: A and B keep their markers, the ring empty.
+    runTicks(sim, Math.round(countdown * 0.4) + 1)
+    const qs = vs.quests()
+    expect(qs.active).toBeNull()
+    expect(qs.magic).toEqual({
+      parcelId: pr.parcelId,
+      origin: pr.origin,
+      dest: pr.dest,
+    })
+    expect(magicMarkers(qs.active, qs.magic)).toEqual({
+      origin: pr.origin,
+      dest: pr.dest,
+      remaining01: 0,
+    })
+    // Delivered (late): gone from the city.
+    sim.dispatch({ kind: 'setZone', id: bike.id, zone: 'any' })
+    runUntil(sim, () => vs.quests().magic === null, 6000)
+    expect(vs.quests().magic).toBeNull()
+    expect(magicMarkers(vs.quests().active, vs.quests().magic)).toBeNull()
+  })
+
+  it('the parcel itself carries the golden hop icon', () => {
+    const sim = noOffers(quietSim(3))
+    openingA(sim)
+    const q = startQuest(sim, 'magic_parcel')
+    if (q.progress.kind !== 'magicParcel' || q.progress.parcelId === null)
+      throw new Error('not magic')
+    const p = sim.state.parcels[String(q.progress.parcelId)]
+    expect(p && hopIcon(p)).toBe('ic_magic')
   })
 })

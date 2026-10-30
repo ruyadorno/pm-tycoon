@@ -258,6 +258,159 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
     expect(problemsOf(old)).toContainEqual('puns.inspectorNames: unknown key')
   })
 
+  it('quests.json shapes (spec-build2 §9; design-m7 §1.5): one slot, goal kinds, level arrays, unknown keys', () => {
+    const raw = fresh()
+    raw.quests.offer.maxActive = 2
+    raw.quests.templates[0].goal = { kind: 'deliveriesTo', count: 3 }
+    raw.quests.templates[5].goal.count = [1, 2, 3, 4, 5, 6]
+    raw.quests.templates[6].foo = 1
+    raw.quests.templates[3].reward.starApplicant.pips.eye = 6
+    const p = problemsOf(raw)
+    expect(p).toContainEqual('quests.offer.maxActive: 2 is outside 1..1')
+    expect(p).toContainEqual(
+      expect.stringMatching(
+        /^quests\.templates\[0\]\.goal\.kind: expected one of "deliveriesFrom"\|/,
+      ),
+    )
+    expect(p).toContainEqual(
+      'quests.templates[5].goal.count: expected 1..5 items, got 6',
+    )
+    expect(p).toContainEqual('quests.templates[6].foo: unknown key')
+    expect(p).toContainEqual(
+      'quests.templates[3].reward.starApplicant.pips.eye: 6 is outside 0..5',
+    )
+    const puns = fresh()
+    delete puns.puns.tickerQuest
+    expect(problemsOf(puns)).toContainEqual('puns.tickerQuest: missing')
+  })
+
+  it('quests.json relations: ids, levels, the magic parcel’s one copy, limits and rewards present', () => {
+    const dup = fresh()
+    dup.quests.templates[1].id = 'rush_district'
+    dup.quests.templates[4].id = 'golden_release'
+    dup.quests.templates[5].unlockLevel = 6
+    let p = problemsOf(dup)
+    expect(p).toContainEqual(
+      'quests.templates[1].id: duplicate id "rush_district" (first at quests.templates[0])',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[4].id: "golden_release" is a levels.json ultimateQuest id',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[5].unlockLevel: level 6 does not exist',
+    )
+    const magic = fresh()
+    magic.quests.templates[2].limitDays = 2
+    expect(problemsOf(magic)).toContainEqual(
+      "quests.templates[2]: the magic parcel's clock and payout live in parcels.json magic (no limitDays / reward here)",
+    )
+    const limits = fresh()
+    delete limits.quests.templates[5].limitDays
+    delete limits.quests.templates[6].reward
+    limits.quests.templates[7].reward = {}
+    p = problemsOf(limits)
+    expect(p).toContainEqual('quests.templates[5].limitDays: missing')
+    expect(p).toContainEqual('quests.templates[6].reward: missing')
+    expect(p).toContainEqual(
+      'quests.templates[7].reward: needs at least one field',
+    )
+    const levels = fresh()
+    levels.levels.pop()
+    expect(problemsOf(levels)).toContainEqual(
+      'quests.templates[0].goal.count: 5 entries, more than the 4 levels',
+    )
+  })
+
+  it('quests.json targets: deliveriesFrom needs one, satisfactionAtLeast needs satisfactionBelow below its goal, nothing else takes one', () => {
+    const raw = fresh()
+    delete raw.quests.templates[0].target
+    raw.quests.templates[0].targetArg = 40
+    raw.quests.templates[5].target = 'district:mostWaiting'
+    let p = problemsOf(raw)
+    expect(p).toContainEqual(
+      'quests.templates[0].target: deliveriesFrom needs a district:* target',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[0].targetArg: only with "district:satisfactionBelow"',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[5].target: goal "deliveriesOfSize" takes no target',
+    )
+    const sat = fresh()
+    sat.quests.templates[1].target = 'district:mostWaiting'
+    expect(problemsOf(sat)).toContainEqual(
+      'quests.templates[1].target: satisfactionAtLeast needs "district:satisfactionBelow"',
+    )
+    const arg = fresh()
+    delete arg.quests.templates[1].targetArg
+    expect(problemsOf(arg)).toContainEqual(
+      'quests.templates[1].targetArg: missing (district:satisfactionBelow)',
+    )
+    const unreachable = fresh()
+    unreachable.quests.templates[1].goal.value = 50
+    p = problemsOf(unreachable)
+    expect(p).toContainEqual(
+      'quests.templates[1].goal.value: 50 is not above targetArg 50',
+    )
+  })
+
+  it('quests.json conditions and hubs: livesBelowCap or hubLive:<overseas id>; overseasCleared at an overseas hub', () => {
+    const raw = fresh()
+    raw.quests.templates[7].condition = 'hubLive:downtown'
+    raw.quests.templates[9].condition = 'whenever'
+    raw.quests.templates[7].goal.hub = 'industrial'
+    const p = problemsOf(raw)
+    expect(p).toContainEqual(
+      'quests.templates[7].condition: "downtown" is not an overseas district',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[9].condition: expected "livesBelowCap" or "hubLive:<overseas id>", got "whenever"',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[7].goal.hub: "industrial" is not an overseas district',
+    )
+  })
+
+  it('quests.json rewards: a voucher is a checker id; a ★ has exactly its role’s stats, 1-5 (charisma 0-2), an affinity only as a driver', () => {
+    const raw = fresh()
+    raw.quests.templates[5].reward.voucher = 'magnet_wand'
+    raw.quests.templates[3].reward.starApplicant.pips = { eye: 5, pace: 3 }
+    raw.quests.templates[3].reward.starApplicant.affinity = 'van'
+    raw.quests.templates[4].reward.starApplicant.pips.charisma = 3
+    raw.quests.templates[4].reward.starApplicant.pips.speed = 0
+    const p = problemsOf(raw)
+    expect(p).toContainEqual(
+      'quests.templates[5].reward.voucher: unknown checker "magnet_wand"',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[3].reward.starApplicant.pips: expected the inspector stats ["eye","pace","charisma"], got ["eye","pace"]',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[3].reward.starApplicant.affinity: only drivers have an affinity',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[4].reward.starApplicant.pips.charisma: 3 is outside 0..2',
+    )
+    expect(p).toContainEqual(
+      'quests.templates[4].reward.starApplicant.pips.speed: 0 is outside 1..5',
+    )
+  })
+
+  it('puns.json quest lines: one per template and the ultimate; ticker lines carry {name} ({company} for Victory)', () => {
+    const raw = fresh()
+    delete raw.puns.quests.big_haul
+    delete raw.puns.quests.golden_release
+    raw.puns.tickerQuest.offered = 'A new job'
+    raw.puns.tickerQuest.victory = 'We won, {name}'
+    const p = problemsOf(raw)
+    expect(p).toContainEqual('puns.quests: missing the line for "big_haul"')
+    expect(p).toContainEqual(
+      'puns.quests: missing the line for "golden_release"',
+    )
+    expect(p).toContainEqual('puns.tickerQuest.offered: must contain {name}')
+    expect(p).toContainEqual('puns.tickerQuest.victory: must contain {company}')
+  })
+
   it('empty pun list for a strain', () => {
     const raw = fresh()
     raw.puns.malwareLabels.battery = []

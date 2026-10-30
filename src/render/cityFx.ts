@@ -2,12 +2,16 @@
 // tasks 5 + 9; city-view.md §1.3-§1.4, §2, §9.6; spec-core.md §3.5, §9.2,
 // Q33) and of the build-2 lot (spec-build2.md §6.1: the warehouse slab, ramp
 // and bollards stamped by the ground bake; the exterior anchors read from the
-// manifest-derived frames.generated.ts). No Phaser, no DOM: CityScene /
+// manifest-derived frames.generated.ts) and of the M7 magic parcel
+// (spec-build2 §3.3, design-m7 §6.8: the gold `ic_magic` markers over A and
+// B, their countdown ring, the gold hop icon). No Phaser, no DOM: CityScene /
 // BuildingView / VehicleView / DistrictLabel / ground.ts drive their sprites
 // from these and Vitest pins them under Node (tests/render/cityFx.test.ts,
 // tests/render/ground-slab.test.ts). Every time is ms on the scene clock
 // (frozen-clock friendly: __pm.freeze steps it).
 import { isRoadTile, mapBlockAt, type MapData, type XY } from '../data/index.ts'
+import type { BuildingId, Parcel } from '../sim/types.ts'
+import type { QuestView } from '../sim/view-api.ts'
 import { WH_ANCHORS, type WarehouseAnchorSet } from './frames.generated.ts'
 
 // ---------------------------------------------------------------- region unlock (§1.4)
@@ -140,6 +144,74 @@ export const HONK_SHOW_MS = 500
 export function honkShown(nowMs: number, vehicleId: number): boolean {
   const phase = (((vehicleId % 4) + 4) % 4) * 1000
   return (nowMs + phase) % HONK_EVERY_MS < HONK_SHOW_MS
+}
+
+// ---------------------------------------------------------------- rush / magic rings (city-view §6.1; B2 §3.3)
+
+/** Frames of the draining badge rings (rush_ring_0..3, magic_ring_0..3). */
+export const RING_STEPS = 4
+
+/**
+ * Ring frame of a draining countdown: 0 while ≥ 75 % remains, then 1, 2 and
+ * 3 at 75 / 50 / 25 % (city-view §6.1, the rush ring). `remaining01` = 1 → 0;
+ * out-of-range (and NaN) values clamp.
+ */
+export function ringStep(remaining01: number): 0 | 1 | 2 | 3 {
+  const r = Number.isFinite(remaining01)
+    ? Math.max(0, Math.min(1, remaining01))
+    : 0
+  return Math.min(
+    RING_STEPS - 1,
+    Math.max(0, Math.floor((1 - r) * RING_STEPS)),
+  ) as 0 | 1 | 2 | 3
+}
+
+/** The magic parcel's countdown ring (design-m7 §6.8): the rush ring's steps. */
+export function magicRingStep(remaining01: number): 0 | 1 | 2 | 3 {
+  return ringStep(remaining01)
+}
+
+/** Where the city hangs the magic markers: A and B with the ring's 1 → 0 fill. */
+export interface MagicMarkers {
+  origin: BuildingId
+  dest: BuildingId
+  remaining01: number
+}
+
+/**
+ * B2 §3.3 / design-m7 §6.8: the gold `ic_magic` over A and B while the
+ * golden parcel is alive. While the active magic quest's countdown runs (a
+ * `magicParcel` quest with a route, undelivered, ticks left) the ring drains
+ * with it; once the countdown is over — the quest late, failed or abandoned
+ * — the parcel `live` (QuestsView.magic) still on its way keeps both markers
+ * with an empty ring (remaining 0). Null when no golden parcel is alive.
+ */
+export function magicMarkers(
+  q: Pick<QuestView, 'progress' | 'route' | 'ticksLeft' | 'limitTicks'> | null,
+  live: { origin: BuildingId; dest: BuildingId } | null = null,
+): MagicMarkers | null {
+  const pr = q?.progress
+  if (
+    q &&
+    q.route !== null &&
+    pr?.kind === 'magicParcel' &&
+    pr.deliveredTick === null &&
+    (q.ticksLeft ?? 0) > 0
+  ) {
+    const total = Math.max(1, q.limitTicks)
+    return {
+      origin: q.route.origin,
+      dest: q.route.dest,
+      remaining01: Math.max(0, Math.min(1, (q.ticksLeft ?? 0) / total)),
+    }
+  }
+  if (!live) return null
+  return { origin: live.origin, dest: live.dest, remaining01: 0 }
+}
+
+/** The pickup / delivery hop icon (design-m7 §6.8): gold for the magic parcel. */
+export function hopIcon(p: Pick<Parcel, 'size' | 'magic'>): string {
+  return p.magic ? 'ic_magic' : `ic_parcel_${p.size.toLowerCase()}`
 }
 
 // ---------------------------------------------------------------- warehouse exterior (art install hand-off)

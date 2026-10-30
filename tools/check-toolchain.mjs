@@ -1,4 +1,5 @@
-// Toolchain pin (plan.md §6.2, Q15): Node >= 26, vlt 1.6.0, the vendored m5x7 TTF hash when present.
+// Toolchain pin (plan.md §6.2, Q15): Node >= 26, vlt 1.6.x (patch releases accepted: the VM's vlt moved
+// 1.6.0 → 1.6.1 between the builds; same CLI and lockfile format), the vendored m5x7 TTF hash when present.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -17,7 +18,7 @@ try {
 } catch {
   vlt = 'missing'
 }
-if (vlt !== '1.6.0') problems.push(`vlt ${vlt} (expected 1.6.0)`)
+if (!/^1\.6\.\d+$/.test(vlt)) problems.push(`vlt ${vlt} (expected 1.6.x)`)
 
 if (existsSync(FONT)) {
   const sha = createHash('sha256').update(readFileSync(FONT)).digest('hex')

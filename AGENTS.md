@@ -1,8 +1,9 @@
 # pm-tycoon — agent rules
 
 Package Management Tycoon: a portrait, pixel-art, isometric tycoon game (Phaser 4.2.1 + TypeScript 5.9 + Vite 8).
-The plan lives outside this repo at /home/ruybot/agents/main/plans/pm-tycoon/ — `plan.md` is the entry point and
-`spec-core.md` is the single source of truth for mechanics and numbers (cite its section numbers in commits and docs).
+The plan lives outside this repo at /home/ruybot/agents/main/plans/pm-tycoon/ — build 2: `plan-build2.md` is the entry
+point and `spec-build2.md` (cited `B2 §N`) wins over `spec-core.md` (cited `§N`) where they differ; `plan.md` §5, §6,
+§12.1 and §13 still apply. Cite spec section numbers in commits and docs.
 Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under .agents/skills (`vlt skills link -y '#phaser'`).
 
 ## Commands (vlt only — never npm/pnpm/yarn/npx)
@@ -26,7 +27,7 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
   only (no test files, no art manifest, no policy.ts, no Chromium). `vlr check:quick` (the first five steps, gate tests
   excluded) is the pre-commit hook; the full check is the rule.
 - Commit subject `<area>: <imperative summary>` (areas: scaffold, data, sim, city, warehouse, hud, audio, art, tools, tests,
-  docs, M0…M4); a body when the diff is not obvious; the last line is `Co-authored-by: Ruy Adorno <ruy@vlt.sh>`.
+  docs, people, quests, title, M0…M10); a body when the diff is not obvious; the last line is `Co-authored-by: Ruy Adorno <ruy@vlt.sh>`.
 - No AI-attribution lines anywhere in commits, PR bodies or files (no "Generated with", no session links, no Co-Authored-By: Claude).
 - `git commit --no-verify` is not allowed.
 - Trunk only: commit directly to `main` in this checkout. Never create branches, worktrees, forks or pull requests; never run
@@ -35,7 +36,7 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 - Git remote: `origin` = https://github.com/ruyadorno/pm-tycoon.git (created by the author 2026-10-29, ruy-bot app
   installed on it). Push `main` only, at checkpoints: `source ~/.ghtoken && git push origin main` (~1 h GitHub App token
   refreshed into ~/.ghtoken; https only; never print or commit the token). If a push 403s or is refused for
-  .github/workflows (the app may lack Workflows: write), stop retrying and record it in docs/report-playtest1.md.
+  .github/workflows (the app may lack Workflows: write), stop retrying and record it in docs/report-playtest2.md.
 - Subagents never commit: they edit disjoint files in this working tree (no worktree isolation), run checks and report back;
   the orchestrating agent reviews the diff, runs `vlr check` and commits on `main`.
 
@@ -54,7 +55,9 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 - No new runtime dependency without a paragraph in docs/decisions.md (why, licence, size). Dev deps need no note.
 - Sprites follow art/STYLE.md + art/manifest.json (canvas classes, anchors, headings, palette); scenes reference frames through
   `src/render/frames.generated.ts`; `vlr art:lint` fails off-contract pixels. Art swaps never require code changes.
-- One atlas (`public/assets/world.{png,json}`) incl. the m5x7 glyph sheet; BitmapText only (Text only in the debug overlay);
+- Two atlases: `world` (city, UI nine-slices, icons, the m5x7 glyph sheet — the HUD binds only this one) and `interior`
+  (warehouse room, fixtures, machines, workers, faces), packed by the manifest's `atlas` key with hashed URLs; the logo
+  (`public/assets/logo.png`) is brand art outside both atlases and the palette lint. BitmapText only (Text only in the debug overlay);
   integer camera zoom {1, 2}; no setScale/rotation/filters/flipX on world art; `scene.sleep/run` for view switches (never
   `start`); sim events are subscribed on WAKE/create and removed on SLEEP/SHUTDOWN, with `syncAll()` on wake.
 
@@ -62,26 +65,30 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 
 - `vlr art:build` is the offline loop (draw → gen-if-token → normalize → quantize → outline → variants → lint → atlas → gallery)
   and is idempotent (seeded procedural art, hashed finals).
-- `vlr art:gen` needs PIXELLAB_TOKEN in .env (gitignored). The author has an active PixelLab Tier 2 subscription and the `pixellab` MCP registered at local scope for ~/agents/main: in M0 copy the token from that registration into .env without printing it and re-register at user scope (plan.md §10 "PixelLab status"). Without a token the procedural placeholders stay and the script exits 0.
-  Never paste a token into chat, a commit or a log. Bulk generation runs on agent-approved anchors (provisional gate G2, plan.md §10 "PixelLab status"); the author confirms or rejects by id after the run.
+- `vlr art:gen` needs PIXELLAB_TOKEN in the gitignored .env (already there; never paste it into chat, a commit or a log);
+  without it the procedural placeholders stay and the script exits 0. One agent at a time calls PixelLab; `vlr art:balance`
+  first. Build-2 budget 1,500 generations with a 300 reserve; the author approves or rejects ids after the run (G4–G6).
 
 ## Status and reports
 
-- docs/status.md: one entry per checkpoint (M0–M4), newest first, in the format of plans/pm-tycoon/status.md; PARTIAL entries
-  list unfinished task numbers. Copy the filled file back to plans/pm-tycoon/status.md at the end of M4.
-- docs/decisions.md: every "(default — confirm)" choice taken (with the plan.md question number) and every runtime dep.
-- docs/report-playtest1.md: the end-of-run report for the author (sections listed in plan.md, "Final report").
+- docs/status.md: one entry per checkpoint (M0–M10), newest first, in the format of plans/pm-tycoon/status.md; PARTIAL
+  entries list unfinished task numbers. Copy the filled file back to plans/pm-tycoon/status.md at the end of M10.
+- docs/decisions.md: every "(default — confirm)" choice taken (with the plan.md / plan-build2.md question number, build 2
+  under "Run decisions (build 2)") and every runtime dep.
+- docs/report-playtest2.md: the build-2 end-of-run report (plan.md §13.4 sections + plan-build2.md §8.7 task 6);
+  docs/report-playtest1.md stays as the playtest-1 record.
 
 ## Sim gate
 
 - `vlr sim -- --minutes 30 --seed N` prints the per-minute timeline; `vlr sim:gate` runs seeds 1–10 × 30 min and checks the
-  playtest-1 windows of spec §7 (first delivery < 60 s, scripted malware caught, L2 at 8–15 min, truck ≤ 4 min after L2,
-  no lost life, no shelf stall under the Toss-everything policy). Medians must pass; retune JSON, not code.
+  windows of spec §7 + B2 §7.3 (first delivery < 60 s, scripted malware caught, L2 at 8–15 min, truck ≤ 4 min after L2,
+  no lost life, no shelf stall under the Toss-everything policy; L3–L5 and quest rows as their `SIM_FEATURES` flags
+  land); from M9 also `vlr sim:gate -- --minutes 35` (Golden Release row). Medians must pass; retune JSON, not code, in
+  the B2 §7.3 tuning order.
 
-## Scope guard (playtest 1)
+## Scope guard (build 2 / playtest 2)
 
-- Levels 1–2 only (economy.playtestMaxLevel = 2; at the cap the level bar keeps counting with "Lv 3 coming soon" and the
-  malware share climbs by malware.postVictoryPerDay — in-game text never says "next build"). No belts, no management scene, no driver stats, no quests or magic parcels,
-  no L3+ mechanics (overseas, docks 2–3, Battery checker, X-ray, Sorter Arm), no airport/train, no GitHub repo creation
-  or Pages deploy execution (the workflow file stays inert; pushes to `main` only), no PWA/service worker, no ready-made art packs.
-  L3+ data rows ship untouched and schema-valid.
+- Levels 1–5, quests, people (applicants, desks, the Hold Bay sorter, drivers); the fixed lane only — no belts of any kind,
+  no management scene, no train, no splitters/traffic/day-night/bankruptcy, no PWA/service worker, no save migrations
+  (v1 saves are discarded), no ready-made art packs. Pages deploy only through the `pages.yml` workflow dispatch at M10
+  (Q-B2-9); GitHub mechanics beyond that and `git push origin main` stay out. The sorter is Toss-only (it never Clears).

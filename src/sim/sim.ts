@@ -361,6 +361,7 @@ export function createStartState(data: GameData, seed: number): SimState {
       holdBayEvents: 0,
       minutes: [],
       victoryTick: null,
+      cleared: 0,
     },
     lastLostLife: null,
     nextId: {
@@ -428,7 +429,8 @@ function laneNodeOf(
 
 /**
  * The generic lane (plan.md §5 node ids): dock1 → conv1 → slot1..slotN →
- * shelf (N = the largest levels.json slot count; slots past L1's count carry
+ * shelf (docks 2-3 and their conveyors are added when bought, M8
+ * docks.ts addDock; N = the largest levels.json slot count; slots past L1's count carry
  * `locked: {level}` of the first row that opens them), each slot diverting to
  * hold; hold → shelf (Clear) | bin (Toss). Caps: conveyor and slot buffer
  * from machines.json, Hold Bay and shelf from the level row.
@@ -487,6 +489,7 @@ function buildStartLane(data: GameData, L1: LevelDef): Lane {
     stallSecondsToday: 0,
     quarantine: { count: 0, malware: 0, clean: 0 },
     holdStation: { fixture: null, nextDecisionTick: null },
+    feedIndex: 0,
     dockQueue: [],
   }
 }
@@ -538,8 +541,8 @@ function jsonProblems(v: unknown, path: string, add: (m: string) => void) {
  * ascending and every cross-reference resolving; every live parcel in
  * exactly one place (a building's waiting list, a vehicle's cargo, a lane
  * node's queue or station; none while handed off / clearing or terminal);
- * and the conservation identity spawned = live + delivered + tossed
- * (plan.md §12.5; build 2 adds cleared overseas parcels).
+ * and the conservation identity spawned = live + delivered + tossed +
+ * cleared (plan.md §12.5; M8 adds the overseas clearances, stats.cleared).
  */
 export function auditState(state: SimState, data: GameData): string[] {
   const out: string[] = []
@@ -720,9 +723,10 @@ export function auditState(state: SimState, data: GameData): string[] {
   }
   const delivered = state.stats.deliveries
   const tossed = lane.quarantine.count
-  if (state.spawn.spawnedCount !== live + delivered + tossed) {
+  const cleared = state.stats.cleared
+  if (state.spawn.spawnedCount !== live + delivered + tossed + cleared) {
     add(
-      `conservation: spawned ${state.spawn.spawnedCount} ≠ live ${live} + delivered ${delivered} + tossed ${tossed}`,
+      `conservation: spawned ${state.spawn.spawnedCount} ≠ live ${live} + delivered ${delivered} + tossed ${tossed} + cleared ${cleared}`,
     )
   }
   const c = conservation(state)
@@ -903,7 +907,9 @@ export interface Conservation {
   offMap: number
   delivered: number
   tossed: number
-  /** spawned = waiting + vehicles + lane + held + shelf + offMap + delivered + tossed */
+  /** M8: overseas clearances (stats.cleared, malware included). */
+  cleared: number
+  /** spawned = waiting + vehicles + lane + held + shelf + offMap + delivered + tossed + cleared */
   ok: boolean
 }
 
@@ -929,9 +935,18 @@ export function conservation(state: SimState): Conservation {
   }
   const delivered = state.stats.deliveries
   const tossed = lane.quarantine.count
+  const cleared = state.stats.cleared
   const spawned = state.spawn.spawnedCount
   const sum =
-    waiting + vehicles + inLane + held + shelf + offMap + delivered + tossed
+    waiting +
+    vehicles +
+    inLane +
+    held +
+    shelf +
+    offMap +
+    delivered +
+    tossed +
+    cleared
   return {
     spawned,
     waiting,
@@ -942,12 +957,13 @@ export function conservation(state: SimState): Conservation {
     offMap,
     delivered,
     tossed,
+    cleared,
     ok: sum === spawned,
   }
 }
 
 export function formatConservation(c: Conservation): string {
-  return `spawned ${c.spawned} ${c.ok ? '=' : '≠'} waiting ${c.waiting} + vehicles ${c.vehicles} + lane ${c.lane} + held ${c.held} + shelf ${c.shelf} + off-map ${c.offMap} + delivered ${c.delivered} + tossed ${c.tossed}`
+  return `spawned ${c.spawned} ${c.ok ? '=' : '≠'} waiting ${c.waiting} + vehicles ${c.vehicles} + lane ${c.lane} + held ${c.held} + shelf ${c.shelf} + off-map ${c.offMap} + delivered ${c.delivered} + tossed ${c.tossed} + cleared ${c.cleared}`
 }
 
 /** Why a snapshot cannot be loaded (empty = loadable). */

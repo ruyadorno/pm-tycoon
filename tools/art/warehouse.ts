@@ -511,6 +511,27 @@ const LAMP_COLOURS: Readonly<Record<string, [string, string, string]>> = {
 }
 
 function lamp(suffix: string): Grid {
+  if (suffix === '_lock') {
+    // build 2 M8: a dock the player does not own (DockView's lamp row) —
+    // a dim grey padlock, never a lit colour
+    return tpl(
+      [
+        '..oooo..',
+        '.oGooGo.',
+        '.oo..oo.',
+        'oooooooo',
+        'oLMMMMMo',
+        'oMMooMMo',
+        'oMMoMMGo',
+        'oooooooo',
+      ],
+      8,
+      8,
+      0,
+      0,
+      { o: 'outline', G: 'grey2', L: 'grey4', M: 'grey3' },
+    )
+  }
   const [base, hi, lo] = LAMP_COLOURS[suffix] ?? ['grey1', 'grey2', 'grey0']
   const rows = [
     '..oooo..',
@@ -1105,7 +1126,278 @@ function desk(): Grid {
 }
 
 // ---------------------------------------------------------------------------
+// Tier 3 "Regional" (build 2 M8, B2 §4.1 / §6.6, design-m8-m9 §6.4): the
+// brick depot of wh_ext_t3 seen from inside — green epoxy floor with yellow
+// lane lines, red brick walls over a cream dado, orange-beamed pallet
+// racking, a wrapped pallet, a corkboard poster, a cream enamel sign.
+
+function floorT3(d: DrawCtx, lane: boolean): Grid {
+  const g = new Grid(T, T)
+  const r = rngOf(d, 'epoxy')
+  g.rect(0, 0, T, T, 'leaf1')
+  // 32-px slab joints (top row, left column), as tiers 1-2
+  g.hline(0, T - 1, 0, 'leaf0')
+  g.vline(0, 0, T - 1, 'leaf0')
+  // polished sheen: a few lit specks and a short scuff
+  specks(g, r, 4, 'leaf2', 3, 3, 26, 26)
+  specks(g, r, 2, 'leaf0', 3, 3, 26, 26)
+  const sx = r.int(6, 20)
+  const sy = r.int(6, 24)
+  g.hline(sx, sx + 3, sy, 'leaf2')
+  if (lane) {
+    g.rect(0, 0, 2, T, 'yellow2')
+    g.rect(30, 0, 2, T, 'yellow2')
+    g.vline(1, 0, T - 1, 'yellow1')
+    g.vline(31, 0, T - 1, 'yellow1')
+  }
+  return g
+}
+
+/** red brick courses (running bond, 8x4 bricks) inside a rect */
+function bricks(g: Grid, x0: number, y0: number, w: number, h: number): void {
+  for (let y = 0; y < h; y++) {
+    const course = Math.floor(y / 4)
+    const k = y % 4
+    for (let x = 0; x < w; x++) {
+      const bx = (x + (course % 2) * 4) % 8
+      let c = 'orange1'
+      if (k === 3 || bx === 7) c = 'orange0'
+      else if (k === 0 && bx < 6) c = 'orange2'
+      g.set(x0 + x, y0 + y, c)
+    }
+  }
+}
+
+/** side walls (west c0, east c10): brick between two concrete copings */
+function wallT3(): Grid {
+  const g = new Grid(T, T)
+  bricks(g, 4, 0, 24, T)
+  for (const x of [1, 28]) {
+    g.rect(x, 0, 3, T, 'grey3')
+    g.vline(x, 0, T - 1, 'grey4')
+    g.vline(x + 2, 0, T - 1, 'grey2')
+  }
+  g.vline(0, 0, T - 1, 'outline')
+  g.vline(T - 1, 0, T - 1, 'outline')
+  return g
+}
+
+/** north wall face: brick over a cream painted dado */
+function wallfaceT3(): Grid {
+  const g = new Grid(T, T)
+  g.hline(0, T - 1, 0, 'outline')
+  g.rect(0, 1, T, 2, 'grey3')
+  g.hline(0, T - 1, 1, 'grey4')
+  bricks(g, 0, 3, T, 20)
+  // dado: cream panel with a lit top edge and a dark kick plate
+  g.hline(0, T - 1, 23, 'outline')
+  g.rect(0, 24, T, 6, 'grey4')
+  g.hline(0, T - 1, 24, 'grey5')
+  g.hline(0, T - 1, 29, 'grey3')
+  g.hline(0, T - 1, 30, 'grey0')
+  g.hline(0, T - 1, 31, 'outline')
+  return g
+}
+
+/**
+ * Pallet racking 224x64 for the tier >= 3 shelf grid (design-m8-m9 §6.1:
+ * 20 x 5 cells @ 11 px from room (35, 388) = canvas (3, 4)): five wire-deck
+ * rows y 4 + 11r .. 14 + 11r (seam row 14 + 11r), cell dividers at x
+ * 13 + 11c, so every 10x10 mini parcel sits in its own pigeon-hole; blue
+ * uprights at both ends, the orange front beam under the last row.
+ */
+function shelfT3(): Grid {
+  const g = new Grid(224, 64)
+  oRect(g, 0, 0, 224, 63, 'grey4')
+  // back beam
+  g.rect(1, 1, 222, 2, 'orange2')
+  g.hline(1, 222, 1, 'orange3')
+  g.hline(1, 222, 3, 'outline')
+  for (let r = 0; r < 5; r++) {
+    const y = 4 + 11 * r
+    g.hline(1, 222, y, 'grey5')
+    g.hline(1, 222, y + 10, 'grey2')
+    // wire mesh: a mid line along the row
+    g.hline(3, 220, y + 5, 'grey3')
+    for (let c = 0; c <= 19; c++) {
+      const x = 13 + 11 * c
+      if (x > 221) break
+      g.vline(x, y + 1, y + 9, 'grey3')
+      g.set(x, y, 'grey4')
+    }
+  }
+  // uprights (left lit, right shaded)
+  g.rect(1, 4, 2, 55, 'blue1')
+  g.vline(1, 4, 58, 'blue2')
+  g.rect(222, 4, 1, 55, 'blue0')
+  // the orange front beam with its clips
+  g.hline(1, 222, 59, 'orange3')
+  g.hline(1, 222, 60, 'orange2')
+  g.hline(1, 222, 61, 'orange1')
+  for (const x of [2, 110, 219]) g.rect(x, 59, 3, 3, 'blue1')
+  g.hline(0, 223, 62, 'outline')
+  g.hline(1, 223, 63, 'outline')
+  return g
+}
+
+/**
+ * Roller pad 24x56 of docks 2-3 (design-m8-m9 §6.1: conv2 / conv3 east of
+ * their door at room (32, door.y)). Flow runs north (to conv1's line), so
+ * the rollers run across; six mini-parcel spots centred at (7|18, 11|27|43).
+ */
+function dockPad(): Grid {
+  const g = new Grid(24, 56)
+  oRect(g, 0, 0, 24, 56, 'grey2')
+  // hazard ends
+  hazard(g, 1, 1, 22, 3)
+  hazard(g, 1, 52, 22, 3)
+  g.hline(1, 22, 4, 'outline')
+  g.hline(1, 22, 51, 'outline')
+  // rollers between the rails: lit top, body, shadow line
+  const ROLL = ['grey4', 'grey3', 'grey3', 'grey1']
+  for (let y = 5; y <= 50; y++) {
+    g.hline(3, 20, y, ROLL[(y - 5) % 4] as string)
+  }
+  // side rails with the roller axle ends
+  g.rect(1, 5, 2, 46, 'grey3')
+  g.vline(1, 5, 50, 'grey4')
+  g.rect(21, 5, 2, 46, 'grey1')
+  for (let y = 6; y <= 50; y += 4) {
+    g.set(2, y, 'grey0')
+    g.set(21, y, 'grey0')
+  }
+  return g
+}
+
+/** a 3/4 pallet: slats on the top edge, blocks on the front face */
+function pallet(g: Grid, x: number, y: number, w: number): void {
+  oRect(g, x, y, w, 7, 'brown2')
+  g.hline(x + 1, x + w - 2, y + 1, 'brown3')
+  g.rect(x + 1, y + 3, w - 2, 3, 'brown1')
+  for (let bx = x + 2; bx < x + w - 3; bx += Math.floor((w - 5) / 2)) {
+    g.rect(bx, y + 3, 3, 3, 'brown0')
+  }
+  g.hline(x + 1, x + w - 1, y + 7, 'outline')
+}
+
+function propsT3(): Grid {
+  const g = new Grid(48, 64)
+  // the wrapped load: back boxes, front boxes, on a pallet
+  crate(g, 4, 3, 20, 16, CARDBOARD)
+  crate(g, 22, 4, 21, 15, CARD_LIGHT)
+  crate(g, 3, 17, 22, 20, CARD_LIGHT)
+  crate(g, 23, 18, 21, 19, CARDBOARD)
+  pallet(g, 2, 37, 44)
+  // stretch film: lit diagonal glints and a pale band round the load
+  for (const [x0, y0] of [
+    [6, 8],
+    [27, 22],
+    [9, 26],
+    [33, 7],
+  ] as const) {
+    for (let i = 0; i < 4; i++) g.set(x0 + i, y0 + i, 'grey5')
+  }
+  g.hline(4, 43, 29, 'blue2')
+  g.hline(4, 43, 30, 'grey5')
+  // the pallet jack in front: forks under the pallet, body, handle
+  g.rect(8, 45, 26, 3, 'grey3')
+  g.hline(8, 33, 45, 'grey4')
+  g.hline(8, 33, 48, 'outline')
+  oRect(g, 30, 44, 12, 10, 'orange2')
+  g.hline(31, 40, 45, 'orange3')
+  g.hline(31, 40, 52, 'orange1')
+  g.rect(33, 49, 6, 2, 'grey1')
+  // handle (tilted back toward the viewer) and its grip
+  g.vline(36, 54, 60, 'orange1')
+  g.vline(37, 54, 60, 'orange2')
+  oRect(g, 32, 59, 10, 3, 'grey1')
+  // wheels
+  g.rect(31, 54, 3, 2, 'outline')
+  g.rect(39, 54, 3, 2, 'outline')
+  g.hline(30, 43, 63, 'outline')
+  return g
+}
+
+/** corkboard with the L3 battery-strain WANTED sheet and a sticky note */
+function posterT3(): Grid {
+  const g = new Grid(32, 32)
+  oRect(g, 1, 1, 30, 30, 'brown0')
+  g.rect(2, 2, 28, 28, 'brown2')
+  g.hline(2, 29, 2, 'brown1')
+  g.vline(2, 2, 29, 'brown1')
+  for (const [x, y] of [
+    [5, 26],
+    [27, 6],
+    [4, 13],
+    [26, 18],
+    [12, 28],
+    [21, 27],
+  ] as const) {
+    g.set(x, y, 'brown3')
+  }
+  // the WANTED sheet
+  oRect(g, 5, 4, 19, 23, 'grey5')
+  g.rect(6, 5, 17, 4, 'red1')
+  g.hline(6, 22, 5, 'red2')
+  for (const [x0, x1] of [
+    [8, 11],
+    [13, 16],
+    [18, 21],
+  ] as const) {
+    g.hline(x0, x1, 7, 'grey5')
+  }
+  // mugshot: the dark parcel with an orange battery and its yellow bolt
+  oRect(g, 8, 10, 13, 11, 'grey1')
+  g.rect(9, 11, 11, 3, 'grey2')
+  g.rect(12, 13, 5, 7, 'outline')
+  g.rect(13, 14, 3, 5, 'orange2')
+  g.hline(13, 15, 14, 'orange3')
+  g.rect(13, 12, 3, 1, 'grey3')
+  g.set(14, 15, 'yellow3')
+  g.set(13, 16, 'yellow3')
+  g.set(14, 16, 'yellow3')
+  g.set(14, 17, 'yellow3')
+  // printed lines
+  g.hline(8, 20, 22, 'grey3')
+  g.hline(8, 17, 24, 'grey3')
+  // pins
+  g.set(6, 4, 'blue1')
+  g.set(22, 4, 'blue1')
+  // a yellow sticky note over the corner
+  oRect(g, 20, 20, 9, 9, 'yellow3')
+  g.hline(21, 27, 21, 'yellow2')
+  g.hline(22, 26, 23, 'yellow1')
+  g.hline(22, 25, 25, 'yellow1')
+  g.set(24, 20, 'red1')
+  g.hline(1, 30, 31, 'outline')
+  return g
+}
+
+// ---------------------------------------------------------------------------
 // Signs 200x24
+
+/** tier 3: cream enamel face (dark text, as t2), green band with rivets */
+function signT3(): Grid {
+  const g = new Grid(200, 24)
+  oRect(g, 0, 0, 200, 24, 'leaf1')
+  g.hline(1, 198, 1, 'leaf2')
+  g.vline(1, 1, 22, 'leaf2')
+  g.hline(1, 198, 22, 'leaf0')
+  g.vline(198, 1, 22, 'leaf0')
+  // the cream face inside a 1-px outline
+  oRect(g, 3, 3, 194, 18, 'grey5')
+  g.hline(4, 195, 19, 'grey4')
+  // rivets in the band
+  for (const x of [5, 194]) {
+    g.set(x, 1, 'grey4')
+    g.set(x, 22, 'grey3')
+  }
+  for (const x of [50, 100, 150]) {
+    g.set(x, 1, 'grey4')
+    g.set(x, 22, 'grey3')
+  }
+  return g
+}
 
 function signT1(): Grid {
   const g = new Grid(200, 24)
@@ -1707,6 +1999,16 @@ reg('wall_t1', (_s, _i, d) => wallT1(d))
 reg('wall_t2', () => wallT2())
 reg('wallface_t1', (_s, _i, d) => wallfaceT1(d))
 reg('wallface_t2', () => wallfaceT2())
+// build 2 M8: tier 3 (design-m8-m9 §6.4)
+reg('floor_t3', (_s, _i, d) => floorT3(d, false))
+reg('floor_t3_lane', (_s, _i, d) => floorT3(d, true))
+reg('wall_t3', () => wallT3())
+reg('wallface_t3', () => wallfaceT3())
+reg('shelf_t3', () => shelfT3())
+reg('sign_t3', () => signT3())
+reg('props_t3', () => propsT3())
+reg('wanted_poster_t3', () => posterT3())
+reg('dock_pad', () => dockPad())
 reg('belt_h', (_s, i) => beltH(i))
 reg('belt_v', (_s, i) => beltV(i))
 reg('belt_corner', (_s, i) => beltCorner(i))

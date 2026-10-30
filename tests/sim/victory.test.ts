@@ -16,6 +16,7 @@ import { malwareShare, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   acceptOffer,
+  capConfig,
   collect,
   dataFixture,
   eventLog,
@@ -29,7 +30,7 @@ import {
 } from './helpers.ts'
 
 const DAY = TICKS_PER_DAY
-const PM5 = { economy: { playtestMaxLevel: 5 } }
+const PM5 = capConfig(5)
 const u = dataFixture().levels.find((l) => l.ultimateQuest)!.ultimateQuest!
 
 let next = 0
@@ -351,7 +352,8 @@ describe('endless after Victory: malware escalation (B2 §3.4; design §2.2, Q16
   })
 
   it('with the playtest cap below the last level the cap rule still escalates (M7 data); at the last level, reaching L5 alone does not', () => {
-    const capped = noOffers(quietSim(7))
+    // The playtest-1 cap (2) pins the cap rule; M8 ships cap 3.
+    const capped = noOffers(quietSim(7, { economy: { playtestMaxLevel: 2 } }))
     const m = capped.data.parcels.malware
     capped.state.economy.lifetimeEarned = capped.data.levels[1]!.threshold
     runTicks(capped, 1)

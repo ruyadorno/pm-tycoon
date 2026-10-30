@@ -43,6 +43,10 @@ const FIXTURE_NAMES = [
   'level-up',
   'payroll-short',
   'l2-lane',
+  // M8 (tools/fixtures/m8.ts): L3, two docks, a clearance in flight.
+  'level-up-3',
+  'l3-docks',
+  'overseas-malware',
 ] as const
 
 /** Count DOM listeners on window / document / the canvas, by type. */

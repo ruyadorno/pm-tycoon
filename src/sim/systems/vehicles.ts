@@ -22,7 +22,7 @@ import { driverNumbers, driverOf } from './people.ts'
 import { mapIndex, sameTile, unitsOf, vehicleTypeDef } from '../map.ts'
 import type { Sim } from '../sim.ts'
 import type { Heading, TileXY, Vehicle } from '../types.ts'
-import { TICKS_PER_S } from '../types.ts'
+import { dockNumber, TICKS_PER_S } from '../types.ts'
 
 /** Edge progress units per tile. */
 export const MILLI = 1000
@@ -253,10 +253,15 @@ export function queueTile(sim: Sim, i: number): TileXY {
   return { x: t.x, y: t.y }
 }
 
-/** The bay tile of a loading dock (lot.docks in lane.docks order). */
+/**
+ * The bay tile of a loading dock by its NUMBER (M8): `dockN` drives onto
+ * lot.docks[N − 1], whichever docks are owned (dock 3 may come before
+ * dock 2).
+ */
 export function dockTile(sim: Sim, dockId: string): TileXY {
-  const i = sim.state.lane.docks.findIndex((d) => d.id === dockId)
-  const t = mapIndex(sim.data).lot.docks[Math.max(0, i)] as TileXY
+  const bays = mapIndex(sim.data).lot.docks
+  const n = dockNumber(dockId)
+  const t = (bays[Number.isInteger(n) ? n - 1 : 0] ?? bays[0]) as TileXY
   return { x: t.x, y: t.y }
 }
 

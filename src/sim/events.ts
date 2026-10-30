@@ -129,7 +129,17 @@ export interface SimEventPayloads {
     onTime: boolean
     malware: boolean
   }
-  'parcel:handedOff': { id: number; hub: DistrictId; lockedValue: number }
+  /**
+   * M8 (§5.6, systems/hubs.ts): a delivering vehicle handed the parcel off at
+   * an overseas pier / terminal (`buildingId` = p.dest): its value is locked
+   * at `lockedValue` and the clearance timer runs.
+   */
+  'parcel:handedOff': {
+    id: number
+    hub: DistrictId
+    lockedValue: number
+    buildingId: BuildingId
+  }
   /**
    * An overseas clearance (§5.6; emitted from M8's systems/hubs.ts): `hub` =
    * the destination hub, `buildingId` = the pier / terminal (p.dest),
@@ -158,6 +168,14 @@ export interface SimEventPayloads {
   'vehicle:inactive': VehicleRef
   'vehicle:sold': VehicleRef
   'dock:queueLength': { dockId: string; n: number }
+  /** M8: loading dock `index` (economy.docks) was bought: nodes dock<index> + conv<index>. */
+  'dock:bought': { index: number; dockId: string }
+  /**
+   * M8: `count` parcels of this hub cleared this tick (one event per hub per
+   * tick, districts.json order) — the renderer sails the vessel unless it is
+   * already away (a batch = the clearances during one trip).
+   */
+  'hub:departure': { hub: DistrictId; count: number }
   /** Once per in-game minute (day boundary). */
   'dock:occupancy': { dockId: string; pct: number }
   // lane / money / workers
@@ -334,6 +352,8 @@ export const SIM_EVENT_NAMES = [
   'vehicle:inactive',
   'vehicle:sold',
   'dock:queueLength',
+  'dock:bought',
+  'hub:departure',
   'dock:occupancy',
   'lane:stalled',
   'lane:resumed',

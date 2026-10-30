@@ -1,8 +1,9 @@
 // city-view.md §5.1 (district half-sheet rows 1-7), spec §9.2 (trend,
 // loud districts), §9.4 (70 / 40 bands), §3.3 + §4.1 (Industrial trucks
 // only), §3.5 + §8 (unlock line from levels.json); M7 (spec-build2 §3.1,
-// design-m7 §6.5) the quest row. Pure helpers only; Phaser is stubbed
-// because DistrictPanel imports the Button kit.
+// design-m7 §6.5) the quest row; M8 (design-m8-m9 §6.3) the overseas hub
+// rows. Pure helpers only; Phaser is stubbed because DistrictPanel imports
+// the Button kit.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -20,8 +21,18 @@ vi.mock('phaser', () => {
 })
 
 const dp = await import('../../src/ui/DistrictPanel.ts')
-const { dataFixture, makeSim, noOffers, offerQuest, acceptOffer } =
-  await import('../sim/helpers.ts')
+const {
+  dataFixture,
+  makeSim,
+  noOffers,
+  offerQuest,
+  acceptOffer,
+  fund,
+  injectParcel,
+  quietSim,
+  runTicks,
+} = await import('../sim/helpers.ts')
+const { handOff } = await import('../../src/sim/systems/hubs.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { questRowText } = await import('../../src/ui/questText.ts')
 
@@ -79,9 +90,11 @@ describe('District panel (city-view §5.1)', () => {
         // district can be a quest's target).
         const open = dp.districtContentBottom({
           locked: false,
+          // M8: a hub has its own rows (a quest may target it too).
+          hub: d.kind === 'overseas',
           satisfaction: d.kind === 'district',
           moodNote: d.kind === 'district',
-          quest: d.kind === 'district',
+          quest: true,
           favouredOrRule: !!(
             dp.favouredLine(d, data) || dp.vehicleRuleLine(d, data)
           ),
@@ -160,8 +173,10 @@ describe('District panel (city-view §5.1)', () => {
     expect(dp.lockedLine(district('industrial'), data)).toBe(
       'Unlocks at Lv 2 — $2,000 lifetime earned',
     )
+    // M8: the L3 threshold is a §7.6 tuning lever — read it from levels.json.
+    const l3 = data.levels.find((l) => l.level === 3)!
     expect(dp.lockedLine(district('docks'), data)).toBe(
-      'Unlocks at Lv 3 — $5,000 lifetime earned',
+      `Unlocks at Lv 3 — $${l3.threshold.toLocaleString('en-US')} lifetime earned`,
     )
   })
 
@@ -330,5 +345,94 @@ describe('M7 (design-m7 §6.5): the quest row', () => {
 
   it('its tap band is 44 px, centred on the 28-px row, full width', () => {
     expect(dp.questTapBand(100, 360)).toEqual({ x: 0, y: 92, w: 360, h: 44 })
+  })
+})
+
+/** A quiet L3 sim (debugForceLevel), no spawns, funded. */
+function atL3() {
+  const sim = quietSim(1)
+  expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
+  for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+  return fund(sim)
+}
+
+describe('M8 (design-m8-m9 §6.3): the overseas hub variant', () => {
+  const docks = district('docks')
+  if (docks.kind !== 'overseas') throw new Error('docks is not a hub')
+  const handOffAt = (sim: ReturnType<typeof atL3>, dest: string) => {
+    const p = injectParcel(sim, 'hr_towers_a', dest)
+    p.mult = docks.valueMult
+    const b = sim.state.buildings[p.origin]!
+    b.waiting.splice(b.waiting.indexOf(p.id), 1)
+    p.trace.push({ tick: p.spawnedTick, what: 'spawned', ref: p.origin })
+    handOff(sim, null, p)
+    return p
+  }
+
+  it('rows: header, pay, clearance, earned, sizes (no satisfaction, waiting or homed rows); a quest adds one', () => {
+    const hub = dp.districtContentBottom({ locked: false, hub: true })
+    expect(hub).toBe(16 + 28 + 28 + 3 * 28)
+    expect(
+      dp.districtContentBottom({ locked: false, hub: true, quest: true }),
+    ).toBe(hub + 28)
+    // The hub flag wins over the district rows (a hub never has them).
+    expect(
+      dp.districtContentBottom({
+        locked: false,
+        hub: true,
+        satisfaction: true,
+        waiting: true,
+      }),
+    ).toBe(hub)
+    for (const H of [604, 659])
+      expect(
+        dp.districtFitHeight(hub + 28, { H, safeTop: 0, safeBottom: 34 }),
+      ).toBeLessThanOrEqual(dp.districtSheetHeight(H))
+  })
+
+  it('the Docks from vs.hub(): "Overseas hub · pays ×1.5", "Clearance 45 s · 2 clearing · next 0:32", "Sizes: S M L XL"', () => {
+    const sim = atL3()
+    const vs = createViewSim(sim)
+    const empty = dp.districtHubRows(vs.hub('docks'), docks, vs.tick)
+    expect(empty).toEqual({
+      pay: 'Overseas hub · pays ×1.5',
+      clearance: `Clearance ${docks.clearanceS} s · nothing clearing`,
+      sizes: 'Sizes: S M L XL',
+    })
+    handOffAt(sim, 'dk_pier_2')
+    runTicks(sim, 130)
+    handOffAt(sim, 'dk_pier_1')
+    const live = createViewSim(sim)
+    expect(live.districtStats('docks')?.kind).toBe('overseas')
+    expect(dp.districtHubRows(live.hub('docks'), docks, live.tick)).toEqual({
+      pay: 'Overseas hub · pays ×1.5',
+      clearance: `Clearance ${docks.clearanceS} s · 2 clearing · next 0:32`,
+      sizes: 'Sizes: S M L XL',
+    })
+  })
+
+  it('the earned row is the clearances paid (District.earned)', () => {
+    const sim = atL3()
+    const p = handOffAt(sim, 'dk_pier_2')
+    const locked = p.lockedValue!
+    expect(locked).toBeGreaterThan(0)
+    runTicks(sim, docks.clearanceS * 10)
+    const stats = createViewSim(sim).districtStats('docks')!
+    expect(stats.earned).toBe(locked)
+    expect(dp.earnedLine(stats.earned)).toBe(
+      `Earned here: $${locked.toLocaleString('en-US')}`,
+    )
+    expect(createViewSim(sim).hub('docks')?.clearing).toEqual([])
+  })
+
+  it('a hub with no map.hubs row yet (the Airport before M9) reads its districts.json row, nothing clearing', () => {
+    const airport = district('airport')
+    if (airport.kind !== 'overseas') throw new Error('airport is not a hub')
+    expect(createViewSim(makeSim(1)).hub('airport')).toBeNull()
+    expect(dp.districtHubRows(null, airport, 0)).toEqual({
+      pay: 'Overseas hub · pays ×2',
+      clearance: `Clearance ${airport.clearanceS} s · nothing clearing`,
+      sizes: 'Sizes: S M',
+    })
   })
 })

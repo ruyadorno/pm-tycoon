@@ -5,7 +5,7 @@
 //
 //   top bar      money (300 ms count tween, red flash on a negative delta,
 //                floats), 5 life slots, mood face; level label + bar
-//                (`$1,240 / $2,000`, `· Lv 3 coming soon` at the cap), shield
+//                (`$1,240 / $2,000`, `· Lv N coming soon` at the cap), shield
 //                (2 Hz poll of laneStats, ShieldPopover on tap)
 //   ticker       Ticker (Day cell + scrolling news, PAUSED blink)
 //   toast lane   kit Toast (also pm:toast) + pm:tooltip bubbles
@@ -33,9 +33,10 @@
 //
 // M3 (city-view §4.1, §4.3-§4.4, §8, §9.6-§9.7; plan.md §12.6 task 7): the
 // level bar refills on level:up (a short full-then-grow sweep) and reads
-// `$3,410 / $5,000 · Lv 3 coming soon` at the playtest cap; the Newspaper
-// (level / region papers once the level-up moment's stamp has played —
-// STAMP_MS after level:up, §9.6 step 3 — the walkout paper, the
+// `$3,410 / $3,700 · Lv 3 coming soon` at a cap of 2 (`Lv 4 coming soon` at
+// M8's cap of 3); the Newspaper (level / region papers once the level-up
+// moment's stamp has played — STAMP_MS after level:up, §9.6 step 3 — the
+// walkout paper, the
 // incident paper once the lost-life card closes) waits while a modal card,
 // sheet or the Paused card is up; ticker lines the HUD writes (level,
 // region, strain, payroll, worker, mood, daily, incident, defused, stall)
@@ -77,6 +78,16 @@
 // tinted by the Ticker). The questDone SFX is the audio director's. Event
 // handlers mark the chip dirty and it re-reads quests() next frame (the
 // ViewSim cache follows sim.revision, bumped after the tick's events).
+//
+// M8 overseas hubs (design-m8-m9 §6.3): the district panel's hub rows
+// (`Clearance 45 s · 3 clearing · next 0:32`) re-read on the frame after a
+// parcel:handedOff / parcel:cleared (districtDirty, like every district
+// panel refresh event), a clearance's lost life reads `Handed off at
+// Prefetch Pier 2 14:02` · `Cleared 14:47 — the ship has sailed` on the
+// LostLifeCard, the daily line adds the day's paid clearances, dock:bought
+// toasts `Loading dock 2 open — two vehicles unload at once`, and at the cap
+// 3 the level bar reads `· Lv 4 coming soon` (data-driven,
+// hudKit.cappedBelowNext).
 //
 // M4 (plan.md §12.7 tasks 1-2, §12.9): the PlaytestRecorder
 // (src/metrics/playtest.ts) follows the sim from create (resumed from
@@ -148,6 +159,7 @@ import { Button } from '../ui/Button.ts'
 import { Dialog } from '../ui/Dialog.ts'
 import { DistrictPanel } from '../ui/DistrictPanel.ts'
 import { FollowStrip } from '../ui/FollowStrip.ts'
+import { dockBoughtToast } from '../ui/hubText.ts'
 import {
   addTapZone,
   chipEntries,
@@ -487,6 +499,8 @@ export class HudScene extends Phaser.Scene {
   private plusPending = false
   /** Re-read the Garage badge next frame (after the event's revision bump). */
   private garageDirty = false
+  /** Re-read the open district panel next frame (same reason: vs.hubs()). */
+  private districtDirty = false
   /** Employee id → name (worker:fired arrives after the sim dropped them). */
   private staffNames = new Map<number, string>()
   private seenTypes = new Set<VehicleType>()
@@ -502,6 +516,8 @@ export class HudScene extends Phaser.Scene {
   private autoPaused = false
   private rotatePaused = false
   private dayDelivered = 0
+  /** M8: paid overseas clearances today (the daily line). */
+  private dayCleared = 0
   private dayEarned = 0
   private dayPayroll = 0
   /** Step 3 is due but waits for an on-screen building with waiting parcels. */
@@ -632,6 +648,7 @@ export class HudScene extends Phaser.Scene {
     this.autoPaused = false
     this.rotatePaused = false
     this.dayDelivered = 0
+    this.dayCleared = 0
     this.dayEarned = 0
     this.dayPayroll = 0
     this.step3Armed = false
@@ -669,6 +686,7 @@ export class HudScene extends Phaser.Scene {
     this.pauseHinted = false
     this.newGameDialog = null
     this.garageDirty = false
+    this.districtDirty = false
     this.staffNames = new Map()
     this.questDirty = false
     this.chipShown = false
@@ -844,6 +862,10 @@ export class HudScene extends Phaser.Scene {
       this.applyGarageBadge()
     }
     if (this.questDirty) this.refreshQuest()
+    if (this.districtDirty) {
+      this.districtDirty = false
+      if (this.district?.isOpen()) this.district.refresh()
+    }
     if (this.questAutoOpen) this.tryAutoOpenQuest()
     if (time >= this.pollAt) {
       this.pollAt = time + POLL_MS
@@ -1757,10 +1779,17 @@ export class HudScene extends Phaser.Scene {
       const day = this.dailyDay
       this.dailyDay = null
       this.queueLine(
-        dailyLine(day, this.dayDelivered, this.dayEarned, this.dayPayroll),
+        dailyLine(
+          day,
+          this.dayDelivered,
+          this.dayEarned,
+          this.dayPayroll,
+          this.dayCleared,
+        ),
         'daily',
       )
       this.dayDelivered = 0
+      this.dayCleared = 0
       this.dayEarned = 0
       this.dayPayroll = 0
     }
@@ -1914,6 +1943,16 @@ export class HudScene extends Phaser.Scene {
     // Step 3 after steps 1-2: the papers wait for the city's stamp to end.
     this.paperHoldMs = reducedMotion() ? 0 : STAMP_MS
     this.queuePaper({ kind: 'level', headline: row.ticker, level: p.level })
+  }
+
+  /**
+   * dock:bought (M8, design-m8-m9 §6.3): `Loading dock 2 open — two vehicles
+   * unload at once` (the count from the lane after the buy: dock 3 before
+   * dock 2 still reads two).
+   */
+  private onDockBought(p: SimEventPayloads['dock:bought']): void {
+    const owned = getSim(this).state.lane.docks.length
+    this.toast.show(dockBoughtToast(p.index, owned))
   }
 
   /** region:unlocked: the chip with its NEW badge, the region line and paper. */
@@ -2939,9 +2978,15 @@ export class HudScene extends Phaser.Scene {
     return { ...L.toast, y: room.roomY + 4 }
   }
 
-  /** Re-read the open district panel (city-view §5.1 refresh events). */
+  /**
+   * Re-read the open district panel (city-view §5.1 refresh events) on the
+   * next frame: the callers are sim event handlers, and the ViewSim caches
+   * (hubs(), vehicles) follow sim.revision, bumped only after the tick's
+   * events — a read inside the tick is stale for every later event of it
+   * (M8 review: one hand-off short per same-tick pair).
+   */
   private refreshDistrict(): void {
-    if (this.district?.isOpen()) this.district.refresh()
+    if (this.district?.isOpen()) this.districtDirty = true
   }
 
   private openDistrict(id: string): void {
@@ -3221,6 +3266,14 @@ export class HudScene extends Phaser.Scene {
         'parcel:delivered': () => {
           this.dayDelivered++
         },
+        // M8 overseas hubs: the hub panel's clearing row (and the daily
+        // line's paid clearances); the city draws the ring / ship / popups.
+        'parcel:handedOff': () => this.refreshDistrict(),
+        'parcel:cleared': (p) => {
+          if (!p.malware) this.dayCleared++
+          this.refreshDistrict()
+        },
+        'dock:bought': (p) => this.onDockBought(p),
         'parcel:pickedUp': (p) => {
           this.onPickedUp(p)
           this.refreshDistrict()

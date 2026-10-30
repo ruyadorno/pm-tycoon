@@ -5,8 +5,12 @@
 // fit rules for long paths. M6 (spec-build2 §2.3, design-m6 §6.3 / D14): the
 // desk line names the inspector, the sorter's tag is shown, and the better
 // of the machine and the 5-eye inspector lines is the counter (machine first
-// on ties) — also end to end from a real Sim's life:lost. Phaser is stubbed
-// (the module imports the kit).
+// on ties) — also end to end from a real Sim's life:lost. M8 (design-m8-m9
+// §6.3, §7 M8 9): an overseas route ends `Handed off at Prefetch Pier 2
+// 14:02` · `Cleared 14:47 — the ship has sailed` (Airport: `— the plane has
+// left`), a 12-line 6-slot overseas path fits 360×604, elision keeps both
+// overseas lines, and a real clearance's life:lost reads the same. Phaser is
+// stubbed (the module imports the kit).
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -605,5 +609,217 @@ describe('M6 end to end: a real Sim life:lost through the card model', () => {
       `A 5-eye inspector at this desk would make it ${card.ratePct(l.inspectorRate!)}%`,
     ])
     expect(m.highlight).toBeNull()
+  })
+})
+
+// ---- M8: overseas routes (spec-core §5.6, design-m8-m9 §6.3, §7 M8 9) --------
+
+/** m5x7 advance widths (src/assets/m5x7.xml), as the card's BitmapText measures. */
+async function m5x7Width(): Promise<(s: string) => number> {
+  const { readFileSync } = await import('node:fs')
+  const xml = readFileSync(
+    new URL('../../src/assets/m5x7.xml', import.meta.url),
+    'utf8',
+  )
+  const adv = new Map<number, number>()
+  for (const m of xml.matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+    adv.set(Number(m[1]), Number(m[2]))
+  return (t) =>
+    [...t].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
+}
+
+/** Ticks of the sim clock mm:ss. */
+const at = (m: number, sec: number): number => s(m * 60 + sec)
+
+/** The sim's stored lines of a 6-slot lane ending overseas at Prefetch Pier 2. */
+function overseasPath(hub: 'docks' | 'airport' = 'docks'): TraceEntry[] {
+  const pier = hub === 'docks' ? 'dk_pier_2' : 'ap_terminal'
+  const slots: TraceEntry[] = [
+    {
+      tick: at(13, 20),
+      what: 'missed',
+      ref: 'slot1',
+      text: 'Slot 1 desk — Audrey: missed (85% vs battery)',
+    },
+    {
+      tick: at(13, 22),
+      what: 'missed',
+      ref: 'slot2',
+      text: 'Slot 2 Metal detector: missed (20% vs battery)',
+    },
+    {
+      tick: at(13, 24),
+      what: 'missed',
+      ref: 'slot3',
+      text: 'Slot 3 Shaky shaker: missed (20% vs battery)',
+    },
+    { tick: at(13, 25), what: 'empty', ref: 'slot4', text: 'Slot 4: empty' },
+    {
+      tick: at(13, 27),
+      what: 'missed',
+      ref: 'slot5',
+      text: 'Slot 5 X-ray: missed (60% vs battery)',
+    },
+    { tick: at(13, 28), what: 'empty', ref: 'slot6', text: 'Slot 6: empty' },
+  ]
+  return [
+    {
+      tick: at(12, 40),
+      what: 'spawned',
+      ref: 'in_lodash_smelting',
+      text: 'Spawned at Lodash Smelting Works',
+    },
+    {
+      tick: at(12, 58),
+      what: 'pickedUp',
+      ref: '1',
+      text: 'Picked up by Truck 1',
+    },
+    { tick: at(13, 15), what: 'unloaded', ref: 'dock2', text: 'Unloaded' },
+    ...slots,
+    { tick: at(13, 30), what: 'shelved', ref: 'shelf', text: 'Shelved' },
+    { tick: at(13, 40), what: 'loaded', ref: '1', text: 'Loaded onto Truck 1' },
+    {
+      tick: at(14, 2),
+      what: 'handedOff',
+      ref: pier,
+      text: `Handed off at ${bname(pier)}`,
+    },
+    {
+      tick: at(14, 47),
+      what: 'customsCleared',
+      ref: hub,
+      text: 'Cleared',
+    },
+  ]
+}
+
+describe('M8 (design-m8-m9 §6.3): the overseas route lines', () => {
+  it('ends "Handed off at Prefetch Pier 2 14:02" · "Cleared 14:47 — the ship has sailed"', () => {
+    const lines = card.routeText(
+      card.routeItems(overseasPath(), 'battery', deps()),
+      'battery',
+    )
+    expect(lines.slice(-2)).toEqual([
+      'Handed off at Prefetch Pier 2 14:02',
+      'Cleared 14:47 — the ship has sailed',
+    ])
+    expect(lines[0]).toBe('Spawned at Lodash Smelting Works 12:40')
+    // The player's Hold Bay Clear keeps its own wording.
+    expect(lines.some((l) => l.startsWith('Cleared by you'))).toBe(false)
+  })
+
+  it('reads the same without the stored texts (built from the trace refs)', () => {
+    const bare = overseasPath().map(({ text: _t, ...e }) => e)
+    const lines = card.routeText(
+      card.routeItems(bare, 'battery', deps()),
+      'battery',
+    )
+    expect(lines.slice(-2)).toEqual([
+      'Handed off at Prefetch Pier 2 14:02',
+      'Cleared 14:47 — the ship has sailed',
+    ])
+  })
+
+  it('the Airport: "— the plane has left" (design R11)', () => {
+    const lines = card.routeText(
+      card.routeItems(overseasPath('airport'), 'battery', deps()),
+      'battery',
+    )
+    expect(lines.slice(-2)).toEqual([
+      'Handed off at Prefetch International Terminal 14:02',
+      'Cleared 14:47 — the plane has left',
+    ])
+  })
+
+  it('the title stays MALWARE DELIVERED (design R12)', () => {
+    expect(card.LOST_LIFE_TITLE).toBe('MALWARE DELIVERED')
+  })
+})
+
+describe('M8: a 6-slot overseas path fits the card', () => {
+  const items = card.routeItems(overseasPath(), 'battery', deps())
+  // The worst tail: the rate line + the dice line + the suggestion.
+  const tailH = card.tailTextsHeight({
+    counter: [
+      'This one got through on the 17%',
+      'Another X-ray would make it 97%',
+    ],
+  })
+
+  it('12 lines (spawn, pickup, unload, 6 slots, shelved, handed off, cleared) at 18 px on 360×604 and 393×659', () => {
+    expect(card.routeText(items, 'battery')).toHaveLength(12)
+    for (const H of [604, 659]) {
+      const fit = card.fitRoute(items, 'battery', card.routeBudget(H, tailH))
+      expect(fit.lines, `H ${H}`).toHaveLength(12)
+      expect(fit.lines, `H ${H}`).not.toContain('…')
+      expect(fit.pitch, `H ${H}`).toBe(18)
+    }
+  })
+
+  it('every line fits the 360-px card unwrapped (inner width 312 in m5x7)', async () => {
+    const width = await m5x7Width()
+    const inner = 360 - 24 - 2 * 12
+    for (const hub of ['docks', 'airport'] as const) {
+      const lines = card.routeText(
+        card.routeItems(overseasPath(hub), 'battery', deps()),
+        'battery',
+      )
+      for (const l of lines) expect(width(l), l).toBeLessThanOrEqual(inner)
+    }
+  })
+
+  it("routeBudget is the card's own arithmetic: 230 px at 604 with three tail lines", () => {
+    // min(604 − 80, 440) − (title 18 + parcel 36 + 8) − (6 + 54 + 6 + 16 + 10 + 44 + 12)
+    expect(card.routeBudget(604, tailH)).toBe(440 - 62 - 148)
+    expect(card.routeBudget(200, tailH)).toBe(42)
+  })
+
+  it('as a last resort the middle is elided, the hand-off and clearance kept at the end', () => {
+    const fit = card.fitRoute(items, 'battery', 6 * 14)
+    expect(fit.lines).toHaveLength(6)
+    expect(fit.lines.slice(-3)).toEqual([
+      '…',
+      'Handed off at Prefetch Pier 2 14:02',
+      'Cleared 14:47 — the ship has sailed',
+    ])
+    expect(fit.lines[0]).toBe('Spawned at Lodash Smelting Works 12:40')
+    // A local route still keeps only its delivery line.
+    const local = card.routeItems(examplePath, 'rattle', deps())
+    const short = card.fitRoute(local, 'rattle', 4 * 14)
+    expect(short.lines.slice(-2)).toEqual([
+      '…',
+      'Delivered to Node Heights Towers A 12:40',
+    ])
+  })
+})
+
+describe('M8 end to end: a real clearance life:lost through the card model', () => {
+  it('debug overseas malware at the Docks: the card ends with the hand-off and "the ship has sailed"', () => {
+    const sim = helpers.quietSim(5)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
+    for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
+    helpers.fund(sim)
+    const lost = helpers.collect(sim, 'life:lost')
+    expect(
+      sim.dispatch({ kind: 'debugOverseasMalware', hub: 'docks' }).ok,
+    ).toBe(true)
+    const handOffTick = sim.state.tick
+    const docks = data.districts.find((d) => d.id === 'docks')!
+    if (docks.kind !== 'overseas') throw new Error('docks is not a hub')
+    helpers.runTicks(sim, docks.clearanceS * 10)
+    expect(lost).toHaveLength(1)
+    const l = lost[0]!
+    expect(l.report.viaClearance).toBe(true)
+    const m = model(sim, l)
+    const lines = card.routeText(m.route, m.strain)
+    const pier = data.buildings.find(
+      (b) => b.district === 'docks' && b.recv > 0,
+    )!
+    expect(lines.slice(-2)).toEqual([
+      `Handed off at ${pier.name} ${card.simClock(handOffTick)}`,
+      `Cleared ${card.simClock(handOffTick + docks.clearanceS * 10)} — the ship has sailed`,
+    ])
+    expect(m.lives).toBe(2)
   })
 })

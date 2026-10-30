@@ -13,10 +13,13 @@
 //
 //   people-l3    The competent policy past L2 until the Shaky shaker is in
 //                and the balance covers desk 2, MAX_ADS ads and two hire
-//                fees; then `debugForceLevel 3` (M6 has no L3 run — the
-//                playtest cap is still L2, so Docks go live without the M8
-//                clearance: shots only, never the gate or the attract city),
-//                `removeFixture` of the COUNTERS Metal detector in DESK2_SLOT,
+//                fees; then `debugForceLevel 3` only if the run is still
+//                below L3 (M8: the playtest cap is 3 and seed 7 reaches L3
+//                for real at ~18 min, before the balance is there, so the
+//                fixture is a real L3 — `fixture.forced` false — and slot 3
+//                holds the policy's Battery checker, which replaced the
+//                COUNTERS Metal detector there), `removeFixture` of the
+//                machine in DESK2_SLOT,
 //                `placeDesk {DESK2_SLOT, index 2}`, `postAd inspector` until
 //                the pool holds a charisma-2 applicant, and two hires into
 //                desk 2 — that one and then the best (highest-eye) applicant.
@@ -42,9 +45,9 @@ import type { LaneNode, Parcel } from '../../src/sim/types.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 
 const SEED = 7
-/** people-l3: the slot desk 2 takes (the policy's COUNTERS Metal detector sits there at L2). */
+/** people-l3: the slot desk 2 takes (the COUNTERS Metal detector at L2, the policy's Battery checker at L3). */
 const DESK2_SLOT = 'slot3'
-/** people-l3: the forced level (desk 2 unlocks there, employees.json desks.rows). */
+/** people-l3: the fixture's level (desk 2 unlocks there, employees.json desks.rows); forced only if the run is below it. */
 const FORCED_LEVEL = 3
 /** people-l3: at most this many ads for a charisma-2 inspector. */
 const MAX_ADS = 10
@@ -144,7 +147,13 @@ function peopleL3(): void {
   if (sim.state.level.level < 2 || !owns(sim, shaker.id))
     throw new Error(`people-l3: no L2 lane with the shaker by ${CAP_S} s`)
 
-  must(sim, { kind: 'debugForceLevel', level: FORCED_LEVEL })
+  // M8: the cap is 3 — seed 7 is usually at a real L3 by now.
+  const forced = sim.state.level.level < FORCED_LEVEL
+  if (forced) must(sim, { kind: 'debugForceLevel', level: FORCED_LEVEL })
+  if (sim.state.level.level !== FORCED_LEVEL)
+    throw new Error(
+      `people-l3: level ${sim.state.level.level}, want ${FORCED_LEVEL}`,
+    )
   const slot = laneNode(sim.state.lane, DESK2_SLOT)
   if (!slot || slot.locked || slot.fixture?.kind !== 'machine')
     throw new Error(`people-l3: ${DESK2_SLOT} holds no machine to remove`)
@@ -200,6 +209,7 @@ function peopleL3(): void {
     throw new Error('people-l3: not a live L3 game after settling')
   write('people-l3', sim, {
     level: FORCED_LEVEL,
+    forced,
     removed: { nodeId: DESK2_SLOT, defId: removed },
     ads,
     charismaInspector: {

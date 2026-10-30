@@ -73,12 +73,24 @@ describe('city-view §4.1: the level bar against nextThreshold', () => {
   })
 
   it('at playtestMaxLevel: "$3,410 / $5,000 · Lv 3 coming soon", never "next build"', () => {
-    expect(data.economy.playtestMaxLevel).toBe(2)
-    const p = kit.levelProgress(data, 2, 3410, 5000)
+    // The playtest-1 cap through the override (M8 ships cap 3: design R1).
+    const capped = dataFixture({ economy: { playtestMaxLevel: 2 } })
+    expect(capped.economy.playtestMaxLevel).toBe(2)
+    const p = kit.levelProgress(capped, 2, 3410, 5000)
     expect(p.text).toBe('$3,410 / $5,000 · Lv 3 coming soon')
     expect(p.frac).toBeCloseTo((3410 - 2000) / 3000)
     expect(p.text).not.toMatch(/build/i)
-    expect(kit.nextUnlockLine(data, 2)).toBe('Lv 3 coming soon')
+    expect(kit.nextUnlockLine(capped, 2)).toBe('Lv 3 coming soon')
+  })
+
+  it('M8 at the cap 3: "$7,200 / $9,000 · Lv 4 coming soon"', () => {
+    expect(data.economy.playtestMaxLevel).toBe(3)
+    // Thresholds are §7.6 tuning levers: the bar reads them from levels.json.
+    const t3 = data.levels.find((l) => l.level === 3)!.threshold
+    const p = kit.levelProgress(data, 3, 7200, 9000)
+    expect(p.text).toBe('$7,200 / $9,000 · Lv 4 coming soon')
+    expect(p.frac).toBeCloseTo((7200 - t3) / (9000 - t3))
+    expect(kit.nextUnlockLine(data, 3)).toBe('Lv 4 coming soon')
   })
 
   it('§9.6 step 4: the bar starts again from 0 right at the threshold', () => {
@@ -140,11 +152,50 @@ describe('city-view §4.3: the Garage "!" badge', () => {
   })
 })
 
+/** A regionState() with `ids` live and every other region locked. */
+const live = (ids: string[]) => (id: string) =>
+  ids.includes(id) ? ('live' as const) : ('locked' as const)
+
 describe('city-view §8.1: region, strain and mood ticker lines', () => {
   it('region: "Hoist Hill is now open"', () => {
     expect(kit.regionOpenLine(data, 'industrial')).toBe(
       'Hoist Hill is now open',
     )
+  })
+
+  it('M8 (L3 row): "Shrinkwrap Shore is now open", "New strain spotted: battery", the Docks chip', () => {
+    expect(kit.regionOpenLine(data, 'docks')).toBe(
+      'Shrinkwrap Shore is now open',
+    )
+    const l3 = data.levels.find((l) => l.level === 3)!
+    expect(l3.strain).toBe('battery')
+    expect(kit.strainLine(l3.strain!)).toBe('New strain spotted: battery')
+    // Lv 2: the Docks chip waits with its lock and `Lv3`.
+    const at2 = kit.chipEntries(
+      data,
+      2,
+      live(['highres', 'downtown', 'industrial']),
+    )
+    expect(at2.find((c) => c.id === 'docks')).toEqual({
+      id: 'docks',
+      label: 'Docks',
+      lockLevel: 3,
+    })
+    // Lv 3: the Docks are live; the L4 regions show locked behind them.
+    const at3 = kit.chipEntries(
+      data,
+      3,
+      live(['highres', 'downtown', 'industrial', 'docks']),
+    )
+    expect(at3.map((c) => `${c.id}:${c.lockLevel ?? ''}`)).toEqual([
+      'warehouse:',
+      'highres:',
+      'downtown:',
+      'industrial:',
+      'docks:',
+      'lowres:4',
+      'rural:4',
+    ])
   })
 
   it('strain: "New strain spotted: rattle" once announced + newStrainDelayS', () => {

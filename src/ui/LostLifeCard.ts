@@ -9,6 +9,10 @@
 //     Spawned at Lodash Smelting Works 11:02 · Picked up by Truck 1 11:20 ·
 //     Unloaded 11:51 · Slot 1 Metal detector: missed (15% vs rattle) ·
 //     Slot 2: empty · Shelved · Delivered to Node Heights Towers A 12:40
+//   an overseas parcel (M8, spec-core §5.6, design-m8-m9 §6.3) ends with
+//     `Handed off at Prefetch Pier 2 14:02` and `Cleared 14:47 — the ship
+//     has sailed` (Airport: `— the plane has left`); the title stays
+//     MALWARE DELIVERED (design R12)
 //   Your lane's catch rate vs rattle was 15%
 //   the counter: `A Shaky shaker would make it 83%`, or (counterOwned)
 //     `This one got through on the 17%` (the rate line already gives 83%) +
@@ -26,8 +30,9 @@
 // The route list grows the card up to min(H − 80, 440) px (it fits its
 // content below that); when a long path would not fit it tightens the line
 // pitch 18 → 16 → 14 px, then merges runs of empty slots (`Slots 2–4:
-// empty`), then elides the middle — the build-2 scrolling viewport for
-// overseas paths is not needed at L1–L2.
+// empty`), then elides the middle, keeping the delivery line — or, for an
+// overseas parcel, the hand-off and clearance lines — at the end. A 6-slot
+// overseas path (12 lines) fits 360×604 at the 18-px pitch (routeBudget).
 //
 // The card draws through its own full-screen camera over an off-screen
 // origin (the Dialog pattern), so it covers every HUD camera; its dim
@@ -49,6 +54,7 @@ import { addPanel } from './Panel.ts'
 import { claimKey, offscreenOrigin, popModal, pushModal } from './Sheet.ts'
 import { addText, lineCount, LINE_H, textTop } from './text.ts'
 import { THEME } from './theme.ts'
+import { sailedText } from './hubText.ts'
 
 /** city-view §3.3 step 5: the card opens this long after `life:lost`. */
 export const LOST_LIFE_DELAY_MS = 600
@@ -59,6 +65,10 @@ const BTN_H = 44
 const BTN_GAP = 8
 const ROUTE_PITCHES = [18, 16, 14] as const
 const BACKDROP_ALPHA = 0.55
+/** Card-local y of the first route line: title row 18 + parcel row 36. */
+const ROUTE_TOP = PAD - 4 + 18 + 36
+/** One rate / counter text line (unwrapped) in the tail. */
+const TAIL_LINE = 18
 
 // ---- model (pure) ---------------------------------------------------------------
 
@@ -134,7 +144,12 @@ export interface RouteDeps {
 export type SlotStatus = 'empty' | 'missed' | 'flagged'
 
 export type RouteItem =
-  | { kind: 'text'; text: string }
+  | {
+      kind: 'text'
+      text: string
+      /** The trace `what` of the hop (M8: fitRoute keeps the overseas tail). */
+      what?: string
+    }
   | {
       kind: 'slot'
       nodeId: string
@@ -158,8 +173,21 @@ const MISSED_WHATS = new Set(['missed', 'passed', 'pass', 'checked', 'rolled'])
 const EMPTY_WHATS = new Set(['empty', 'skipped', 'passthrough', 'unstaffed'])
 const FLAG_WHATS = new Set(['flagged', 'caught'])
 const CLEAR_WHATS = new Set(['cleared_by_player', 'clearedByPlayer', 'cleared'])
-/** Hops whose line carries the mm:ss time (the spec §10 example). */
-const TIMED_WHATS = new Set(['spawned', 'pickedUp', 'unloaded', 'delivered'])
+/** Hops whose line carries the mm:ss time (the spec §10 example; M8 the hand-off). */
+const TIMED_WHATS = new Set([
+  'spawned',
+  'pickedUp',
+  'unloaded',
+  'delivered',
+  'handedOff',
+])
+/**
+ * M8 (spec-core §5.6): the overseas clearance — `Cleared 14:47 — the ship
+ * has sailed`. Not the player's Hold Bay Clear (`cleared`, CLEAR_WHATS).
+ */
+const CUSTOMS_WHAT = 'customsCleared'
+/** The hops fitRoute keeps at the end of an elided route (M8: overseas). */
+const TAIL_WHATS = new Set(['handedOff', CUSTOMS_WHAT])
 /** Hops the card leaves out: the spec example lists none of them. */
 const SKIP_WHATS = new Set(['loaded', 'returned', 'held', 'tossed'])
 /**
@@ -205,7 +233,9 @@ export function resolveCheckerDef(
  * stores each hop's card line in `TraceEntry.text` (one slot entry per slot
  * left, ref = node id: empty / missed / passed / flagged / skipped): that
  * text is used as is, with the mm:ss time appended to the spawned, picked
- * up, unloaded, cleared and delivered hops (and a flag). Entries without a
+ * up, unloaded, cleared, delivered and (M8) handed-off hops (and a flag);
+ * the overseas clearance (`customsCleared`, ref = the hub) reads `Cleared
+ * 14:47 — the ship has sailed` (`— the plane has left`). Entries without a
  * text are worded here: a `slot` entry opens a slot visit whose outcome is
  * the next roll entry naming it; a visit with no outcome entry is read from
  * the lane (a checker there now → missed, else empty). `loaded`, `returned`,
@@ -329,9 +359,23 @@ export function routeItems(
       if (e.text) items.push({ kind: 'text', text: e.text })
       continue
     }
+    if (w === CUSTOMS_WHAT) {
+      // ref = the hub district id (hubs.ts clearanceStep).
+      const head = e.text ?? 'Cleared'
+      items.push({
+        kind: 'text',
+        text: `${head} ${t} — ${sailedText(data, e.ref)}`,
+        what: w,
+      })
+      continue
+    }
     if (e.text) {
       const timed = TIMED_WHATS.has(w) || CLEAR_WHATS.has(w)
-      items.push({ kind: 'text', text: timed ? `${e.text} ${t}` : e.text })
+      items.push({
+        kind: 'text',
+        text: timed ? `${e.text} ${t}` : e.text,
+        what: w,
+      })
       continue
     }
     if (w === 'spawned')
@@ -350,6 +394,12 @@ export function routeItems(
     else if (w === 'shelved') items.push({ kind: 'text', text: 'Shelved' })
     else if (w === 'delivered')
       items.push({ kind: 'text', text: `Delivered to ${bname(e.ref)} ${t}` })
+    else if (w === 'handedOff')
+      items.push({
+        kind: 'text',
+        text: `Handed off at ${bname(e.ref)} ${t}`,
+        what: w,
+      })
   }
   closeOpen()
   return items
@@ -519,8 +569,42 @@ export function lostLifeModel(
 }
 
 /**
+ * The px the route may take on a card `H` px tall whose rate + counter texts
+ * take `tailTextsH` px (TAIL_LINE per unwrapped line): what is left of
+ * min(H − 80, CARD_MAX_H) under the title and parcel rows and above the
+ * texts, the lives row and the buttons (build() lays it out the same way).
+ */
+export function routeBudget(H: number, tailTextsH: number): number {
+  const maxH = Math.min(H - 80, CARD_MAX_H)
+  const tailH = 6 + tailTextsH + 6 + 16 + 10 + BTN_H + PAD
+  return Math.max(42, maxH - ROUTE_TOP - tailH)
+}
+
+/** The rate + counter texts' height when none wraps (the card's TAIL_LINE pitch). */
+export function tailTextsHeight(model: Pick<LostLifeModel, 'counter'>): number {
+  return TAIL_LINE * (1 + model.counter.length)
+}
+
+/**
+ * How many route lines end the route and survive an elision: the overseas
+ * hand-off and clearance (M8) when the route ends with them, else the last
+ * hop (the delivery).
+ */
+function tailCount(items: readonly RouteItem[]): number {
+  let n = 0
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]!
+    if (it.kind !== 'text' || !it.what || !TAIL_WHATS.has(it.what)) break
+    n++
+  }
+  return Math.max(1, n)
+}
+
+/**
  * Route lines that fit `budget` px: pitch 18 → 16 → 14, then merged empty
- * slots, then the middle elided (`…`) keeping the first and last hops.
+ * slots, then the middle elided (`…`) keeping the first hops and the tail
+ * (the delivery line; M8: the hand-off + clearance lines of an overseas
+ * parcel).
  */
 export function fitRoute(
   items: readonly RouteItem[],
@@ -534,10 +618,11 @@ export function fitRoute(
   }
   const pitch = ROUTE_PITCHES[ROUTE_PITCHES.length - 1]!
   const lines = routeText(items, strain, true)
-  const n = Math.max(3, Math.floor(budget / pitch))
+  const tail = Math.min(tailCount(items), Math.max(1, lines.length - 1))
+  const n = Math.max(2 + tail, Math.floor(budget / pitch))
   if (lines.length <= n) return { lines, pitch }
-  const head = lines.slice(0, n - 2)
-  return { lines: [...head, '…', lines[lines.length - 1]!], pitch }
+  const head = lines.slice(0, n - 1 - tail)
+  return { lines: [...head, '…', ...lines.slice(lines.length - tail)], pitch }
 }
 
 // ---- view -----------------------------------------------------------------------
@@ -639,7 +724,6 @@ export class LostLifeCard {
     const { W, H } = this.L
     const o = offscreenOrigin()
     const w = Math.max(200, W - 24)
-    const maxH = Math.min(H - 80, CARD_MAX_H)
     const inner = w - 2 * PAD
 
     const backdrop = scene.add
@@ -658,7 +742,7 @@ export class LostLifeCard {
       return obj
     }
 
-    // Title.
+    // Title (the route starts at ROUTE_TOP: routeBudget's arithmetic).
     let y = PAD - 4
     const title = addText(scene, 0, 0, LOST_LIFE_TITLE, { tint: THEME.danger })
     put(title, Math.round((w - title.width) / 2), y)
@@ -688,11 +772,10 @@ export class LostLifeCard {
     )
     parts.push(rate, ...counter)
     const textsH = [rate, ...counter].reduce(
-      (s, t) => s + (lineCount(t) - 1) * LINE_H + 18,
+      (s, t) => s + (lineCount(t) - 1) * LINE_H + TAIL_LINE,
       0,
     )
-    const tailH = 6 + textsH + 6 + 16 + 10 + BTN_H + PAD
-    const fit = fitRoute(m.route, m.strain, Math.max(42, maxH - y - tailH))
+    const fit = fitRoute(m.route, m.strain, routeBudget(H, textsH))
     for (const line of fit.lines) {
       const t = addText(scene, 0, 0, line, { maxWidth: inner })
       put(t, PAD, y + Math.floor((fit.pitch - 14) / 2))
@@ -702,7 +785,7 @@ export class LostLifeCard {
     y += 6
     for (const t of [rate, ...counter]) {
       put(t, PAD, y)
-      y += (lineCount(t) - 1) * LINE_H + 18
+      y += (lineCount(t) - 1) * LINE_H + TAIL_LINE
     }
     y += 6
 
@@ -741,7 +824,7 @@ export class LostLifeCard {
     this.buttons = [open, cont]
     y += BTN_H + PAD
 
-    // Fit to the content (fitRoute kept it within maxH).
+    // Fit to the content (fitRoute kept it within min(H − 80, CARD_MAX_H)).
     const h = Math.max(y, 120)
     const px = Math.round((W - w) / 2)
     const py = Math.max(0, Math.round((H - h) / 2))

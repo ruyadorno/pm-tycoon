@@ -56,6 +56,7 @@ import type { Sim } from '../sim.ts'
 import type { BuildingId, Parcel, Stop, TileXY, Vehicle } from '../types.ts'
 import { ticksFromS } from '../types.ts'
 import { deliverParcel } from './economy.ts'
+import { handOff, hubDef } from './hubs.ts'
 import { laneParcelIds, shelfNode } from './lane.ts'
 import { driverNumbers, driverOf, swapPendingDriver } from './people.ts'
 import { changeSatisfaction } from './satisfaction.ts'
@@ -716,18 +717,22 @@ function pickupAt(sim: Sim, v: Vehicle, buildingId: BuildingId): void {
   if (v.rushBuildingId === buildingId) v.rushBuildingId = null
 }
 
-/** Deliver the stop's parcels still aboard (§4.5 step 3). */
+/**
+ * Deliver the stop's parcels still aboard (§4.5 step 3); a parcel bound for
+ * an overseas hub (its stop is a 'handoff' at the pier / terminal, §5.6,
+ * M8) is handed off instead — the value locks and the clearance timer runs
+ * (hubs.ts). The parcel's destRegion decides, not the stop's kind, so
+ * handOff only ever sees a hub-bound parcel (validate.ts checks both agree).
+ */
 function deliverAt(sim: Sim, v: Vehicle, stop: Stop): void {
-  // TODO(build 2): a 'handoff' stop (overseas hub, §5.6) locks the value and
-  // starts the clearance timer instead of paying here; no hub is live in
-  // playtest 1, so every stop is a local 'deliver'.
   for (const id of stop.parcelIds) {
     const i = v.cargo.indexOf(id)
     const p = parcelOf(sim, id)
     if (i < 0 || !p) continue
     v.cargo.splice(i, 1)
     v.unitsUsed -= unitsOf(sim.data, p.size)
-    deliverParcel(sim, v, p)
+    if (hubDef(sim.data, p.destRegion)) handOff(sim, v, p)
+    else deliverParcel(sim, v, p)
   }
 }
 

@@ -3,14 +3,26 @@
 // scene drives its sprites from (src/render/cityFx.ts). M7 (spec-build2
 // §3.3, design-m7 §6.8): the magic parcel's markers over A and B, its
 // countdown ring (magicRingStep: the rush ring's steps) and the gold hop.
+// M8 (design-m8-m9 §6.2, docks 2–3): the bay lights and docked poses by
+// dock NUMBER, and the dock run that maps the hidden dock column onto the
+// SW face's bays (continuous, never moving the queue head).
 import { describe, expect, it } from 'vitest'
 import {
   BAY_LIGHTS,
+  bayLightShown,
   CONSTRUCTION_MS,
   CONSTRUCTION_SWAP_MS,
+  DOCK_BAY_DEPTH,
   DOCK_BLEND_TILES,
   DOCK_POSE_CANVAS,
+  DOCK_POSE_DEPTH,
+  DOCK_POSES_CANVAS,
   dockBlend,
+  dockPoseAt,
+  dockPoseCanvas,
+  dockPosesCanvas,
+  dockRunBlend,
+  dockRunRadius,
   dustFrame,
   fadeK,
   grumbleDue,
@@ -22,6 +34,7 @@ import {
   magicMarkers,
   magicRingStep,
   manifestWarehouseAnchors,
+  maxDockNumber,
   moodFor,
   RING_STEPS,
   ringStep,
@@ -49,6 +62,7 @@ import {
   footprintAnchor,
   originX,
   screenToTileF,
+  tileToScreen,
 } from '../../src/render/iso.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
 import { FRAMES } from '../../src/render/frames.generated.ts'
@@ -278,6 +292,266 @@ describe('warehouse exterior hand-off: bay lights and the docked pose', () => {
       expect(w).toBeGreaterThanOrEqual(prev - 1e-9)
       prev = w
     }
+  })
+})
+
+/** Lamps 0..2 lit for `owned` docks on a frame with `lamps` lamps. */
+function lit(owned: string[], lamps: number): number[] {
+  return [0, 1, 2].filter((k) => bayLightShown(k, owned, lamps))
+}
+
+describe('M8 docks 2–3: lights and docked poses by dock number (design-m8-m9 §6.2)', () => {
+  const map = data.map
+  const ox = originX(map.size[1])
+  const wa = footprintAnchor(lot.warehouse.tile, lot.warehouse.footprint, ox)
+  const lotX0 = lot.entrance[0] + 1
+  const head = lot.queue[0] as [number, number]
+  const runOf = (n: number) =>
+    lot.docks.slice(0, n) as unknown as readonly (readonly [number, number])[]
+  /** CityScene.placeDockPose: each bay's world offset from its dock tile. */
+  const posesFor = (frame: string) =>
+    lot.docks.map((tile, i) => {
+      const [px, py] = dockPoseCanvas(warehouseAnchors(frame), i + 1)
+      const t = tileToScreen(tile[0], tile[1], ox)
+      return {
+        dx: wa.x - WH_CANVAS / 2 + px - t.x,
+        dy: wa.y - WH_CANVAS + py - t.y,
+      }
+    })
+  /** The drawn foot point of a vehicle at (tx, ty) over the run of n docks. */
+  const drawn = (
+    tx: number,
+    ty: number,
+    n: number,
+    poses: { dx: number; dy: number }[],
+  ) => {
+    const run = runOf(n)
+    const h = dockRunBlend(tx, ty, run, lotX0, dockRunRadius(run, head))
+    const o = dockPoseAt(poses, h.at)
+    const s = tileToScreen(tx, ty, ox)
+    return { x: s.x + o.dx * h.w, y: s.y + o.dy * h.w, w: h.w, at: h.at }
+  }
+
+  it('the lot has three dock tiles in a run; the tier-1 poses are the manifest’s, [0] = bay 1', () => {
+    expect(lot.docks).toHaveLength(3)
+    expect(DOCK_POSES_CANVAS).toHaveLength(3)
+    expect(DOCK_POSES_CANVAS[0]).toEqual(DOCK_POSE_CANVAS)
+    expect(DOCK_POSES_CANVAS).toEqual(WH_ANCHORS.wh_ext_t1?.dockPoses)
+  })
+
+  it('dockPoseCanvas: the frame’s own, else the lamp offset, else extrapolated (t3: two bays)', () => {
+    const own = {
+      bayLights: [
+        [10, 20],
+        [30, 30],
+      ],
+      dockPose: [5, 50],
+      dockPoses: [
+        [5, 50],
+        [26, 61],
+      ],
+    } as const
+    expect(dockPoseCanvas(own, 1)).toEqual([5, 50])
+    expect(dockPoseCanvas(own, 2)).toEqual([26, 61])
+    // A debug dock 3 on a two-bay frame: one more bay-to-bay step.
+    expect(dockPoseCanvas(own, 3)).toEqual([47, 72])
+    const lamps = {
+      bayLights: [
+        [10, 20],
+        [30, 30],
+        [50, 40],
+      ],
+      dockPose: [5, 50],
+    } as const
+    expect(dockPosesCanvas(lamps)).toEqual([
+      [5, 50],
+      [25, 60],
+      [45, 70],
+    ])
+    const one = { bayLights: [[10, 20]], dockPose: [5, 50] } as const
+    expect(dockPosesCanvas(one)).toEqual([
+      [5, 50],
+      [5, 50],
+      [5, 50],
+    ])
+    expect(dockPosesCanvas(LEGACY_WH_ANCHORS)).toEqual([
+      [40, 178],
+      [64, 190],
+      [89, 202],
+    ])
+    // t3 (brick, 2 bays): its dock 3 pose continues along the face.
+    const t3 = warehouseAnchors('wh_ext_t3')
+    expect(t3.bayLights).toHaveLength(2)
+    const [p1, p2, p3] = dockPosesCanvas(t3) as [
+      [number, number],
+      [number, number],
+      [number, number],
+    ]
+    expect(p3).toEqual([2 * p2[0] - p1[0], 2 * p2[1] - p1[1]])
+  })
+
+  for (const frame of [
+    'wh_ext_t1',
+    'wh_ext_t2',
+    'wh_ext_t3',
+    'wh_ext_t4',
+    'wh_ext_t5',
+  ]) {
+    it(`${frame}: a vehicle docked at bay k stands at bay k's pose, on the lot, bays in order along the SW face`, () => {
+      const poses = posesFor(frame)
+      const a = warehouseAnchors(frame)
+      const lotBlock = map.blocks.find((b) => b.kind === 'lot')
+      const rect = lotBlock
+        ? blockRect(map, lotBlock.block[0], lotBlock.block[1])
+        : null
+      expect(rect).not.toBeNull()
+      const [x0, y0, x1, y1] = rect ?? [0, 0, 0, 0]
+      let prev: { x: number; y: number } | null = null
+      lot.docks.forEach(([tx, ty], i) => {
+        const d = drawn(tx, ty, 3, poses)
+        expect(d.w).toBe(1)
+        expect(d.at).toBe(i)
+        const [px, py] = dockPoseCanvas(a, i + 1)
+        expect(d.x).toBe(wa.x - WH_CANVAS / 2 + px)
+        expect(d.y).toBe(wa.y - WH_CANVAS + py)
+        const t = screenToTileF(d.x, d.y, ox)
+        expect(t.tx).toBeGreaterThan(x0 - 0.5)
+        expect(t.tx).toBeLessThan(x1 + 0.5)
+        expect(t.ty).toBeGreaterThan(y0 - 0.5)
+        expect(t.ty).toBeLessThan(y1 + 0.5)
+        // Bay k + 1 is further along the face: right of and below bay k.
+        if (prev) {
+          expect(d.x).toBeGreaterThan(prev.x)
+          expect(d.y).toBeGreaterThan(prev.y)
+        }
+        prev = { x: d.x, y: d.y }
+      })
+    })
+  }
+
+  it('the run radius never reaches the queue head (3 / 2 / 1 tiles for 1 / 2 / 3 docks)', () => {
+    expect(dockRunRadius(runOf(1), head)).toBe(DOCK_BLEND_TILES)
+    expect(dockRunRadius(runOf(2), head)).toBe(2)
+    expect(dockRunRadius(runOf(3), head)).toBe(1)
+    for (const n of [1, 2, 3]) {
+      const run = runOf(n)
+      const r = dockRunRadius(run, head)
+      for (const q of lot.queue)
+        expect(dockRunBlend(q[0], q[1], run, lotX0, r).w).toBe(0)
+      for (const q of lot.parking)
+        expect(dockRunBlend(q[0], q[1], run, lotX0, r).w).toBe(0)
+      expect(
+        dockRunBlend(lot.entrance[0], lot.entrance[1], run, lotX0, r).w,
+      ).toBe(0)
+    }
+  })
+
+  it('with one dock the run is exactly the pre-M8 dockBlend (L1–L2 runs draw as before)', () => {
+    const dock = lot.docks[0] as [number, number]
+    /** The M7 rule verbatim (cityFx.dockBlend before the run). */
+    const m7 = (tx: number, ty: number): number => {
+      const near = 1 - Math.hypot(tx - dock[0], ty - dock[1]) / DOCK_BLEND_TILES
+      if (near <= 0) return 0
+      const inLot = Math.max(0, Math.min(1, (tx - (lotX0 - 1)) * 2))
+      const inColumn = Math.max(0, Math.min(1, (ty - dock[1] + 0.5) * 2))
+      return Math.min(1, near) * inLot * inColumn
+    }
+    const r = dockRunRadius(runOf(1), head)
+    for (let tx = 17; tx <= 24; tx += 0.25)
+      for (let ty = 19; ty <= 28; ty += 0.25) {
+        const h = dockRunBlend(tx, ty, runOf(1), lotX0, r)
+        expect(h.w).toBeCloseTo(m7(tx, ty), 12)
+        expect(dockBlend(tx, ty, dock, lotX0)).toBeCloseTo(m7(tx, ty), 12)
+        expect(h.at).toBe(0)
+      }
+  })
+
+  it('driving in from the entrance or the queue head onto any bay never jumps', () => {
+    const poses = posesFor('wh_ext_t4')
+    const routes: [number, number][][] = [
+      // entrance → along the column north (dock 1), onto dock 2, south (dock 3)
+      [
+        [19, 23],
+        [20, 23],
+        [20, 22],
+      ],
+      [
+        [19, 23],
+        [20, 23],
+      ],
+      [
+        [19, 23],
+        [20, 23],
+        [20, 24],
+      ],
+      // queue head → north along the run
+      [
+        [20, 25],
+        [20, 24],
+        [20, 23],
+        [20, 22],
+      ],
+    ]
+    for (const n of [1, 2, 3])
+      for (const route of routes) {
+        let prev = drawn(route[0]![0], route[0]![1], n, poses)
+        for (let i = 0; i + 1 < route.length; i++) {
+          const [ax, ay] = route[i]!
+          const [bx, by] = route[i + 1]!
+          for (let u = 0.02; u <= 1.0001; u += 0.02) {
+            const d = drawn(ax + (bx - ax) * u, ay + (by - ay) * u, n, poses)
+            // 0.02 tile of road is ≈ 0.7 px; the pose blend adds at most a few px.
+            expect(
+              Math.hypot(d.x - prev.x, d.y - prev.y),
+              `n=${n} ${route.join(' → ')}`,
+            ).toBeLessThan(6)
+            prev = d
+          }
+        }
+      }
+  })
+
+  it('dockPoseAt interpolates between bays and clamps outside the run', () => {
+    const poses = [
+      { dx: -60, dy: 20 },
+      { dx: 0, dy: 20 },
+      { dx: 60, dy: 18 },
+    ]
+    expect(dockPoseAt(poses, 0)).toEqual({ dx: -60, dy: 20 })
+    expect(dockPoseAt(poses, 0.5)).toEqual({ dx: -30, dy: 20 })
+    expect(dockPoseAt(poses, 2)).toEqual({ dx: 60, dy: 18 })
+    expect(dockPoseAt(poses, 7)).toEqual({ dx: 60, dy: 18 })
+    expect(dockPoseAt(poses, -1)).toEqual({ dx: -60, dy: 20 })
+    expect(dockPoseAt([], 1)).toEqual({ dx: 0, dy: 0 })
+  })
+
+  it('bays further along draw over earlier ones, inside the footprint’s depth slot', () => {
+    // A vehicle's dot / glyph ride +0.01 / +0.02 over it (DEPTH.mood / bell).
+    expect(DOCK_BAY_DEPTH).toBeGreaterThan(0.02)
+    expect(DOCK_POSE_DEPTH + 2 * DOCK_BAY_DEPTH + 0.02).toBeLessThan(0.5)
+  })
+
+  it('lamps by dock number: dock 3 before dock 2 lights lamps 1 and 3; t3 hides the third', () => {
+    expect(lit(['dock1'], 3)).toEqual([0])
+    expect(lit(['dock1', 'dock2'], 3)).toEqual([0, 1])
+    expect(lit(['dock1', 'dock3'], 3)).toEqual([0, 2])
+    expect(lit(['dock1', 'dock2', 'dock3'], 3)).toEqual([0, 1, 2])
+    expect(lit(['dock1', 'dock2', 'dock3'], 2)).toEqual([0, 1])
+    expect(maxDockNumber(['dock1'])).toBe(1)
+    expect(maxDockNumber(['dock1', 'dock3'])).toBe(3)
+    expect(maxDockNumber([])).toBe(1)
+  })
+
+  it('through the facade: buying dock 2 at L3 adds dock2 to vs.docks (the lamp and the run follow)', () => {
+    const sim = quietSim(1)
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
+    sim.state.economy.balance = 1_000_000
+    const vs = createViewSim(() => sim)
+    expect(vs.lane.buyDock(2).ok).toBe(true)
+    const owned = vs.docks.map((d) => d.id)
+    expect(owned).toEqual(['dock1', 'dock2'])
+    expect(maxDockNumber(owned)).toBe(2)
+    expect([0, 1, 2].filter((k) => bayLightShown(k, owned, 2))).toEqual([0, 1])
   })
 })
 

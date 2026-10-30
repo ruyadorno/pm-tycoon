@@ -62,9 +62,10 @@ export interface TilePos {
  * (no migrations). 2 = build 2 (`pm.save.v2`); 3 = M6 people (applicants,
  * roles with pips, the Hold Bay station, the wanted list; same save key);
  * 4 = M7 quests (state.quests, nextId.quest, stats.victoryTick, the
- * MinuteRow quest columns; same save key).
+ * MinuteRow quest columns; same save key); 5 = M8 L3 (lane.feedIndex,
+ * stats.cleared; same save key).
  */
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
 
 export interface SimState {
   version: typeof STATE_VERSION
@@ -237,8 +238,11 @@ export type ParcelState =
  * 'spawned' (ref building), 'pickedUp' (vehicle id), 'unloaded' (dock id),
  * one slot result per slot passed — 'empty' | 'passed' | 'missed' |
  * 'flagged' | 'skipped' (ref node id; M2) — 'held' / 'cleared' / 'tossed'
- * (Hold Bay), 'shelved' / 'returned' (shelf), 'loaded' (vehicle id),
- * 'delivered' (building). M1 saves may still hold 'slot' (entered a slot).
+ * (Hold Bay; 'cleared' = the player's Clear), 'shelved' / 'returned'
+ * (shelf), 'loaded' (vehicle id), 'delivered' (building); M8 overseas:
+ * 'handedOff' (ref = the pier / terminal building, text "Handed off at
+ * Prefetch Pier 2") and 'customsCleared' (ref = the hub district id, text
+ * "Cleared") — never 'cleared'. M1 saves may still hold 'slot'.
  */
 export interface TraceEntry {
   tick: Tick
@@ -459,6 +463,13 @@ export interface Lane {
   quarantine: { count: number; malware: number; clean: number }
   /** M6: the station next to the Hold Bay rack (replaces `sorterArm`). */
   holdStation: HoldStation
+  /**
+   * M8 (design-m8-m9 §2.1, §4.3): index into the conveyors (lane.docks
+   * order) the feed into the first slot tries first; after a successful
+   * feed it points past the conveyor that fed. 0 at start (and always with
+   * one dock).
+   */
+  feedIndex: number
   /** ADDITION to §6.4: the FIFO dock queue on the lot (vehicle ids, index 0 docks next, §4.3). */
   dockQueue: number[]
   /**
@@ -686,7 +697,7 @@ export interface RunStats {
   malwareSpawned: number
   /** Malware flagged by a checker. */
   malwareCaught: number
-  /** Malware delivered (or cleared overseas). */
+  /** Malware delivered (or cleared overseas, M8). */
   malwareMissed: number
   wrongToss: number
   firstDeliveryTick: Tick | null
@@ -705,6 +716,11 @@ export interface RunStats {
   minutes: MinuteRow[]
   /** M7: tick the Golden Release completed (game:victory); null before. */
   victoryTick: Tick | null
+  /**
+   * M8: overseas clearances (every parcel:cleared, malware included) — the
+   * conservation term of parcels that left the map at a hub.
+   */
+  cleared: number
 }
 
 // Defined here (named in §6.4) --------------------------------------------------
@@ -812,6 +828,15 @@ export function nextLiveNodeId(lane: Lane, id: string): string | null {
     cur = next
   }
   return null
+}
+
+/**
+ * M8: a loading dock's number ('dock3' → 3; economy.docks `index`, the
+ * map.lot.docks bay `n − 1`); NaN for any other id.
+ */
+export function dockNumber(id: string): number {
+  const m = /^dock([1-9]\d*)$/.exec(id)
+  return m ? Number(m[1]) : Number.NaN
 }
 
 /** Unlocked slot node ids in flow order. */

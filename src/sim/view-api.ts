@@ -45,7 +45,9 @@ import {
   meanSatisfaction,
   TICKS_PER_DAY,
   TICKS_PER_S,
+  ticksFromS,
 } from './types.ts'
+import { clearingParcels, hubDef } from './systems/hubs.ts'
 import { holdBays } from './systems/lane.ts'
 import { liveMagicParcel } from './systems/magic.ts'
 import { ticksToPayday } from './systems/payroll.ts'
@@ -294,6 +296,46 @@ export interface HoldBayView {
   touch(parcelId: number): CommandResult
 }
 
+/** M8 (design-m8-m9 §3.3): one parcel clearing at an overseas hub. */
+export interface HubClearing {
+  parcelId: number
+  /** The pier / terminal it was handed off at (p.dest). */
+  buildingId: BuildingId
+  size: Size
+  /** clearTick − ticksFromS(hub.clearanceS). */
+  handOffTick: Tick
+  clearTick: Tick
+  lockedValue: number
+}
+
+/** M8: an overseas hub as the city / HUD read it (map.hubs row + districts.json + state). */
+export interface HubView {
+  id: DistrictId
+  live: boolean
+  /** map.hubs office: the building the clearance ring sits on. */
+  office: BuildingId
+  clearanceS: number
+  valueMult: number
+  sizes: Size[]
+  /** Parcels handed off and not yet cleared: clearTick asc, then parcelId. */
+  clearing: readonly HubClearing[]
+  /** District.earned: $ paid by this hub's clearances. */
+  earned: number
+}
+
+/** M8: one loading dock slot (dock 1 + the economy.docks rows) for the room and the buy dialog. */
+export interface DockSlotView {
+  index: 1 | 2 | 3
+  dockId: string
+  owned: boolean
+  /** Dock 1: 1. */
+  unlockLevel: number
+  /** Dock 1: 0. */
+  price: number
+  /** owned || level ≥ unlockLevel. */
+  available: boolean
+}
+
 export interface LaneView {
   /** Every node incl. locked ones, in state order (flow order = next edges). */
   nodes(): readonly LaneNode[]
@@ -308,6 +350,10 @@ export interface LaneView {
   moveFixture(from: string, to: string): CommandResult
   removeFixture(nodeId: string): CommandResult
   rehire(employeeId: number): CommandResult
+  /** M8: buy loading dock `index` (2 at L3, 3 at L4). */
+  buyDock(index: number): CommandResult
+  /** M8: dock 1 and every economy.docks row, by index. */
+  dockSlots(): readonly DockSlotView[]
 }
 
 /**
@@ -371,6 +417,8 @@ export interface ViewSimDebug {
   forceLevel(level: number): CommandResult
   /** M7: offer this quest template (or the ultimate id) now (`?quest=`). */
   offerQuest(templateId: string): CommandResult
+  /** M8: hand a malware parcel off at a live hub now (a life at clearance). */
+  forceOverseasMalware(hub: DistrictId): CommandResult
 }
 
 export interface ViewSim {
@@ -439,6 +487,10 @@ export interface ViewSim {
   readonly quest: QuestActions
   /** M7: the Golden Release is done (economy.victory). */
   readonly victory: boolean
+  /** M8: every map.hubs row in order, live or not (cached per sim revision). */
+  hubs(): readonly HubView[]
+  /** M8: one hub by district id, or null (not a map.hubs row). */
+  hub(id: DistrictId): HubView | null
   /** Present only with `{debug: true}`. */
   readonly debug: ViewSimDebug | null
 }
@@ -593,6 +645,56 @@ function magicOf(s: SimState): QuestsView['magic'] {
   return p ? { parcelId: p.id, origin: p.origin, dest: p.dest } : null
 }
 
+/** M8: every map.hubs row (render order) with its districts.json numbers and the parcels clearing. */
+function hubViews(sim: Sim): HubView[] {
+  const s = sim.state
+  const out: HubView[] = []
+  for (const h of sim.data.map.hubs) {
+    const def = hubDef(sim.data, h.district)
+    if (!def) continue
+    const ticks = ticksFromS(def.clearanceS)
+    out.push({
+      id: def.id,
+      live: s.districts[def.id]?.live ?? false,
+      office: h.office,
+      clearanceS: def.clearanceS,
+      valueMult: def.valueMult,
+      sizes: [...def.sizes],
+      clearing: clearingParcels(s, def.id).map((p) => ({
+        parcelId: p.id,
+        buildingId: p.dest,
+        size: p.size,
+        handOffTick: (p.clearTick ?? 0) - ticks,
+        clearTick: p.clearTick ?? 0,
+        lockedValue: p.lockedValue ?? 0,
+      })),
+      earned: s.districts[def.id]?.earned ?? 0,
+    })
+  }
+  return out
+}
+
+/** M8: dock 1 (owned, free) and every economy.docks row, by index. */
+function dockSlotViews(sim: Sim): DockSlotView[] {
+  const s = sim.state
+  const rows = [
+    { index: 1, unlockLevel: 1, price: 0 },
+    ...sim.data.economy.docks.filter((r) => r.index !== 1),
+  ].toSorted((a, b) => a.index - b.index)
+  return rows.map((r) => {
+    const dockId = `dock${r.index}`
+    const owned = s.lane.docks.some((d) => d.id === dockId)
+    return {
+      index: r.index as DockSlotView['index'],
+      dockId,
+      owned,
+      unlockLevel: r.unlockLevel,
+      price: r.price,
+      available: owned || s.level.level >= r.unlockLevel,
+    }
+  })
+}
+
 function personView(sim: Sim, e: Employee): PersonView {
   const s = sim.state
   const data = sim.data
@@ -656,6 +758,14 @@ export function createViewSim(
     return pCache.list
   }
   let qCache: { sim: Sim; rev: number; view: QuestsView } | null = null
+  let hCache: { sim: Sim; rev: number; list: HubView[] } | null = null
+  const hubs = (): HubView[] => {
+    const sim = get()
+    if (!hCache || hCache.sim !== sim || hCache.rev !== sim.revision) {
+      hCache = { sim, rev: sim.revision, list: hubViews(sim) }
+    }
+    return hCache.list
+  }
   let tileIndex: { data: GameData; idx: Int32Array; w: number } | null = null
 
   const node = (id: string): LaneNode | null => laneNode(st().lane, id)
@@ -726,6 +836,8 @@ export function createViewSim(
     moveFixture: (from, to) => run({ kind: 'moveFixture', from, to }),
     removeFixture: (nodeId) => run({ kind: 'removeFixture', nodeId }),
     rehire: (employeeId) => run({ kind: 'rehire', employeeId }),
+    buyDock: (index) => run({ kind: 'buyDock', index }),
+    dockSlots: () => dockSlotViews(get()),
   }
 
   const debug: ViewSimDebug | null = opts.debug
@@ -736,6 +848,8 @@ export function createViewSim(
         forceLevel: (level) => run({ kind: 'debugForceLevel', level }),
         offerQuest: (templateId) =>
           run({ kind: 'debugOfferQuest', templateId }),
+        forceOverseasMalware: (hub) =>
+          run({ kind: 'debugOverseasMalware', hub }),
       }
     : null
 
@@ -1039,6 +1153,10 @@ export function createViewSim(
     quest,
     get victory() {
       return st().economy.victory
+    },
+    hubs,
+    hub(id) {
+      return hubs().find((h) => h.id === id) ?? null
     },
     debug,
   }

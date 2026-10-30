@@ -94,8 +94,9 @@
 //   garage-driver-picker  a new game: the Garage's Bike buy card → `Who
 //                         drives the Bike?` (three driver cards, Post an ad,
 //                         Hire later)
-//   warehouse-two-desks   people-l3.json, no policy (L3 by debug.forceLevel,
-//                         desk 2 in slot 3 with a charisma-2 inspector):
+//   warehouse-two-desks   people-l3.json, no policy (L3 — real since M8,
+//                         by debug.forceLevel before —, desk 2 in slot 3
+//                         with a charisma-2 inspector):
 //                         both desks staffed, both in the readout; then
 //                         warehouse-desk2-card (desk 2's card, its rows)
 //   station-sorter        sorter-duty.json, no policy: the sorter on duty at
@@ -103,8 +104,8 @@
 //                         station-card (the StationCard on duty)
 //   holdcard-sorter-hint  sorter-duty.json: the tagged parcel's bay tapped →
 //                         the Hold Bay card with the record's `holdCardLine`
-//                         (`Mo: looks clean (90%)` — the fixture's sorter,
-//                         not the plan's Pat 85 %) (+ `-360x604`)
+//                         (`Mo: looks clean (85%)` — the fixture's sorter,
+//                         not the plan's Pat) (+ `-360x604`)
 // tools/fixtures/people.ts writes both fixtures (same staleness rule).
 //
 // M7 (plan-build2 §8.4 task 8; design-m7 §6.3-§6.8, §7 "e2e/shots.spec.ts"):
@@ -138,6 +139,38 @@
 //                         finishUltimate: its counters set to the goal),
 //                         the VictoryCard after the stamp
 //                         (+ `-360x604`: its buttons inside the canvas)
+//
+// M8 (plan-build2 §8.5 tasks 9-10; design-m8-m9 §6.1-§6.3, §8 lane G),
+// fixtures from `node tools/fixtures/m8.ts`:
+//   title                  re-taken over the L3 attract city (≥ 6 vehicles
+//                          incl. a van and two trucks, the Docks live)
+//   level-up-3             level-up-3.json + policy, camera on the
+//                          warehouse, frozen on dust frame 2 (500-749 ms
+//                          after level:up {3}) with the LEVEL stamp
+//   docks-live             level-up-3.json + policy, the chip's pan to the
+//                          Docks, after the 1-s fog cross-fade: the modern
+//                          port sprites in colour (B2 §6.4)
+//   warehouse-tier3        level-up-3.json + policy in the room: level:up
+//                          while inside → the tier-3 cross-fade settled
+//                          (green floor, brick, 20 × 5 shelf, props_t3)
+//                          (+ `-360x604`)
+//   warehouse-two-docks    l3-docks.json + policy in the room, real frames
+//                          at 4× until both docks hold a vehicle: two doors
+//                          open, two tails, dock 2's roller pad, the panel's
+//                          lamp column (+ `-360x604`)
+//   warehouse-dock-dialog  level-up-3.json + policy past the level-up: dock
+//                          2's door tapped → `Loading dock 2` · `$800 · a
+//                          second door into slot 1` · `Buy $800`
+//   clearance-ring         l3-docks.json + policy at zoom 2 on the port
+//                          office, the fixture clearance 20 s out: ring_4
+//                          or so over the office (B2 §4.1)
+//   ship-departure         l3-docks.json + policy, sim-only to the fixture
+//                          clearance's hub:departure, then 2 s of frames:
+//                          the ship 2 s into its 4-s sail west
+//   lost-life-overseas     overseas-malware.json + policy, camera on the
+//                          pier, sim-only to life:lost: the card's route
+//                          ends `Handed off at Prefetch Pier 1 …` / `Cleared
+//                          … — the ship has sailed` (+ `-360x604`)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
@@ -152,6 +185,7 @@ import {
 } from './fixtures.ts'
 import {
   bayRect,
+  dockHit,
   hireSheet,
   openSheet,
   policyOff,
@@ -346,6 +380,8 @@ test.describe('M1 shots', () => {
         hud: sm.isActive('HUD'),
         attract: api.attractSim !== null && api.core === api.attractSim,
         vehicles: api.core.state.vehicles.length,
+        level: api.core.state.level.level,
+        docks: api.core.state.districts['docks']?.live ? 'live' : 'locked',
       }
     })
     console.log(`shots: title ${JSON.stringify(st)}`)
@@ -354,8 +390,11 @@ test.describe('M1 shots', () => {
       logoVisible: true,
       hud: false,
       attract: true,
+      docks: 'live',
     })
-    expect(st.vehicles).toBeGreaterThanOrEqual(4)
+    // M8: the L3 attract city (tools/fixtures/attract.ts).
+    expect(st.level).toBeGreaterThanOrEqual(3)
+    expect(st.vehicles).toBeGreaterThanOrEqual(6)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
@@ -982,15 +1021,17 @@ async function levelUpAt(
   page: Page,
   pm: PmHelpers,
   url: string,
-  focus: 'warehouse' | 'industrial' | null,
+  focus: 'warehouse' | 'industrial' | 'docks' | null,
+  name: 'level-up' | 'level-up-3' = 'level-up',
+  level = 2,
 ): Promise<void> {
   await pm.open(url)
-  const { fixture } = await loadFixture(page, pm, 'level-up')
+  const { fixture } = await loadFixture(page, pm, name)
   await pm.settle(5)
   if (focus === 'warehouse') await focusCity(page, await warehouseCentre(page))
-  else if (focus === 'industrial') {
+  else if (focus !== null) {
     // The chip's own pan (pm:panTo), one frame per 16 ms until it lands.
-    await emit(page, 'pm:panTo', { regionId: 'industrial' })
+    await emit(page, 'pm:panTo', { regionId: focus })
     await pm.settle(40)
   }
   await pm.freeze()
@@ -1016,8 +1057,8 @@ async function levelUpAt(
     ev.off('level:up', fn)
     return { level: got.level, frames }
   }, capFrames)
-  console.log(`shots: level:up after ${w.frames} frames`)
-  expect(w.level, 'the fixture levels up to 2').toBe(2)
+  console.log(`shots: ${name} level:up after ${w.frames} frames`)
+  expect(w.level, `the fixture levels up to ${level}`).toBe(level)
 }
 
 /** The HUD newspaper: the paper on screen (kind) and whether it shows. */
@@ -1948,7 +1989,7 @@ test.describe('M6 shots', () => {
 
   test('warehouse-two-desks', async ({ page, pm, consoleErrors }) => {
     phoneOnly()
-    // people-l3.json (tools/fixtures/people.ts): L3 by debug.forceLevel,
+    // people-l3.json (tools/fixtures/people.ts): L3 (a real one since M8),
     // desk 2 in slot 3 with a charisma-2 inspector and a colleague. Loaded
     // without the policy: its dock-blocked rule could seat a new inspector
     // at desk 1 during the settle.
@@ -2461,6 +2502,427 @@ test.describe('M7 shots', () => {
     const texts = await sceneTexts(page, 'HUD')
     expect(texts).toContain('TYCOON')
     await pm.shot(shotName('victory-card'), 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M8 ------------------------------------------------------------------
+
+/**
+ * Real 16-ms frames at `speed`× until `cond(api)` has held for `hold`
+ * frames in a row (cap `capFrames`), then back to 1×: every sprite the view
+ * shows comes in its own time, as in play (a sim-only advance would spawn
+ * them all on one frame); `hold` > 1 skips one-tick states.
+ */
+async function framesUntil(
+  page: Page,
+  cond: string,
+  capFrames: number,
+  speed: 1 | 2 | 4 = 4,
+  hold = 1,
+): Promise<{ ok: boolean; frames: number; tick: number }> {
+  return page.evaluate(
+    ([src, cap, sp, h]) => {
+      const api = window.__pm!
+      const f = new Function('api', `return (${src as string})`) as (
+        a: typeof api,
+      ) => boolean
+      api.speed(sp as 1 | 2 | 4)
+      let frames = 0
+      let run = f(api) ? 1 : 0
+      while (run < (h as number) && frames < (cap as number)) {
+        api.step(16)
+        frames++
+        run = f(api) ? run + 1 : 0
+      }
+      api.speed(1)
+      return { ok: run >= (h as number), frames, tick: api.sim.tick }
+    },
+    [cond, capFrames, speed, hold] as const,
+  )
+}
+
+/** The City's hub probe (CityScene.hubProbe) plus the vessel's phase t. */
+function hubState(
+  page: Page,
+  hub: string,
+): Promise<{ phase: string; ring: number | null; t: number } | null> {
+  return page.evaluate((h) => {
+    const city = window.__pm!.game.scene.getScene('City') as unknown as {
+      hubProbe(id: string): { phase: string; ring: number | null } | null
+      hubViews: Map<string, { state: { phase: string; t: number } }>
+    }
+    const p = city.hubProbe(h)
+    const v = city.hubViews.get(h)
+    return p ? { ...p, t: v?.state.t ?? -1 } : null
+  }, hub)
+}
+
+/** The world position (anchor) of a hub's vessel prop and its image's. */
+function vesselAt(
+  page: Page,
+  hub: string,
+): Promise<{ home: Pt; img: Pt | null; visible: boolean } | null> {
+  return page.evaluate((h) => {
+    const api = window.__pm!
+    const row = api.data.map.hubs.find((x) => x.district === h)
+    if (!row) return null
+    const city = api.game.scene.getScene('City') as unknown as {
+      props: {
+        region: string
+        tile: readonly [number, number]
+        x: number
+        y: number
+        img: { x: number; y: number; visible: boolean } | null
+      }[]
+    }
+    const p = city.props.find(
+      (pv) =>
+        pv.region === h &&
+        pv.tile[0] === row.vessel.tile[0] &&
+        pv.tile[1] === row.vessel.tile[1],
+    )
+    if (!p) return null
+    return {
+      home: { x: p.x, y: p.y },
+      img: p.img ? { x: p.img.x, y: p.img.y } : null,
+      visible: p.img?.visible ?? false,
+    }
+  }, hub)
+}
+
+/** Zoom the City camera to `z` about the screen centre. */
+async function cityZoom(page: Page, z: 1 | 2): Promise<void> {
+  await page.evaluate((zz) => {
+    const api = window.__pm!
+    const city = api.game.scene.getScene('City') as unknown as {
+      rig: { zoomAt(z: 1 | 2, px: number, py: number): void }
+    }
+    const { width: W, height: H } = api.game.scale
+    city.rig.zoomAt(zz, Math.round(W / 2), Math.round(H / 2))
+  }, z)
+}
+
+test.describe('M8 shots', () => {
+  test('level-up-3', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, 'warehouse', 'level-up-3', 3)
+    // 38 frames = 608 ms: dust frame 2 (500-749 ms), the stamp rising.
+    await pm.shot('level-up-3', 38)
+    const st = await page.evaluate(() => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        construction: { start: number } | null
+        time: { now: number }
+      }
+      const c = city.construction
+      return { ms: c ? city.time.now - c.start : null }
+    })
+    console.log(`shots: level-up-3 construction at ${JSON.stringify(st)}`)
+    expect(st.ms, 'the construction overlay is up').not.toBeNull()
+    expect(st.ms!).toBeGreaterThanOrEqual(500)
+    expect(st.ms!).toBeLessThan(750)
+    expect((await paperState(page)).visible, 'no paper over the moment').toBe(
+      false,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('docks-live', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await levelUpAt(page, pm, POLICY, 'docks', 'level-up-3', 3)
+    // 100 frames = 1.6 s: the 1-s fog cross-fade and the sign pop are done.
+    await pm.shot('docks-live', 100)
+    const st = await page.evaluate(() => {
+      const city = window.__pm!.game.scene.getScene('City') as unknown as {
+        byDistrict: Map<
+          string,
+          { id: string; image: { frame: { name: string } } | null }[]
+        >
+      }
+      return {
+        region: window.__pm!.sim.regionState('docks'),
+        chips: (
+          window.__pm!.game.scene.getScene('HUD') as unknown as {
+            chips: { entry: { id: string; lockLevel: number | null } }[]
+          }
+        ).chips.map((c) => `${c.entry.id}:${c.entry.lockLevel ?? ''}`),
+        frames: (city.byDistrict.get('docks') ?? []).map(
+          (v) => `${v.id}:${v.image?.frame.name ?? '-'}`,
+        ),
+      }
+    })
+    console.log(`shots: docks-live ${JSON.stringify(st)}`)
+    expect(st.region).toBe('live')
+    expect(st.chips).toContain('docks:')
+    expect(st.frames.length).toBeGreaterThan(0)
+    for (const f of st.frames) expect(f, 'in colour').not.toMatch(/_locked$/)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-tier3', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await levelUpAt(page, pm, WH_POLICY, null, 'level-up-3', 3)
+    // 64 frames ≈ 1 s: the 400-ms tier cross-fade and the shelf re-grid.
+    await pm.shot(shotName('warehouse-tier3'), 64)
+    // The clock is frozen, so this reads the state the PNG shows: the fade
+    // is over (no tier part or the sign text mid-tween — the ghost copies of
+    // the old frames run the same 400 ms —, every tier-only part at full
+    // alpha or hidden, the floor on t3 frames).
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      type Obj = { visible: boolean; alpha: number }
+      const wh = api.game.scene.getScene('Warehouse') as unknown as {
+        tweens: { isTweening(o: unknown): boolean }
+        lane: {
+          tier: number
+          bulb: Obj
+          strips: Obj[]
+          plates: Obj[]
+          props: Map<number, Obj[]>
+          signText: Obj
+          floorImgs: { img: { frame: { name: string } } }[]
+        }
+      }
+      const L = wh.lane
+      const parts: [string, Obj][] = [
+        ['bulb', L.bulb],
+        ['sign', L.signText],
+        ...L.strips.map((o, i): [string, Obj] => [`strip${i}`, o]),
+        ...L.plates.map((o, i): [string, Obj] => [`plate${i}`, o]),
+        ...[...L.props].flatMap(([g, imgs]) =>
+          imgs.map((o, i): [string, Obj] => [`props${g}.${i}`, o]),
+        ),
+      ]
+      const fading = parts
+        .filter(
+          ([, o]) => wh.tweens.isTweening(o) || (o.visible && o.alpha < 1),
+        )
+        .map(([n]) => n)
+      const shown = (g: number): boolean =>
+        (L.props.get(g) ?? []).every((o) => o.visible)
+      return {
+        warehouse: api.game.scene.isActive('Warehouse'),
+        level: api.sim.level,
+        tier: L.tier,
+        fading,
+        bulb: L.bulb.visible,
+        strips: L.strips.every((o) => o.visible),
+        props3: shown(3),
+        props2: (L.props.get(2) ?? []).some((o) => o.visible),
+        floorT3: L.floorImgs.every((f) =>
+          f.img.frame.name.startsWith('floor_t3'),
+        ),
+        shelfCap: api.core.state.lane.nodes.find((n) => n.id === 'shelf')?.cap,
+        holdCap: api.sim.holdBay.cap,
+      }
+    })
+    console.log(`shots: warehouse-tier3 ${JSON.stringify(st)}`)
+    expect(st).toMatchObject({ warehouse: true, level: 3, tier: 3 })
+    expect(st.fading, 'the tier cross-fade has finished').toEqual([])
+    expect(st).toMatchObject({
+      bulb: false,
+      strips: true,
+      props3: true,
+      props2: false,
+      floorT3: true,
+    })
+    expect((await paperState(page)).visible, 'no paper over the room').toBe(
+      false,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-two-docks', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    test.setTimeout(180_000)
+    await pm.open(WH_POLICY)
+    const { fixture } = await loadFixture(page, pm, 'l3-docks')
+    await pm.settle(16)
+    // Real frames at 4× until both docks have held a docked vehicle for ~1 s
+    // (DockView's rule: a `docked_*` state, not just assigned — ≈ 47 s of sim).
+    const w = await framesUntil(
+      page,
+      `api.core.state.lane.docks.length === 2 && api.core.state.lane.docks.every((d) => api.core.state.vehicles.find((v) => v.id === d.vehicleId)?.state.startsWith('docked') === true)`,
+      4000,
+      4,
+      16, // ≈ 1 s of sim at 4× (seed 7: both docked from 46.1 s to 54 s)
+    )
+    console.log(`shots: warehouse-two-docks both busy ${JSON.stringify(w)}`)
+    expect(w.ok, 'both docks unloading').toBe(true)
+    await pm.shot(shotName('warehouse-two-docks'), 20)
+    const st = await page.evaluate(() => {
+      const api = window.__pm!
+      return {
+        warehouse: api.game.scene.isActive('Warehouse'),
+        slots: api.sim.lane
+          .dockSlots()
+          .map(
+            (d) =>
+              `${d.index}:${d.owned ? 'owned' : d.available ? 'buy' : 'locked'}`,
+          ),
+        docks: api.core.state.lane.docks.map((d) => ({
+          id: d.id,
+          state:
+            api.core.state.vehicles.find((v) => v.id === d.vehicleId)?.state ??
+            null,
+        })),
+      }
+    })
+    console.log(`shots: warehouse-two-docks ${JSON.stringify(st)}`)
+    expect(st.warehouse).toBe(true)
+    expect(st.slots).toEqual(['1:owned', '2:owned', '3:locked'])
+    expect(st.docks.map((d) => d.id)).toEqual(fixture.docks)
+    for (const d of st.docks)
+      expect(d.state ?? '', `${d.id} docked`).toMatch(/^docked/)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('warehouse-dock-dialog', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // overseas-malware.json: a real L3 with dock 1 only (no level-up paper,
+    // no policy); the dialog opens whatever the balance.
+    await pm.open(WH_NEW)
+    await loadFixture(page, pm, 'overseas-malware')
+    await pm.settle(30)
+    expect(
+      await page.evaluate(() =>
+        window
+          .__pm!.sim.lane.dockSlots()
+          .map((d) => [d.index, d.available, d.owned]),
+      ),
+    ).toEqual([
+      [1, true, true],
+      [2, true, false],
+      [3, false, false],
+    ])
+    await tapRoomRect(page, pm, dockHit(2))
+    await pm.settle(16)
+    expect(
+      await sceneTarget(page, 'Warehouse', 'wh:dockDialog:confirm'),
+      'the dock 2 dialog is up',
+    ).not.toBeNull()
+    const texts = await sceneTexts(page, 'Warehouse')
+    console.log(
+      `shots: warehouse-dock-dialog ${JSON.stringify(texts.filter((t) => /dock|\$800/.test(t)))}`,
+    )
+    expect(texts).toContain('Loading dock 2')
+    expect(texts).toContain('$800 · a second door into slot 1')
+    expect(texts).toContain('Buy $800')
+    await pm.shot('warehouse-dock-dialog', 20)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('clearance-ring', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'l3-docks')
+    await pm.settle(5)
+    const office = fixture.officeId as string
+    await cityZoom(page, 2)
+    await focusCity(page, await buildingCentre(page, office))
+    await pm.settle(10)
+    // Sim-only to 20 s before the fixture clearance: the ring ~55 % drained.
+    const lead = (fixture.clearInS as number) - 20
+    await page.evaluate((ms) => window.__pm!.advance(ms), lead * 1000)
+    await focusCity(page, await buildingCentre(page, office))
+    await pm.settle(30)
+    const st = await hubState(page, 'docks')
+    const hub = await page.evaluate(() => {
+      const h = window.__pm!.sim.hub('docks')
+      return h
+        ? {
+            live: h.live,
+            office: h.office,
+            clearing: h.clearing.map((c) => c.parcelId),
+          }
+        : null
+    })
+    console.log(`shots: clearance-ring ${JSON.stringify({ st, hub, lead })}`)
+    expect(hub?.live).toBe(true)
+    expect(hub?.office).toBe(office)
+    expect(hub?.clearing[0]).toBe(fixture.clearingParcelId)
+    expect(st?.ring, 'a ring over the office').not.toBeNull()
+    expect(st!.ring!).toBeGreaterThan(0)
+    expect(st!.ring!).toBeLessThan(8)
+    await pm.shot('clearance-ring', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('ship-departure', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'l3-docks')
+    await pm.settle(5)
+    const v0 = await vesselAt(page, 'docks')
+    expect(v0, 'the Docks vessel prop').not.toBeNull()
+    // Half-way along the sail's first 2 s (t² ease: a quarter of `exit`).
+    await focusCity(page, { x: v0!.home.x - 40, y: v0!.home.y - 40 })
+    await pm.settle(10)
+    const capMs = ((fixture.clearInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('hub:departure', cap),
+      capMs,
+    )
+    console.log(
+      `shots: ship-departure hub:departure after ${w.waitedMs} ms ${JSON.stringify(w.payload)}`,
+    )
+    expect(w.ok, 'the fixture clearance sails the ship').toBe(true)
+    expect(w.payload!.hub).toBe('docks')
+    // shot(…, 0) renders no frame of its own: hide the overlay, stamp, then
+    // 2 s of frames (125 × 16 ms) from the departure frame.
+    await pm.overlay(false)
+    await pm.stamp('test')
+    await pm.settle(125)
+    const st = await hubState(page, 'docks')
+    const v = await vesselAt(page, 'docks')
+    console.log(`shots: ship-departure ${JSON.stringify({ st, v })}`)
+    expect(st?.phase).toBe('out')
+    expect(st!.t).toBeGreaterThan(0.4)
+    expect(st!.t).toBeLessThan(0.6)
+    expect(v?.visible).toBe(true)
+    expect(v!.img!.x, 'the ship moved west').toBeLessThan(v!.home.x)
+    await pm.shot('ship-departure', 0)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('lost-life-overseas', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    await pm.open(POLICY)
+    const { fixture } = await loadFixture(page, pm, 'overseas-malware')
+    await pm.settle(5)
+    await focusCity(
+      page,
+      await buildingCentre(page, fixture.destBuildingId as string),
+    )
+    const capMs = ((fixture.lifeLostInS as number) + 10) * 1000
+    const w = await page.evaluate(
+      (cap) => window.__pm!.waitEvent('life:lost', cap),
+      capMs,
+    )
+    console.log(
+      `shots: lost-life-overseas life:lost after ${w.waitedMs} ms ${JSON.stringify(w.payload?.report.path.slice(-3) ?? null)}`,
+    )
+    expect(w.ok, 'the handed-off malware clears').toBe(true)
+    expect(w.payload!.parcelId).toBe(fixture.parcelId)
+    expect(w.payload!.report.viaClearance).toBe(true)
+    expect(w.waitedMs).toBe(
+      Math.ceil((fixture.lifeLostInS as number) * 10) * 100,
+    )
+    expect(
+      await settleUntil(page, pm, async () => (await hudCards(page)).lost),
+      'the lost-life card opens (600 ms after the loss)',
+    ).toBe(true)
+    await pm.shot(shotName('lost-life-overseas'), 30)
+    const texts = await sceneTexts(page, 'HUD')
+    const route = texts.filter((t) => /^(Handed off at|Cleared) /.test(t))
+    console.log(`shots: lost-life-overseas route ${JSON.stringify(route)}`)
+    expect(route.length).toBe(2)
+    expect(route[0]).toMatch(/^Handed off at Prefetch Pier \d \d+:\d\d$/)
+    expect(route[1]).toMatch(/^Cleared \d+:\d\d — the ship has sailed$/)
+    expect(texts).toContain('MALWARE DELIVERED')
+    expect(await page.evaluate(() => window.__pm!.sim.lives)).toBe(
+      (fixture.lives as number) - 1,
+    )
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

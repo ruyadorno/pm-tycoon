@@ -11,6 +11,8 @@
 // the `delegating` policy — a sorter hired at L2 who takes over the Hold Bay
 // — 5 seeds × 60 min under the same Monitor, with saves while the sorter's
 // clock runs and while a tagged parcel waits, continuing identically.
+// Build 2, M8: both sweeps end at the playtest cap (L3 — the plan's Battery
+// checker REPLACE, dock 2, a van and a 2nd truck in the run).
 
 import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
@@ -49,7 +51,7 @@ describe('[long] the §7 policy, 20 seeds × 90 min: every invariant holds; save
       expect(run.monitor.problems).toEqual([])
       const s = sim.state
       expect(s.tick).toBe(90 * TICKS_PER_DAY)
-      expect(s.level.level).toBe(2)
+      expect(s.level.level).toBe(data.economy.playtestMaxLevel) // M8: L3
       expect(s.stats.minutes).toHaveLength(90)
       // The 60-minute checkpoint.
       const at60 = s.stats.minutes[59]!
@@ -101,7 +103,7 @@ describe('[long] the delegating policy, 5 seeds × 60 min: every invariant holds
       expect(run.monitor.problems).toEqual([])
       const s = sim.state
       expect(s.tick).toBe(60 * TICKS_PER_DAY)
-      expect(s.level.level).toBe(2)
+      expect(s.level.level).toBe(data.economy.playtestMaxLevel) // M8: L3
       // The policy hired one sorter at L2 and never fires, so it holds the station.
       const sorters = s.employees.filter((e) => e.role === 'sorter')
       expect(sorters).toHaveLength(1)

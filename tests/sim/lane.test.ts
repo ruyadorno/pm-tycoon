@@ -20,7 +20,9 @@ import {
   hireInspector,
   injectParcel,
   laneParcel,
+  makeSim,
   noCheckers,
+  openingA,
   placeMachine,
   quietSim,
   runTicks,
@@ -327,5 +329,20 @@ describe('conservation (plan.md §12.5 acceptance)', () => {
       expect(auditState(sim.state, data)).toEqual([])
     }
     expect(sim.state.stats.deliveries).toBeGreaterThan(10)
+  })
+
+  it('M8: with one conveyor the feed pointer stays 0 for a 10-minute run (bit-identical to the playtest-1 feed)', () => {
+    const sim = makeSim(3)
+    openingA(sim)
+    for (let t = 0; t < 6000; t++) {
+      sim.tick()
+      if (sim.state.lane.feedIndex !== 0) {
+        throw new Error(
+          `tick ${sim.state.tick}: feedIndex ${sim.state.lane.feedIndex}`,
+        )
+      }
+    }
+    expect(sim.state.lane.docks).toHaveLength(1)
+    expect(sim.state.stats.deliveries).toBeGreaterThan(20)
   })
 })

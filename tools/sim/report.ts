@@ -25,6 +25,17 @@
 // parcel's on-time count and the per-template offered / completed / failed
 // counts are printed. The --baseline Δ compares the seven playtest-1 rows
 // only.
+//
+// Build 2, M8 (spec-build2 §7.3; plan-build2 §8.5; design-m8-m9 §5.3): the
+// L3 rows level3Min (15-20 min) and firstOverseasClearedAfterLevel3MaxMin
+// (≤ 3 min from L3 to the first parcel:cleared) are gated behind
+// SIM_FEATURES.levels3plus, level4Min / level5Min behind levels45 (M9). A
+// level row is informational in --quick ("informational (quick)") and on a
+// run shorter than its upper bound ("informational (run < N min)"; the
+// overseas row needs the L3 bound + its own), so `vlr check`'s 3 × 20 min
+// never fails on L3. Printed: overseasCleared, overseasLivesLost (life:lost
+// with report.viaClearance), dock2Min / dock3Min (dock:bought); the gate
+// table gains L3_min, ovs+min, L4_min, L5_min.
 
 import type { PacingTargets } from '../../src/data/types.ts'
 import type { SimEventName } from '../../src/sim/events.ts'
@@ -234,8 +245,24 @@ export class Highlights {
       }
       case 'ticker:news':
         return e.kind === 'strain' ? `${at} ${String(e.text)}` : null
-      case 'life:lost':
-        return `${at} LIFE LOST: #${e.parcelId} ${e.label} → ${e.destBuildingId} (lives ${s.economy.lives})`
+      case 'life:lost': {
+        const via = (e.report as { viaClearance?: boolean } | undefined)
+          ?.viaClearance
+        return `${at} LIFE LOST${via === true ? ' at clearance' : ''}: #${e.parcelId} ${e.label} → ${e.destBuildingId} (lives ${s.economy.lives})`
+      }
+      case 'dock:bought':
+        return `${at} bought loading dock ${e.index}`
+      case 'parcel:handedOff':
+        return this.#first('handedOff')
+          ? `${at} first hand-off #${e.id} at ${e.buildingId} (locked $${e.lockedValue})`
+          : null
+      case 'parcel:cleared':
+        if (e.malware === true) {
+          return `${at} malware cleared at ${e.hub} #${e.id} (the ship has sailed)`
+        }
+        return this.#first('clearedOverseas')
+          ? `${at} first overseas clearance #${e.id} at ${e.hub}: $${e.paid}`
+          : null
       case 'quest:offered':
         return `${at} quest ${e.questId} offered: ${e.templateId}${e.target === null ? '' : ` (${String(e.target)})`}${e.ultimate === true ? ' — ULTIMATE' : ''}`
       case 'quest:accepted': {
@@ -314,6 +341,15 @@ export interface RunMetrics {
   level3Min: number | null
   level4Min: number | null
   level5Min: number | null
+  /** M8: minutes from level:up {3} to the first parcel:cleared; null if either never happened. */
+  firstOverseasClearedAfterLevel3Min: number | null
+  /** M8: parcel:cleared over the run (malware included). */
+  overseasCleared: number
+  /** M8: life:lost at a clearance (report.viaClearance). */
+  overseasLivesLost: number
+  /** M8: minute of dock:bought {index: 2} / {index: 3}, or null. */
+  dock2Min: number | null
+  dock3Min: number | null
   /** M6: stats.payrollPaid ÷ stats.income (gross), 3 dp; null with no income yet. */
   payrollShareOfGross: number | null
   /** M6: sorter:decided calls. */
@@ -385,7 +421,37 @@ export const WINDOW_NEEDS: Partial<Record<keyof PacingTargets, SimFeature[]>> =
     payrollShareOfGrossMax: ['people'],
     questsOfferedBy30MinMin: ['quests'],
     questsCompletedBy30MinMin: ['quests'],
+    level3Min: ['levels3plus'],
+    firstOverseasClearedAfterLevel3MaxMin: ['levels3plus'],
+    level4Min: ['levels45'],
+    level5Min: ['levels45'],
   }
+
+/** The level windows (M8-M9): informational in --quick and on a run shorter than their upper bound. */
+export const LEVEL_KEYS: readonly (keyof PacingTargets)[] = [
+  'level3Min',
+  'firstOverseasClearedAfterLevel3MaxMin',
+  'level4Min',
+  'level5Min',
+]
+
+/**
+ * The run length a level window needs (its upper bound, from the targets):
+ * level3Min / level4Min / level5Min their window's end; the first overseas
+ * clearance the L3 window's end + its own maximum. Null for any other key.
+ */
+export function levelWindowMinutes(
+  key: keyof PacingTargets,
+  t: PacingTargets,
+): number | null {
+  if (key === 'level3Min') return t.level3Min[1]
+  if (key === 'level4Min') return t.level4Min[1]
+  if (key === 'level5Min') return t.level5Min[1]
+  if (key === 'firstOverseasClearedAfterLevel3MaxMin') {
+    return t.level3Min[1] + t.firstOverseasClearedAfterLevel3MaxMin
+  }
+  return null
+}
 
 /** The windows read over the first QUEST_WINDOW_MIN minutes (informational on a shorter run). */
 const WINDOW_MIN_MINUTES: Partial<Record<keyof PacingTargets, number>> = {
@@ -406,19 +472,37 @@ export const PLAYTEST1_KEYS: readonly (keyof PacingTargets)[] = [
 
 export type SimFeatures = Record<SimFeature, boolean>
 
+/** How a run was made, for the level windows' notes (M8). */
+export interface WindowContext {
+  /** The quick gate (`--quick`): every level window is informational. */
+  quick?: boolean
+  /** The targets, for the level windows' run-length rule. */
+  targets?: PacingTargets
+}
+
 /**
  * null when every system the window needs is built, else "informational
  * (Mn)"; a window read over the first 30 minutes on a shorter run (the
- * quick gate's 20) is "informational (minutes too short)".
+ * quick gate's 20) is "informational (minutes too short)"; a level window
+ * (M8) is "informational (quick)" in --quick and "informational (run < N
+ * min)" on a run shorter than its upper bound (given `ctx.targets`).
  */
 export function windowNote(
   key: keyof PacingTargets,
   features: SimFeatures = SIM_FEATURES,
   minutes: number | null = null,
+  ctx: WindowContext = {},
 ): string | null {
   const missing = (WINDOW_NEEDS[key] ?? []).filter((f) => !features[f])
   const first = missing[0]
   if (first !== undefined) return `informational (${FEATURE_MILESTONE[first]})`
+  if (LEVEL_KEYS.includes(key)) {
+    if (ctx.quick === true) return 'informational (quick)'
+    const lvl = ctx.targets ? levelWindowMinutes(key, ctx.targets) : null
+    return lvl !== null && minutes !== null && minutes < lvl
+      ? `informational (run < ${lvl} min)`
+      : null
+  }
   const need = WINDOW_MIN_MINUTES[key]
   return need !== undefined && minutes !== null && minutes < need
     ? 'informational (minutes too short)'
@@ -490,6 +574,11 @@ export function computeMetrics(
     (e) => e.name === 'parcel:flagged' && e.scripted === true,
   )
   const quests = questMetrics(events, endTick)
+  const l3 = levelTick(3)
+  const cleared = events.filter((e) => e.name === 'parcel:cleared')
+  const firstCleared = cleared[0]?.tick ?? null
+  const dockTick = (index: number): number | null =>
+    firstTick((e) => e.name === 'dock:bought' && e.index === index)
   return {
     seed,
     minutes,
@@ -509,9 +598,22 @@ export function computeMetrics(
       (e) => e.name === 'parcel:tossed' && e.wasMalware === false,
     ).length,
     malwareShareAtEnd: last ? last.malShare : 0,
-    level3Min: toMin(levelTick(3)),
+    level3Min: toMin(l3),
     level4Min: toMin(levelTick(4)),
     level5Min: toMin(levelTick(5)),
+    firstOverseasClearedAfterLevel3Min:
+      l3 === null || firstCleared === null
+        ? null
+        : toMin(Math.max(0, firstCleared - l3)),
+    overseasCleared: cleared.length,
+    overseasLivesLost: events.filter(
+      (e) =>
+        e.name === 'life:lost' &&
+        (e.report as { viaClearance?: boolean } | undefined)?.viaClearance ===
+          true,
+    ).length,
+    dock2Min: toMin(dockTick(2)),
+    dock3Min: toMin(dockTick(3)),
     payrollShareOfGross:
       stats.income > 0 ? round(stats.payrollPaid / stats.income, 3) : null,
     sorterDecisions: calls.length,
@@ -653,16 +755,30 @@ export interface GateInputs {
   /** M7 (gated behind SIM_FEATURES.quests). */
   questsOffered30: number | null
   questsCompleted30: number | null
+  /** M8 (gated behind levels3plus; L4-L5 behind levels45, M9). Absent = never. */
+  level3Min?: number | null
+  firstOverseasClearedAfterLevel3Min?: number | null
+  level4Min?: number | null
+  level5Min?: number | null
   /** Run length; a quest window on a run shorter than QUEST_WINDOW_MIN is informational. Absent = full. */
   minutes?: number
+  /** M8: the quick gate — every level window is informational. */
+  quick?: boolean
 }
 
 const le = (v: number | null, max: number): boolean => v !== null && v <= max
 
+/** A level window: inside [lo, hi] (null = never reached = fail). */
+const inRange = (
+  v: number | null | undefined,
+  [lo, hi]: readonly [number, number],
+): boolean => v !== null && v !== undefined && v >= lo && v <= hi
+
 /**
- * The seven playtest-1 windows (spec §7, plan.md §6.9.2) and the two M7
- * quest rows (spec-build2 §7.3) against economy.pacingTargets. `override`
- * (e.g. "informational (delegating)") notes every window, so none gates.
+ * The seven playtest-1 windows (spec §7, plan.md §6.9.2), the two M7
+ * quest rows and the M8-M9 level rows (spec-build2 §7.3) against
+ * economy.pacingTargets. `override` (e.g. "informational (delegating)")
+ * notes every window, so none gates.
  */
 export function checkMetrics(
   m: GateInputs,
@@ -741,10 +857,42 @@ export function checkMetrics(
         m.questsCompleted30 !== null &&
         m.questsCompleted30 >= t.questsCompletedBy30MinMin,
     },
+    {
+      key: 'level3Min',
+      metric: 'level3Min',
+      target: `${t.level3Min[0]}-${t.level3Min[1]} min`,
+      value: m.level3Min ?? null,
+      pass: inRange(m.level3Min, t.level3Min),
+    },
+    {
+      key: 'firstOverseasClearedAfterLevel3MaxMin',
+      metric: 'firstOverseasClearedAfterLevel3Min',
+      target: `≤ ${t.firstOverseasClearedAfterLevel3MaxMin} min after L3`,
+      value: m.firstOverseasClearedAfterLevel3Min ?? null,
+      pass: le(
+        m.firstOverseasClearedAfterLevel3Min ?? null,
+        t.firstOverseasClearedAfterLevel3MaxMin,
+      ),
+    },
+    {
+      key: 'level4Min',
+      metric: 'level4Min',
+      target: `${t.level4Min[0]}-${t.level4Min[1]} min`,
+      value: m.level4Min ?? null,
+      pass: inRange(m.level4Min, t.level4Min),
+    },
+    {
+      key: 'level5Min',
+      metric: 'level5Min',
+      target: `${t.level5Min[0]}-${t.level5Min[1]} min`,
+      value: m.level5Min ?? null,
+      pass: inRange(m.level5Min, t.level5Min),
+    },
   ]
+  const ctx: WindowContext = { quick: m.quick === true, targets: t }
   return checks.map((c) => ({
     ...c,
-    note: override ?? windowNote(c.key, features, m.minutes ?? null),
+    note: override ?? windowNote(c.key, features, m.minutes ?? null, ctx),
   }))
 }
 
@@ -770,6 +918,11 @@ export interface MedianMetrics extends GateInputs {
   level3Min: number | null
   level4Min: number | null
   level5Min: number | null
+  firstOverseasClearedAfterLevel3Min: number | null
+  overseasCleared: number | null
+  overseasLivesLost: number | null
+  dock2Min: number | null
+  dock3Min: number | null
   payrollShareOfGross: number | null
   sorterDecisions: number | null
   sorterWrongToss: number | null
@@ -801,6 +954,13 @@ export function medianMetrics(runs: readonly RunMetrics[]): MedianMetrics {
     level3Min: pick('level3Min'),
     level4Min: pick('level4Min'),
     level5Min: pick('level5Min'),
+    firstOverseasClearedAfterLevel3Min: pick(
+      'firstOverseasClearedAfterLevel3Min',
+    ),
+    overseasCleared: pick('overseasCleared'),
+    overseasLivesLost: pick('overseasLivesLost'),
+    dock2Min: pick('dock2Min'),
+    dock3Min: pick('dock3Min'),
     payrollShareOfGross: pick('payrollShareOfGross'),
     sorterDecisions: pick('sorterDecisions'),
     sorterWrongToss: pick('sorterWrongToss'),
@@ -859,8 +1019,14 @@ export function seedResult(
   asserts: string[],
   features: SimFeatures = SIM_FEATURES,
   override: string | null = null,
+  quick = false,
 ): SeedResult {
-  const checks = checkMetrics(metrics, targets, features, override)
+  const checks = checkMetrics(
+    { ...metrics, quick },
+    targets,
+    features,
+    override,
+  )
   return {
     metrics,
     checks,
@@ -886,13 +1052,15 @@ export function summarise(
     minutes: number
     targets: PacingTargets
     features?: SimFeatures
+    /** M8: the quick gate (every level window informational). */
+    quick?: boolean
   },
 ): GateSummary {
   const features = meta.features ?? SIM_FEATURES
   const delegating = meta.policy === 'delegating'
   const medians = medianMetrics(runs.map((r) => r.metrics))
   const checks = checkMetrics(
-    { ...medians, minutes: meta.minutes },
+    { ...medians, minutes: meta.minutes, quick: meta.quick === true },
     meta.targets,
     features,
     delegating ? DELEGATING_NOTE : null,
@@ -902,6 +1070,7 @@ export function summarise(
   const people =
     windowNote('payrollShareOfGrossMax', features) ?? 'informational'
   const quests = features.quests ? 'informational' : build2
+  const l3 = features.levels3plus ? 'informational' : build2
   const metrics = runs.map((r) => r.metrics)
   const plateau = metrics.filter((m) => m.questActive7to13 === 1).length
   const magicOffered = metrics.reduce((n, m) => n + (m.magicSpawned ?? 0), 0)
@@ -930,24 +1099,6 @@ export function summarise(
       target: `share at ${meta.minutes} min`,
       median: medians.malwareShareAtEnd,
       note: 'informational',
-    },
-    {
-      key: 'level3Min',
-      target: `${t.level3Min[0]}-${t.level3Min[1]} min`,
-      median: medians.level3Min,
-      note: build2,
-    },
-    {
-      key: 'level4Min',
-      target: `${t.level4Min[0]}-${t.level4Min[1]} min`,
-      median: medians.level4Min,
-      note: build2,
-    },
-    {
-      key: 'level5Min',
-      target: `${t.level5Min[0]}-${t.level5Min[1]} min`,
-      median: medians.level5Min,
-      note: build2,
     },
     {
       key: 'payrollShareOfGross',
@@ -990,10 +1141,28 @@ export function summarise(
         ]
       : []),
     {
-      key: 'firstOverseasClearedAfterLevel3MaxMin',
-      target: `≤ ${t.firstOverseasClearedAfterLevel3MaxMin} min after L3`,
-      median: null,
-      note: build2,
+      key: 'overseasCleared',
+      target: 'overseas clearances (parcel:cleared, malware included)',
+      median: medians.overseasCleared,
+      note: l3,
+    },
+    {
+      key: 'overseasLivesLost',
+      target: 'lives lost at a clearance (the ship has sailed)',
+      median: medians.overseasLivesLost,
+      note: l3,
+    },
+    {
+      key: 'dock2Min',
+      target: 'minute loading dock 2 is bought',
+      median: medians.dock2Min,
+      note: l3,
+    },
+    {
+      key: 'dock3Min',
+      target: 'minute loading dock 3 is bought',
+      median: medians.dock3Min,
+      note: features.levels45 ? 'informational' : 'informational (M9)',
     },
     {
       key: 'goldenReleaseOfferedMaxMin',
@@ -1191,6 +1360,14 @@ const GATE_COLS: readonly {
   { head: 'qOff', w: 4, cell: (m) => count(m.questsOffered30) },
   { head: 'qDone', w: 5, cell: (m) => count(m.questsCompleted30) },
   { head: 'q7-13', w: 5, cell: (m) => count(m.questActive7to13) },
+  { head: 'L3_min', w: 7, cell: (m) => num(m.level3Min, 2) },
+  {
+    head: 'ovs+min',
+    w: 7,
+    cell: (m) => num(m.firstOverseasClearedAfterLevel3Min, 2),
+  },
+  { head: 'L4_min', w: 7, cell: (m) => num(m.level4Min, 2) },
+  { head: 'L5_min', w: 7, cell: (m) => num(m.level5Min, 2) },
 ]
 
 /** An integer count (a median of counts may end in .5). */

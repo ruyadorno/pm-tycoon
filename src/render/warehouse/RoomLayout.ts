@@ -26,6 +26,17 @@
 // the rack (HOLD_STATION, not a lane node: `stationAt`, never `nodeAt`), the
 // wanted poster and the tier props moved up the east column to make room,
 // and the sorter walks in from the dock door along `stationWalkPath`.
+//
+// M8 (spec-build2 §4.1, §4.4; design-m8-m9 §6.1, R7, R13): docks 2–3 open
+// their doors on the west wall 64 px apart (`dockGeom(k)`: door, tail, lamp,
+// door point, hit) and their conveyors are 24 × 56 roller pads east of the
+// door (`dock_pad`, six mini-parcel spots head first; the parcels hop onto
+// conv1's line toward slot 1). The pads push the desk's west hit strip, the
+// inspector's w1 stand point and the workers' aisle 8–12 px east on every
+// tier. `new FixedLaneLayout(tier)`: tiers ≥ 3 use the 20 × 5 @ 11 px shelf
+// grid (100 cells ≥ the L3–L5 caps 60 / 80 / 100), tiers 1–2 the 18 × 3 @ 12
+// one; `propsFor(tier)` places the tier's props. The room keeps 14 rows
+// through tier 3 (room growth is M9).
 
 export interface Point {
   x: number
@@ -122,6 +133,49 @@ export const SHELF_COLS = 18
 export const SHELF_ROWS = 3
 export const SHELF_PITCH = 12
 export const SHELF_ORIGIN = { x: 38, y: 390 } as const
+
+/** A shelf mini grid: `cols × rows` 10 × 10 minis at `pitch` from `origin` (top-left of mini 0). */
+export interface ShelfGrid {
+  cols: number
+  rows: number
+  pitch: number
+  origin: Point
+}
+
+/** Tiers 1–2 (§1.8): 18 × 3 @ 12 px from (38, 390) — 54 cells. */
+export const SHELF_GRID_T1: ShelfGrid = {
+  cols: SHELF_COLS,
+  rows: SHELF_ROWS,
+  pitch: SHELF_PITCH,
+  origin: { ...SHELF_ORIGIN },
+}
+
+/**
+ * Tiers ≥ 3 (design-m8-m9 §6.1, R13): 20 × 5 @ 11 px from (35, 388) — 100
+ * cells, the L3–L5 caps 60 / 80 / 100; `shelf_t3+` draws its five wire-deck
+ * rows under exactly these cells (minis at canvas (3 + 11c, 4 + 11r)).
+ */
+export const SHELF_GRID_T3: ShelfGrid = {
+  cols: 20,
+  rows: 5,
+  pitch: 11,
+  origin: { x: 35, y: 388 },
+}
+
+/** The most cells any tier's grid has (the renderer's mini pool). */
+export const SHELF_MAX_CELLS = SHELF_GRID_T3.cols * SHELF_GRID_T3.rows
+
+/** The shelf grid of warehouse tier `tier`. */
+export function shelfGrid(tier: number): ShelfGrid {
+  return tier >= 3 ? SHELF_GRID_T3 : SHELF_GRID_T1
+}
+
+/** Cell i (oldest first, wrapping past the last cell) of `g`: top-left of its 10 × 10 mini. */
+export function shelfCellIn(g: ShelfGrid, i: number): Point {
+  const c = i % g.cols
+  const r = Math.floor(i / g.cols) % g.rows
+  return { x: g.origin.x + c * g.pitch, y: g.origin.y + r * g.pitch }
+}
 export const SHELF_BADGE = { x: 212, y: 372, w: 40, h: 16 } as const
 /** Quarantine-bin counter centre (bin plate, artUi hand-off). */
 export const BIN_COUNTER = { x: 288, y: 436 } as const
@@ -138,6 +192,73 @@ export const LOCKED_DOORS: readonly Rect[] = [
   { x: 0, y: 100, w: 32, h: 56 },
   { x: 0, y: 164, w: 32, h: 56 },
 ]
+/** Loading docks on the west wall (dock 1 + economy.json docks 2–3). */
+export const DOCK_COUNT = 3
+/** Dock k's parts are dock 1's moved down DOCK_PITCH × (k − 1). */
+export const DOCK_PITCH = 64
+/**
+ * The roller pad of docks 2–3 (interior-prop `dock_pad`, 24 × 56) east of
+ * the door, door.y to door.y + 55 (design-m8-m9 §6.1, R7): the conveyor
+ * `conv2` / `conv3` of the sim, drawn as a pad because a belt from doors 2–3
+ * would cross the desk strip.
+ */
+export const DOCK_PAD = { x: 32, w: 24, h: 56 } as const
+/**
+ * The pad's six mini-parcel spots (centres, head first: the north pair
+ * leaves next), relative to the pad's top-left.
+ */
+export const PAD_SPOTS: readonly Point[] = [
+  { x: 7, y: 11 },
+  { x: 18, y: 11 },
+  { x: 7, y: 27 },
+  { x: 18, y: 27 },
+  { x: 7, y: 43 },
+  { x: 18, y: 43 },
+]
+/** Where a pad parcel joins conv1's line on its way to slot 1. */
+export const PAD_EXIT: Point = { x: 44, y: 64 }
+
+/** One loading dock's room parts (design-m8-m9 §6.1 table). */
+export interface DockGeom {
+  /** 1..3 (the dock number, `dock<index>`). */
+  index: number
+  door: Rect
+  /** The docked vehicle's tail (40 × 40) at rest. */
+  tail: Rect
+  /** The wall lamp (8 × 8) top-left. */
+  lamp: Point
+  /** Where unloaded parcels and walking workers come through the door. */
+  doorPoint: Point
+  /** Docks 2–3: the conveyor's roller pad; dock 1 feeds the belt (null). */
+  pad: Rect | null
+  /** Tap rect: dock 1 the belt area west of the column; docks 2–3 door + pad (56 × 56). */
+  hit: Rect
+}
+
+/** Dock number of `dock3` / `conv3` (any id ending in its number), else NaN. */
+export function dockIndexOf(id: string): number {
+  const m = /^(?:dock|conv)([1-9]\d*)$/.exec(id)
+  return m ? Number(m[1]) : Number.NaN
+}
+
+/** The parts of loading dock `index` (1..DOCK_COUNT), else null. */
+export function dockGeom(index: number): DockGeom | null {
+  if (!Number.isInteger(index) || index < 1 || index > DOCK_COUNT) return null
+  const dy = DOCK_PITCH * (index - 1)
+  const door: Rect = { ...DOOR, y: DOOR.y + dy }
+  const first = index === 1
+  return {
+    index,
+    door,
+    tail: { ...TAIL, y: TAIL.y + dy },
+    lamp: first ? { ...DOCK_LAMP } : { x: DOCK_LAMP.x, y: door.y - 8 },
+    doorPoint: { x: DOOR_POINT.x, y: DOOR_POINT.y + dy },
+    pad: first ? null : { x: DOCK_PAD.x, y: door.y, w: DOCK_PAD.w, h: door.h },
+    hit: first
+      ? { x: 0, y: 32, w: 128, h: 64 }
+      : { x: 0, y: door.y, w: DOCK_PAD.x + DOCK_PAD.w, h: door.h },
+  }
+}
 /** North-wall sign and its BitmapText face (artUi: x 8..191, y 4..19). */
 export const SIGN = { x: 76, y: 4, w: 200, h: 24 } as const
 export const SIGN_TEXT = { x: 84, y: 8, w: 184, h: 16 } as const
@@ -159,9 +280,27 @@ export const PROPS_T1: readonly Point[] = [
   { x: 264, y: 236 },
 ]
 export const PROPS_T2: readonly Point[] = [{ x: 264, y: 196 }]
-/** Prop canvases (art/manifest.json `props_t1` / `props_t2`). */
+/**
+ * Tier 3 (M8): one 48 × 64 shrink-wrapped pallet + pallet jack where the
+ * tier-2 shelving unit stood (tiers 4–5 reuse the spot; their art falls back
+ * to the nearest lower tier until M9 draws it).
+ */
+export const PROPS_T3: readonly Point[] = [{ x: 264, y: 196 }]
+/** Prop canvases (art/manifest.json `props_t1` / `props_t2` / `props_t3`). */
 export const PROP_T1_SIZE = { w: 48, h: 48 } as const
 export const PROP_T2_SIZE = { w: 48, h: 64 } as const
+export const PROP_T3_SIZE = { w: 48, h: 64 } as const
+
+/** Which tier's prop set a room of tier `tier` shows (1, 2, or 3 for tiers ≥ 3). */
+export function propGroup(tier: number): 1 | 2 | 3 {
+  return tier >= 3 ? 3 : tier >= 2 ? 2 : 1
+}
+
+/** Top-left of every prop of tier `tier` (`props_t<tier>` art, per propGroup). */
+export function propsFor(tier: number): readonly Point[] {
+  const g = propGroup(tier)
+  return g === 1 ? PROPS_T1 : g === 2 ? PROPS_T2 : PROPS_T3
+}
 /** The wanted poster (32 × 32) and its tap rect padded to 44 (B2 §4.4). */
 export const POSTER = { x: 272, y: 120, w: 32, h: 32 } as const
 export const POSTER_HIT = { x: 266, y: 114, w: 44, h: 44 } as const
@@ -195,8 +334,16 @@ export const SORTER_ARM_AT: Point = {
  * the walker's 24 × 32 sprite (y 324–355) never passes under a plate.
  */
 export const STATION_ROW_Y = 352
-/** The aisle west of the desks the workers walk (feet x). */
-export const AISLE_X = 56
+/**
+ * The aisle west of the desks the workers walk (feet x). M8 (design-m8-m9
+ * R7): 68 (was 56), so a walker's 24-px sprite (x 56–79) clears the dock 2–3
+ * roller pads (x 32–55) and the desk sprite (x 80–127).
+ */
+export const AISLE_X = 68
+/** The desk's west hit strip starts here (M8: 56, east of the dock pads; was 48). */
+export const DESK_HIT_X = 56
+/** Inspector w1's feet x (M8: 68 on the aisle, was 60; sprite x 56–79). */
+export const W1_X = 68
 /** The rack lamp's `S` badge (m5x7 text top-left: cap y 110–116, x 245–249). */
 export const RACK_S_BADGE = { x: 245, y: 106 } as const
 /**
@@ -264,14 +411,9 @@ function extDef(k: number): NodeDef {
   }
 }
 
-/** Shelf cell i (oldest first): top-left of its 10 × 10 mini. */
+/** Shelf cell i (oldest first) of the tier-1/2 grid: top-left of its 10 × 10 mini. */
 export function shelfCell(i: number): Point {
-  const c = i % SHELF_COLS
-  const r = Math.floor(i / SHELF_COLS) % SHELF_ROWS
-  return {
-    x: SHELF_ORIGIN.x + c * SHELF_PITCH,
-    y: SHELF_ORIGIN.y + r * SHELF_PITCH,
-  }
+  return shelfCellIn(SHELF_GRID_T1, i)
 }
 
 /** Top-left of bay i's pad (44 × 44). */
@@ -279,8 +421,32 @@ export function bayRect(i: number): Rect {
   return { x: 196, y: 100 + BAY_PITCH * i, w: 44, h: 44 }
 }
 
-function buildTable(): Map<string, NodeDef> {
+/** Dock k ≥ 2 (M8): the door + pad node and its pad conveyor (design-m8-m9 §6.1). */
+function addDockDefs(t: Map<string, NodeDef>, k: number): void {
+  const g = dockGeom(k)
+  if (!g?.pad) return
+  const pad = g.pad
+  t.set(`dock${k}`, {
+    label: `Dock ${k}`,
+    rect: { ...g.hit },
+    hit: { ...g.hit },
+    anchors: { buffer: [], stations: [], entry: { ...g.doorPoint } },
+  })
+  t.set(`conv${k}`, {
+    label: `Conveyor ${k}`,
+    rect: { ...pad },
+    hit: null,
+    anchors: {
+      buffer: PAD_SPOTS.map((p) => ({ x: pad.x + p.x, y: pad.y + p.y })),
+      stations: [],
+      entry: { x: pad.x + pad.w / 2, y: pad.y + pad.h / 2 },
+    },
+  })
+}
+
+function buildTable(tier: number): Map<string, NodeDef> {
   const t = new Map<string, NodeDef>()
+  const grid = shelfGrid(tier)
   t.set('dock1', {
     label: 'Dock 1',
     rect: { x: 0, y: 32, w: 160, h: 64 },
@@ -301,6 +467,7 @@ function buildTable(): Map<string, NodeDef> {
       entry: { x: 42, y: 64 },
     },
   })
+  for (let k = 2; k <= DOCK_COUNT; k++) addDockDefs(t, k)
   for (let k = 1; k <= 4; k++) t.set(`slot${k}`, slotDef(k))
   t.set('slot5', extDef(5))
   t.set('slot6', extDef(6))
@@ -328,8 +495,8 @@ function buildTable(): Map<string, NodeDef> {
     rect: { x: 32, y: 384, w: 224, h: 64 },
     hit: { x: 32, y: 384, w: 224, h: 64 },
     anchors: {
-      buffer: Array.from({ length: SHELF_COLS * SHELF_ROWS }, (_, i) => {
-        const c = shelfCell(i)
+      buffer: Array.from({ length: grid.cols * grid.rows }, (_, i) => {
+        const c = shelfCellIn(grid, i)
         return { x: c.x + 5, y: c.y + 5 }
       }),
       stations: [],
@@ -343,14 +510,55 @@ const containsPt = (r: Rect, x: number, y: number): boolean =>
   x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h
 
 /**
- * The fixed playtest-1 lane (spec §6.1-§6.2): one dock, the dock conveyor,
- * slots 1–4 in the belt column, slots 5–6 as the dashed extension strip,
- * the Hold Bay rack, the Quarantine Bin and the shelf.
+ * The fixed lane (spec §6.1-§6.2): docks 1–3 (dock 1's belt, docks 2–3's
+ * pads), slots 1–4 in the belt column, slots 5–6 as the dashed extension
+ * strip, the Hold Bay rack, the Quarantine Bin and the shelf. `tier` (the
+ * levels.json warehouseTier, default 1) picks the shelf grid and the props.
  */
 export class FixedLaneLayout implements LaneLayout {
   readonly width = ROOM_W
   readonly height = ROOM_H
-  private readonly table = buildTable()
+  readonly tier: number
+  private readonly grid: ShelfGrid
+  private readonly table: Map<string, NodeDef>
+
+  constructor(tier = 1) {
+    this.tier = Math.max(1, Math.floor(tier))
+    this.grid = shelfGrid(this.tier)
+    this.table = buildTable(this.tier)
+  }
+
+  /** Loading dock `dockId`'s parts (`dock2`, or its conveyor `conv2`), else null. */
+  dockGeom(dockId: string): DockGeom | null {
+    return dockGeom(dockIndexOf(dockId))
+  }
+
+  /** True for a dock 2–3 conveyor (a roller pad: mini parcels, PAD_EXIT path). */
+  isPad(nodeId: string): boolean {
+    return (
+      /^conv\d+$/.test(nodeId) && (this.dockGeom(nodeId)?.pad ?? null) !== null
+    )
+  }
+
+  /** This tier's shelf grid. */
+  shelfGrid(): ShelfGrid {
+    return this.grid
+  }
+
+  /** Shelf cell i (oldest first) of this tier's grid: top-left of its 10 × 10 mini. */
+  shelfCell(i: number): Point {
+    return shelfCellIn(this.grid, i)
+  }
+
+  /** How many minis this tier's shelf grid draws (54, or 100 from tier 3). */
+  shelfCapacity(): number {
+    return this.grid.cols * this.grid.rows
+  }
+
+  /** Top-left of this tier's props (propsFor). */
+  props(): readonly Point[] {
+    return propsFor(this.tier)
+  }
 
   has(nodeId: string): boolean {
     return this.table.has(nodeId)
@@ -400,8 +608,12 @@ export class FixedLaneLayout implements LaneLayout {
     const fromKind = kindOf(fromNodeId)
     if (!from || !this.table.has(toNodeId)) return [to]
     if (fromKind === 'conveyor' && toKind !== 'conveyor') {
-      // Along the dock belt to the corner, then down the column.
-      return [{ x: BELT_CX, y: 64 }, to]
+      // Along the dock belt to the corner, then down the column; a dock 2–3
+      // pad parcel first hops north onto conv1's line (design-m8-m9 §6.1).
+      const corner = { x: BELT_CX, y: 64 }
+      return this.isPad(fromNodeId)
+        ? [{ ...PAD_EXIT }, corner, to]
+        : [corner, to]
     }
     if (fromKind === 'slot' && toNodeId === 'hold') {
       // The divert edge: out of the side outlet onto the chute, down it to
@@ -447,6 +659,8 @@ export class FixedLaneLayout implements LaneLayout {
       'shelf',
       'slot5',
       'dock1',
+      'dock2',
+      'dock3',
     ]
     for (const id of order) {
       const h = this.hitFor(id)
@@ -471,11 +685,14 @@ export class FixedLaneLayout implements LaneLayout {
     return { x: 80, y: r.y + 20 }
   }
 
-  /** The desk's extra hit strip west of the slot (48, y_k, 48, 64). */
+  /**
+   * The desk's extra hit strip west of the slot: (56, y_k, 40, 64) — M8
+   * (design-m8-m9 R7) moved it off the dock 2–3 pads (was 48 wide from x 48).
+   */
   deskHit(nodeId: string): Rect | null {
     const r = this.rectFor(nodeId)
     if (!r || !this.isBeltSlot(nodeId)) return null
-    return { x: 48, y: r.y, w: 48, h: 64 }
+    return { x: DESK_HIT_X, y: r.y, w: 96 - DESK_HIT_X, h: 64 }
   }
 
   /** Inspector stand points w1–w3 (feet), facing the belt (east). */
@@ -483,7 +700,7 @@ export class FixedLaneLayout implements LaneLayout {
     const r = this.rectFor(nodeId)
     if (!r || !this.isBeltSlot(nodeId)) return []
     return [
-      { x: 60, y: r.y + 36 },
+      { x: W1_X, y: r.y + 36 },
       { x: 84, y: r.y + 10 },
       { x: 108, y: r.y + 10 },
     ]

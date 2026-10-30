@@ -321,6 +321,10 @@ export function traceText(data: GameData, t: TraceEntry): string {
       return 'Loaded'
     case 'delivered':
       return `Delivered to ${buildingName(data, t.ref)}`
+    case 'handedOff':
+      return `Handed off at ${buildingName(data, t.ref)}`
+    case 'customsCleared':
+      return 'Cleared'
     default:
       return t.what
   }

@@ -5,7 +5,7 @@
 //      the pixels a ?debug=1 probe of the same layout captured; the attract
 //      city moves behind it, so "the same" allows SAME_PIXELS_MIN),
 //      window.__pm is absent before and after a real New game tap, and the
-//      game it starts autosaves pm.save.v2 (version 3 since M6) on pagehide; no
+//      game it starts autosaves pm.save.v2 (version 5 since M8) on pagehide; no
 //      console error.
 //   2. `/?debug=1` — window.__pm is present on the production build, the
 //      Title is the active scene, New game → __pm.ready (City); no console
@@ -38,8 +38,8 @@ import { sceneTarget, settleUntil, tapTarget, worlds } from './warehouse.ts'
 
 const NEW_GAME = 'title:new-game'
 const SAVE_KEY = 'pm.save.v2'
-/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (4 since M7, design-m7 §2.5). */
-const SAVE_VERSION = 4
+/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (5 since M8, design-m8-m9 §2.4). */
+const SAVE_VERSION = 5
 /** plan-build2 §6 "Draw-call budget": city 3 (measured), warehouse 7. */
 const CITY_DRAW_CALLS = 3
 const WAREHOUSE_DRAW_CALLS = 7

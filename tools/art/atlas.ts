@@ -75,6 +75,12 @@ export const SPRITE_MAP_JSON = join(ROOT, 'src/render/spriteMap.generated.json')
 export const MAX_SIDE = 2048
 /** plan-build2 §8.2 acceptance: `world` fill after M5 (a warning when over). */
 export const WORLD_FILL_MAX = 0.75
+/**
+ * plan-build2 §8.8 R13 trigger (besides "does not pack"): over this the
+ * L4/L5 `_locked` twins move to shared locked_1x1/2x2/3x3, then a lazy
+ * `city2` atlas (tests/render/atlases.test.ts holds the line).
+ */
+export const WORLD_FILL_R13 = 0.9
 
 export function atlasPngPath(key: AtlasKey): string {
   return join(ASSETS_DIR, `${key}.png`)
@@ -406,6 +412,8 @@ export function framesTs(
     '  readonly bayLights: readonly (readonly [number, number])[]',
     '  /** foot point of a vehicle docked at bay 1 */',
     '  readonly dockPose: readonly [number, number]',
+    '  /** foot point of a vehicle docked at bay k (one per bay light; [0] = dockPose; build 2 M8) */',
+    '  readonly dockPoses?: readonly (readonly [number, number])[]',
     '}',
     '',
     '/** per exterior frame (manifest warehouse-ext bayLights / dockPose, frameAnchors overrides) */',
@@ -414,7 +422,7 @@ export function framesTs(
   for (const [f, a] of Object.entries(warehouseAnchorTable(m))) {
     if (!names.includes(f)) continue
     lines.push(
-      `  ${f}: { bayLights: [${a.bayLights.map(pt).join(', ')}], dockPose: ${pt(a.dockPose)} },`,
+      `  ${f}: { bayLights: [${a.bayLights.map(pt).join(', ')}], dockPose: ${pt(a.dockPose)}, dockPoses: [${a.dockPoses.map(pt).join(', ')}] },`,
     )
   }
   lines.push(
@@ -714,7 +722,10 @@ export async function run(opts: StepOpts): Promise<number> {
     if (p.key === 'world' && fill > WORLD_FILL_MAX) {
       console.warn(
         `atlas: world is ${(100 * fill).toFixed(1)} % full, over the ` +
-          `${100 * WORLD_FILL_MAX} % target (plan-build2 §8.2)`,
+          `${100 * WORLD_FILL_MAX} % target (plan-build2 §8.2)` +
+          (fill > WORLD_FILL_R13
+            ? ` and the ${100 * WORLD_FILL_R13} % R13 trigger (plan-build2 §8.8: shared locked twins, then city2)`
+            : `; R13 triggers over ${100 * WORLD_FILL_R13} %`),
       )
     }
   }

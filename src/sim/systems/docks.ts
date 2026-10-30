@@ -48,10 +48,29 @@
 // checker, and the overflow is bounded by the lane's contents plus one
 // vehicle's cargo. A docked vehicle that cannot carry any shelf parcel still
 // yields (a) or waits alone for the player.
+//
+// M8 (spec-build2 §4.1, design-m8-m9 §4.2): docks 2-3 are bought
+// (`buyDock {index}`, economy.docks rows) — a `dockN` node feeding its own
+// `convN` conveyor (cap machines.conveyorCapPerDock) whose `next` is conv1's
+// (the first slot); lane.ts feeds the slot from the conveyors round-robin
+// (lane.feedIndex). Every rule above is per dock: a full conveyor blocks its
+// own dock only (blockedTicksThisDay, the yield, relief), while the queue is
+// shared and `emptyDrainerQueued` / `canRelieve` read the one shelf; a dock
+// in relief takes every slot-1 feed while its conveyor holds a parcel
+// (lane.ts step 4), so it unloads as fast as with one dock and the other
+// conveyors add to the overflow only while it has nothing to feed. A dock
+// may be bought out of order (dock 3 at L4 before dock 2): lane.docks and the
+// node pairs stay sorted by number, and the lot bay is `lot.docks[n − 1]`
+// (vehicles.ts dockTile). Docks are never sold and draw no salary. The
+// Q-RUN1 (a) yield with several docks: a blocked vehicle yields only while
+// more vehicles wait in the queue than docks are free right now (vehicles
+// that yielded this tick not counted) — one queued vehicle frees one dock,
+// not every blocked one; with one dock this is "≥ 1 queued", as before.
 
+import type { CommandResult } from '../commands.ts'
 import type { Sim } from '../sim.ts'
-import type { LoadingDock, Vehicle } from '../types.ts'
-import { laneNode, ticksFromS } from '../types.ts'
+import type { LaneNode, LoadingDock, Vehicle } from '../types.ts'
+import { dockNumber, laneNode, ticksFromS } from '../types.ts'
 import { unitsOf } from '../map.ts'
 import {
   carriableInLane,
@@ -129,7 +148,24 @@ function finishUnloading(sim: Sim, dock: LoadingDock, v: Vehicle): void {
   beginLoading(sim, dock, v)
 }
 
-function unloadTick(sim: Sim, dock: LoadingDock, v: Vehicle): void {
+/**
+ * Q-RUN1 (a) yield condition (M8, several docks): more vehicles wait than
+ * docks are free now, the vehicles that yielded earlier this tick excluded.
+ * One dock: the queue is non-empty (the dock is this vehicle's).
+ */
+function yieldWanted(sim: Sim, yielded: readonly number[]): boolean {
+  const lane = sim.state.lane
+  const waiting = lane.dockQueue.filter((id) => !yielded.includes(id)).length
+  const free = lane.docks.filter((d) => d.vehicleId === null).length
+  return waiting > free
+}
+
+function unloadTick(
+  sim: Sim,
+  dock: LoadingDock,
+  v: Vehicle,
+  yielded: number[],
+): void {
   const s = sim.state
   const due = dock.nextTransferTick === null || s.tick >= dock.nextTransferTick
   if (v.cargo.length > 0 && due) {
@@ -169,7 +205,10 @@ function unloadTick(sim: Sim, dock: LoadingDock, v: Vehicle): void {
     dock.stuckSinceTick = s.tick
     return
   }
-  if (s.lane.dockQueue.length > 0) yieldDock(sim, v)
+  if (yieldWanted(sim, yielded)) {
+    yieldDock(sim, v)
+    yielded.push(v.id)
+  }
 }
 
 /** The shelf is at its cap and `v` could carry ≥ 1 of its parcels (Q-RUN1 (c)). */
@@ -275,14 +314,108 @@ function assignDocks(sim: Sim): void {
 /** Tick step 5. */
 export function docksStep(sim: Sim): void {
   const s = sim.state
+  /** Vehicles that yielded a dock this tick (Q-RUN1 (a), yieldWanted). */
+  const yielded: number[] = []
   for (const dock of s.lane.docks) {
     const v = vehicleById(sim, dock.vehicleId)
     if (!v) continue
-    if (v.state === 'docked_unloading') unloadTick(sim, dock, v)
+    if (v.state === 'docked_unloading') unloadTick(sim, dock, v, yielded)
     else if (v.state === 'docked_loading') loadTick(sim, dock, v)
   }
   assignDocks(sim)
   for (const dock of s.lane.docks) {
     if (dock.vehicleId !== null) dock.busyTicksThisDay += 1
   }
+}
+
+// Docks 2-3 (M8) ------------------------------------------------------------------------
+
+/** A loading dock's node or its conveyor. */
+const isDockPart = (n: LaneNode): boolean =>
+  (n.kind === 'dock' || n.kind === 'conveyor') && n.dockId !== null
+
+/**
+ * Add loading dock `index` to the lane (topology only — no price, no event;
+ * buyDock, tests, debug): the node pair `dock<index>` → `conv<index>` (the
+ * conveyor's `next` = conv1's, its cap machines.conveyorCapPerDock) among
+ * the dock / conveyor nodes in number order, and a LoadingDock into
+ * lane.docks in number order. The caller checked the index is free.
+ */
+export function addDock(sim: Sim, index: number): LoadingDock {
+  const lane = sim.state.lane
+  const id = `dock${index}`
+  const convId = `conv${index}`
+  const first = lane.docks[0]
+  const conv1 = first ? laneNode(lane, first.conveyorNodeId) : null
+  if (!conv1) throw new Error('addDock: the lane has no first conveyor')
+  const node = (
+    nodeId: string,
+    kind: 'dock' | 'conveyor',
+    next: string[],
+    cap: number | null,
+  ): LaneNode => ({
+    id: nodeId,
+    kind,
+    next,
+    cap,
+    queue: [],
+    fixture: null,
+    stations: [],
+    dockId: id,
+  })
+  const pair = [
+    node(id, 'dock', [convId], null),
+    node(
+      convId,
+      'conveyor',
+      [...conv1.next],
+      sim.data.machines.conveyorCapPerDock,
+    ),
+  ]
+  let at = lane.nodes.findIndex(
+    (n) => isDockPart(n) && dockNumber(n.dockId as string) > index,
+  )
+  if (at < 0) at = lane.nodes.findLastIndex(isDockPart) + 1
+  lane.nodes.splice(at, 0, ...pair)
+  const dock: LoadingDock = {
+    id,
+    conveyorNodeId: convId,
+    vehicleId: null,
+    nextTransferTick: null,
+    busyTicksThisDay: 0,
+    blockedTicksThisDay: 0,
+    stuckSinceTick: null,
+  }
+  const di = lane.docks.findIndex((d) => dockNumber(d.id) > index)
+  if (di < 0) lane.docks.push(dock)
+  else {
+    lane.docks.splice(di, 0, dock)
+    // The feed pointer keeps naming the same conveyor (lane.ts step 4).
+    if (lane.feedIndex >= di) lane.feedIndex += 1
+  }
+  return dock
+}
+
+/**
+ * The buyDock command (design-m8-m9 §3.1): `invalid` (no economy.docks row
+ * with that index — dock 1 included — or already owned), `locked` (level
+ * below the row's unlockLevel), `insufficient-funds`; else the dock is
+ * added, its price debited and `dock:bought {index, dockId}` emitted. The
+ * next assignDocks pass hands it the first queued vehicle.
+ */
+export function buyDock(sim: Sim, index: number): CommandResult {
+  const s = sim.state
+  const row = sim.data.economy.docks.find((r) => r.index === index)
+  if (!row) return { ok: false, reason: 'invalid' }
+  if (s.lane.docks.some((d) => d.id === `dock${index}`)) {
+    return { ok: false, reason: 'invalid' }
+  }
+  if (s.level.level < row.unlockLevel) return { ok: false, reason: 'locked' }
+  if (s.economy.balance < row.price) {
+    return { ok: false, reason: 'insufficient-funds' }
+  }
+  const dock = addDock(sim, index)
+  if (row.price > 0) sim.debit(row.price, 'purchase')
+  sim.emit('dock:bought', { index, dockId: dock.id })
+  return { ok: true }
 }

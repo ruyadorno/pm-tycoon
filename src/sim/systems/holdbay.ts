@@ -157,12 +157,17 @@ export function liveBuildingIds(sim: Sim): BuildingId[] {
     .map((b) => b.id)
 }
 
-/** A new parcel object (not placed anywhere yet; the caller places it). */
+/**
+ * A new parcel object (not placed anywhere yet; the caller places it). M8:
+ * `destId` overrides the destination (an overseas pier — the parcel then
+ * carries the hub's valueMult).
+ */
 export function debugParcel(
   sim: Sim,
   k: number,
   malware: boolean,
   strain: Strain,
+  destId?: BuildingId,
 ): Parcel {
   const s = sim.state
   const data = sim.data
@@ -171,7 +176,11 @@ export function debugParcel(
   const origin = ids[(k * 5) % n] ?? data.buildings[0]?.id ?? ''
   let dest = ids[(k * 5 + 7) % n] ?? origin
   if (dest === origin) dest = ids[(k * 5 + 8) % n] ?? origin
+  if (destId !== undefined) dest = destId
   const destDef = data.buildings.find((b) => b.id === dest)
+  const destDistrict = destDef
+    ? mapIndex(data).districtById[destDef.district]
+    : undefined
   const labels = malware
     ? data.puns.malwareLabels[strain]
     : data.puns.decoyLabels[strain]
@@ -181,7 +190,7 @@ export function debugParcel(
     id,
     size: 'S',
     baseValue: data.parcels.sizes.S.value,
-    mult: 1,
+    mult: destDistrict?.kind === 'overseas' ? destDistrict.valueMult : 1,
     origin,
     dest,
     destRegion: destDef?.district ?? '',

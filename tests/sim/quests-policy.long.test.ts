@@ -27,6 +27,7 @@ import {
   tallyText,
 } from '../../tools/sim/report.ts'
 import {
+  capConfig,
   dataFixture,
   makeSim,
   noOffers,
@@ -39,7 +40,7 @@ import {
 const data = dataFixture()
 const targets = data.economy.pacingTargets
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-const PM5 = { economy: { playtestMaxLevel: 5 } }
+const PM5 = capConfig(5)
 
 let gateRuns: RunResult[] | null = null
 /** The 10-seed × 30-min competent-policy runs (computed once for this file). */
@@ -247,7 +248,7 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
     expect(n).toBeGreaterThanOrEqual(0)
   }, 120_000)
 
-  it('the full gate (seven playtest-1 windows + the two quest rows) passes by median on these runs; no seed breaks an invariant', () => {
+  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows, L4-L5 informational until M9) passes by median on these runs; no seed breaks an invariant', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -258,9 +259,16 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
         targets,
       },
     )
-    expect(g.checks.every((c) => c.note === null)).toBe(true)
     expect(
-      g.checks.filter((c) => !c.pass).map((c) => [c.key, c.value]),
+      g.checks.filter((c) => c.note !== null).map((c) => [c.key, c.note]),
+    ).toEqual([
+      ['level4Min', 'informational (M9)'],
+      ['level5Min', 'informational (M9)'],
+    ])
+    expect(
+      g.checks
+        .filter((c) => c.note === null && !c.pass)
+        .map((c) => [c.key, c.value]),
     ).toEqual([])
     for (const r of runs()) {
       expect(r.result.asserts, `seed ${r.seed}`).toEqual([])

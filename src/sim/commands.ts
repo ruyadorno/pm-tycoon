@@ -2,8 +2,7 @@
 // validates the shape (isCommand), runs the handler — which validates the
 // rules and applies the change immediately, or returns a stable failure
 // reason without touching state or the rng — and logs successful commands.
-// Build-2 commands not built yet (buyDock) return 'locked'. A
-// handler that changes state while reporting a failure marks it `applied`
+// A handler that changes state while reporting a failure marks it `applied`
 // (logged for replay). The `debug*` kinds back ViewSim.debug (debug builds
 // only; logged like any command, so __pm.replay stays exact).
 // M6 people (spec-build2 §2, §8; design-m6 §3.1): hire / fire / postAd,
@@ -15,6 +14,10 @@
 // declineQuest / abandonQuest / debugOfferQuest delegate to
 // systems/quests.ts (an Accept of the magic parcel draws only on the quest
 // stream); buyMachine spends a quest voucher before money.
+// M8 L3 (design-m8-m9 §3.1): buyDock {index} (systems/docks.ts — dock<index>
+// + conv<index> feeding the first slot) and debugOverseasMalware {hub}
+// (systems/hubs.ts — a malware parcel handed off now, so it costs a life at
+// clearance).
 
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import { machineChecker } from './detection.ts'
@@ -36,6 +39,7 @@ import type {
 } from './types.ts'
 import { laneNode } from './types.ts'
 import { applyRush } from './systems/dispatch.ts'
+import { buyDock } from './systems/docks.ts'
 import { debugMalwareDelivery } from './systems/economy.ts'
 import {
   clearParcel,
@@ -43,6 +47,7 @@ import {
   isHeld,
   tossParcel,
 } from './systems/holdbay.ts'
+import { debugOverseasMalware } from './systems/hubs.ts'
 import { moveFixture, placeFixture, removeFixture } from './systems/lane.ts'
 import { forceLevel } from './systems/levels.ts'
 import { rehire, rehireFee } from './systems/payroll.ts'
@@ -87,7 +92,7 @@ export type Command =
   | { kind: 'clear'; parcelId: number }
   /** M6: the player looked at a held parcel (the sorter's player grace, design D3). */
   | { kind: 'touchHeld'; parcelId: number }
-  /** build 2 */
+  /** M8: loading dock `index` (an economy.docks row: 2 at L3, 3 at L4). */
   | { kind: 'buyDock'; index: number }
   | { kind: 'continueWithOneLife' }
   /** M7: accept the open offer. */
@@ -106,6 +111,8 @@ export type Command =
   | { kind: 'debugForceLevel'; level: number }
   /** Debug builds (ViewSim.debug.offerQuest, ?quest=): offer this template (or the ultimate) now. */
   | { kind: 'debugOfferQuest'; templateId: string }
+  /** Debug builds (ViewSim.debug.forceOverseasMalware): hand a malware parcel off at a live hub now. */
+  | { kind: 'debugOverseasMalware'; hub: string }
 
 export type CommandKind = Command['kind']
 export type CommandOf<K extends CommandKind> = Extract<Command, { kind: K }>
@@ -188,6 +195,7 @@ const FIELDS: { [K in CommandKind]: Record<string, FieldType> } = {
   debugMalwareDelivery: {},
   debugForceLevel: { level: 'int' },
   debugOfferQuest: { templateId: 'string' },
+  debugOverseasMalware: { hub: 'string' },
 }
 
 /** Exactly one of {nodeId: string}, {station: 'hold'}, {vehicleId: safe int}. */
@@ -515,9 +523,8 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     return OK
   },
 
-  buyDock() {
-    // build 2: docks 2-3 (economy.docks) are not implemented in playtest 1.
-    return fail('locked')
+  buyDock(sim, cmd) {
+    return buyDock(sim, cmd.index)
   },
 
   continueWithOneLife(sim) {
@@ -570,6 +577,10 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
 
   debugOfferQuest(sim, cmd) {
     return debugOfferQuest(sim, cmd.templateId)
+  },
+
+  debugOverseasMalware(sim, cmd) {
+    return debugOverseasMalware(sim, cmd.hub)
   },
 }
 

@@ -307,8 +307,9 @@ describe('warehouse exteriors t3-t5 (B2 §6.1, §6.6)', () => {
       // the docked pose stands in front of bay 1, low on the canvas
       expect(set!.dockPose[1]).toBeGreaterThan(128)
     }
-    // tier 1 stays the row's own set (cityFx BAY_LIGHTS)
-    expect(table.wh_ext_t1).toEqual({
+    // tier 1 stays the row's own set (cityFx BAY_LIGHTS); M8 adds the
+    // per-bay dockPoses (first = dockPose), checked in m8-art.test.ts
+    expect(table.wh_ext_t1).toMatchObject({
       bayLights: getEntry(m, 'wh_ext').bayLights,
       dockPose: getEntry(m, 'wh_ext').dockPose,
     })

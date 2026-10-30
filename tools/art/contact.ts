@@ -27,7 +27,15 @@
 //     the fence and hay_bale props.
 //   art/contact/tiers@4x.png              M7 / G6 (build 2): `node
 //     tools/art/contact.ts tiers` — wh_ext_t1 … _t5 on the lot slab, and
-//     tiers 3-5 at 2x with their manifest bay lights / dock pose marked.
+//     tiers 3-5 at 2x with their manifest bay lights / dock poses marked.
+//   art/contact/airport@4x.png, civic@4x.png  M8 / G5 (build 2): `node
+//     tools/art/contact.ts airport|civic` — the L5 uniques on their map
+//     positions (colour and the _locked look until M9) + close-ups.
+//   art/contact/warehouse-tier3@4x.png    M8 / G6 (build 2): `node
+//     tools/art/contact.ts tier3` — room mocks t1 / t2 / t3 with the M8
+//     dock geometry, the tier-3 pieces, the overseas icons.
+//   art/contact/docks@4x.png is the gallery's docks category (gallery.ts):
+//     since M8 it opens with the port on the map in colour (live at L3).
 // Never writes art/final, the manifest or public/.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -51,6 +59,7 @@ import {
   type Manifest,
   type ManifestEntry,
   ROOT,
+  dockPosesOf,
   finalPath,
 } from './manifest.ts'
 import { PALETTE } from './palette.ts'
@@ -1410,6 +1419,12 @@ export function regionScene(
   nx: number,
   ny: number,
   locked: boolean,
+  opts: {
+    /** draw map.json ground.scenery rects (the runway; not the sea) */
+    scenery?: boolean
+    /** props not in map.json yet (M9 data), drawn like map props */
+    extraProps?: readonly { frame: string; tile: [number, number] }[]
+  } = {},
 ): Canvas {
   const top = 160
   const W = (nx + ny) * 32
@@ -1427,7 +1442,9 @@ export function regionScene(
       const x = x0 + tx
       const y = y0 + ty
       let t: Canvas | null
-      if (roadAt(x, y)) {
+      const sc = opts.scenery ? sceneryAt(x, y) : null
+      if (sc) t = fin(m, sc, lk(sc)) ?? fin(m, sc)
+      else if (roadAt(x, y)) {
         const k =
           (roadAt(x, y - 1) ? 1 : 0) |
           (roadAt(x + 1, y) ? 2 : 0) |
@@ -1474,9 +1491,28 @@ export function regionScene(
   for (const pr of map.props.filter((x) => x.region === district)) {
     put(pr.frame, pr.tile[0], pr.tile[1])
   }
+  for (const pr of opts.extraProps ?? []) put(pr.frame, pr.tile[0], pr.tile[1])
   draws.sort((a, b) => a.d - b.d)
   for (const d of draws) d.f()
   return cv
+}
+
+/** the ground.scenery frame of map tile (x, y) other than the sea, or null */
+function sceneryAt(x: number, y: number): string | null {
+  const map = dataJson('map.json') as {
+    ground: {
+      scenery: { rect: [number, number, number, number]; frame: string }[]
+    }
+  }
+  const r = map.ground.scenery.find(
+    (s) =>
+      s.frame !== 'water' &&
+      x >= s.rect[0] &&
+      x <= s.rect[2] &&
+      y >= s.rect[1] &&
+      y <= s.rect[3],
+  )
+  return r?.frame ?? null
 }
 
 /** the ten Low-density uniques (buildings.json district lowres) */
@@ -1603,7 +1639,16 @@ function anchorMarks(m: Manifest, n: number, ext: Canvas): Canvas {
     ctx.fillRect(x - 1, y - 1, 3, 3)
   }
   for (const [x, y] of set?.bayLights ?? []) mark(x, y, 'yellow3')
-  if (set?.dockPose) mark(set.dockPose[0], set.dockPose[1], 'red1')
+  // build 2 M8: every bay's docked pose (dockPoses, [0] = dockPose)
+  if (set?.bayLights && set.dockPose) {
+    for (const [x, y] of dockPosesOf({
+      bayLights: set.bayLights,
+      dockPose: set.dockPose,
+      ...(set.dockPoses ? { dockPoses: set.dockPoses } : {}),
+    })) {
+      mark(x, y, 'red1')
+    }
+  }
   return out
 }
 
@@ -1622,7 +1667,8 @@ export function tiersSheet(m: Manifest): string {
     {
       title:
         'tiers 3-5 at 2x with the footprint grid; the manifest anchors ' +
-        'marked on the frame (yellow = bayLights, red = dockPose)',
+        'marked on the frame (yellow = bayLights, red = the docked pose ' +
+        'of each bay, dockPoses)',
       blocks: [3, 4, 5].flatMap((n) => {
         const ext = tierFrame(m, n)
         if (!ext) return []
@@ -1638,6 +1684,319 @@ export function tiersSheet(m: Manifest): string {
   ]
   const out = join(CONTACT, 'tiers@4x.png')
   writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 2700, 2))
+  return out.replace(ROOT, '')
+}
+
+// ---------------------------------------------------------------------------
+// M8 (build 2): art/contact/airport@4x.png and art/contact/civic@4x.png —
+// the L5 regions (G5), generated in M8 and fogged until M9
+
+/** buildings.json ids of a district, in data order */
+export function districtIds(district: string): string[] {
+  const rows = dataJson('buildings.json') as { id: string; district: string }[]
+  return rows.filter((r) => r.district === district).map((r) => r.id)
+}
+
+/** colour | _locked close-ups of buildings and props (2x sheets) */
+function closeupsOf(m: Manifest, ids: readonly string[]): Block[] {
+  return ids.flatMap((id) => {
+    const e = entry(m, id)
+    if (!e) return []
+    const blocks = e.class.startsWith('building')
+      ? buildingBlock(m, e, finals(m, id, id))
+      : propBlock(m, e, finals(m, id, id))
+    return blocks.map((b) => ({
+      cv: b.cv,
+      label: b.label.replace(/^PH /, `${id} `),
+    }))
+  })
+}
+
+/**
+ * The Airport's M9 props (design-m8-m9 §1.2, map.json rows Lane A adds at
+ * M9): the parked plane on the runway apron and the control tower.
+ */
+export const AIRPORT_M9_PROPS: readonly {
+  frame: string
+  tile: [number, number]
+}[] = [
+  { frame: 'ap_plane', tile: [45, 10] },
+  { frame: 'ap_tower', tile: [44, 16] },
+]
+
+export function airportSheet(m: Manifest): string {
+  const S = 2
+  const scene = (locked: boolean) =>
+    regionScene(m, 'airport', 33, 2, 15, 19, locked, {
+      scenery: true,
+      extraProps: AIRPORT_M9_PROPS,
+    })
+  const sections: Section[] = [
+    {
+      title:
+        'Airport on the map, tiles x 33-47, y 2-20 (2x = camera zoom 2), ' +
+        'with the M9 props (ap_plane at (45, 10), ap_tower at (44, 16), ' +
+        'design-m8-m9 §1.2): colour (live from M9)',
+      blocks: [{ cv: scene(false), label: 'in colour' }],
+    },
+    {
+      title: 'as shipped until M9: the _locked frames',
+      blocks: [{ cv: scene(true), label: '_locked' }],
+    },
+    {
+      title:
+        'ap_terminal (re-rolled), ap_cargo_hangar, ap_tower, ap_plane (2x): ' +
+        'colour | _locked',
+      blocks: closeupsOf(m, [
+        ...districtIds('airport'),
+        'ap_tower',
+        'ap_plane',
+      ]),
+    },
+  ]
+  const out = join(CONTACT, 'airport@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 2000, S))
+  return out.replace(ROOT, '')
+}
+
+/** a free tile of the civic park block [2, 4] (pavilion, trees, benches) for the fountain prop — suggested map.json row for M9 */
+export const CIVIC_FOUNTAIN_TILE: [number, number] = [22, 41]
+
+export function civicSheet(m: Manifest): string {
+  const S = 2
+  const scene = (locked: boolean) =>
+    regionScene(m, 'civic', 10, 26, 19, 18, locked, {
+      extraProps: [{ frame: 'fountain', tile: CIVIC_FOUNTAIN_TILE }],
+    })
+  const sections: Section[] = [
+    {
+      title:
+        'Park & civic (Commons) on the map, tiles x 10-28, y 26-43 (2x = ' +
+        'camera zoom 2), the fountain at a suggested tile ' +
+        `(${CIVIC_FOUNTAIN_TILE.join(', ')}): colour (live from M9)`,
+      blocks: [{ cv: scene(false), label: 'in colour' }],
+    },
+    {
+      title: 'as shipped until M9: the _locked frames',
+      blocks: [{ cv: scene(true), label: '_locked' }],
+    },
+    {
+      title: 'the ten uniques + the fountain prop (2x): colour | _locked',
+      blocks: closeupsOf(m, [...districtIds('civic'), 'fountain']),
+    },
+  ]
+  const out = join(CONTACT, 'civic@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grass3'), 2000, S))
+  return out.replace(ROOT, '')
+}
+
+// ---------------------------------------------------------------------------
+// M8 (build 2): art/contact/warehouse-tier3@4x.png — the tier-3 room pieces
+
+/** `name` of tier t, else the nearest lower tier that exists (frameOrNull rule) */
+function tierPiece(m: Manifest, stem: string, t: number): Canvas | null {
+  for (let k = t; k >= 1; k--) {
+    const im =
+      stem === 'floor' ? fin(m, `floor_t${k}`) : fin(m, `${stem}_t${k}`)
+    if (im) return im
+    if (stem === 'floor' && k === 1) return fin(m, 'floor_t1', '_0')
+  }
+  return null
+}
+
+/** the six mini-parcel spots of a dock pad, centred (design-m8-m9 §6.1) */
+const PAD_SPOTS: readonly [number, number][] = [
+  [7, 11],
+  [18, 11],
+  [7, 27],
+  [18, 27],
+  [7, 43],
+  [18, 43],
+]
+
+const MINI = ['s', 'm', 'l', 'xl'] as const
+
+/**
+ * A 352 x 448 room of tier `t` with docks 2-3 in the M8 geometry (doors at
+ * y 36 / 100 / 164, the roller pad east of doors 2-3, design-m8-m9 §6.1),
+ * the tier-3 shelf grid (20 x 5 @ 11 from (35, 388), `shelfN` minis) and
+ * the east-column props; positions are the tier-1 table of RoomLayout.ts
+ * (props_t3 where props_t2 stands). An art mock, not the renderer.
+ */
+function roomMock(m: Manifest, t: number, shelfN: number): Canvas {
+  const cv = createCanvas(352, 448)
+  const ctx = cv.getContext('2d')
+  const draw = (im: Canvas | null, x: number, y: number) => {
+    if (im) ctx.drawImage(im, x, y)
+  }
+  for (let r = 0; r < 14; r++) {
+    for (let c = 0; c < 11; c++) {
+      let im: Canvas | null
+      if (c === 0 || c === 10) im = tierPiece(m, 'wall', t)
+      else if (r === 0) im = tierPiece(m, 'wallface', t)
+      else if (t === 1) im = fin(m, 'floor_t1', `_${(c + r) % 3}`)
+      else if (c === 4)
+        im = fin(m, `floor_t${t}_lane`) ?? tierPiece(m, 'floor', t)
+      else im = tierPiece(m, 'floor', t)
+      draw(im, c * 32, r * 32)
+    }
+  }
+  // the belt: conv1 along y 48, the corner, the column c4 down to the shelf
+  for (let x = 32; x < 128; x += 32) draw(fin(m, 'belt_h', '_0'), x, 48)
+  draw(fin(m, 'belt_corner', '_0'), 128, 48)
+  for (let y = 80; y <= 352; y += 32) draw(fin(m, 'belt_v', '_0'), 128, y)
+  for (let y = 96; y < 352; y += 32) draw(fin(m, 'chute_v'), 172, y)
+  draw(fin(m, 'holdbay_rack'), 192, 96)
+  for (let i = 0; i < 5; i++) draw(fin(m, 'bay_pad'), 194, 98 + 48 * i)
+  draw(fin(m, 'hold_station'), 264, 300)
+  draw(fin(m, 'bin', '_closed'), 256, 384)
+  // north wall dressing
+  draw(tierPiece(m, 'sign', t), 76, 4)
+  if (t === 1) draw(fin(m, 'bulb', '_0'), 296, 6)
+  else {
+    draw(fin(m, 'strip_light'), 8, 2)
+    draw(fin(m, 'strip_light'), 280, 2)
+  }
+  draw(tierPiece(m, 'wanted_poster', t), 272, 120)
+  if (t === 1) {
+    draw(fin(m, 'props_t1'), 264, 164)
+    draw(fin(m, 'props_t1'), 264, 236)
+  } else draw(tierPiece(m, 'props', t), 264, 196)
+  // docks: 1 open with a van tail, 2 bought (closed, pad with parcels),
+  // 3 locked; a lamp over each door
+  draw(fin(m, 'dock_door', '_open'), 0, 36)
+  draw(fin(m, 'dock_tail_van', '_open'), 0, 44)
+  draw(fin(m, 'dock_door', '_closed'), 0, 100)
+  draw(fin(m, 'dock_pad'), 32, 100)
+  PAD_SPOTS.slice(0, 4).forEach(([x, y], i) => {
+    draw(fin(m, `parcel_mini_${MINI[i % 4]}`), 32 + x - 8, 100 + y - 8)
+  })
+  draw(fin(m, 'dock_door', '_locked'), 0, 164)
+  // RoomLayout dockGeom(k).lamp: (12, 24) / (12, 92) / (12, 156)
+  draw(fin(m, 'lamp', '_green'), 12, 24)
+  draw(fin(m, 'lamp', '_amber'), 12, 92)
+  draw(fin(m, 'lamp', '_lock'), 12, 156)
+  // slots: the desk (slot 1), detector, battery checker, shaker
+  draw(fin(m, 'desk'), 80, 112)
+  draw(fin(m, 'metal_detector', '_f0'), 120, 168)
+  draw(fin(m, 'battery_checker', '_f0'), 120, 232)
+  draw(fin(m, 'shaky_shaker', '_f0'), 120, 296)
+  // inspector w1: feet x 68 on the M8 aisle (RoomLayout W1_X) → canvas x 56
+  draw(fin(m, 'worker', '_e_idle_0'), 56, 114)
+  // the shelf and its minis
+  const shelf = t >= 3 ? tierPiece(m, 'shelf', t) : tierPiece(m, 'shelf', t)
+  draw(shelf, 32, 384)
+  const cols = t >= 3 ? 20 : 18
+  const rows = t >= 3 ? 5 : 3
+  const pitch = t >= 3 ? 11 : 12
+  const [sx, sy] = t >= 3 ? [35, 388] : [38, 390]
+  for (let i = 0; i < Math.min(shelfN, cols * rows); i++) {
+    const c = i % cols
+    const r = Math.floor(i / cols)
+    draw(
+      fin(m, `parcel_mini_${MINI[(i * 7) % 4]}`),
+      sx + c * pitch - 3,
+      sy + r * pitch - 3,
+    )
+  }
+  return cv
+}
+
+/** one piece on a floor_t3 patch (interior props / fixtures, 1x) */
+function onFloor(m: Manifest, im: Canvas | null, pad = 8): Canvas {
+  const w = (im?.width ?? 32) + 2 * pad
+  const h = (im?.height ?? 32) + 2 * pad
+  const cv = createCanvas(w, h)
+  const ctx = cv.getContext('2d')
+  for (let y = 0; y < h; y += 32) {
+    for (let x = 0; x < w; x += 32) {
+      const f = fin(m, 'floor_t3')
+      if (f) ctx.drawImage(f, x, y)
+    }
+  }
+  if (im) ctx.drawImage(im, pad, pad)
+  return cv
+}
+
+export function warehouseTier3Sheet(m: Manifest): string {
+  const pieces: [string, string][] = [
+    ['floor_t3', ''],
+    ['floor_t3_lane', ''],
+    ['wall_t3', ''],
+    ['wallface_t3', ''],
+    ['sign_t3', ''],
+    ['shelf_t3', ''],
+    ['dock_pad', ''],
+    ['props_t3', ''],
+    ['wanted_poster_t3', ''],
+    ['lamp', '_green'],
+    ['lamp', '_red'],
+    ['lamp', '_amber'],
+    ['lamp', '_off'],
+    ['lamp', '_lock'],
+  ]
+  const padFull = (() => {
+    const cv = onFloor(m, fin(m, 'dock_pad'))
+    const ctx = cv.getContext('2d')
+    PAD_SPOTS.forEach(([x, y], i) => {
+      const mini = fin(m, `parcel_mini_${MINI[i % 4]}`)
+      if (mini) ctx.drawImage(mini, 8 + x - 8, 8 + y - 8)
+    })
+    return cv
+  })()
+  const shelfFull = (n: number) => {
+    const cv = onFloor(m, fin(m, 'shelf_t3'))
+    const ctx = cv.getContext('2d')
+    for (let i = 0; i < n; i++) {
+      const mini = fin(m, `parcel_mini_${MINI[(i * 7) % 4]}`)
+      if (mini)
+        ctx.drawImage(
+          mini,
+          8 + 3 + (i % 20) * 11 - 3,
+          8 + 4 + Math.floor(i / 20) * 11 - 3,
+        )
+    }
+    return cv
+  }
+  const icons = ['ic_handoff', 'ic_cleared', 'ic_ship', 'ic_plane', 'ic_lock']
+  const iconRow = panel(icons.length * 20 + 4, 24)
+  icons.forEach((id, i) => {
+    const im = fin(m, id)
+    if (im) iconRow.getContext('2d').drawImage(im, 4 + i * 20, 4)
+  })
+  const sections: Section[] = [
+    {
+      title:
+        'tier 3 "Regional" room (1x mock, tier-1 rect table + the M8 dock ' +
+        'geometry): dock 1 open, dock 2 bought (roller pad), dock 3 locked; ' +
+        'shelf 57/60 on the 20x5 @11 grid',
+      blocks: [
+        { cv: roomMock(m, 1, 40), label: 'tier 1 (as today)' },
+        { cv: roomMock(m, 2, 50), label: 'tier 2 (as today)' },
+        { cv: roomMock(m, 3, 57), label: 'tier 3 (M8)' },
+      ],
+    },
+    {
+      title: 'the M8 pieces at 1x on the tier-3 floor',
+      blocks: [
+        ...pieces.map(([id, f]) => ({
+          cv: onFloor(m, fin(m, id, f)),
+          label: `${id}${f}`,
+        })),
+        { cv: padFull, label: 'dock_pad + 6 minis' },
+        { cv: shelfFull(60), label: 'shelf_t3 60/60' },
+        { cv: shelfFull(100), label: 'shelf_t3 100 (cap at L5)' },
+      ],
+    },
+    {
+      title:
+        'overseas icons (icon16, both atlases): ic_handoff, ic_cleared, ' +
+        'ic_ship, ic_plane (+ ic_lock for scale)',
+      blocks: [{ cv: iconRow, label: 'icons' }],
+    },
+  ]
+  const out = join(CONTACT, 'warehouse-tier3@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grey4'), 1200, 4))
   return out.replace(ROOT, '')
 }
 
@@ -1657,10 +2016,16 @@ if (isMain) {
     console.log(`contact: ${ruralSheet(loadManifest())}`)
   } else if (cmd === 'tiers') {
     console.log(`contact: ${tiersSheet(loadManifest())}`)
+  } else if (cmd === 'airport') {
+    console.log(`contact: ${airportSheet(loadManifest())}`)
+  } else if (cmd === 'civic') {
+    console.log(`contact: ${civicSheet(loadManifest())}`)
+  } else if (cmd === 'tier3') {
+    console.log(`contact: ${warehouseTier3Sheet(loadManifest())}`)
   } else {
     console.error(
       'usage: node tools/art/contact.ts fixes [--hop <crop.png>] | people | ' +
-        'lowres | rural | tiers',
+        'lowres | rural | tiers | tier3 | airport | civic',
     )
     process.exitCode = 1
   }

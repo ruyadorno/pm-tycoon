@@ -487,3 +487,42 @@ M7 review fixes (rules the M7 contract did not state, or stated against the spec
   Auto-open still waits until the slot frees.
 - **Resize with a confirm open.** `Dialog.relayout` re-raises its camera. The HUD re-fits the New-game confirm after the
   Victory and Summary cards rebuild their cameras, and the QuestCard re-fits its Abandon confirm.
+
+## Run decisions and deviations (M8 — L3 Regional)
+
+- **R1 — the level cap is 3 at M8, 5 at M9** (plan-build2 §8.5 task 1 says 5 at M8): slots 5–6 have no room geometry and
+  L4/L5 regions no live art until M9, and the Golden Release would fire mid-M8. `economy.json playtestMaxLevel` 3 now;
+  "Lv 4 coming soon" is the existing cap UI. Tests of the cap mechanism run under a `playtestMaxLevel: 2` override.
+- **Retune — L3 threshold $5,000 → $3,700** (`levels.json`, gate row `level3Min`, B2 §7.3 order "a late level → lower its
+  threshold"): with the L3 plan alone the median was 22.38 min (window 15–20). Thresholds 3,500–3,900 were scanned with
+  full gates: 3,500 broke the lives median, 3,600 left 4/10 seeds losing a life, 3,700 gave L3 17.98 min with 2/10 seeds
+  losing one, 3,900 broke lives again. First overseas clearance after L3: 2.37 → 2.18 min. spec-core's "$5,000" heading
+  is superseded by the data.
+- **Overseas clearance** (B2 §4.1, spec-core §5.6) in `systems/hubs.ts`: the hand-off at the pier locks the value; the 45-s
+  clearance pays it; malware clears for $0 and costs a life only at clearance (route lines "Handed off at …" / "Cleared
+  … — the ship has sailed"); one `hub:departure` per hub per tick with clearances (the renderer ignores departures while
+  the vessel is away, so a "batch" is one 18-s trip — R3); `handed_off` covers the whole wait (R4); clearances never
+  count as local deliveries or touch satisfaction (R5; the Golden Release counts non-malware clearances, M7 Q13); the
+  daily ticker line adds "N cleared overseas". `STATE_VERSION` 5 (`lane.feedIndex`, `stats.cleared`).
+- **Docks 2–3** (B2 §4.1, §4.4): dock/conveyor pairs kept in dock-number order (dock 3 may be bought before dock 2 — R8);
+  the conveyors feed slot 1 round-robin through `lane.feedIndex` (one dock behaves exactly as before), except that the
+  lowest-numbered dock in Q-RUN1 relief takes every feed while its conveyor holds a parcel (M8 review: with 1/n of the
+  feed a relieving truck stayed docked 2–3 min on 4 of 1,000 two-dock soak seeds; now 0 of 1,000 for one, two and three
+  docks); a blocked vehicle yields its dock only while more vehicles are queued than docks are free. In the room each extra dock is a 24×56 roller
+  pad by its door (R7); the dock panel stacks three lamps in a column; a lamp blinks red only for its own blocked
+  vehicle or a busy dock with a queue. In the city the docked pose follows position along the dock run (not `dockId`,
+  which jumped), bay poses come from the manifest's per-bay `dockPoses`.
+- **Policy L3 plan** (B2 §7.2, `src/sim/policies/levelPlan.ts`): Battery checker → dock 2 → van → 2nd truck at price + $50,
+  starting once the playtest-1 purchases are owned; impossible steps re-checked each step; a vehicle step with an empty
+  driver pool waits; COUNTERS waits for the plan. **REPLACE** (R9, policy extension): with every slot full, the last
+  duplicate machine in flow order is sold for the Battery checker (never a desk). Desk 2 only when the dock-blocked rule
+  fires with desk 1 full, with the hire in the same step, and never while a plan machine step is pending (M8 review:
+  desk 2 in the REPLACE slot left the Battery checker impossible for the run; like COUNTERS it waits for the plan). Rows `level3Min` and `firstOverseasClearedAfterLevel3MaxMin`
+  are gated (informational in `--quick` and on runs shorter than the window); other-length gate runs write
+  `latest-<N>min.*`.
+- **Fixtures**: the attract scan holds first at minute 30 on seed 7 (L3, bike ×3, van, two trucks, Docks live) — R15's
+  24 → 30 scan; `vlr fixtures` runs every generator; `level-up-3.json`, `l3-docks.json`, `overseas-malware.json` are new.
+- **Art (M8)**: tier 3 is a green epoxy floor with brick walls; 220 generations for the L5 regions at 2 candidates (Airport
+  terminal + cargo hangar re-rolled, tower, plane; ten Park & civic uniques with `cv_changelog_stadium` re-rolled without
+  townhouses); five old shared rows retired; world atlas 80.1 % (over M5's 75 % target, under the R13 trigger of 90 % —
+  no shared locked silhouettes, no `city2`).

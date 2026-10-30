@@ -15,7 +15,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 - [x] M5 foundations + the author's fixes: logo + attract title, slab, bike, hop, modern port art, two atlases + hashed URLs, save v2, report §6 rough edges (commit `M5: …`)
 - [x] M6 people: applicants, pips, charisma, salaries, desk 2, the Hold Bay sorter, drivers, hire sheets, faces, policies (commit `M6: …`)
 - [x] M7 quests: engine, templates, magic parcels, rewards, chip/card, gate rows (commit `M7: …`)
-- [ ] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
+- [x] M8 L3 Regional: Docks + overseas clearance, Battery checker, dock 2, Hold Bay 5, tier 3 (commit `M8: …`)
 - [ ] M9 L4 + L5 Tycoon: four regions, X-ray, Sorter Arm, dock 3, slots 5–6, Airport, tiers 4–5, Golden Release, Victory (commit `M9: …`)
 - [ ] M10 playtest-2 build: metrics v2, summary card v2, shots, report, Pages deploy, hand-off (commit `M10: …`)
 
@@ -29,7 +29,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 ## Gate results
 
-Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M7 commit (data 20c5e42e; the table below is playtest 1's, the build-2 medians are in the newest entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
+Latest `vlr sim:gate` (seeds 1–10 × 30 min, medians) at the M8 commit (data 9be64b60; the table below is playtest 1's, the build-2 medians are in the newest entry and docs/gate/latest.md); windows from spec §7 / `economy.pacingTargets`; `docs/gate/latest.md` is the full table.
 
 | Gate                                                          | Window           | Median    | Min / max     | Pass                        |
 | ------------------------------------------------------------- | ---------------- | --------- | ------------- | --------------------------- |
@@ -47,7 +47,40 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M7 — quests — 2026-10-30 08:20 UTC — DONE at (this commit; sha recorded in the M8 entry)
+## M8 — L3 Regional — 2026-10-30 11:15 UTC — DONE at (this commit; sha recorded in the M9 entry)
+
+Built: the level counter to 3 (`playtestMaxLevel` 3 — R1, 5 at M9) with the L3 row's unlocks from data (Docks live,
+`battery` strain + Battery checker, Hold Bay 5, shelf 60, tier 3, dock 2 for $800); `systems/hubs.ts` — overseas
+destinations at live hubs, the hand-off at a pier with a locked value, the 45-s clearance at the port office, malware
+costing a life only at clearance ("… — the ship has sailed"), `hub:departure`; docks 2–3 (`buyDock`, round-robin feed into
+slot 1, relief feeds one dock at a time, two- and three-dock soaks); `STATE_VERSION` 5; the room's tier 3 (green floor,
+brick walls, the 20×5 shelf grid, roller pads and lamps for docks 2–3, the buy-dock dialog); the city's live port in
+colour, the clearance ring over the port office, the ship departure, docked poses per bay; the overseas lost-life route,
+hub tooltips and district panel; the policy's L3 plan (Battery checker → dock 2 → van → 2nd truck, REPLACE, desk 2 on the
+dock-blocked rule); the L5 region art (fogged until M9); the attract city regenerated at L3.
+Gate: PASS (data 9be64b60, Δ vs M7 0.0 % on every playtest-1 row): first delivery 43.3 s, scripted catch 178.3 s, L2
+11.72 min, truck +1.54 min, lives 0 (2/10 seeds lose one), shelf stall 0 s, Hold Bay 6.78/10 min, quests 6 offered / 3
+completed, **L3 17.98 min** (15–20; per seed 15.36–19.59), **first overseas clearance +2.18 min after L3** (≤ 3), 11
+clearances, 0 lives lost at a clearance, dock 2 bought at 20.58 min. Retune: L3 threshold $5,000 → $3,700 (row
+level3Min 22.38 → 17.98). Delegating (informational): L3 17.76, lives 1.5.
+Tests: 1,925 passing (vitest, 97 files incl. the long sweeps, + 1 todo); e2e: full `vlr e2e` 112 passed / 0 failed;
+`vlr check` 125 s. Draw calls: city 3, warehouse 6. Atlases: world 80.1 %, interior 31.8 %. Dist 6.26 MB transfer
+(~4.29 MB gzip) of 8 MB.
+Shots: `title` (+430×932) — the logo over the 30:00 L3 attract city (tier-3 brick exterior, six vehicles); `level-up-3` —
+"LEVEL 3 — REGIONAL" over the dust, the Docks chip NEW, "$3,718 / $9,000"; `docks-live` — the port in colour, the ship at
+its buoy; `clearance-ring` — the ring over the port office at zoom 2; `ship-departure` — the ship mid-sail (it slides
+sideways — art note); `warehouse-tier3` (+360×604) — green floor, brick walls, 5 bays, 0/60 shelf, dock 2 "+$800", dock 3
+"Lv4"; `warehouse-two-docks` (+360×604) — two tails, two green lamps, "2 docks 1 unloading"; `warehouse-dock-dialog`;
+`lost-life-overseas` (+360×604) — "Handed off at Prefetch Pier 1 18:27 / Cleared 19:12 — the ship has sailed". All in the
+STYLE.md look.
+Deviations from spec-core.md / B2: R1 (cap 3 at M8), the L3 threshold retune, R7 roller pads, R9 REPLACE, docked pose by
+position (decisions.md "Run decisions and deviations (M8 — L3 Regional)").
+Open for the author: G5 — `art/contact/docks@4x.png` (live port), `airport@4x.png`, `civic@4x.png` (fogged until M9),
+`art/contact/warehouse-tier3@4x.png`; the ship slides sideways on departure (art heading); for the M9 balance pass:
+`customs_run` 0/5 completed (candidates count 3 / limitDays 5), `cheer_up` 0/8, delegating lives 1.5 (> 1).
+Next: M9 L4 + L5 Tycoon
+
+## M7 — quests — 2026-10-30 08:20 UTC — DONE at 11b6517
 
 Built: `quests.json` (B2 §9) + `systems/quests.ts` (offer scheduler from day 3 every 2 days, 1-day decline/expiry
 cooldown, one active quest, the Golden Release from `levels.json ultimateQuest` with no expiry; ten templates' goal
@@ -215,7 +248,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 ## Art approvals pending
 
 - G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
-- G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural presented at M7 — `art/contact/rural@4x.png` (ten uniques, agent picks); Airport, Park & civic, Docks pending
+- G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural presented at M7 — `art/contact/rural@4x.png` (ten uniques, agent picks); Docks (live), Airport, Park & civic presented at M8 — `art/contact/{docks,airport,civic}@4x.png` (agent picks, 2 candidates for L5)
 - G6 tiers 3–5 + machines + people (build 2): people + machines presented at M6 — `art/contact/people@4x.png` (agent picks `battery_checker`, `xray`, `sorter_arm`; procedural faces, pips, ★, `worker_sorter`, `hold_station`); tiers pending (M8–M9)
 
 - G1 palette + STYLE.md: drawn 2026-10-29 (M0), presented in the end-of-run report — `art/palette.png`, `art/contact/palette-ramps@4x.png`, `art/STYLE.md`
@@ -225,7 +258,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Cost spent
 
-- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); run total 609; $0 credits
+- PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); M8 220 (Airport + Park & civic at 2 candidates); run total 829; $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)
 - Retro Diffusion: $0 (expected; only with RD_API_KEY and after the author read its ToS)

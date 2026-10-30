@@ -26,6 +26,17 @@
 // victory rows as informational (M9), the 7-13 minute plateau, the magic
 // on-time count and the per-template counts; --baseline compares only the
 // seven playtest-1 rows.
+//
+// Build 2, M8 (spec-build2 §7.2 L3 row, §7.3; plan-build2 §8.5 task 7;
+// design-m8-m9 §5.1-§5.3): at L3 the plan (policies/levelPlan.ts) buys the
+// Battery checker — REPLACEing the duplicate Metal detector — then dock 2,
+// a van and a 2nd truck, each at price + $50, skipping impossible steps and
+// waiting on an unaffordable one; desk 2 only when the dock-blocked rule
+// fires with desk 1 full. The report gates level3Min (15-20 min) and
+// firstOverseasClearedAfterLevel3MaxMin (≤ 3 min) behind levels3plus
+// (informational in --quick and on a shorter run), level4Min / level5Min
+// stay informational (M9); a non-30-minute gate writes latest-<N>min.*.
+// tests/sim/levels3.long.test.ts has the seeds 1-10 × 25 min L3 window.
 
 import { describe, expect, it } from 'vitest'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
@@ -35,12 +46,24 @@ import {
   sorterOnDuty,
 } from '../../src/sim/policies/delegating.ts'
 import {
+  LEVEL_PLAN,
+  levelPlanDone,
+  levelPlanStep,
+  placeNextDesk,
+  planMaxLevel,
+  planSteps,
+  replaceSlot,
+  slotForPurchase,
+  stepStatus,
+} from '../../src/sim/policies/levelPlan.ts'
+import {
   POLICY_PARAMS,
   bestApplicant,
   createPolicy,
   dockBlockedSecondsToday,
   weakestCounter,
 } from '../../src/sim/policy.ts'
+import type { Command } from '../../src/sim/commands.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import { conservation, formatConservation } from '../../src/sim/sim.ts'
 import { hireFeeOf, salaryOf } from '../../src/sim/systems/people.ts'
@@ -51,8 +74,9 @@ import type {
   Role,
   VehicleType,
 } from '../../src/sim/types.ts'
-import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
+import { laneNode, liveSlotIds, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import {
+  gateFileBase,
   parseCli,
   questsLine,
   runSeed,
@@ -63,10 +87,13 @@ import type { GateCheck, RecordedEvent } from '../../tools/sim/report.ts'
 import {
   baselineLine,
   checkMetrics,
+  checkOk,
   compareBaseline,
   computeMetrics,
   DELEGATING_NOTE,
+  formatGate,
   gateMarkdown,
+  levelWindowMinutes,
   median,
   questMetrics,
   questTallies,
@@ -88,9 +115,10 @@ import {
 const data = dataFixture()
 const targets = data.economy.pacingTargets
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-/** A vehicles.json / machines.json price by id. */
+/** A vehicles.json / machines.json price by id, or economy.docks' by `dock<index>`. */
 const price = (k: string): number =>
   data.vehicles.types.find((t) => t.id === k)?.price ??
+  data.economy.docks.find((d) => `dock${d.index}` === k)?.price ??
   data.machines.checkers.find((c) => c.id === k)!.price
 
 let gateRuns: RunResult[] | null = null
@@ -101,7 +129,7 @@ function runs(): RunResult[] {
 }
 
 describe('competent policy (spec §7) [gate]', () => {
-  it("opening A at t = 0: a bike with the best driver + a Metal detector, $100 − the driver's fee left; then bikes at price + $50 until 3; a 2nd Metal detector (COUNTERS); at L2 the truck, then the Shaky shaker — each at price + $50, each vehicle with the best driver for its type", () => {
+  it("opening A at t = 0: a bike with the best driver + a Metal detector, $100 − the driver's fee left; then bikes at price + $50 until 3; a 2nd Metal detector (COUNTERS); at L2 the truck, then the Shaky shaker; at L3 (M8) the Battery checker REPLACEs the 2nd Metal detector, then dock 2, a van, a 2nd truck — each at price + $50 (a REPLACE counts its refund), each vehicle with the best driver for its type", () => {
     const sim = makeSim(1)
     const policy = createPolicy(sim, 'competent')
     const first = bestApplicant(sim, 'driver', 'bike')!
@@ -116,8 +144,17 @@ describe('competent policy (spec §7) [gate]', () => {
       const balance = sim.state.economy.balance
       const picks: Partial<Record<VehicleType, number | undefined>> = {
         bike: bestApplicant(sim, 'driver', 'bike')?.id,
+        van: bestApplicant(sim, 'driver', 'van')?.id,
         truck: bestApplicant(sim, 'driver', 'truck')?.id,
       }
+      const lane = sim.state.lane
+      const slotPrice = new Map(
+        liveSlotIds(lane).map((id) => {
+          const f = laneNode(lane, id)?.fixture
+          return [id, f?.kind === 'machine' ? f.checker.price : 0] as const
+        }),
+      )
+      let refund = 0
       policy.step()
       for (const e of sim.commandLog.slice(before)) {
         if (e.cmd.kind === 'buyVehicle') {
@@ -125,14 +162,21 @@ describe('competent policy (spec §7) [gate]', () => {
           expect(e.cmd.applicantId, `${e.cmd.type} at ${e.tick}`).not.toBeNull()
           expect(e.cmd.applicantId).toBe(picks[e.cmd.type])
         }
+        if (e.cmd.kind === 'removeFixture') {
+          refund += Math.round(
+            (slotPrice.get(e.cmd.nodeId) ?? 0) * data.machines.removalRefund,
+          )
+        }
         const k =
           e.cmd.kind === 'buyVehicle'
             ? e.cmd.type
             : e.cmd.kind === 'buyMachine'
               ? e.cmd.defId
-              : null
+              : e.cmd.kind === 'buyDock'
+                ? `dock${e.cmd.index}`
+                : null
         if (k !== null) {
-          expect(balance, `${k} at ${e.tick}`).toBeGreaterThanOrEqual(
+          expect(balance + refund, `${k} at ${e.tick}`).toBeGreaterThanOrEqual(
             price(k) + POLICY_PARAMS.purchaseBuffer,
           )
         }
@@ -141,9 +185,22 @@ describe('competent policy (spec §7) [gate]', () => {
     }
     const buys = sim.commandLog
       .map((e) => e.cmd)
-      .filter((c) => c.kind === 'buyVehicle' || c.kind === 'buyMachine')
-      .map((c) => (c.kind === 'buyVehicle' ? c.type : `${c.defId}@${c.nodeId}`))
-    expect(buys).toEqual([
+      .filter(
+        (c) =>
+          c.kind === 'buyVehicle' ||
+          c.kind === 'buyMachine' ||
+          c.kind === 'buyDock' ||
+          c.kind === 'removeFixture' ||
+          c.kind === 'placeDesk',
+      )
+      .map((c) => {
+        if (c.kind === 'buyVehicle') return c.type
+        if (c.kind === 'buyMachine') return `${c.defId}@${c.nodeId}`
+        if (c.kind === 'buyDock') return `dock${c.index}`
+        if (c.kind === 'removeFixture') return `remove@${c.nodeId}`
+        return `desk${c.index}@${c.nodeId}`
+      })
+    const head = [
       'bike',
       'metal_detector@slot2',
       'bike',
@@ -151,10 +208,19 @@ describe('competent policy (spec §7) [gate]', () => {
       'metal_detector@slot3', // COUNTERS: the weakest strain (metal) after the 3rd bike
       'truck',
       'shaky_shaker@slot4',
-    ])
+      // M8, L3 (17:05 on seed 1): REPLACE the duplicate, then the plan.
+      'remove@slot3',
+      'battery_checker@slot3',
+      'dock2',
+      'van',
+    ]
+    expect(buys.slice(0, head.length)).toEqual(head)
+    // The 2nd truck closes the L3 plan (29:31 on seed 1); nothing else.
+    expect(buys.slice(head.length)).toEqual(['truck'])
     expect(sim.state.vehicles.every((v) => v.zone === 'any')).toBe(true)
     expect(sim.state.vehicles.every((v) => v.driverId !== null)).toBe(true)
-    expect(sim.state.level.level).toBe(2)
+    expect(sim.state.level.level).toBe(3)
+    expect(levelPlanDone(sim)).toBe(true)
   }, 30_000)
 
   it("COUNTERS picks the weakest announced strain's counter (rattle → the Shaky shaker when it is the weakest)", () => {
@@ -332,7 +398,7 @@ describe('competent policy (spec §7) [gate]', () => {
     }
   }, 60_000)
 
-  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows)', () => {
+  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows; M8: the L3 rows — L4-L5 informational until M9)', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -350,6 +416,8 @@ describe('competent policy (spec §7) [gate]', () => {
       payroll: true,
       people: true,
       quests: true,
+      levels3plus: true,
+      levels45: false,
     })
     expect(g.checks.map((c) => [c.key, c.note])).toEqual([
       ['firstDeliveryS', null],
@@ -361,9 +429,33 @@ describe('competent policy (spec §7) [gate]', () => {
       ['holdBayEventsPer10MinMin', null],
       ['questsOfferedBy30MinMin', null],
       ['questsCompletedBy30MinMin', null],
+      ['level3Min', null],
+      ['firstOverseasClearedAfterLevel3MaxMin', null],
+      ['level4Min', 'informational (M9)'],
+      ['level5Min', 'informational (M9)'],
     ])
-    expect(g.checks.filter((c) => !c.pass)).toEqual([])
+    expect(g.checks.filter((c) => c.note === null && !c.pass)).toEqual([])
+    expect(g.checks.every(checkOk)).toBe(true)
     expect(g.pass).toBe(true)
+  }, 60_000)
+
+  it('M8 acceptance (plan-build2 §8.5): L3 median in [15, 20] min and the first overseas clearance ≤ 3 min after L3 (median); every seed reaches L3 and clears overseas', () => {
+    const m = runs().map((r) => r.result.metrics)
+    for (const x of m) {
+      expect(x.level3Min, `seed ${x.seed}`).not.toBeNull()
+      expect(
+        x.firstOverseasClearedAfterLevel3Min,
+        `seed ${x.seed}`,
+      ).not.toBeNull()
+      expect(x.overseasCleared, `seed ${x.seed}`).toBeGreaterThan(0)
+    }
+    const [lo, hi] = targets.level3Min
+    const l3 = median(m.map((x) => x.level3Min))!
+    expect(l3).toBeGreaterThanOrEqual(lo)
+    expect(l3).toBeLessThanOrEqual(hi)
+    expect(
+      median(m.map((x) => x.firstOverseasClearedAfterLevel3Min))!,
+    ).toBeLessThanOrEqual(targets.firstOverseasClearedAfterLevel3MaxMin)
   }, 60_000)
 
   it('L2 median in [8, 15] min (lifetime earned reaches the levels.json threshold)', () => {
@@ -384,16 +476,17 @@ describe('competent policy (spec §7) [gate]', () => {
     expect(median(t)!).toBeLessThanOrEqual(targets.truckAfterLevel2MaxMin)
   }, 60_000)
 
-  it('no level:up {3} on any seed; the post-cap escalation is printed (malwareShareAt30Min)', () => {
+  it('level:up {2} then {3} on every seed, never {4} (the M8 cap, design-m8-m9 R1); the post-cap escalation from L3 is printed (malwareShareAt30Min)', () => {
+    expect(data.economy.playtestMaxLevel).toBe(3)
     for (const r of runs()) {
       const ups = r.events.filter((e) => e.name === 'level:up')
       expect(
         ups.map((e) => e.level),
         `seed ${r.seed}`,
-      ).toEqual([2])
+      ).toEqual([2, 3])
       const m = data.parcels.malware
       expect(r.result.metrics.malwareShareAtEnd).toBeGreaterThan(
-        m.baseShare + m.perLevel,
+        m.baseShare + 2 * m.perLevel,
       )
       expect(r.result.metrics.malwareShareAtEnd).toBeLessThanOrEqual(m.cap)
     }
@@ -426,9 +519,13 @@ describe('competent policy (spec §7) [gate]', () => {
     expect(run.rows.at(-1)!.deliv).toBeGreaterThan(150)
   }, 30_000)
 
-  it('B2 §7.2: the competent policy never hires a sorter, posts an ad, fires or Replaces; its hires are drivers with their vehicles and inspectors at desk 1', () => {
+  it('B2 §7.2: the competent policy never hires a sorter, posts an ad, fires or Replaces; its hires are drivers with their vehicles and inspectors at desk 1 (desk 2 never fires on seeds 1-10: desk 1 never fills)', () => {
     for (const r of runs()) {
       const hired = r.events.filter((e) => e.name === 'worker:hired')
+      expect(
+        r.events.filter((e) => e.name === 'desk:placed'),
+        `seed ${r.seed}`,
+      ).toEqual([])
       expect(
         hired.filter((e) => e.role === 'sorter'),
         `seed ${r.seed}`,
@@ -674,10 +771,307 @@ describe('the delegating policy (B2 §7.2 L2 row, design §5.2, D8)', () => {
       sim.tick()
     }
     expect(sorterHires).toBe(1)
-    expect(sim.state.level.level).toBe(2)
+    expect(sim.state.level.level).toBe(3) // M8: L3 at 17:05 on seed 1
     expect(sorterOnDuty(sim)).toBe(true)
     expect(clears).toBeGreaterThan(0)
   }, 30_000)
+})
+
+/** One policy step's commands. */
+function stepCmds(sim: Sim, policy: { step(): void }): Command[] {
+  const n = sim.commandLog.length
+  policy.step()
+  return sim.commandLog.slice(n).map((e) => e.cmd)
+}
+
+/**
+ * A quiet sim at L3 with the 30-minute runs' lane and fleet at L2's end —
+ * desk 1, then `layout` in slots 2-4 (default: Metal detector, COUNTERS'
+ * 2nd Metal detector, Shaky shaker), 3 bikes + a truck with the best
+ * drivers — and `balance` dollars. No tick runs, so nothing else moves.
+ */
+function l3Sim(
+  balance: number,
+  layout: readonly string[] = [
+    'metal_detector',
+    'metal_detector',
+    'shaky_shaker',
+  ],
+): Sim {
+  const sim = fund(quietSim(1))
+  expect(sim.dispatch({ kind: 'debugForceLevel', level: 2 }).ok).toBe(true)
+  quiet(sim)
+  for (const [i, defId] of layout.entries()) {
+    const nodeId = `slot${i + 2}`
+    expect(sim.dispatch({ kind: 'buyMachine', defId, nodeId }).ok).toBe(true)
+  }
+  for (const type of ['bike', 'bike', 'bike', 'truck'] as const) {
+    const a = bestApplicant(sim, 'driver', type)!
+    const res = sim.dispatch({ kind: 'buyVehicle', type, applicantId: a.id })
+    expect(res.ok).toBe(true)
+  }
+  expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
+  quiet(sim)
+  sim.state.economy.balance = balance
+  return sim
+}
+
+/** Fill desk 1 (the start inspector + 2 hires from the pool). */
+function fillDesk1(sim: Sim): void {
+  for (let i = 0; i < 2; i++) {
+    const a = bestApplicant(sim, 'inspector')!
+    const res = sim.dispatch({
+      kind: 'hire',
+      role: 'inspector',
+      applicantId: a.id,
+      target: { nodeId: 'slot1' },
+    })
+    expect(res.ok).toBe(true)
+  }
+}
+
+describe('the L3 plan (B2 §7.2 L3 row; design-m8-m9 §5.1, R9)', () => {
+  const buffer = POLICY_PARAMS.purchaseBuffer
+  const refund = Math.round(
+    price('metal_detector') * data.machines.removalRefund,
+  )
+
+  it('LEVEL_PLAN is B2 §7.2 verbatim; the M8 build runs L3 only (levels3plus), M9 adds L4-L5 (levels45); nothing below L3', () => {
+    expect(LEVEL_PLAN[3]).toEqual([
+      { kind: 'machine', defId: 'battery_checker' },
+      { kind: 'dock', index: 2 },
+      { kind: 'vehicle', type: 'van', count: 1 },
+      { kind: 'vehicle', type: 'truck', count: 2 },
+    ])
+    expect(LEVEL_PLAN[4]).toEqual([
+      { kind: 'machine', defId: 'xray' },
+      { kind: 'dock', index: 3 },
+      { kind: 'sorterArm' },
+      { kind: 'vehicle', type: 'van', count: 2 },
+    ])
+    expect(LEVEL_PLAN[5]).toEqual([
+      { kind: 'vehicle', type: 'truck', count: 3 },
+    ])
+    expect(planMaxLevel()).toBe(3)
+    expect(planMaxLevel({ levels3plus: true, levels45: true })).toBe(5)
+    expect(planMaxLevel({ levels3plus: false, levels45: false })).toBe(2)
+    const sim = fund(quietSim(1))
+    expect(planSteps(sim)).toEqual([])
+    expect(levelPlanStep(sim, buffer)).toBe('done')
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+    expect(planSteps(sim)).toEqual(LEVEL_PLAN[3]) // L4 rows wait for M9
+  })
+
+  it('on a funded forced-L3 sim: the Battery checker REPLACEs the duplicate Metal detector → dock 2 → van → 2nd truck, each at price + $50 (the REPLACE counts its refund), one per step; nothing is bought while the next step is unaffordable', () => {
+    const sim = l3Sim(price('battery_checker') + buffer - refund - 1)
+    const policy = createPolicy(sim, 'competent')
+    expect(replaceSlot(sim)).toEqual({ nodeId: 'slot3', replace: true, refund })
+    expect(stepStatus(sim, LEVEL_PLAN[3]![0]!, buffer)).toBe('waiting')
+    expect(stepCmds(sim, policy)).toEqual([]) // $1 short: dock 2 waits too
+    sim.state.economy.balance += 1
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'removeFixture', nodeId: 'slot3' },
+      { kind: 'buyMachine', defId: 'battery_checker', nodeId: 'slot3' },
+    ])
+    expect(sim.state.economy.balance).toBe(buffer)
+    expect(laneNode(sim.state.lane, 'slot2')?.fixture).toMatchObject({
+      checker: { defId: 'metal_detector' },
+    })
+    const steps: [number, Command][] = [
+      [price('dock2'), { kind: 'buyDock', index: 2 }],
+      [
+        price('van'),
+        { kind: 'buyVehicle', type: 'van', applicantId: Number.NaN },
+      ],
+      [
+        price('truck'),
+        { kind: 'buyVehicle', type: 'truck', applicantId: Number.NaN },
+      ],
+    ]
+    for (const [cost, cmd] of steps) {
+      sim.state.economy.balance = cost + buffer - 1
+      expect(stepCmds(sim, policy), `${cmd.kind} $1 short`).toEqual([])
+      sim.state.economy.balance += 1
+      const want =
+        cmd.kind === 'buyVehicle'
+          ? {
+              ...cmd,
+              applicantId: bestApplicant(sim, 'driver', cmd.type)!.id,
+            }
+          : cmd
+      expect(stepCmds(sim, policy)).toEqual([want])
+    }
+    expect(sim.state.lane.docks.map((d) => d.id)).toEqual(['dock1', 'dock2'])
+    expect(sim.state.vehicles.map((v) => v.type)).toEqual([
+      'bike',
+      'bike',
+      'bike',
+      'truck',
+      'van',
+      'truck',
+    ])
+    expect(levelPlanDone(sim)).toBe(true)
+    expect(levelPlanStep(sim, buffer)).toBe('done')
+    // Done: a fortune buys nothing more (COUNTERS: no free slot).
+    sim.state.economy.balance = 1_000_000
+    expect(stepCmds(sim, policy)).toEqual([])
+  })
+
+  it('REPLACE takes the LAST duplicate in flow order, never a desk; a free slot comes first; with neither the machine step is impossible and the next step goes ahead', () => {
+    const shakers = l3Sim(0, ['metal_detector', 'shaky_shaker', 'shaky_shaker'])
+    expect(replaceSlot(shakers)).toEqual({
+      nodeId: 'slot4',
+      replace: true,
+      refund: Math.round(price('shaky_shaker') * data.machines.removalRefund),
+    })
+    const free = l3Sim(0, ['metal_detector', 'shaky_shaker'])
+    expect(replaceSlot(free)).toBeNull()
+    expect(slotForPurchase(free)).toEqual({
+      nodeId: 'slot4',
+      replace: false,
+      refund: 0,
+    })
+    // desk 1, Metal detector, Shaky shaker, desk 2: nowhere to go.
+    const full = l3Sim(0, ['metal_detector', 'shaky_shaker'])
+    expect(
+      full.dispatch({ kind: 'placeDesk', nodeId: 'slot4', index: 2 }),
+    ).toEqual({ ok: false, reason: 'insufficient-funds' })
+    full.state.economy.balance = 400
+    expect(
+      full.dispatch({ kind: 'placeDesk', nodeId: 'slot4', index: 2 }).ok,
+    ).toBe(true)
+    expect(slotForPurchase(full)).toBeNull()
+    full.state.economy.balance = price('dock2') + buffer
+    expect(stepStatus(full, LEVEL_PLAN[3]![0]!, buffer)).toBe('impossible')
+    expect(stepCmds(full, createPolicy(full, 'competent'))).toEqual([
+      { kind: 'buyDock', index: 2 },
+    ])
+  })
+
+  it('a vehicle step waits with an empty driver pool; dock 3 / the Sorter Arm are impossible below their level; the Arm is impossible with a sorter seated, else ready at price + $50', () => {
+    const sim = l3Sim(1_000_000)
+    sim.state.applicants.driver = []
+    expect(
+      stepStatus(sim, { kind: 'vehicle', type: 'van', count: 1 }, buffer),
+    ).toBe('waiting')
+    expect(stepStatus(sim, { kind: 'dock', index: 3 }, buffer)).toBe(
+      'impossible',
+    )
+    expect(stepStatus(sim, { kind: 'sorterArm' }, buffer)).toBe('impossible')
+    expect(stepStatus(sim, { kind: 'machine', defId: 'xray' }, buffer)).toBe(
+      'impossible',
+    )
+    const l4 = fund(quietSim(1))
+    expect(l4.dispatch({ kind: 'debugForceLevel', level: 4 }).ok).toBe(true)
+    const arm = data.machines.upgrades.find((u) => u.id === 'sorter_arm')!
+    l4.state.economy.balance = arm.price + buffer - 1
+    expect(stepStatus(l4, { kind: 'sorterArm' }, buffer)).toBe('waiting')
+    l4.state.economy.balance += 1
+    expect(stepStatus(l4, { kind: 'sorterArm' }, buffer)).toBe('ready')
+    const a = bestApplicant(l4, 'sorter')!
+    expect(
+      l4.dispatch({
+        kind: 'hire',
+        role: 'sorter',
+        applicantId: a.id,
+        target: { station: 'hold' },
+      }).ok,
+    ).toBe(true)
+    expect(stepStatus(l4, { kind: 'sorterArm' }, buffer)).toBe('impossible')
+  })
+
+  it('COUNTERS waits for the plan: at L3 with a free slot the Battery checker takes it, never a counter', () => {
+    const sim = l3Sim(1_000_000, ['metal_detector', 'shaky_shaker'])
+    const cmds = stepCmds(sim, createPolicy(sim, 'competent'))
+    expect(cmds).toEqual([
+      { kind: 'buyMachine', defId: 'battery_checker', nodeId: 'slot4' },
+    ])
+  })
+
+  it('desk 2 only when the dock-blocked rule fires with desk 1 full: REPLACE allowed, the best inspector seated there in the same step (one hire per day); dock 2 is next', () => {
+    // desk 1, Shaky shaker, Battery checker, Shaky shaker: no plan machine
+    // waits (the Battery checker is owned); desk 2 at $400 + $50 REPLACEs
+    // the duplicate shaker (refund $150).
+    const sim = l3Sim(1000, ['shaky_shaker', 'metal_detector', 'shaky_shaker'])
+    expect(sim.dispatch({ kind: 'removeFixture', nodeId: 'slot3' }).ok).toBe(
+      true,
+    )
+    expect(
+      sim.dispatch({
+        kind: 'buyMachine',
+        defId: 'battery_checker',
+        nodeId: 'slot3',
+      }).ok,
+    ).toBe(true)
+    fillDesk1(sim) // on tick 0: not "hired today" (the start-crew guard)
+    runTicks(sim, 1)
+    const policy = createPolicy(sim, 'competent')
+    sim.state.economy.balance = 400
+    sim.state.lane.docks[0]!.blockedTicksThisDay =
+      POLICY_PARAMS.dockBlockedHireS * 10
+    expect(stepCmds(sim, policy)).toEqual([]) // exactly 10 s: not yet
+    sim.state.lane.docks[0]!.blockedTicksThisDay += 1
+    const best = bestApplicant(sim, 'inspector')!
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'removeFixture', nodeId: 'slot4' },
+      { kind: 'placeDesk', nodeId: 'slot4', index: 2 },
+      {
+        kind: 'hire',
+        role: 'inspector',
+        applicantId: best.id,
+        target: { nodeId: 'slot4' },
+      },
+    ])
+    const desk2 = laneNode(sim.state.lane, 'slot4')!.fixture
+    expect(desk2).toMatchObject({ kind: 'desk', index: 2 })
+    sim.state.economy.balance = 1_000_000
+    expect(stepStatus(sim, LEVEL_PLAN[3]![0]!, buffer)).toBe('done')
+    expect(stepCmds(sim, policy)).toEqual([{ kind: 'buyDock', index: 2 }])
+    // Desk 1 with a free seat: the hire goes there, no desk 2.
+    const other = l3Sim(400)
+    other.state.lane.docks[0]!.blockedTicksThisDay = 200
+    const pick = bestApplicant(other, 'inspector')!
+    expect(stepCmds(other, createPolicy(other, 'competent'))).toEqual([
+      {
+        kind: 'hire',
+        role: 'inspector',
+        applicantId: pick.id,
+        target: { nodeId: 'slot1' },
+      },
+    ])
+  })
+
+  it('desk 2 waits while a plan machine is pending (M8 review): desk 1 full, the dock-blocked rule firing and desk 2 affordable, the Battery checker keeps its REPLACE slot and is bought first; desk 2 then has no slot', () => {
+    // desk 1 (full), Metal, Metal, Shaky shaker: desk 2 ($400 + $50 − $75)
+    // affordable at $420, the Battery checker ($500 + $50 − $75) not.
+    const sim = l3Sim(1000)
+    fillDesk1(sim)
+    runTicks(sim, 1)
+    const policy = createPolicy(sim, 'competent')
+    sim.state.economy.balance = 420
+    sim.state.lane.docks[0]!.blockedTicksThisDay =
+      POLICY_PARAMS.dockBlockedHireS * 10 + 1
+    const battery = LEVEL_PLAN[3]![0]!
+    expect(stepStatus(sim, battery, buffer)).toBe('waiting')
+    expect(placeNextDesk(sim, buffer)).toBe(false)
+    expect(stepCmds(sim, policy)).toEqual([])
+    expect(laneNode(sim.state.lane, 'slot3')?.fixture).toMatchObject({
+      checker: { defId: 'metal_detector' },
+    })
+    sim.state.economy.balance = price('battery_checker') + buffer - refund
+    expect(stepCmds(sim, policy)).toEqual([
+      { kind: 'removeFixture', nodeId: 'slot3' },
+      { kind: 'buyMachine', defId: 'battery_checker', nodeId: 'slot3' },
+    ])
+    expect(stepStatus(sim, battery, buffer)).toBe('done')
+    // desk 1, Metal, Battery, Shaker: no free slot, no duplicate.
+    sim.state.economy.balance = 1_000_000
+    expect(placeNextDesk(sim, buffer)).toBe(false)
+    expect(stepCmds(sim, policy)).toEqual([{ kind: 'buyDock', index: 2 }])
+    expect(
+      sim.state.lane.nodes.filter((n) => n.fixture?.kind === 'desk'),
+    ).toHaveLength(1)
+  })
 })
 
 const meta = (policy: string) => ({
@@ -738,7 +1132,7 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     ).toBeNull()
   })
 
-  it('the competent gate prints the people rows, the unbuilt build-2 key, the M9 quest rows and the M7 quest printout as informational; no delegating row', () => {
+  it('the competent gate prints the people rows, the M8 overseas / dock rows, the M9 quest rows and the M7 quest printout as informational; no delegating row', () => {
     const g = summarise(
       runs().map((r) => r.result),
       meta('competent'),
@@ -749,13 +1143,30 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
       `≤ ${targets.payrollShareOfGrossMax}`,
     )
     expect(info.sorterDecisions?.median).toBe(0)
-    expect(info.firstOverseasClearedAfterLevel3MaxMin?.note).toBe(
-      'build 2 — informational',
+    // Gated since M7 / M8: checks, not informational rows.
+    for (const k of [
+      'questsOfferedBy30MinMin',
+      'questsCompletedBy30MinMin',
+      'level3Min',
+      'firstOverseasClearedAfterLevel3MaxMin',
+      'level4Min',
+      'level5Min',
+    ]) {
+      expect(info[k], k).toBeUndefined()
+    }
+    // M8: printed only.
+    expect(info.overseasCleared).toMatchObject({ note: 'informational' })
+    expect(info.overseasCleared!.median!).toBeGreaterThan(0)
+    expect(info.overseasLivesLost?.note).toBe('informational')
+    expect(info.dock2Min?.note).toBe('informational')
+    expect(info.dock2Min!.median!).toBeGreaterThan(
+      median(runs().map((r) => r.result.metrics.level3Min))! - 1e-9,
     )
-    // Gated since M7: checks, not informational rows.
-    expect(info.questsOfferedBy30MinMin).toBeUndefined()
-    expect(info.questsCompletedBy30MinMin).toBeUndefined()
-    // The sim caps at L2 until M9: no Golden Release, no victory.
+    expect(info.dock3Min).toMatchObject({
+      median: null,
+      note: 'informational (M9)',
+    })
+    // The sim caps at L3 until M9: no Golden Release, no victory.
     for (const k of ['goldenReleaseOfferedMaxMin', 'victoryMaxMin']) {
       expect(info[k], k).toMatchObject({
         median: null,
@@ -948,5 +1359,191 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     const r = runSeed(data, 1, 1, createPolicy, { kind: 'delegating' })
     expect(r.result.checks.every((c) => c.note === DELEGATING_NOTE)).toBe(true)
     expect(r.result.pass).toBe(true)
+  })
+})
+
+/** A recorded parcel:cleared at the Docks. */
+const clearedAt = (tick: number, id: number, malware: boolean): RecordedEvent =>
+  ({
+    tick,
+    name: 'parcel:cleared',
+    id,
+    paid: malware ? 0 : 30,
+    malware,
+    hub: 'docks',
+    buildingId: 'dk_pier_1',
+    onTime: true,
+  }) as RecordedEvent
+
+/** gateFileBase's options. */
+const fileOpts = (
+  minutes: number,
+  policy: 'delegating' | null = null,
+  quick = false,
+) => ({ minutes, policy, quick })
+
+describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)', () => {
+  it('L3 rows from the events: minutes from level:up {3} to the first parcel:cleared, clearances, lives lost at a clearance, dock 2 / dock 3 minutes', () => {
+    const stats = makeSim(1).state.stats
+    const events = [
+      { tick: at(17), name: 'level:up', level: 3 } as RecordedEvent,
+      ev('dock:bought', { tick: at(17.5), index: 2, dockId: 'dock2' }),
+      clearedAt(at(19.25), 5, false),
+      clearedAt(at(20), 6, true),
+      ev('life:lost', { tick: at(20), report: { viaClearance: true } }),
+      ev('life:lost', { tick: at(21), report: { viaClearance: false } }),
+    ]
+    const m = computeMetrics(1, 30, events, [], stats)
+    expect(m).toMatchObject({
+      level3Min: 17,
+      firstOverseasClearedAfterLevel3Min: 2.25,
+      overseasCleared: 2,
+      overseasLivesLost: 1,
+      livesLost: 2,
+      dock2Min: 17.5,
+      dock3Min: null,
+    })
+    const noL3 = computeMetrics(1, 30, events.slice(1), [], stats)
+    expect(noL3.level3Min).toBeNull()
+    expect(noL3.firstOverseasClearedAfterLevel3Min).toBeNull()
+    const noClear = computeMetrics(1, 30, events.slice(0, 2), [], stats)
+    expect(noClear.firstOverseasClearedAfterLevel3Min).toBeNull()
+    expect(noClear.overseasCleared).toBe(0)
+  })
+
+  it('level3Min / firstOverseasClearedAfterLevel3MaxMin gate behind levels3plus, level4Min / level5Min behind levels45 (M9); informational in --quick and on a run shorter than the window end', () => {
+    const inputs = {
+      firstDeliveryS: 40,
+      firstMalwareCaughtS: 100,
+      level2Min: 12,
+      truckAfterLevel2Min: 2,
+      livesLost: 0,
+      shelfStallS: 0,
+      holdBayEventsPer10MinL1: 7,
+      questsOffered30: 5,
+      questsCompleted30: 3,
+      level3Min: 17.5 as number | null,
+      firstOverseasClearedAfterLevel3Min: 2.5 as number | null,
+      level4Min: null,
+      level5Min: null,
+    }
+    const rows = (
+      over: Partial<typeof inputs> & { minutes?: number; quick?: boolean },
+      features = SIM_FEATURES,
+    ) =>
+      Object.fromEntries(
+        checkMetrics({ ...inputs, ...over }, targets, features)
+          .filter((c) =>
+            [
+              'level3Min',
+              'firstOverseasClearedAfterLevel3MaxMin',
+              'level4Min',
+              'level5Min',
+            ].includes(c.key),
+          )
+          .map((c) => [c.key, [c.note, c.pass]]),
+      )
+    expect(rows({ minutes: 30 })).toEqual({
+      level3Min: [null, true],
+      firstOverseasClearedAfterLevel3MaxMin: [null, true],
+      level4Min: ['informational (M9)', false],
+      level5Min: ['informational (M9)', false],
+    })
+    expect(
+      rows({ level3Min: 20.5, firstOverseasClearedAfterLevel3Min: 3.1 }),
+    ).toMatchObject({
+      level3Min: [null, false],
+      firstOverseasClearedAfterLevel3MaxMin: [null, false],
+    })
+    expect(rows({ level3Min: 14.9 }).level3Min).toEqual([null, false])
+    expect(rows({ level3Min: null }).level3Min).toEqual([null, false])
+    expect(rows({ minutes: 20, quick: true })).toMatchObject({
+      level3Min: ['informational (quick)', true],
+      firstOverseasClearedAfterLevel3MaxMin: ['informational (quick)', true],
+    })
+    expect(levelWindowMinutes('level3Min', targets)).toBe(targets.level3Min[1])
+    expect(
+      levelWindowMinutes('firstOverseasClearedAfterLevel3MaxMin', targets),
+    ).toBe(targets.level3Min[1] + targets.firstOverseasClearedAfterLevel3MaxMin)
+    expect(levelWindowMinutes('level2Min', targets)).toBeNull()
+    const end = targets.level3Min[1]
+    const both = end + targets.firstOverseasClearedAfterLevel3MaxMin
+    expect(rows({ minutes: end })).toMatchObject({
+      level3Min: [null, true],
+      firstOverseasClearedAfterLevel3MaxMin: [
+        `informational (run < ${both} min)`,
+        true,
+      ],
+    })
+    expect(rows({ minutes: end - 1 }).level3Min).toEqual([
+      `informational (run < ${end} min)`,
+      true,
+    ])
+    const m7 = { ...SIM_FEATURES, levels3plus: false }
+    expect(rows({ minutes: 30 }, m7).level3Min).toEqual([
+      'informational (M8)',
+      true,
+    ])
+    const m9 = { ...SIM_FEATURES, levels45: true }
+    expect(rows({ minutes: 30 }, m9).level4Min).toEqual([null, false])
+    expect(windowNote('level3Min', SIM_FEATURES, 20, { quick: true })).toBe(
+      'informational (quick)',
+    )
+    expect(windowNote('maxLivesLost', SIM_FEATURES, 20, { quick: true })).toBe(
+      null,
+    )
+  })
+
+  it('the quick summary notes the level rows "informational (quick)" (vlr check never fails on L3); per seed too', () => {
+    const res = runs()
+      .slice(0, 3)
+      .map((r) => ({
+        ...r.result,
+        metrics: { ...r.result.metrics, minutes: 20, level3Min: null },
+      }))
+    const g = summarise(res, { ...meta('competent'), minutes: 20, quick: true })
+    const l3 = g.checks.find((c) => c.key === 'level3Min')!
+    expect(l3).toMatchObject({ value: null, pass: false })
+    expect(l3.note).toBe('informational (quick)')
+    expect(checkOk(l3)).toBe(true)
+    const r = runSeed(data, 1, 1, createPolicy, { quick: true })
+    expect(r.result.checks.find((c) => c.key === 'level3Min')?.note).toBe(
+      'informational (quick)',
+    )
+  }, 60_000)
+
+  it('the gate table carries L3_min, ovs+min, L4_min, L5_min', () => {
+    const g = summarise(
+      runs().map((r) => r.result),
+      meta('competent'),
+    )
+    const head = formatGate(g)[1]!
+    for (const col of ['L3_min', 'ovs+min', 'L4_min', 'L5_min']) {
+      expect(head).toContain(col)
+    }
+    const md = gateMarkdown(g, 'vlr sim:gate')
+    expect(md).toContain('| L3_min | ovs+min | L4_min | L5_min |')
+    expect(md).toContain('| `level3Min` |')
+  }, 60_000)
+
+  it('cli: only the 30-minute gate writes latest.*; another length writes latest-<N>min.* (delegating-<N>min.*); --quick writes quick.*', () => {
+    expect(gateFileBase(fileOpts(30))).toBe('latest')
+    expect(gateFileBase(fileOpts(35))).toBe('latest-35min')
+    expect(gateFileBase(fileOpts(20, null, true))).toBe('quick')
+    expect(gateFileBase(fileOpts(30, 'delegating'))).toBe('delegating')
+    expect(gateFileBase(fileOpts(35, 'delegating'))).toBe('delegating-35min')
+    expect(gateFileBase(fileOpts(20, 'delegating', true))).toBe('delegating')
+    // `vlr sim:gate -- --minutes 35`: the later --minutes wins.
+    expect(
+      parseCli([
+        '--gate',
+        '--seeds',
+        '1-10',
+        '--minutes',
+        '30',
+        '--minutes',
+        '35',
+      ]).minutes,
+    ).toBe(35)
   })
 })

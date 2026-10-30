@@ -155,9 +155,15 @@ export function newsPicture(
 ): string | null {
   switch (kind) {
     case 'level': {
+      // The nearest lower tier the atlas has (design-m8-m9 §6.1: missing
+      // tier art never leaves the box empty).
       const row = data.levels.find((l) => l.level === ref.level)
       const tier = row?.warehouseTier ?? ref.level ?? 1
-      return frameOrNull(`wh_ext_t${tier}`) ?? frameOrNull('wh_ext_t1')
+      for (let t = Math.floor(tier); t >= 1; t--) {
+        const f = frameOrNull(`wh_ext_t${t}`)
+        if (f) return f
+      }
+      return null
     }
     case 'incident':
       return frameOrNull('parcel_m_mal')

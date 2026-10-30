@@ -3,7 +3,8 @@
 // next levels.json threshold the company levels up — unless that row is past
 // economy.playtestMaxLevel: then nothing fires and LevelState.nextThreshold
 // keeps pointing at that row's threshold, so the HUD bar keeps counting
-// ("$3,410 / $5,000 · Lv 3 coming soon", spec preamble). Several thresholds
+// ("$6,410 / $9,000 · Lv 4 coming soon" at M8's cap 3, design-m8-m9 R1;
+// spec preamble). Several thresholds
 // crossed in one tick level up one row at a time, in order.
 //
 // A level-up applies the row first, then emits (handlers see the new state):

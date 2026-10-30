@@ -110,10 +110,14 @@ describe('src/assets atlases', () => {
     }
   })
 
-  it('world stays <= 75 % full (plan-build2 §8.2 acceptance)', () => {
+  // plan-build2 §8.2 set 75 % as the M5 acceptance (world was 53 %); the L5
+  // uniques of M8 take it to ~80 % (art:atlas warns over WORLD_FILL_MAX).
+  // The hard line is plan-build2 §8.8 R13's trigger: no pack, or > 90 % —
+  // then the shared locked_1x1/2x2/3x3 twins, then a lazy city2 atlas.
+  it('world stays <= 90 % full (plan-build2 §8.8 R13 trigger)', () => {
     const t = readAtlas('world').textures[0]!
     const area = t.frames.reduce((n, f) => n + f.frame.w * f.frame.h, 0)
-    expect(area / (t.size.w * t.size.h)).toBeLessThanOrEqual(0.75)
+    expect(area / (t.size.w * t.size.h)).toBeLessThanOrEqual(0.9)
   })
 })
 

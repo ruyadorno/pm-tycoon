@@ -53,22 +53,42 @@
 // declines, abandons or rushes the destination (the sim's magic-first
 // outbound rule covers B). Both kinds share it.
 //
+// Build 2, M8 (spec-build2 §7.2 L3 row; design-m8-m9 §5.1): the L3+ plan
+// (src/sim/policies/levelPlan.ts — Battery checker → dock 2 → van → 2nd
+// truck, each at price + purchaseBuffer, impossible steps skipped, an
+// unaffordable one waits) runs after the L2 rule once the playtest-1
+// purchases are done (SIM_FEATURES.levels3plus); a plan machine with no
+// free slot REPLACEs the last duplicate machine (COUNTERS' 2nd Metal
+// detector). COUNTERS waits until the plan is done, so it never takes a
+// plan machine's slot. With every desk full, the dock-blocked rule places
+// desk 2 (the next desks.rows row; a free slot or the REPLACE slot) and
+// seats the best inspector there in the same step. Both kinds share it (the
+// delegating sorter holds the station, so the L4 Sorter Arm is skipped).
+//
 // Prices come from src/data; the buffer, the counts and dockBlockedHireS are
 // the policy's own parameters (spec §7 wording), not balance numbers.
 
 import type { CheckerDef, VehicleTypeDef } from '../data/types.ts'
 import { laneCatchRate } from './detection.ts'
+import { bestApplicant } from './policies/applicants.ts'
 import {
   delegatingHireSorter,
   delegatingHoldBay,
 } from './policies/delegating.ts'
+import {
+  levelPlanDone,
+  levelPlanStep,
+  placeNextDesk,
+} from './policies/levelPlan.ts'
 import { isRushed } from './systems/dispatch.ts'
 import { rehireFee } from './systems/payroll.ts'
-import { hireFeeOf, salaryOf } from './systems/people.ts'
+import { hireFeeOf } from './systems/people.ts'
 import { SIM_FEATURES } from './features.ts'
+import type { LaneNode, Role, VehicleType } from './types.ts'
 import type { Policy, PolicyKind, Sim } from './sim.ts'
-import type { Applicant, Role, VehicleType } from './types.ts'
 import { laneNode, liveSlotIds, TICKS_PER_DAY, TICKS_PER_S } from './types.ts'
+
+export { bestApplicant }
 
 export const POLICY_PARAMS = {
   /** "another bike whenever balance ≥ price + $50 buffer" (spec §7). */
@@ -121,42 +141,6 @@ export function dockBlockedSecondsToday(sim: Sim): number {
     0,
   )
   return ticks / TICKS_PER_S
-}
-
-/**
- * The best applicant waiting in a pool (spec-build2 §7.2, design §5.1):
- * inspector → highest eye, driver → highest effective speed pip for `type`
- * (affinity counted, design D20), sorter → highest judgement; ties → lowest
- * salary (a driver's for `type`) → lowest applicant id. Null with an empty pool.
- */
-export function bestApplicant(
-  sim: Sim,
-  role: Role,
-  type: VehicleType = 'bike',
-): Applicant | null {
-  const data = sim.data
-  const affinityPips = data.employees.roles.driver.affinityPips
-  const score = (a: Applicant): number => {
-    if (role === 'inspector') return a.pips.eye ?? 0
-    if (role === 'sorter') return a.pips.judgement ?? 0
-    const bonus = a.affinity === type ? affinityPips : 0
-    return Math.min(5, (a.pips.speed ?? 0) + bonus)
-  }
-  const salary = (a: Applicant): number =>
-    salaryOf(data, role, a.pips, role === 'driver' ? type : undefined)
-  let best: Applicant | null = null
-  for (const a of sim.state.applicants[role]) {
-    if (
-      best === null ||
-      score(a) > score(best) ||
-      (score(a) === score(best) &&
-        (salary(a) < salary(best) ||
-          (salary(a) === salary(best) && a.id < best.id)))
-    ) {
-      best = a
-    }
-  }
-  return best
 }
 
 /**
@@ -224,6 +208,9 @@ class CompetentPolicy implements Policy {
     this.#opening()
     this.#bikes()
     if (SIM_FEATURES.levels) this.#level2()
+    if (SIM_FEATURES.levels3plus && this.#playtest1Done()) {
+      levelPlanStep(sim, POLICY_PARAMS.purchaseBuffer)
+    }
     this.#counters()
     if (SIM_FEATURES.payroll) this.#inspectors()
     if (SIM_FEATURES.lane && !(this.#delegating && delegatingHoldBay(sim))) {
@@ -353,8 +340,8 @@ class CompetentPolicy implements Policy {
     }
   }
 
-  /** The level's spec purchases are done (L1: the bikes; L2: truck + shaker). */
-  #specDone(): boolean {
+  /** The playtest-1 purchases are done (L1: the bikes; L2: truck + shaker). */
+  #playtest1Done(): boolean {
     const sim = this.#sim
     if (bikeCount(sim) < POLICY_PARAMS.maxBikes) return false
     const truck = typeDef(sim, POLICY_PARAMS.level2Vehicle)
@@ -363,6 +350,12 @@ class CompetentPolicy implements Policy {
       ownsVehicle(sim, truck.id) &&
       ownsMachine(sim, POLICY_PARAMS.level2Machine)
     )
+  }
+
+  /** The level's spec purchases are done: playtest 1's and (M8) every possible L3+ plan step. */
+  #specDone(): boolean {
+    if (!this.#playtest1Done()) return false
+    return !SIM_FEATURES.levels3plus || levelPlanDone(this.#sim)
   }
 
   /** COUNTERS (policy extension, see the header): a free slot → the weakest strain's counter. */
@@ -374,7 +367,31 @@ class CompetentPolicy implements Policy {
     if (this.#affords(def.price)) this.#buyMachine(def.id)
   }
 
-  /** A 2nd / 3rd inspector after > dockBlockedHireS of dock blocking in the day (spec §7, re-based). */
+  /** The first desk (by desks.rows index) with a free seat (walked-out inspectors keep theirs). */
+  #deskWithSeat(): LaneNode | null {
+    const max = this.#sim.data.employees.desks.maxPerDesk
+    return (
+      this.#sim.state.lane.nodes
+        .filter((n) => n.fixture?.kind === 'desk')
+        .toSorted(
+          (a, b) =>
+            (a.fixture?.kind === 'desk' ? a.fixture.index : 0) -
+            (b.fixture?.kind === 'desk' ? b.fixture.index : 0),
+        )
+        .find(
+          (n) =>
+            n.fixture?.kind === 'desk' &&
+            n.fixture.inspectorIds.length + n.fixture.walkedOutIds.length < max,
+        ) ?? null
+    )
+  }
+
+  /**
+   * A 2nd / 3rd inspector after > dockBlockedHireS of dock blocking in the
+   * day (spec §7, re-based); M8: with every desk full, desk 2 first (B2 §7.2
+   * L3 row, levelPlan.ts placeNextDesk — not while a plan machine is
+   * pending), then the hire into it.
+   */
   #inspectors(): void {
     const sim = this.#sim
     const s = sim.state
@@ -385,21 +402,17 @@ class CompetentPolicy implements Policy {
         e.role === 'inspector' && e.hiredTick >= dayStart && e.hiredTick > 0,
     )
     if (hiredToday) return
-    // The first desk (by desks.rows index) with a free seat; the best
-    // inspector applicant when balance ≥ its hire fee.
-    const max = sim.data.employees.desks.maxPerDesk
-    const desk = s.lane.nodes
-      .filter((n) => n.fixture?.kind === 'desk')
-      .toSorted(
-        (a, b) =>
-          (a.fixture?.kind === 'desk' ? a.fixture.index : 0) -
-          (b.fixture?.kind === 'desk' ? b.fixture.index : 0),
-      )
-      .find(
-        (n) =>
-          n.fixture?.kind === 'desk' &&
-          n.fixture.inspectorIds.length + n.fixture.walkedOutIds.length < max,
-      )
+    // The first desk with a free seat (else desk 2, M8); the best inspector
+    // applicant when balance ≥ its hire fee.
+    let desk = this.#deskWithSeat()
+    if (
+      !desk &&
+      SIM_FEATURES.levels3plus &&
+      bestApplicant(sim, 'inspector') !== null &&
+      placeNextDesk(sim, POLICY_PARAMS.purchaseBuffer)
+    ) {
+      desk = this.#deskWithSeat()
+    }
     if (!desk) return
     const best = bestApplicant(sim, 'inspector')
     if (!best || this.#balance() < hireFeeOf(sim.data, best)) return

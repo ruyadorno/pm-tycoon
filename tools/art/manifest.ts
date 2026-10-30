@@ -196,13 +196,24 @@ export interface ManifestEntry {
    */
   dockPose?: [number, number]
   /**
-   * warehouse-ext: per-frame overrides of bayLights / dockPose, keyed by
-   * frame suffix ('_t2'): an edited tier keeps the footprint but its lamps
-   * can move a few px
+   * warehouse-ext (build 2 M8, docks 2-3): foot point of a vehicle docked at
+   * each bay, one per bayLights point, [0] = dockPose. Optional: when absent
+   * warehouseAnchorTable derives bay k's pose as dockPose + (bayLights[k] −
+   * bayLights[0]) — the same offset from its lamp as bay 1's.
+   */
+  dockPoses?: [number, number][]
+  /**
+   * warehouse-ext: per-frame overrides of bayLights / dockPose (/ dockPoses),
+   * keyed by frame suffix ('_t2'): an edited tier keeps the footprint but
+   * its lamps can move a few px
    */
   frameAnchors?: Record<
     string,
-    { bayLights: [number, number][]; dockPose: [number, number] }
+    {
+      bayLights: [number, number][]
+      dockPose: [number, number]
+      dockPoses?: [number, number][]
+    }
   >
   /** follow-up edit recipe (wh_ext _t2): which edit k is the second frame */
   editPick?: number
@@ -347,6 +358,25 @@ export function vehicleFoot(e: ManifestEntry): [number, number] {
 export interface WarehouseAnchorSet {
   bayLights: [number, number][]
   dockPose: [number, number]
+  /** one docked-vehicle pose per bay light ([0] = dockPose; build 2 M8) */
+  dockPoses: [number, number][]
+}
+
+/**
+ * Bay k's docked pose (build 2 M8, docks 2-3): the row's own dockPoses,
+ * else dockPose shifted by bay k's lamp offset from bay 1's lamp (bays run
+ * along the SW face, so the vehicle keeps bay 1's place relative to its
+ * door).
+ */
+export function dockPosesOf(a: {
+  bayLights: [number, number][]
+  dockPose: [number, number]
+  dockPoses?: [number, number][]
+}): [number, number][] {
+  if (a.dockPoses?.length) return a.dockPoses.map(([x, y]) => [x, y])
+  const [l0x, l0y] = a.bayLights[0] ?? [0, 0]
+  const [px, py] = a.dockPose
+  return a.bayLights.map(([x, y]) => [px + x - l0x, py + y - l0y])
 }
 
 /**
@@ -362,9 +392,18 @@ export function warehouseAnchorTable(
   const out: Record<string, WarehouseAnchorSet> = {}
   for (const e of m.entries) {
     if (e.class !== 'warehouse-ext' || !e.bayLights || !e.dockPose) continue
-    const row = { bayLights: e.bayLights, dockPose: e.dockPose }
+    const row = {
+      bayLights: e.bayLights,
+      dockPose: e.dockPose,
+      ...(e.dockPoses ? { dockPoses: e.dockPoses } : {}),
+    }
     for (const f of e.frames) {
-      out[e.id + f] = e.frameAnchors?.[f] ?? row
+      const a = e.frameAnchors?.[f] ?? row
+      out[e.id + f] = {
+        bayLights: a.bayLights,
+        dockPose: a.dockPose,
+        dockPoses: dockPosesOf(a),
+      }
     }
   }
   return out
@@ -503,6 +542,7 @@ export function validateManifest(
     for (const [k, v] of [
       ['bayLights', e.bayLights],
       ['dockPose', e.dockPose === undefined ? undefined : [e.dockPose]],
+      ['dockPoses', e.dockPoses],
     ] as const) {
       if (v === undefined) continue
       if (e.class !== 'warehouse-ext') {
@@ -519,11 +559,35 @@ export function validateManifest(
         )
       if (!ok) errors.push(`${at}: ${k} must be [x, y] points in the canvas`)
     }
+    // dockPoses (build 2 M8): one per bay light, the first = dockPose
+    for (const [where, a] of [
+      ['', e],
+      ...Object.entries(e.frameAnchors ?? {}).map(
+        ([sfx, fa]) => [` frameAnchors ${sfx}`, fa] as const,
+      ),
+    ] as const) {
+      const poses = a.dockPoses
+      if (poses === undefined) continue
+      const lights = a.bayLights ?? []
+      const first = poses[0]
+      if (
+        !Array.isArray(poses) ||
+        poses.length !== lights.length ||
+        !first ||
+        !a.dockPose ||
+        first[0] !== a.dockPose[0] ||
+        first[1] !== a.dockPose[1]
+      ) {
+        errors.push(
+          `${at}${where}: dockPoses must have one pose per bay light, the first = dockPose`,
+        )
+      }
+    }
     for (const [suffix, a] of Object.entries(e.frameAnchors ?? {})) {
       if (e.class !== 'warehouse-ext' || !e.frames.includes(suffix)) {
         errors.push(`${at}: frameAnchors ${suffix} is not a warehouse frame`)
       }
-      const pts = [...(a.bayLights ?? []), a.dockPose]
+      const pts = [...(a.bayLights ?? []), a.dockPose, ...(a.dockPoses ?? [])]
       if (
         !Array.isArray(a.bayLights) ||
         !pts.every(

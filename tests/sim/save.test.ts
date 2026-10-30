@@ -1,8 +1,9 @@
 // plan.md §6.4 "Save and load" + §6.9.1 save.test: snapshot → JSON → load →
 // deep-equal; 600 ticks after a load = the uninterrupted run; no non-JSON
 // values; version + dataHash gate (no migrations, R9; build 2 = version 2,
-// M6 = version 3, M7 = version 4 under the same `pm.save.v2` key,
-// spec-build2 §8; design-m7 §2.5). Also pins the M0 sim
+// M6 = version 3, M7 = version 4, M8 = version 5 under the same
+// `pm.save.v2` key, spec-build2 §8; design-m7 §2.5, design-m8-m9 §2.4:
+// lane.feedIndex + stats.cleared). Also pins the M0 sim
 // skeleton the save format rests on: the spec §7.1 start state, the tick
 // clock + day boundary, and the "handlers never dispatch" rule.
 
@@ -85,11 +86,11 @@ describe('save round trip (plan.md §6.4)', () => {
     const text = serialise(sim, { savedAt: 1234, build: 'test', onboarding })
     const payload = deserialise(text)
     expect(SAVE_KEY).toBe('pm.save.v2')
-    expect(SAVE_VERSION).toBe(4)
-    expect(STATE_VERSION).toBe(4)
-    expect(payload.version).toBe(4)
-    expect(payload.state.version).toBe(4)
-    expect(sim.snapshot().version).toBe(4)
+    expect(SAVE_VERSION).toBe(5)
+    expect(STATE_VERSION).toBe(5)
+    expect(payload.version).toBe(5)
+    expect(payload.state.version).toBe(5)
+    expect(sim.snapshot().version).toBe(5)
     expect(payload.dataHash).toBe(sim.data.hash)
     expect(payload.onboarding).toEqual(onboarding)
     expect(isCompatible(payload, dataFixture())).toBe(true)
@@ -106,7 +107,8 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(isCompatible({ ...payload, version: 1 }, dataFixture())).toBe(false)
     expect(isCompatible({ ...payload, version: 2 }, dataFixture())).toBe(false)
     expect(isCompatible({ ...payload, version: 3 }, dataFixture())).toBe(false)
-    expect(isCompatible({ ...payload, version: 5 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 4 }, dataFixture())).toBe(false)
+    expect(isCompatible({ ...payload, version: 6 }, dataFixture())).toBe(false)
     expect(() => Sim.load(retuned, payload)).toThrow(SimLoadError)
     expect(
       Sim.load(retuned, payload, { ignoreDataHash: true }).state.tick,
@@ -115,7 +117,7 @@ describe('save round trip (plan.md §6.4)', () => {
     expect(() => deserialise('{"version":2}')).toThrow(SaveError)
   })
 
-  it('save v4 rejects a v1 snapshot (plan.md R9: no migrations) — and an M5 v2 one', () => {
+  it('save v5 rejects a v1 snapshot (plan.md R9: no migrations) — and an M5 v2 one', () => {
     const sim = playedSim()
     // A build-1 save: the same shape, version 1 on the payload and the state.
     const v1 = structuredClone(sim.snapshot()) as unknown as {
@@ -132,19 +134,19 @@ describe('save round trip (plan.md §6.4)', () => {
     }
     expect(err).toBeInstanceOf(SimLoadError)
     const problems = (err as SimLoadError).problems
-    expect(problems).toContain('version: 1 ≠ 4')
-    expect(problems).toContain('state.version: 1 ≠ 4')
-    // validate.ts accepts version 4 only: a v1 state inside a v4 envelope
-    // is still refused, and so is a v4 state inside a v1 envelope.
+    expect(problems).toContain('version: 1 ≠ 5')
+    expect(problems).toContain('state.version: 1 ≠ 5')
+    // validate.ts accepts version 5 only: a v1 state inside a v5 envelope
+    // is still refused, and so is a v5 state inside a v1 envelope.
     const innerV1 = structuredClone(sim.snapshot()) as unknown as {
       state: { version: number }
     }
     innerV1.state.version = 1
     expect(() => Sim.load(dataFixture(), innerV1)).toThrow(/state.version/)
     const outerV1 = { ...sim.snapshot(), version: 1 }
-    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 4/)
+    expect(() => Sim.load(dataFixture(), outerV1)).toThrow(/version: 1 ≠ 5/)
     const m5 = { ...sim.snapshot(), version: 2 }
-    expect(() => Sim.load(dataFixture(), m5)).toThrow(/version: 2 ≠ 4/)
+    expect(() => Sim.load(dataFixture(), m5)).toThrow(/version: 2 ≠ 5/)
     // The payload layer refuses it before Sim.load: deserialise throws.
     const text = serialise(sim, { savedAt: 0, build: 'build-1' })
     const p = JSON.parse(text) as {
@@ -155,7 +157,7 @@ describe('save round trip (plan.md §6.4)', () => {
     p.state.version = 1
     expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
     expect(isCompatible(p, dataFixture())).toBe(false)
-    // A v4 snapshot of the same run loads.
+    // A v5 snapshot of the same run loads.
     expect(Sim.load(dataFixture(), sim.snapshot()).state.tick).toBe(
       sim.state.tick,
     )
@@ -184,11 +186,11 @@ describe('save round trip (plan.md §6.4)', () => {
       err = e
     }
     expect(err).toBeInstanceOf(SimLoadError)
-    expect((err as SimLoadError).problems).toContain('version: 3 ≠ 4')
-    // Even relabelled version 4, the M6 shape fails validation (no crash).
+    expect((err as SimLoadError).problems).toContain('version: 3 ≠ 5')
+    // Even relabelled version 5, the M6 shape fails validation (no crash).
     const relabelled = structuredClone(v3)
-    relabelled.version = 4
-    relabelled.state.version = 4
+    relabelled.version = 5
+    relabelled.state.version = 5
     expect(() => Sim.load(dataFixture(), relabelled)).toThrow(
       /state\.quests: missing/,
     )
@@ -201,6 +203,140 @@ describe('save round trip (plan.md §6.4)', () => {
     p.state.version = 3
     expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
     expect(isCompatible(p, dataFixture())).toBe(false)
+  })
+
+  it('an M7 version-4 save is refused (design-m8-m9 §2.4: lane.feedIndex, stats.cleared)', () => {
+    const sim = playedSim()
+    // An M7 save as it was written: version 4 throughout, no M8 fields.
+    const v4 = structuredClone(sim.snapshot()) as unknown as {
+      version: number
+      state: Record<string, unknown> & {
+        version: number
+        lane: Record<string, unknown>
+        stats: Record<string, unknown>
+      }
+    }
+    v4.version = 4
+    v4.state.version = 4
+    delete v4.state.lane.feedIndex
+    delete v4.state.stats.cleared
+    let err: unknown = null
+    try {
+      Sim.load(dataFixture(), v4)
+    } catch (e) {
+      err = e
+    }
+    expect(err).toBeInstanceOf(SimLoadError)
+    expect((err as SimLoadError).problems).toContain('version: 4 ≠ 5')
+    // Relabelled version 5, the M7 shape fails validation (no crash).
+    const relabelled = structuredClone(v4)
+    relabelled.version = 5
+    relabelled.state.version = 5
+    expect(() => Sim.load(dataFixture(), relabelled)).toThrow(
+      /state\.lane\.feedIndex: missing/,
+    )
+    expect(() => Sim.load(dataFixture(), relabelled)).toThrow(
+      /state\.stats\.cleared: missing/,
+    )
+    const text = serialise(sim, { savedAt: 0, build: 'm7' })
+    const p = JSON.parse(text) as {
+      version: number
+      state: { version: number }
+    }
+    p.version = 4
+    p.state.version = 4
+    expect(() => deserialise(JSON.stringify(p))).toThrow(/version/)
+    expect(isCompatible(p, dataFixture())).toBe(false)
+  })
+
+  it('M8 relations: a feedIndex past the conveyors, a handed-off parcel without its clearance, an unknown or unsorted dock are refused', () => {
+    const snap = playedSim().snapshot()
+    const feed = structuredClone(snap)
+    feed.state.lane.feedIndex = 1 // one dock: only 0
+    expect(() => Sim.load(dataFixture(), feed)).toThrow(/feedIndex: 1 ≥ 1/)
+    const handed = structuredClone(snap)
+    const p = Object.values(handed.state.parcels).find(
+      (x) => x.state === 'waiting',
+    )
+    expect(p).toBeDefined()
+    // Placeless and bound for a pier, but no clearance tick / locked value.
+    const b = handed.state.buildings[p!.origin]!
+    b.waiting.splice(b.waiting.indexOf(p!.id), 1)
+    p!.state = 'handed_off'
+    p!.dest = 'dk_pier_1'
+    p!.destRegion = 'docks'
+    expect(() => Sim.load(dataFixture(), handed)).toThrow(
+      /clearTick: null \(handed off/,
+    )
+    p!.clearTick = handed.state.tick + 10
+    expect(() => Sim.load(dataFixture(), handed)).toThrow(
+      /lockedValue: null \(handed off/,
+    )
+    p!.lockedValue = 18
+    expect(Sim.load(dataFixture(), handed).state.tick).toBe(handed.state.tick)
+    p!.destRegion = 'highres'
+    p!.dest = 'hr_towers_b'
+    expect(() => Sim.load(dataFixture(), handed)).toThrow(
+      /destRegion: highres is not an overseas hub/,
+    )
+    const dock = structuredClone(snap)
+    dock.state.lane.docks[0]!.id = 'dock7'
+    expect(() => Sim.load(dataFixture(), dock)).toThrow(SimLoadError)
+  })
+
+  it('M8 stop kinds (M8 review): a handoff stop off a hub, a deliver stop at a pier, a destRegion that is not the dest district are refused; a live mismatch still delivers by the parcel, never throws', () => {
+    const sim = makeSim(1)
+    const policy = createPolicy(sim, 'competent')
+    const delivering = (): boolean =>
+      sim.state.vehicles.some(
+        (v) =>
+          v.state === 'delivering' &&
+          v.stops[v.stopIndex]?.kind === 'deliver' &&
+          v.path.length > 3,
+      )
+    for (let t = 0; t < 20_000 && !delivering(); t++) {
+      policy.step()
+      sim.tick()
+    }
+    expect(delivering()).toBe(true)
+    const snap = sim.snapshot()
+    const vehicleOf = (s: typeof snap) =>
+      s.state.vehicles.find(
+        (v) =>
+          v.state === 'delivering' && v.stops[v.stopIndex]?.kind === 'deliver',
+      )!
+    const handoff = structuredClone(snap)
+    vehicleOf(handoff).stops[vehicleOf(handoff).stopIndex]!.kind = 'handoff'
+    expect(() => Sim.load(dataFixture(), handoff)).toThrow(
+      /stops\[\d+\]\.kind: handoff at .* \(not a hub: deliver \/ collect\)/,
+    )
+    const pier = structuredClone(snap)
+    const stop = vehicleOf(pier).stops[vehicleOf(pier).stopIndex]!
+    stop.buildingId = 'dk_pier_1'
+    expect(() => Sim.load(dataFixture(), pier)).toThrow(
+      /stops\[\d+\]\.kind: deliver at dk_pier_1 \(an overseas hub: handoff\)/,
+    )
+    const region = structuredClone(snap)
+    const pid =
+      vehicleOf(region).stops[vehicleOf(region).stopIndex]!.parcelIds[0]!
+    region.state.parcels[String(pid)]!.destRegion = 'docks'
+    expect(() => Sim.load(dataFixture(), region)).toThrow(
+      /destRegion: docks ≠ .*'s district/,
+    )
+    // The tick itself decides by the parcel: a live 'handoff' stop for a
+    // local parcel delivers it (no throw, no hand-off).
+    const v = sim.state.vehicles.find((x) => x.id === vehicleOf(snap).id)!
+    const live = v.stops[v.stopIndex]!
+    live.kind = 'handoff'
+    const ids = [...live.parcelIds]
+    const handed = collect(sim, 'parcel:handedOff')
+    const delivered = collect(sim, 'parcel:delivered')
+    expect(runUntil(sim, () => v.state !== 'delivering', 3000)).toBeGreaterThan(
+      0,
+    )
+    expect(handed).toEqual([])
+    expect(delivered.map((e) => e.id)).toEqual(expect.arrayContaining(ids))
+    expect(auditState(sim.state, sim.data)).toEqual([])
   })
 
   it('Sim.load rejects dangling ids and non-JSON numbers', () => {

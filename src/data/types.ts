@@ -549,6 +549,28 @@ export interface MapBuildingDef {
   doorOffset: XY
 }
 
+/**
+ * M8 (design-m8-m9 §1.2): the render facts of one overseas hub — the
+ * clearance ring's building and the vessel that departs on `hub:departure`.
+ * districts.json keeps the sim numbers (clearanceS, valueMult, sizes).
+ */
+export interface MapHubDef {
+  /** An OverseasDistrictDef id. */
+  district: DistrictId
+  /** A building of that district: the clearance ring anchor (the port office / terminal). */
+  office: BuildingId
+  vessel: {
+    /** Frame stem of the vessel prop (equals one map.props row of the hub). */
+    frame: string
+    /** The prop's tile (its map.props row). */
+    tile: XY
+    /** Tile delta the vessel travels to leave the map (not both 0). */
+    exit: XY
+    /** Screen px the vessel climbs while leaving (0 for a ship). */
+    liftPx: number
+  }
+}
+
 export interface MapData {
   size: WH
   /** Avenue line coordinates (both axes); lines span avenues[0]..avenues[last]. */
@@ -561,6 +583,8 @@ export interface MapData {
   lot: LotDef
   regions: RegionDef[]
   props: PropDef[]
+  /** M8: one row per overseas hub (districts.json order not required; render order). */
+  hubs: MapHubDef[]
   buildings: Record<BuildingId, MapBuildingDef>
   lockedStyle: 'frames' | 'fill'
 }

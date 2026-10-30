@@ -177,7 +177,22 @@ export const GROUP_SUBJECTS = new Set([
  * the tractor in Tilde Tractor Repair): CITY_SUFFIX without its 'no
  * vehicles' (it keeps road vehicles off the other plots).
  */
-export const VEHICLE_OK = new Set(['ru_tilde_tractors'])
+export const VEHICLE_OK = new Set([
+  'ru_tilde_tractors',
+  // build 2 M8 (L5 civic): the fire engine in the open bay; the Airport's
+  // parked jet is itself the subject (a dock-prop)
+  'cv_fire',
+  'ap_plane',
+])
+
+/**
+ * dock-prop headings (the template says "bow pointing to the lower left",
+ * the moored ship): the plane taxis east along +x, off the east edge
+ * (B2 §4.3, design-m8-m9 §1.2 `exit [4, 0]`) — nose to the lower right.
+ */
+export const DOCK_PROP_HEADING: Record<string, string> = {
+  ap_plane: 'nose pointing to the lower right',
+}
 
 /** the build-2 modern port rows (B2 §6.4) */
 export const PORT_IDS = new Set([
@@ -210,9 +225,11 @@ export const DISTRICT_ANCHOR: Record<string, string> = {
   docks: 'in_esbuild_engines',
   airport: 'in_esbuild_engines',
   warehouse: 'in_esbuild_engines',
-  civic: 'cv_civic_2x2',
-  rural: 'cv_civic_2x2',
-  map: 'cv_civic_2x2',
+  // build 2 M8: cv_civic_2x2 (the playtest-1 civic anchor) was retired for
+  // the ten civic uniques; its districts borrow the residential anchor
+  civic: 'hr_async_arms',
+  rural: 'hr_async_arms',
+  map: 'hr_async_arms',
 }
 
 /** narrower target palettes (ramps) for small sprites, by id or class */
@@ -639,12 +656,16 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
     }
     case 'prop':
     case 'dock-prop': {
+      const suffix = VEHICLE_OK.has(e.id)
+        ? CITY_SUFFIX.replace('no vehicles, ', '')
+        : CITY_SUFFIX
       const text =
         e.class === 'dock-prop'
-          ? `${subject}, seen from a 2:1 isometric angle, bow pointing to ` +
-            `the lower left, isometric pixel art prop${CITY_SUFFIX}`
+          ? `${subject}, seen from a 2:1 isometric angle, ` +
+            `${DOCK_PROP_HEADING[e.id] ?? 'bow pointing to the lower left'}, ` +
+            `isometric pixel art prop${suffix}`
           : `${subject}, a single standalone object standing on the ground, ` +
-            `isometric pixel art prop${CITY_SUFFIX}`
+            `isometric pixel art prop${suffix}`
       const anchor = ctx.style === 'anchor' ? anchorFor(e, anchors) : null
       return proFlashImage(e, text, [], anchor)
     }

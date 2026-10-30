@@ -13,7 +13,9 @@
 //                overseas hub (by hubWeight among hubs taking the size);
 //                otherwise a building of another live district. The building
 //                is then picked weighted by `recv` (one draw). Origin ≠ dest.
-//                overseasShare is ignored while no hub is live (playtest 1);
+//                overseasShare is ignored while no hub is live (before L3;
+//                the hub draw and the pier draw happen only in this branch,
+//                so runs are bit-identical until a hub goes live);
 //   4. malware — after the grace (graceS AND graceCount spawns) and once a
 //                strain is announced + newStrainDelayS: chance(share), then a
 //                uniform strain;
@@ -173,7 +175,7 @@ export function availableStrains(sim: Sim): Strain[] {
     .map((st) => st.id)
 }
 
-/** Live overseas hubs accepting this size (§5.2; none in playtest 1). */
+/** Live overseas hubs accepting this size (§5.2; none before L3). */
 function liveHubs(sim: Sim, size: SizeId): OverseasDistrictDef[] {
   return sim.data.districts.filter(
     (d): d is OverseasDistrictDef =>

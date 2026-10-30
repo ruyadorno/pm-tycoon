@@ -1,7 +1,7 @@
 // Autosave and the localStorage keys (plan.md §5 "localStorage keys", §6.4
 // "Save and load"; spec §2; city-view.md §9.1, §9.5; spec-build2 §8).
 //
-//   pm.save.v2      {version: SAVE_VERSION (3 since M6), savedAt, build,
+//   pm.save.v2      {version: SAVE_VERSION (5 since M8), savedAt, build,
 //                    dataHash, seed, state, commandLog, onboarding} via
 //                    src/sim/save.ts
 //   pm.settings.v1  {muted, speed} (merged: the AudioDirector writes `muted`

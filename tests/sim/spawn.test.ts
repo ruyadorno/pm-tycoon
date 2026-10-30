@@ -239,28 +239,46 @@ describe('malware at spawn (spec §5.4)', () => {
   })
 
   it('share per level: baseShare at L1, + perLevel at L2, + postVictoryPerDay per day after the playtest cap, capped, × overseasMult', () => {
-    const sim = makeSim(1)
+    // The playtest-1 cap (2) keeps testing the cap rule; the shipped cap
+    // (3 since M8) escalates from the L3 tick instead (below).
+    const sim = makeSim(1, { economy: { playtestMaxLevel: 2 } })
+    const cap2 = sim.data
     const s = sim.state
-    const m = data.parcels.malware
-    expect(malwareShare(s, data)).toBeCloseTo(m.baseShare, 10)
-    expect(malwareShare(s, data, true)).toBeCloseTo(
+    const m = cap2.parcels.malware
+    expect(malwareShare(s, cap2)).toBeCloseTo(m.baseShare, 10)
+    expect(malwareShare(s, cap2, true)).toBeCloseTo(
       m.baseShare * m.overseasMult,
       10,
     )
     s.level.level = 2
     const l2 = m.baseShare + m.perLevel
-    expect(malwareShare(s, data)).toBeCloseTo(l2, 10)
+    expect(malwareShare(s, cap2)).toBeCloseTo(l2, 10)
     s.stats.levelTick['2'] = 600 * 3 + 120 // reached L2 (the cap) during day 3
     s.tick = 600 * 4
     s.day = 4
-    expect(malwareShare(s, data)).toBeCloseTo(l2 + m.postVictoryPerDay, 10)
+    expect(malwareShare(s, cap2)).toBeCloseTo(l2 + m.postVictoryPerDay, 10)
     s.tick = 600 * 9
     s.day = 9
-    expect(malwareShare(s, data)).toBeCloseTo(l2 + 6 * m.postVictoryPerDay, 10)
+    expect(malwareShare(s, cap2)).toBeCloseTo(l2 + 6 * m.postVictoryPerDay, 10)
     s.tick = 600 * 40
     s.day = 40
-    expect(malwareShare(s, data)).toBe(data.parcels.malware.cap)
-    expect(malwareShare(s, data, true)).toBe(data.parcels.malware.cap)
+    expect(malwareShare(s, cap2)).toBe(cap2.parcels.malware.cap)
+    expect(malwareShare(s, cap2, true)).toBe(cap2.parcels.malware.cap)
+    // M8: at the shipped cap (L3) reaching L2 alone does not escalate.
+    const shipped = dataFixture()
+    expect(shipped.economy.playtestMaxLevel).toBe(3)
+    expect(malwareShare(s, shipped)).toBeCloseTo(m.baseShare + m.perLevel, 10)
+    s.level.level = 3
+    s.stats.levelTick['3'] = 600 * 30 + 5 // day 30; now day 40: 10 boundaries
+    const l3 = m.baseShare + 2 * m.perLevel
+    expect(malwareShare(s, shipped)).toBeCloseTo(
+      l3 + 10 * m.postVictoryPerDay,
+      10,
+    )
+    expect(malwareShare(s, shipped, true)).toBeCloseTo(
+      Math.min(m.cap, (l3 + 10 * m.postVictoryPerDay) * m.overseasMult),
+      10,
+    )
   })
 
   it('decoy traits only on clean parcels (~10 %); labels come from the matching puns.json list', () => {

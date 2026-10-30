@@ -40,7 +40,7 @@ import { formatMoney } from '../../src/ui/text.ts'
 import { THEME } from '../../src/ui/theme.ts'
 import type { VehicleSnapshot } from '../../src/sim/view-api.ts'
 import type { VehicleType } from '../../src/sim/types.ts'
-import { dataFixture } from '../sim/helpers.ts'
+import { capConfig, dataFixture } from '../sim/helpers.ts'
 
 const data = dataFixture()
 /** A stand-in for BitmapText width: 5 px per character. */
@@ -119,14 +119,16 @@ describe('spec §8 / city-view §4.1: the level bar', () => {
   })
 
   it('at playtestMaxLevel keeps counting toward the L3 threshold with "Lv 3 coming soon"', () => {
-    const cap = data.economy.playtestMaxLevel
-    expect(cap).toBe(2)
-    const p = levelProgress(data, 2, 3410, 5000)
+    // The cap mechanism at the playtest-1 cap (design-m8-m9 §3.4: M8 moved
+    // the shipped cap to 3; the override keeps this case).
+    const capped = dataFixture({ economy: { playtestMaxLevel: 2 } })
+    expect(capped.economy.playtestMaxLevel).toBe(2)
+    const p = levelProgress(capped, 2, 3410, 5000)
     expect(p.atCap).toBe(true)
     expect(p.text).toBe('$3,410 / $5,000 · Lv 3 coming soon')
     expect(p.frac).toBeCloseTo((3410 - 2000) / (5000 - 2000), 6)
     // Past the threshold the bar stays full and the text keeps counting.
-    const over = levelProgress(data, 2, 5400, 5000)
+    const over = levelProgress(capped, 2, 5400, 5000)
     expect(over.frac).toBe(1)
     expect(over.text).toBe('$5,400 / $5,000 · Lv 3 coming soon')
     // In-game text never mentions a "next build".
@@ -134,15 +136,48 @@ describe('spec §8 / city-view §4.1: the level bar', () => {
   })
 
   it('tap toast: the next unlock line from levels.json, "coming soon" at the cap', () => {
-    expect(nextUnlockLine(data, 1)).toBe(
+    const capped = dataFixture({ economy: { playtestMaxLevel: 2 } })
+    expect(nextUnlockLine(capped, 1)).toBe(
       'Lv 2: Hoist Hill + trucks + Shaky shaker',
     )
-    expect(nextUnlockLine(data, 2)).toBe('Lv 3 coming soon')
+    expect(nextUnlockLine(capped, 2)).toBe('Lv 3 coming soon')
+  })
+
+  it('M8 (design R1): the shipped cap is 3 — Lv 2 counts toward L3 plainly, Lv 3 reads "Lv 4 coming soon"', () => {
+    expect(data.economy.playtestMaxLevel).toBe(3)
+    const l3 = data.levels.find((l) => l.level === 3)!
+    const l4 = data.levels.find((l) => l.level === 4)!
+    // Lv 2 is below the cap: no suffix, the L3 unlocks on tap.
+    const two = levelProgress(data, 2, 3410, l3.threshold)
+    expect(two.atCap).toBe(false)
+    expect(two.text).toBe(`$3,410 / ${formatMoney(l3.threshold)}`)
+    expect(nextUnlockLine(data, 2)).toBe(
+      'Lv 3: Shrinkwrap Shore + Battery checker',
+    )
+    // Lv 3 at the cap keeps counting toward the L4 threshold.
+    const three = levelProgress(data, 3, 7200, l4.threshold)
+    expect(three.atCap).toBe(true)
+    expect(three.text).toBe(
+      `$7,200 / ${formatMoney(l4.threshold)} · Lv 4 coming soon`,
+    )
+    expect(three.frac).toBeCloseTo(
+      (7200 - l3.threshold) / (l4.threshold - l3.threshold),
+      6,
+    )
+    const over = levelProgress(data, 3, 9400, l4.threshold)
+    expect(over.frac).toBe(1)
+    expect(over.text).toMatch(/· Lv 4 coming soon$/)
+    expect(three.text).not.toMatch(/build/i)
+    // M7's compact bar (quest chip showing) drops the suffix.
+    expect(
+      levelProgress(data, 3, 7200, l4.threshold, { compact: true }).text,
+    ).toBe(`$7,200 / ${formatMoney(l4.threshold)}`)
+    expect(nextUnlockLine(data, 3)).toBe('Lv 4 coming soon')
   })
 
   it('plan-build2 §8.2 task 11: "coming soon" vanishes by data once the cap rises', () => {
     const top = Math.max(...data.levels.map((l) => l.level))
-    const open = dataFixture({ economy: { playtestMaxLevel: top } })
+    const open = dataFixture(capConfig(top))
     const l3 = open.levels.find((l) => l.level === 3)!
     const p = levelProgress(open, 2, 3410, l3.threshold)
     expect(p.atCap).toBe(false)
@@ -376,6 +411,13 @@ describe('city-view §8.1: news ticker queue (max 8, FIFO, dedupe)', () => {
       'Day 3: 14 delivered, $312 earned, payroll $28',
     )
     expect(dailyLine(1, 4, 96, 0)).toBe('Day 1: 4 delivered, $96 earned')
+  })
+
+  it("M8: the day's paid overseas clearances follow the deliveries (none → unchanged)", () => {
+    expect(dailyLine(9, 14, 412, 28, 3)).toBe(
+      'Day 9: 14 delivered, 3 cleared overseas, $412 earned, payroll $28',
+    )
+    expect(dailyLine(9, 14, 412, 0, 0)).toBe('Day 9: 14 delivered, $412 earned')
   })
 })
 

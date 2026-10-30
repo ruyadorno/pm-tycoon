@@ -452,6 +452,96 @@ describe('crafted defects are reported with their path (plan.md §6.6)', () => {
     )
   })
 
+  it('map.hubs (M8, design-m8-m9 §1.4): an overseas district, once; its office a building of that district; its vessel one of its props; an exit that moves', () => {
+    const shipped = fresh()
+    expect(shipped.map.hubs).toEqual([
+      {
+        district: 'docks',
+        office: 'dk_customs',
+        vessel: { frame: 'dk_ship', tile: [1, 29], exit: [-5, 0], liftPx: 0 },
+      },
+    ])
+    const raw = fresh()
+    const docks = raw.map.hubs[0]
+    raw.map.hubs.push(
+      structuredClone(docks),
+      { ...structuredClone(docks), district: 'highres' },
+      { ...structuredClone(docks), district: 'airport' },
+    )
+    raw.map.hubs[0].office = 'ap_terminal'
+    raw.map.hubs[1].vessel.tile = [2, 29]
+    raw.map.hubs[1].vessel.exit = [0, 0]
+    raw.map.hubs[3].vessel.liftPx = 999
+    const p = problemsOf(raw)
+    expect(p).toContainEqual('map.hubs[3].vessel.liftPx: 999 is outside 0..256')
+    raw.map.hubs[3].vessel.liftPx = 64
+    const q = problemsOf(raw)
+    expect(q).toContainEqual(
+      'map.hubs[0].office: "ap_terminal" is not a building of "docks"',
+    )
+    expect(q).toContainEqual('map.hubs[1].district: duplicate hub "docks"')
+    expect(q).toContainEqual(
+      'map.hubs[1].vessel: no map.props row {frame "dk_ship", tile [2,29], region "docks"}',
+    )
+    expect(q).toContainEqual(
+      'map.hubs[1].vessel.exit: is [0,0] (the vessel never leaves)',
+    )
+    expect(q).toContainEqual(
+      'map.hubs[2].district: "highres" is not an overseas district',
+    )
+    // The Airport row (M9) is not a dk_ship prop of the airport region.
+    expect(q).toContainEqual(
+      'map.hubs[3].vessel: no map.props row {frame "dk_ship", tile [1,29], region "airport"}',
+    )
+    const missing = fresh()
+    delete missing.map.hubs
+    expect(problemsOf(missing)).toContainEqual('map.hubs: missing')
+  })
+
+  it('M8 review: every overseas district live at ≤ playtestMaxLevel has a map.hubs row; dock indices are unique; an overseas clearanceS / valueMult is positive', () => {
+    const none = fresh()
+    none.map.hubs = []
+    expect(problemsOf(none)).toContainEqual(
+      'map.hubs: no row for "docks" (overseas, live at level 3 ≤ playtestMaxLevel 3)',
+    )
+    // Below the Docks' level no row is needed; the Airport (L5) needs one
+    // once the cap reaches it.
+    none.economy.playtestMaxLevel = 2
+    expect(problemsOf(none)).toEqual([])
+    const pm5 = fresh()
+    pm5.economy.playtestMaxLevel = 5
+    expect(problemsOf(pm5)).toEqual([
+      'map.hubs: no row for "airport" (overseas, live at level 5 ≤ playtestMaxLevel 5)',
+    ])
+    const dup = fresh()
+    dup.economy.docks.push({ ...dup.economy.docks[0] })
+    expect(problemsOf(dup)).toContainEqual(
+      `economy.docks[${dup.economy.docks.length - 1}].index: duplicate dock index 2`,
+    )
+    const zero = fresh()
+    const i = zero.districts.findIndex((d: { id: string }) => d.id === 'docks')
+    zero.districts[i].clearanceS = 0
+    zero.districts[i].valueMult = 0
+    const z = problemsOf(zero)
+    expect(z).toContainEqual(
+      expect.stringMatching(
+        new RegExp(`^districts\\[${i}\\]\\.clearanceS: 0 `),
+      ),
+    )
+    expect(z).toContainEqual(
+      expect.stringMatching(new RegExp(`^districts\\[${i}\\]\\.valueMult: 0 `)),
+    )
+  })
+
+  it('an overseas district’s malwareMult must equal parcels.malware.overseasMult (spawn.ts reads the latter; R6)', () => {
+    const raw = fresh()
+    const i = raw.districts.findIndex((d: { id: string }) => d.id === 'airport')
+    raw.districts[i].malwareMult = 3
+    expect(problemsOf(raw)).toContainEqual(
+      `districts[${i}].malwareMult: 3 ≠ parcels.malware.overseasMult 2`,
+    )
+  })
+
   it('buildGameData throws DataError with the problems', () => {
     const raw = fresh()
     raw.districts[0].sizeMix.S = 0.9

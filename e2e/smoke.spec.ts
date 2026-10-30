@@ -49,7 +49,7 @@
 //      sorter applicant, who walks in to the stand under the rack lamp's S;
 //      the Title's New game with ?level=3&policy=delegating is a fresh L3
 //      game driven by the delegating policy (the attract sim untouched).
-//      The save is version 4 (types.ts STATE_VERSION since M7).
+//      The save is version 5 (types.ts STATE_VERSION since M8).
 //   M7 (plan-build2 §8.4 tasks 4-6; design-m7 §3.4, §6.4, §6.10) — quests:
 //      under ?policy=1 the first offer comes at 3:00 (tick 1800, state.day 3)
 //      and the policy accepts it on that step — __pm.quests().active, the
@@ -58,11 +58,21 @@
 //      fresh L2 game whose log starts debugForceLevel, debugOfferQuest (the
 //      L2 goal: 10 deliveries), the attract sim untouched.
 //      e2e/quests.spec.ts has the card / chip / magic / victory flows.
+//   M8 (plan-build2 §8.5 tasks 3, 6; design-m8-m9 §6.1, §6.3) — L3 docks:
+//      a fresh ?level=3 game in the room: dock 3's door gives its unlock
+//      tooltip (`… unlocks at Lv 4 ($2,000) · coming soon`), dock 2's door
+//      the `Loading dock 2` dialog, whose Buy is refused at the start
+//      balance (deny tooltip, nothing bought); then level-up-3.json without
+//      the policy, sim-only to L3 with $800 (tools/fixtures/m8.ts), dock 2's
+//      door → Buy by real taps: `dock:bought {2}` (the log's buyDock, −$800),
+//      lane.docks [dock1, dock2], the HUD toast `Loading dock 2 open — two
+//      vehicles unload at once`, the replay still matches.
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { expect, gameUp, test, titleUp, type PmHelpers } from './fixtures.ts'
 import {
   bayRect,
+  dockHit,
   expectRoomFits,
   hireSheet,
   openSheet,
@@ -87,8 +97,8 @@ const LEVEL_UP_FIXTURE = 'tests/fixtures/level-up.json'
 const MAX_DRAW_CALLS = 8
 /** src/sim/save.ts SAVE_KEY (build 2: save v2, plan-build2 §8.2 task 9). */
 const SAVE_KEY = 'pm.save.v2'
-/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (4 since M7, design-m7 §2.5). */
-const SAVE_VERSION = 4
+/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (5 since M8, design-m8-m9 §2.4). */
+const SAVE_VERSION = 5
 /** A new game at seed 7 without the policy (the player's own buys). */
 const NEW_URL = '/?seed=7&debug=1&skipTitle=1&audio=0'
 
@@ -1546,6 +1556,137 @@ test.describe('M7 quests smoke', () => {
       ],
       offer: { templateId: 'rush_district', goal: 10, offeredTick: 0 },
     })
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+/** tools/fixtures/m8.ts: 3 s before the policy's real level:up {3}. */
+const LEVEL_UP_3_FIXTURE = 'tests/fixtures/level-up-3.json'
+
+/** Record every pm:tooltip text the scenes emit (window.pmTips). */
+function recordTooltips(page: Page): Promise<void> {
+  return page.evaluate(() => {
+    const w = window as unknown as { pmTips: string[] }
+    w.pmTips = []
+    window.__pm!.game.events.on('pm:tooltip', (p: { text: string }) =>
+      w.pmTips.push(p.text),
+    )
+  })
+}
+
+function tooltips(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as { pmTips: string[] }).pmTips)
+}
+
+/** The dock slots as `index:owned|buy|locked`. */
+function dockSlots(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    window
+      .__pm!.sim.lane.dockSlots()
+      .map(
+        (d) =>
+          `${d.index}:${d.owned ? 'owned' : d.available ? 'buy' : 'locked'}`,
+      ),
+  )
+}
+
+test.describe('M8 docks smoke', () => {
+  test('dock 3 shows its unlock tooltip, dock 2 its dialog; Buy is refused at the start balance, then buys dock 2 at L3 with $800', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    test.setTimeout(150_000)
+    await pm.open(`${NEW_URL}&view=warehouse&level=3`)
+    await pm.freeze()
+    await pm.settle(30)
+    await recordTooltips(page)
+    expect(await dockSlots(page)).toEqual(['1:owned', '2:buy', '3:locked'])
+
+    // Dock 3 (L4): the unlock tooltip, no dialog.
+    await tapRoomRect(page, pm, dockHit(3))
+    await pm.settle(16)
+    expect(
+      await sceneTarget(page, 'Warehouse', 'wh:dockDialog:confirm'),
+    ).toBeNull()
+    expect(await tooltips(page)).toEqual([
+      'Loading dock 3 — unlocks at Lv 4 ($2,000) · coming soon',
+    ])
+
+    // Dock 2 (L3, $800) at the start balance: the dialog, Buy refused.
+    const money0 = await page.evaluate(() => window.__pm!.sim.money)
+    expect(money0).toBeLessThan(800)
+    await tapRoomRect(page, pm, dockHit(2))
+    await pm.settle(16)
+    await tapTarget(page, pm, 'Warehouse', 'wh:dockDialog:confirm')
+    await pm.settle(16)
+    const refused = await page.evaluate(() => ({
+      money: window.__pm!.sim.money,
+      buys: window
+        .__pm!.core.commandLog.filter((e) => e.cmd.kind === 'buyDock')
+        .map((e) => e.cmd),
+    }))
+    const tips = await tooltips(page)
+    console.log(
+      `smoke: dock 2 at $${money0} ${JSON.stringify({ refused, tips })}`,
+    )
+    expect(refused).toEqual({ money: money0, buys: [] })
+    expect(await dockSlots(page)).toEqual(['1:owned', '2:buy', '3:locked'])
+    expect(tips[1]).toBe('Not enough money')
+    expect(
+      await sceneTarget(page, 'Warehouse', 'wh:dockDialog:confirm'),
+      'the dialog closed',
+    ).toBeNull()
+
+    // level-up-3.json without the policy: sim-only to L3 with $800.
+    const fx = readFileSync(LEVEL_UP_3_FIXTURE, 'utf8')
+    expect(
+      (JSON.parse(fx) as { dataHash: string }).dataHash,
+      `${LEVEL_UP_3_FIXTURE} is stale: run \`node tools/fixtures/m8.ts\``,
+    ).toBe(await page.evaluate(() => window.__pm!.data.hash))
+    const ready = await page.evaluate((json) => {
+      const api = window.__pm!
+      api.load(json)
+      let ms = 0
+      while (!(api.sim.level >= 3 && api.sim.money >= 800) && ms < 180_000) {
+        api.advance(100)
+        ms += 100
+      }
+      return { ms, level: api.sim.level, money: api.sim.money }
+    }, fx)
+    console.log(`smoke: level-up-3 to $800 at L3 ${JSON.stringify(ready)}`)
+    expect(ready.level).toBe(3)
+    expect(ready.money).toBeGreaterThanOrEqual(800)
+    await pm.settle(30)
+    expect(await dockSlots(page)).toEqual(['1:owned', '2:buy', '3:locked'])
+    await tapRoomRect(page, pm, dockHit(2))
+    await pm.settle(16)
+    await tapTarget(page, pm, 'Warehouse', 'wh:dockDialog:confirm')
+    await pm.settle(8)
+    const after = await page.evaluate(() => {
+      const api = window.__pm!
+      const log = api.core.commandLog
+      return {
+        money: api.sim.money,
+        docks: api.core.state.lane.docks.map((d) => d.id),
+        last: log[log.length - 1]?.cmd ?? null,
+      }
+    })
+    console.log(`smoke: dock 2 bought ${JSON.stringify(after)}`)
+    expect(after.money).toBe(ready.money - 800)
+    expect(after.docks).toEqual(['dock1', 'dock2'])
+    expect(after.last).toEqual({ kind: 'buyDock', index: 2 })
+    expect(await dockSlots(page)).toEqual(['1:owned', '2:owned', '3:locked'])
+    expect(
+      await settleUntil(page, pm, async () =>
+        (await toastText(page)).startsWith('Loading dock 2 open'),
+      ),
+      'the dock toast',
+    ).toBe(true)
+    expect(await toastText(page)).toBe(
+      'Loading dock 2 open — two vehicles unload at once',
+    )
     expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

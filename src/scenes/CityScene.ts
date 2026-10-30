@@ -64,6 +64,20 @@
 // is cleared. Its pickup and delivery
 // hops fly `ic_magic` instead of `ic_parcel_s` (cityFx.hopIcon).
 //
+// M8 (spec-build2 §4.1, design-m8-m9 §6.2): the Docks unlock through the
+// same crossfade (dk_terminal_a/_b, dk_port_office in colour). One CityHubView
+// per map.hubs row (src/render/cityHub.ts): the 45-s clearance ring over
+// the office (dk_customs → dk_port_office, `×N` from 2 parcels) and the
+// dk_ship prop sailing its `exit` off the map edge on hub:departure (4 s
+// out, 10 s away, 4 s back; ignored while away). parcel:handedOff hops the
+// parcel from the vehicle at the pier anchor into the pier with a grey
+// `LOCKED $18`; parcel:cleared stamps gold `CLEARED +$18` (red `SHIP HAS
+// SAILED` for malware) at the office. Docks 2–3: the bay lights by dock
+// NUMBER (lamp k for dock k + 1; t3 draws two), and docked vehicles stand
+// before their own bay (cityFx.dockRunBlend over lot.docks 1..n, poses per
+// bay from the exterior frame); dock:bought extends the run and pops the
+// new lamp.
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -112,13 +126,17 @@ import {
 import { CameraRig } from '../render/CameraRig.ts'
 import {
   BAY_LIGHTS,
+  bayLightShown,
   CONSTRUCTION_SWAP_MS,
   DOCK_POSE_DEPTH,
+  dockPoseCanvas,
+  dockRunRadius,
   dustFrame,
   fadeK,
   hopIcon,
   levelStampText,
   magicMarkers,
+  maxDockNumber,
   moodFor,
   SMOKE_PHASE_MS,
   SMOKE_PUFFS,
@@ -131,6 +149,15 @@ import {
   WH_CANVAS,
   warehouseAnchors,
 } from '../render/cityFx.ts'
+import {
+  clearedStampText,
+  handOffVehicleId,
+  CityHubView,
+  lockedStampText,
+  lostStampText,
+  stampSum,
+  type StampSum,
+} from '../render/cityHub.ts'
 import { decayPhase } from '../render/decayPhase.ts'
 import { DistrictLabel } from '../render/DistrictLabel.ts'
 import {
@@ -170,7 +197,7 @@ import {
 } from '../render/vehicleDepth.ts'
 import { VehicleView, type DockPose } from '../render/VehicleView.ts'
 import type { CommandResult } from '../sim/commands.ts'
-import type { LifeLostPayload } from '../sim/events.ts'
+import type { LifeLostPayload, SimEventPayloads } from '../sim/events.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../sim/types.ts'
 import type { ViewSim } from '../sim/view-api.ts'
 import {
@@ -179,8 +206,16 @@ import {
   type RushLine,
   type TooltipModel,
 } from '../ui/BuildingTooltip.ts'
+import { hubTip } from '../ui/hubText.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
-import { Popups, STAMP_GOLD, STAMP_GREY, type ViewRect } from '../ui/Popups.ts'
+import {
+  MERGE_MS,
+  Popups,
+  STAMP_GOLD,
+  STAMP_GREY,
+  STAMP_RED,
+  type ViewRect,
+} from '../ui/Popups.ts'
 import { FONT_SIZE, FONT_SIZE_BIG, paletteColour, THEME } from '../ui/theme.ts'
 
 // Game-event names this scene speaks (plan.md §5; the M1 cross-scene contract).
@@ -297,6 +332,8 @@ interface LevelStamp {
 interface PropView {
   frame: string
   region: string
+  /** The map.props tile (map.hubs finds its vessel by it). */
+  tile: readonly [number, number]
   img: Phaser.GameObjects.Image | null
   x: number
   y: number
@@ -347,6 +384,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   private construction: Construction | null = null
   private levelStamp: LevelStamp | null = null
   private dockPose: DockPose | null = null
+  /** M8: one per map.hubs row (the clearance ring + the vessel's trips). */
+  private hubViews = new Map<string, CityHubView>()
+  /** M8: the dollars of the hub stamps inside the Popups merge window, per key. */
+  private stampSums = new Map<string, StampSum>()
   private qualityCtl: QualityController | null = null
   /** Set while SHUTDOWN lands the in-flight fades (no new sprites then). */
   private shuttingDown = false
@@ -428,6 +469,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     this.construction = null
     this.levelStamp = null
     this.dockPose = null
+    this.hubViews = new Map()
+    this.stampSums = new Map()
     this.shuttingDown = false
     this.lockState = new Map()
     this.dirty = new Set()
@@ -523,6 +566,13 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
           this.stalled = false
         },
         'vehicle:bought': (p) => this.popOnCreate.add(p.id),
+        // M8 (design-m8-m9 §6.2): docks 2–3, the overseas hand-off and clearance.
+        'dock:bought': (p) => this.onDockBought(p.index),
+        'parcel:handedOff': (p) => this.onHandedOff(p),
+        'parcel:cleared': (p) => this.onCleared(p),
+        'hub:departure': (p) => {
+          this.departVessel(p.hub)
+        },
         'vehicle:sold': (p) => this.onSold(p.id),
         'day:ended': () => {
           this.refreshSign()
@@ -781,9 +831,11 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     for (const v of this.vehicles.values()) v.destroy()
     for (const b of this.buildings.values()) b.destroy()
     for (const l of this.labels.values()) l.destroy()
+    for (const h of this.hubViews.values()) h.destroy()
     this.vehicles.clear()
     this.buildings.clear()
     this.labels.clear()
+    this.hubViews.clear()
     this.popups.destroy()
     this.tooltip.destroy()
     this.finishFades()
@@ -882,6 +934,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       const pv: PropView = {
         frame: PROP_ALIAS[pr.frame] ?? pr.frame,
         region: pr.region,
+        tile: [pr.tile[0], pr.tile[1]],
         img: null,
         x: Math.round(at.x),
         y: Math.round(at.y + HH),
@@ -890,6 +943,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       this.props.push(pv)
       this.placeProp(pv)
     }
+    this.buildHubs()
 
     // Days-since-last-incident sign on its lot tile with the counter.
     tileToScreen(map.lot.sign[0], map.lot.sign[1], this.ox, at)
@@ -1050,40 +1104,88 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   /**
-   * Where a docked vehicle is drawn: the current exterior frame's dockPose
-   * (frames.generated WH_ANCHORS) on the exterior canvas, relative to the
-   * map's first dock tile, over the wall (art-install hand-off: the dock
-   * tiles sit on the sprite's hidden NW side). One object shared with every
-   * VehicleView; placeDockPose moves it on a tier swap.
+   * Where docked vehicles are drawn: the current exterior frame's per-bay
+   * dockPoses (frames.generated WH_ANCHORS; cityFx.dockPoseCanvas) on the
+   * exterior canvas, each relative to its map dock tile (lot.docks[k],
+   * vehicles.ts dockTile by dock NUMBER), over the wall (art-install
+   * hand-off: the dock tiles sit on the sprite's hidden NW side). One object
+   * shared with every VehicleView: placeDockPose moves it on a tier swap,
+   * refreshDockRun extends its run to the highest dock owned (M8, design-m8-m9
+   * §6.2).
    */
   private makeDockPose(): DockPose | null {
     const map = this.gd.map
-    const dock = map.lot.docks[0]
-    if (!dock) return null
+    if (map.lot.docks.length === 0) return null
     const lotBlock = map.blocks.find((b) => b.kind === 'lot')
     const rect = lotBlock
       ? blockRect(map, lotBlock.block[0], lotBlock.block[1])
       : null
     const wh = map.lot.warehouse
     const pose: DockPose = {
-      tile: [dock[0], dock[1]],
+      tiles: [],
       lotX0: rect ? rect[0] : map.lot.entrance[0] + 1,
-      dx: 0,
-      dy: 0,
+      poses: [],
+      radius: 0,
       depth: footprintDepth(wh.tile, wh.footprint) + DOCK_POSE_DEPTH,
     }
+    this.refreshDockRun(pose)
     this.placeDockPose(pose)
     return pose
   }
 
-  /** The dock pose's offset from the current exterior frame's anchors. */
+  /** Every bay's offset from the current exterior frame's anchors. */
   private placeDockPose(pose: DockPose | null = this.dockPose): void {
     if (!pose) return
     const name = this.warehouse?.frame.name ?? WH_ANCHOR_FRAME
-    const [px, py] = warehouseAnchors(name).dockPose
-    const t = tileToScreen(pose.tile[0], pose.tile[1], this.ox)
-    pose.dx = this.warehouseAnchor.x - WH_CANVAS / 2 + px - t.x
-    pose.dy = this.warehouseAnchor.y - WH_CANVAS + py - t.y
+    const anchors = warehouseAnchors(name)
+    const left = this.warehouseAnchor.x - WH_CANVAS / 2
+    const top = this.warehouseAnchor.y - WH_CANVAS
+    pose.poses = this.gd.map.lot.docks.map((tile, i) => {
+      const [px, py] = dockPoseCanvas(anchors, i + 1)
+      const t = tileToScreen(tile[0], tile[1], this.ox)
+      return { dx: left + px - t.x, dy: top + py - t.y }
+    })
+  }
+
+  /**
+   * The dock run: bays 1..n (n = the highest dock owned) and its blend
+   * radius (never reaching the queue head). Create, dock:bought, sync.
+   */
+  private refreshDockRun(pose: DockPose | null = this.dockPose): void {
+    if (!pose) return
+    const lot = this.gd.map.lot
+    const n = maxDockNumber(this.vs.docks.map((d) => d.id))
+    pose.tiles = lot.docks.slice(0, Math.max(1, n))
+    pose.radius = dockRunRadius(pose.tiles, lot.queue[0])
+  }
+
+  /**
+   * M8 (design-m8-m9 §6.2): one CityHubView per map.hubs row — the clearance
+   * ring on its office building, its vessel = the map.props row of the
+   * hub's region at the vessel's tile.
+   */
+  private buildHubs(): void {
+    for (const h of this.gd.map.hubs) {
+      const frame = PROP_ALIAS[h.vessel.frame] ?? h.vessel.frame
+      const vessel =
+        this.props.find(
+          (pv) =>
+            pv.region === h.district &&
+            pv.frame === frame &&
+            pv.tile[0] === h.vessel.tile[0] &&
+            pv.tile[1] === h.vessel.tile[1],
+        ) ?? null
+      const office = this.buildings.get(h.office) ?? null
+      const depth = DEPTH.marker + (office?.depth ?? 0) + DEPTH.bell
+      this.hubViews.set(
+        h.district,
+        new CityHubView(this, this.world, this.vs, h, {
+          vessel,
+          office,
+          depth,
+        }),
+      )
+    }
   }
 
   private warehouseCentre(): { x: number; y: number } {
@@ -1419,6 +1521,9 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     if (this.followId !== null && !ids.has(this.followId)) this.unfollow(true)
     this.queueN = this.vs.dockQueue.length
     this.stalled = this.vs.lane.stalled !== null
+    this.refreshDockRun()
+    this.stampSums.clear()
+    for (const h of this.hubViews.values()) h.syncAll()
     this.syncMoods()
     this.refreshMarkers()
     this.refreshMagic()
@@ -1533,6 +1638,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     for (const l of this.labels.values()) l.update(now)
     this.updateSmoke(now)
     this.updateDockLights(now)
+    if (this.hubViews.size > 0) {
+      const tickNow = this.vs.tick + getAlpha(this)
+      for (const h of this.hubViews.values()) h.update(now, tickNow)
+    }
     if (this.zone)
       this.zone.setAlpha(
         0.6 + 0.2 * Math.sin((2 * Math.PI * now) / ZONE_PULSE_MS),
@@ -1594,12 +1703,13 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   }
 
   private updateDockLights(now: number): void {
-    const docks = this.vs.docks.length
+    const owned = this.vs.docks.map((d) => d.id)
     const red = this.queueN > 0 || this.stalled
     const blinkOn = !this.stalled || Math.floor(now / LIGHT_BLINK_MS) % 2 === 0
     this.dockLights.forEach((img, i) => {
-      // A frame with fewer lamps than docks (t3: two bays) hides the rest.
-      if (i >= docks || i >= this.bayLightCount) {
+      // By dock NUMBER (M8): lamp k lights for dock k + 1 when it is owned;
+      // a frame with fewer lamps (t3: two bays) hides the rest.
+      if (!bayLightShown(i, owned, this.bayLightCount)) {
         img.setVisible(false)
         return
       }
@@ -1706,6 +1816,119 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       paid,
       onTime,
     )
+  }
+
+  // ---------------------------------------------------------------- M8 hubs + docks
+
+  /**
+   * dock:bought (design-m8-m9 §6.2): the run reaches the new bay (its docked
+   * pose), its lamp lights from the next frame (updateDockLights by number)
+   * and pops once (fx_pop) when the exterior has that lamp.
+   */
+  private onDockBought(index: number): void {
+    this.refreshDockRun()
+    const img = this.dockLights[index - 1]
+    if (!img || index - 1 >= this.bayLightCount) return
+    this.playFx(img.x, img.y, 'fx_pop', FX_POP_MS, false, img.depth)
+  }
+
+  /** The VehicleView handing parcel `id` off at pier `b` (cityHub.handOffVehicleId). */
+  private handOffVehicle(id: number, b: BuildingView): VehicleView | null {
+    const vid = handOffVehicleId(this.vs.vehicles, id, b.id, b.def.anchor)
+    return vid === null ? null : (this.vehicles.get(vid) ?? null)
+  }
+
+  /** Dollars of a same-key stamp inside the Popups merge window (cityHub.stampSum). */
+  private stampDollars(key: string, value: number): number {
+    const next = stampSum(
+      this.stampSums.get(key),
+      this.time.now,
+      value,
+      MERGE_MS,
+    )
+    this.stampSums.set(key, next)
+    return next.sum
+  }
+
+  /**
+   * parcel:handedOff (B2 §4.1): the delivery hop from the vehicle's body
+   * into the pier, then the grey `LOCKED $18` stamp at the pier's door.
+   */
+  private onHandedOff(p: SimEventPayloads['parcel:handedOff']): void {
+    const b = this.buildings.get(p.buildingId)
+    if (!b) return
+    const parcel = this.parcel(p.id)
+    const v = this.handOffVehicle(p.id, b)
+    if (v && parcel) {
+      const c = v.bodyCentre()
+      this.popups.hop(
+        this.viewRect,
+        c.x,
+        c.y,
+        b.door.x,
+        b.door.y,
+        hopIcon(parcel),
+      )
+    }
+    const key = `lock:${b.id}`
+    this.popups.stamp(
+      this.viewRect,
+      key,
+      b.door.x,
+      b.door.y - POPUP_LIFT,
+      lockedStampText(this.stampDollars(key, p.lockedValue)),
+      STAMP_GREY,
+    )
+  }
+
+  /**
+   * parcel:cleared (B2 §4.1, §5.6) at the hub's office: gold `CLEARED +$18`,
+   * or red `SHIP HAS SAILED` (Airport `PLANE HAS LEFT`) for malware — the
+   * lost life itself (boom, scorch on the pier, the HUD card) is life:lost's.
+   */
+  private onCleared(p: SimEventPayloads['parcel:cleared']): void {
+    const officeId = this.hubViews.get(p.hub)?.office ?? p.buildingId
+    const b = this.buildings.get(officeId)
+    if (!b) return
+    const x = b.door.x
+    const y = b.door.y - POPUP_LIFT
+    if (p.malware) {
+      this.popups.stamp(
+        this.viewRect,
+        `sail:${b.id}`,
+        x,
+        y,
+        lostStampText(p.hub),
+        STAMP_RED,
+      )
+      return
+    }
+    const key = `clear:${b.id}`
+    this.popups.stamp(
+      this.viewRect,
+      key,
+      x,
+      y,
+      clearedStampText(this.stampDollars(key, p.paid)),
+      STAMP_GOLD,
+    )
+  }
+
+  /**
+   * hub:departure → the hub's vessel leaves (ignored while it is away: one
+   * trip per batch). Public for debug / e2e (the ship-departure shot); true
+   * when a trip started.
+   */
+  departVessel(hub: string): boolean {
+    return (
+      this.hubViews.get(hub)?.depart(this.time.now, reducedMotion()) ?? false
+    )
+  }
+
+  /** Debug / e2e probe: a hub's vessel phase and the ring frame shown (null hidden). */
+  hubProbe(hub: string): { phase: string; ring: number | null } | null {
+    const h = this.hubViews.get(hub)
+    return h ? { phase: h.phase, ring: h.ringShown } : null
   }
 
   private warehouseRoof(): { x: number; y: number; depth: number } {
@@ -1885,16 +2108,23 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     } else this.rig.panTo(cx, cy, ms, onDone)
   }
 
-  /** The uncovered city area in world coordinates (tooltip clamp). */
+  /**
+   * The uncovered city area in world coordinates (tooltip clamp): below the
+   * HUD's toast lane (city-view §4.2), so a toast never covers a tooltip's
+   * name row — the Docks at the map's west edge clamp their pier / office
+   * tooltips to the top of the view (M8 review).
+   */
   private clampRect(): ClampRect {
     const cam = this.cameras.main
     const v = cam.worldView
     const z = cam.zoom
+    const L = this.L
+    const top = Math.max(L.world.y, L.toast.y + L.toast.h)
     return {
       x: v.x,
-      y: v.y + this.L.world.y / z,
+      y: v.y + top / z,
       w: v.width,
-      h: this.L.world.h / z,
+      h: Math.max(0, L.world.y + L.world.h - top) / z,
     }
   }
 
@@ -2313,6 +2543,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
       sizes: sorted.map((p) => p.size.toLowerCase()),
       rush,
       footer,
+      hub: hubTip(this.vs.hubs(), view.def, this.vs.tick),
     }
   }
 

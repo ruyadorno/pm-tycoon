@@ -4,7 +4,10 @@
 // and bollards stamped by the ground bake; the exterior anchors read from the
 // manifest-derived frames.generated.ts) and of the M7 magic parcel
 // (spec-build2 §3.3, design-m7 §6.8: the gold `ic_magic` markers over A and
-// B, their countdown ring, the gold hop icon). No Phaser, no DOM: CityScene /
+// B, their countdown ring, the gold hop icon) and of the M8 docks 2–3
+// (design-m8-m9 §6.2: bay lights and docked poses by dock NUMBER, the dock
+// run mapping the hidden dock column onto the SW face's bays; the overseas
+// hubs' ring and vessel live in cityHub.ts). No Phaser, no DOM: CityScene /
 // BuildingView / VehicleView / DistrictLabel / ground.ts drive their sprites
 // from these and Vitest pins them under Node (tests/render/cityFx.test.ts,
 // tests/render/ground-slab.test.ts). Every time is ms on the scene clock
@@ -283,8 +286,54 @@ export const BAY_LIGHTS: readonly CanvasPt[] = warehouseAnchors().bayLights
 export const DOCK_POSE_CANVAS: CanvasPt = warehouseAnchors().dockPose
 /** The dock pose draws over the warehouse wall: footprint depth + this. */
 export const DOCK_POSE_DEPTH = 0.2
+/**
+ * M8: each bay further along the SW face draws this much higher (bay 2's
+ * vehicle stands in front of bay 1's); above a vehicle's own dot / glyph
+ * biases (DEPTH.mood 0.01, DEPTH.bell 0.02).
+ */
+export const DOCK_BAY_DEPTH = 0.05
 /** Blend radius (tiles) around the dock tile: the approach from the queue head. */
 export const DOCK_BLEND_TILES = 3
+
+/**
+ * M8 (design-m8-m9 §6.2): the docked foot point of bay `n` (1-based) on an
+ * exterior frame's anchors — the manifest's `dockPoses[n − 1]`; else bay 1's
+ * pose moved by that bay's lamp offset (`bayLights[n − 1] − bayLights[0]`,
+ * the manifest's own rule); else, for a frame with fewer bays than docks
+ * (t3 draws two: a debug dock 3), the last known bay stepped on by the last
+ * bay-to-bay step (bay 1's pose when only one is known).
+ */
+export function dockPoseCanvas(a: WarehouseAnchors, n: number): CanvasPt {
+  const k = Math.max(1, Math.floor(n)) - 1
+  /** Bay i's pose from the manifest or its lamp; bay 1 always has one. */
+  const known = (i: number): CanvasPt | null => {
+    const p = a.dockPoses?.[i]
+    if (p) return p
+    const lamp = a.bayLights[i]
+    const l0 = a.bayLights[0]
+    if (lamp && l0)
+      return [a.dockPose[0] + lamp[0] - l0[0], a.dockPose[1] + lamp[1] - l0[1]]
+    return i === 0 ? a.dockPose : null
+  }
+  const direct = known(k)
+  if (direct) return direct
+  let last = 0
+  while (last + 1 < k && known(last + 1)) last++
+  const pl = known(last) ?? a.dockPose
+  const pp = last > 0 ? known(last - 1) : null
+  const sx = pp ? pl[0] - pp[0] : 0
+  const sy = pp ? pl[1] - pp[1] : 0
+  return [pl[0] + sx * (k - last), pl[1] + sy * (k - last)]
+}
+
+/** Docked foot points of bays 1..count on a frame (dockPoseCanvas each). */
+export function dockPosesCanvas(a: WarehouseAnchors, count = 3): CanvasPt[] {
+  return Array.from({ length: count }, (_, i) => dockPoseCanvas(a, i + 1))
+}
+
+/** Tier-1 docked foot points of bays 1–3 (the manifest's; [0] = DOCK_POSE_CANVAS). */
+export const DOCK_POSES_CANVAS: readonly CanvasPt[] =
+  dockPosesCanvas(warehouseAnchors())
 
 /**
  * 0..1 weight of the dock pose for a vehicle at tile (tx, ty): 1 on the dock
@@ -292,7 +341,8 @@ export const DOCK_BLEND_TILES = 3
  * from tx = lotX0 − 0.5, zero on the avenue tile lotX0 − 1) and south of the
  * parking row (full from ty = dockY, zero at dockY − 0.5), so through-traffic
  * on the avenue and the parking row behind the sprite are never moved.
- * Continuous, so a vehicle driving in or out never jumps.
+ * Continuous, so a vehicle driving in or out never jumps. (One dock: the
+ * dock run of dockRunBlend with the default radius.)
  */
 export function dockBlend(
   tx: number,
@@ -300,12 +350,126 @@ export function dockBlend(
   dock: readonly [number, number],
   lotX0: number,
 ): number {
-  const d = Math.hypot(tx - dock[0], ty - dock[1])
-  const near = 1 - d / DOCK_BLEND_TILES
-  if (near <= 0) return 0
+  return dockRunBlend(tx, ty, [dock], lotX0).w
+}
+
+/** dockRunBlend's result: the pose weight and the fractional bay index (0 = bay 1). */
+export interface DockRunHit {
+  w: number
+  at: number
+}
+
+/**
+ * M8 (docks 2–3, design-m8-m9 §6.2): the dock tiles of bays 1..n (n = the
+ * highest dock number owned; map.json lot.docks, a straight run on the
+ * sprite's hidden NW side) map onto the bays of the visible SW face. A
+ * vehicle at (tx, ty) is drawn toward the pose interpolated at `at` — the
+ * fractional bay index of its nearest point on the run — with the weight of
+ * dockBlend measured from that point (1 on the run, 0 at `radius` tiles,
+ * the same lot / parking-row masks, the column rule from bay 1's tile).
+ * A function of the position only (no per-vehicle state): a vehicle driving
+ * along the run slides from bay to bay, and taking or leaving a bay never
+ * jumps. With one dock this is exactly dockBlend.
+ */
+export function dockRunBlend(
+  tx: number,
+  ty: number,
+  run: readonly (readonly [number, number])[],
+  lotX0: number,
+  radius = DOCK_BLEND_TILES,
+  out: DockRunHit = { w: 0, at: 0 },
+): DockRunHit {
+  out.w = 0
+  out.at = 0
+  const first = run[0]
+  if (!first || !(radius > 0)) return out
+  let best = Math.hypot(tx - first[0], ty - first[1])
+  for (let i = 0; i + 1 < run.length; i++) {
+    const a = run[i] as readonly [number, number]
+    const b = run[i + 1] as readonly [number, number]
+    const ex = b[0] - a[0]
+    const ey = b[1] - a[1]
+    const len2 = ex * ex + ey * ey
+    const u =
+      len2 > 0
+        ? Math.max(0, Math.min(1, ((tx - a[0]) * ex + (ty - a[1]) * ey) / len2))
+        : 0
+    const d = Math.hypot(tx - a[0] - ex * u, ty - a[1] - ey * u)
+    if (d < best - 1e-9) {
+      best = d
+      out.at = i + u
+    }
+  }
+  const near = 1 - best / radius
+  if (near <= 0) {
+    out.at = 0
+    return out
+  }
   const inLot = Math.max(0, Math.min(1, (tx - (lotX0 - 1)) * 2))
-  const inColumn = Math.max(0, Math.min(1, (ty - dock[1] + 0.5) * 2))
-  return Math.min(1, near) * inLot * inColumn
+  const inColumn = Math.max(0, Math.min(1, (ty - first[1] + 0.5) * 2))
+  out.w = Math.min(1, near) * inLot * inColumn
+  return out
+}
+
+/**
+ * The run's blend radius: DOCK_BLEND_TILES, capped at the queue head's
+ * distance from the run's last bay so the vehicle waiting there is never
+ * moved (one dock: exactly 3; docks 1–2: 2; docks 1–3: 1).
+ */
+export function dockRunRadius(
+  run: readonly (readonly [number, number])[],
+  queueHead: readonly [number, number] | undefined,
+): number {
+  const last = run.at(-1)
+  if (!last || !queueHead) return DOCK_BLEND_TILES
+  const d = Math.hypot(queueHead[0] - last[0], queueHead[1] - last[1])
+  return Math.min(DOCK_BLEND_TILES, d > 0 ? d : DOCK_BLEND_TILES)
+}
+
+/** World offset of bay `at` (fractional, 0 = bay 1): linear between the bays' offsets, clamped. */
+export function dockPoseAt(
+  poses: readonly { readonly dx: number; readonly dy: number }[],
+  at: number,
+  out: { dx: number; dy: number } = { dx: 0, dy: 0 },
+): { dx: number; dy: number } {
+  out.dx = 0
+  out.dy = 0
+  const n = poses.length
+  if (n === 0) return out
+  const a = Math.max(0, Math.min(n - 1, Number.isFinite(at) ? at : 0))
+  const i = Math.min(n - 1, Math.floor(a))
+  const j = Math.min(n - 1, i + 1)
+  const u = a - i
+  const p = poses[i] as { dx: number; dy: number }
+  const q = poses[j] as { dx: number; dy: number }
+  out.dx = p.dx + (q.dx - p.dx) * u
+  out.dy = p.dy + (q.dy - p.dy) * u
+  return out
+}
+
+/**
+ * Which bay lights are lit (design-m8-m9 §6.2, by dock NUMBER): light k
+ * (0-based) shows when dock k + 1 is owned and the exterior frame has that
+ * lamp (t3 draws two bays: its third light stays hidden). Dock 3 bought
+ * before dock 2 lights lamps 1 and 3.
+ */
+export function bayLightShown(
+  k: number,
+  ownedDockIds: readonly string[],
+  lampCount: number,
+): boolean {
+  if (k < 0 || k >= lampCount) return false
+  return ownedDockIds.includes(`dock${k + 1}`)
+}
+
+/** The highest dock number owned (1 with dock 1 only; dock ids `dock<N>`). */
+export function maxDockNumber(ownedDockIds: readonly string[]): number {
+  let n = 1
+  for (const id of ownedDockIds) {
+    const m = /^dock([1-9]\d*)$/.exec(id)
+    if (m) n = Math.max(n, Number(m[1]))
+  }
+  return n
 }
 
 // ---------------------------------------------------------------- lot slab (B2 §6.1)

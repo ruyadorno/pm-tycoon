@@ -6430,9 +6430,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "airport",
-      "coversBuildings": ["ap_terminal"],
       "priority": "P2",
-      "subject": "airport terminal, long glass hall with a control tower",
+      "subject": "modern airport passenger terminal: a long hall with a sweeping curved white wave-shaped roof over a tall blue glass front, two covered jet bridges reaching out from its side, a row of small coloured flags along the roof edge",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -6504,6 +6503,52 @@
           "downloadUrl": "",
           "sha256": "31f4929e1322ea9e71e961328c0b296340df964f34134e05c68c417994423e78",
           "at": "2026-10-29T08:16:56.261Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern airport passenger terminal: a long hall with a sweeping curved white wave-shaped roof over a tall blue glass front, two covered jet bridges reaching out from its side, a row of small coloured flags along the roof edge, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3003,
+            "prompt": "modern airport passenger terminal: a long hall with a sweeping curved white wave-shaped roof over a tall blue glass front, two covered jet bridges reaching out from its side, a row of small coloured flags along the roof edge, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "8721cdb3-520c-5fca-8af9-d58121125041",
+            "source_image_id": "8721cdb3-520c-5fca-8af9-d58121125041"
+          },
+          "jobId": "34849e36-bb23-4a47-a39d-15b6594a633d",
+          "seed": 3003,
+          "candidate": 3,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "762a20236920227160013754f725f88374c189458841e27664e6fff7768ba377",
+          "at": "2026-10-30T08:35:34.358Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "modern airport passenger terminal: a long hall with a sweeping curved white wave-shaped roof over a tall blue glass front, two covered jet bridges reaching out from its side, a row of small coloured flags along the roof edge, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3004,
+            "prompt": "modern airport passenger terminal: a long hall with a sweeping curved white wave-shaped roof over a tall blue glass front, two covered jet bridges reaching out from its side, a row of small coloured flags along the roof edge, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "ecb03659-4432-5187-a933-fd87a87ac4c4",
+            "source_image_id": "ecb03659-4432-5187-a933-fd87a87ac4c4"
+          },
+          "jobId": "9046520c-3e4b-46f3-88c4-1ccc92ab4c65",
+          "seed": 3004,
+          "candidate": 4,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "d3fda6e3e0ee7f6eb29d01f72a9118066b81bf6edaf8e36f9e0356bfa6a3c2a4",
+          "at": "2026-10-30T08:35:34.359Z"
         }
       ],
       "rejects": [
@@ -6518,14 +6563,26 @@
           "reason": "curved roof, tower small",
           "by": "claude",
           "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "playtest-1 pick: a generic glass block with a control tower that would duplicate ap_tower",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        },
+        {
+          "candidate": 3,
+          "reason": "wave roof and jet bridges but 747 px clipped by the canvas and a thin plot",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "32f65070951514231661a16fbd7b7d183bcff1c39314f83202ad4662ffd64efd",
-      "chosenCandidate": 1
+      "note": "agent pick #4 (2026-10-30): re-roll for live quality: a long terminal under a sweeping white wave roof over a blue glass front, two jet bridges onto the apron, a row of coloured flags on the roof edge; no tower (ap_tower is its own prop); fills the 3x3 plot",
+      "finalSha256": "7f356632fd5e8d475528ec32514f6ece730fae49ec14a9b877604e69446c768c",
+      "chosenCandidate": 4
     },
     {
-      "id": "ap_hangar",
+      "id": "ap_cargo_hangar",
       "class": "building3x3",
       "source": "pixellab",
       "canvas": [192, 224],
@@ -6533,9 +6590,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "airport",
-      "coversBuildings": ["ap_cargo_hangar"],
       "priority": "P2",
-      "subject": "cargo hangar with a curved roof and big doors",
+      "subject": "big airport cargo hangar with a light grey curved barrel-vault roof, huge open sliding doors on the front showing stacked blue and orange cargo containers and parcel pallets inside, an orange and white checkered band along the roof edge, a small blue office box on one side",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -6543,102 +6599,71 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "big airport cargo hangar with a light grey curved barrel-vault roof, huge open sliding doors on the front showing stacked blue and orange cargo containers and parcel pallets inside, an orange and white checkered band along the roof edge, a small blue office box on one side, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": false,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
               "max_colors": 21
             },
-            "seed": 1000,
-            "prompt": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "d62c12f2-235f-55a0-a66b-3569d36dfb8a",
-            "source_image_id": "d62c12f2-235f-55a0-a66b-3569d36dfb8a"
+            "seed": 3001,
+            "prompt": "big airport cargo hangar with a light grey curved barrel-vault roof, huge open sliding doors on the front showing stacked blue and orange cargo containers and parcel pallets inside, an orange and white checkered band along the roof edge, a small blue office box on one side, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "a349038f-8e17-5b4d-83e2-1892a2ba85fa",
+            "source_image_id": "a349038f-8e17-5b4d-83e2-1892a2ba85fa"
           },
-          "jobId": "24f85286-227c-4c09-b104-431f4e20c8b6",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "57c27e0194a74370eb1f0d934766308e2dc78891838de38e382c220119e5fa5c",
-          "at": "2026-10-29T08:17:06.451Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1001,
-            "prompt": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "9b05a33e-8db9-5ca2-864f-44b2af6657b9",
-            "source_image_id": "9b05a33e-8db9-5ca2-864f-44b2af6657b9"
-          },
-          "jobId": "fd4a9d96-7f52-483d-b9a5-2aa3d245d82c",
-          "seed": 1001,
+          "jobId": "d0ef4f73-7e6a-4ee5-b435-c7e85f038426",
+          "seed": 3001,
           "candidate": 1,
           "cost": 9,
           "downloadUrl": "",
-          "sha256": "6588dba28671c19331e39847532101dacd727f5756b4988e2876a2f3de586c8a",
-          "at": "2026-10-29T08:17:06.686Z"
+          "sha256": "f7ba1e2e66829e44207ff4d502ecc18ce1431eb66f2d6ee64bc15f429dbfcfea",
+          "at": "2026-10-30T08:35:34.359Z"
         },
         {
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "big airport cargo hangar with a light grey curved barrel-vault roof, huge open sliding doors on the front showing stacked blue and orange cargo containers and parcel pallets inside, an orange and white checkered band along the roof edge, a small blue office box on one side, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": false,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
               "max_colors": 21
             },
-            "seed": 1002,
-            "prompt": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "b31e6ffd-2559-575a-afcb-3f53a78657ac",
-            "source_image_id": "b31e6ffd-2559-575a-afcb-3f53a78657ac"
+            "seed": 3000,
+            "prompt": "big airport cargo hangar with a light grey curved barrel-vault roof, huge open sliding doors on the front showing stacked blue and orange cargo containers and parcel pallets inside, an orange and white checkered band along the roof edge, a small blue office box on one side, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "d555aefd-cf54-5b37-a804-27fe77938e3b",
+            "source_image_id": "d555aefd-cf54-5b37-a804-27fe77938e3b"
           },
-          "jobId": "cd452d1f-8c73-4bbe-b5a8-e7532dd0c78e",
-          "seed": 1002,
-          "candidate": 2,
+          "jobId": "841c728e-7db8-4538-ac67-6aaa95d3b96c",
+          "seed": 3000,
+          "candidate": 0,
           "cost": 9,
           "downloadUrl": "",
-          "sha256": "3201c2643a3bfc8c25f5011b16e0a9c16ef9dd483b752f43fa9371c0896715e1",
-          "at": "2026-10-29T08:17:06.856Z"
+          "sha256": "c1f8aecefa1320d2d23899b145e46574e85b645d369d50ccf71942855f90256e",
+          "at": "2026-10-30T08:35:34.359Z"
         }
       ],
       "rejects": [
         {
           "candidate": 1,
-          "reason": "doors on the shade side",
+          "reason": "good ribbed roof but greyer, cargo smaller in the dark bay",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 2,
-          "reason": "smaller",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T08:39:16.001Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "9dfeaf165dc5cfa58698d2311fb9118e92f36ffcfd5e42d3a5c3d52c4a446554",
+      "note": "agent pick #0 (2026-10-30): barrel-vault hangar with an orange checkered band, wide open doors showing blue and orange containers and parcels, a blue office box on the side; reads as cargo at 1x",
+      "finalSha256": "d2dc3736f6fa987abc2bfadf5142cb05e39638035f6fdb5689d9ce8efca4f24b",
       "chosenCandidate": 0
     },
     {
-      "id": "cv_hall",
-      "class": "building3x3",
+      "id": "ap_tower",
+      "class": "prop",
       "source": "pixellab",
-      "canvas": [192, 224],
-      "footprint": [3, 3],
+      "canvas": [64, 128],
       "frames": [""],
       "variants": ["locked"],
-      "district": "civic",
-      "coversBuildings": ["cv_town_hall", "cv_lint_school", "cv_museum", "cv_patch_hospital"],
+      "district": "airport",
       "priority": "P2",
-      "subject": "civic hall with columns, a dome and a flag",
+      "subject": "slim airport control tower: a tall white concrete shaft on a small square base, a wide eight-sided glass cab on top with blue tinted windows, a flat roof with a small radar dish and an antenna",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -6646,102 +6671,71 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
+            "description": "slim airport control tower: a tall white concrete shaft on a small square base, a wide eight-sided glass cab on top with blue tinted windows, a flat roof with a small radar dish and an antenna, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
             "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
             },
-            "seed": 1001,
-            "prompt": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "a08fbaf9-ee5b-5410-ad74-0df9477348c0",
-            "source_image_id": "a08fbaf9-ee5b-5410-ad74-0df9477348c0"
+            "seed": 3001,
+            "prompt": "slim airport control tower: a tall white concrete shaft on a small square base, a wide eight-sided glass cab on top with blue tinted windows, a flat roof with a small radar dish and an antenna, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "ecd21d67-3e59-55b7-bfea-71a372454cf6",
+            "source_image_id": "ecd21d67-3e59-55b7-bfea-71a372454cf6"
           },
-          "jobId": "495f87ad-9749-48b5-a7c3-ea050df845c2",
-          "seed": 1001,
+          "jobId": "e1aa1dd0-41f3-4de2-a996-6b09b1949f83",
+          "seed": 3001,
           "candidate": 1,
-          "cost": 9,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "96d8e41e4ec9d1785902991cbd1a7778f2dc232fee0ecd1d3426f7b4ad16eba4",
-          "at": "2026-10-29T08:17:26.827Z"
+          "sha256": "1bc5ce34047ba00e4931ae2d7a52ce7826846819b415f77a8ba47825483cc30f",
+          "at": "2026-10-30T08:35:34.359Z"
         },
         {
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
+            "description": "slim airport control tower: a tall white concrete shaft on a small square base, a wide eight-sided glass cab on top with blue tinted windows, a flat roof with a small radar dish and an antenna, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
             "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
             },
-            "seed": 1000,
-            "prompt": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "ad625649-6323-5878-a6f5-21a718bae77e",
-            "source_image_id": "ad625649-6323-5878-a6f5-21a718bae77e"
+            "seed": 3000,
+            "prompt": "slim airport control tower: a tall white concrete shaft on a small square base, a wide eight-sided glass cab on top with blue tinted windows, a flat roof with a small radar dish and an antenna, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "e739db8f-5b58-53a9-9c9f-d6b5da8da8ab",
+            "source_image_id": "e739db8f-5b58-53a9-9c9f-d6b5da8da8ab"
           },
-          "jobId": "96c40d9b-c0d7-4bbf-b805-fc38bbe1cdfa",
-          "seed": 1000,
+          "jobId": "db8faa86-8c76-4bfc-96ca-a407f4eceb02",
+          "seed": 3000,
           "candidate": 0,
-          "cost": 9,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "3e35857592603896035cf82eb11b18b8dae057a93de5e8b7d73a3b6a8a51c246",
-          "at": "2026-10-29T08:17:23.025Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1002,
-            "prompt": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "f89076d1-6136-5247-a06c-6cf5ff322448",
-            "source_image_id": "f89076d1-6136-5247-a06c-6cf5ff322448"
-          },
-          "jobId": "79a16591-7e38-449c-a677-6c942d9c03eb",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "364fad07fb2e1286cffbd47d1a3d7b4c1b52fdee6a0818fe9a1a74b11f9c4849",
-          "at": "2026-10-29T08:17:37.880Z"
+          "sha256": "82324e74623e2e3bd86a17982a82116d257cbaf96e728ea893348533f466570e",
+          "at": "2026-10-30T08:35:34.359Z"
         }
       ],
       "rejects": [
         {
           "candidate": 0,
-          "reason": "tan stone",
+          "reason": "good, but grass specks on the base and a darker cab",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 2,
-          "reason": "brick, off the anchor's material",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T08:39:16.001Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "61a5100911cef38387150a0b3742a75e4e6c81d9de4b9556f1625e8c85390b42",
+      "note": "agent pick #1 (2026-10-30): slim white control tower, wide blue glass cab, radar dish and antenna on the roof",
+      "finalSha256": "6778f4808870a0ba4ce93da173dcf85101ce5fad741f34fcd302423790cee32c",
       "chosenCandidate": 1
     },
     {
-      "id": "cv_stadium",
-      "class": "building3x3",
+      "id": "ap_plane",
+      "class": "dock-prop",
       "source": "pixellab",
-      "canvas": [192, 224],
-      "footprint": [3, 3],
+      "canvas": [128, 96],
       "frames": [""],
       "variants": ["locked"],
-      "district": "civic",
-      "coversBuildings": ["cv_changelog_stadium"],
+      "district": "airport",
       "priority": "P2",
-      "subject": "small sports stadium with stands around a green pitch",
+      "subject": "white cargo jet airliner with a blue tail fin and a blue stripe along the fuselage, two engines under the swept wings, parked on the ground",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -6749,92 +6743,428 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
+            "description": "white cargo jet airliner with a blue tail fin and a blue stripe along the fuselage, two engines under the swept wings, parked on the ground, seen from a 2:1 isometric angle, nose pointing to the lower right, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
             "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
             },
-            "seed": 1000,
-            "prompt": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "f0561161-fd57-5f7c-b159-aee088a2ca45",
-            "source_image_id": "f0561161-fd57-5f7c-b159-aee088a2ca45"
+            "seed": 3001,
+            "prompt": "white cargo jet airliner with a blue tail fin and a blue stripe along the fuselage, two engines under the swept wings, parked on the ground, seen from a 2:1 isometric angle, nose pointing to the lower right, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "04dfacf3-5535-5fdd-a85f-96c8e8259084",
+            "source_image_id": "04dfacf3-5535-5fdd-a85f-96c8e8259084"
           },
-          "jobId": "5f2ebc43-c1e3-4b79-8ed9-8627899e638f",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "c35cc85a1c41c23f1309ac093a69166586ad11e98fd5a89c656132410a722580",
-          "at": "2026-10-29T08:17:42.433Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1002,
-            "prompt": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "f78b34a3-5132-5da9-b5ae-bab03d25ef07",
-            "source_image_id": "f78b34a3-5132-5da9-b5ae-bab03d25ef07"
-          },
-          "jobId": "c1dc86e3-1c9f-49ca-8541-1b7c51790148",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 9,
-          "downloadUrl": "",
-          "sha256": "4b95197e70bd50b044b6574a21557752bdd0da55c4dd7c8d9bcc04f3975911bb",
-          "at": "2026-10-29T08:17:47.918Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": false,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
-              "max_colors": 21
-            },
-            "seed": 1001,
-            "prompt": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "90579efd-fc9a-5055-bc24-7678fde2d9ba",
-            "source_image_id": "90579efd-fc9a-5055-bc24-7678fde2d9ba"
-          },
-          "jobId": "bb1711f0-25f7-4b89-ae78-f9df7da248b5",
-          "seed": 1001,
+          "jobId": "df57cd8e-8d5b-4a9d-8e53-239d32ce1313",
+          "seed": 3001,
           "candidate": 1,
-          "cost": 9,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "620d8800f21002520548c10970856a727792126a345be8ec843c20e7a2ee5a25",
-          "at": "2026-10-29T08:17:42.556Z"
+          "sha256": "e45c1e59559e596c58b478e806fa5749e4e8c6573e339cf73aba29a798ddd9ec",
+          "at": "2026-10-30T08:35:34.359Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "white cargo jet airliner with a blue tail fin and a blue stripe along the fuselage, two engines under the swept wings, parked on the ground, seen from a 2:1 isometric angle, nose pointing to the lower right, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3000,
+            "prompt": "white cargo jet airliner with a blue tail fin and a blue stripe along the fuselage, two engines under the swept wings, parked on the ground, seen from a 2:1 isometric angle, nose pointing to the lower right, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "8a5fe1d9-76a4-5931-91a0-dab06c13e617",
+            "source_image_id": "8a5fe1d9-76a4-5931-91a0-dab06c13e617"
+          },
+          "jobId": "5d5a0ce4-c3d7-4782-b9d2-02c925373f03",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "55bd2317e3a174fd52649ac20562973dff520721ee85d438b7e5afd2fe63fcf7",
+          "at": "2026-10-30T08:35:34.359Z"
         }
       ],
       "rejects": [
         {
           "candidate": 0,
-          "reason": "stadium smaller",
+          "reason": "chunkier but the fuselage is steeper than the iso axis",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 2,
-          "reason": "stadium smallest",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T08:39:16.001Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "a0d07275a11b1b2209d30e8f28e21b3774c2286ef956d1353082f5ad94688f07",
+      "note": "agent pick #1 (2026-10-30): white jet with a blue tail and cheat line, nose to the lower right (it taxis east along +x), the fuselage closest to the 2:1 axis",
+      "finalSha256": "3c95cf7682d10f5a5a0857c88b20eb0d7e3d77c934ae63019c35aebe9688ccdb",
       "chosenCandidate": 1
     },
     {
-      "id": "cv_civic_2x2",
+      "id": "cv_town_hall",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "grand town hall of white stone with a row of tall columns across the front, wide front steps, a tall central clock tower with a green copper dome and a flag on top",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "grand town hall of white stone with a row of tall columns across the front, wide front steps, a tall central clock tower with a green copper dome and a flag on top, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3000,
+            "prompt": "grand town hall of white stone with a row of tall columns across the front, wide front steps, a tall central clock tower with a green copper dome and a flag on top, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "6f78a9a9-6f28-55e2-92f7-428b5b3b6fd0",
+            "source_image_id": "6f78a9a9-6f28-55e2-92f7-428b5b3b6fd0"
+          },
+          "jobId": "813e4555-2abd-4f70-bb37-2fec66740ee3",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "0093124a55e82367d0df68053951d314592944fddf9ff6254d3d3940761f9f4b",
+          "at": "2026-10-30T08:35:56.290Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "grand town hall of white stone with a row of tall columns across the front, wide front steps, a tall central clock tower with a green copper dome and a flag on top, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3001,
+            "prompt": "grand town hall of white stone with a row of tall columns across the front, wide front steps, a tall central clock tower with a green copper dome and a flag on top, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f414f0c5-1258-578c-9fae-175aad7ac57e",
+            "source_image_id": "f414f0c5-1258-578c-9fae-175aad7ac57e"
+          },
+          "jobId": "38990e06-7cbc-4924-8fdc-195a6a821f69",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "5d6e8fd840f26a1828195eb7faffe002155d3a536b13ebc5d05430b4e1794cc9",
+          "at": "2026-10-30T08:36:01.690Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "white stone but heavy black roofs on the wings",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): sandstone hall with a colonnade and wide steps, a central clock tower with a green copper dome and a flag",
+      "finalSha256": "814354d07c5ed04469007c9957a0c9d978e30d2c5adf3d26cadc3982b8f26f0d",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "cv_lint_school",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "cheerful two-storey brick elementary school with big windows, a small white bell cupola on the roof, a fenced schoolyard with a yellow climbing frame and a slide beside it",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cheerful two-storey brick elementary school with big windows, a small white bell cupola on the roof, a fenced schoolyard with a yellow climbing frame and a slide beside it, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3000,
+            "prompt": "cheerful two-storey brick elementary school with big windows, a small white bell cupola on the roof, a fenced schoolyard with a yellow climbing frame and a slide beside it, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b2af2860-519a-5c94-8434-96654172a255",
+            "source_image_id": "b2af2860-519a-5c94-8434-96654172a255"
+          },
+          "jobId": "8a67b35d-4243-4331-aa00-10be7ed493ce",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "12a3c463ffc1599580edc2e23ef4874bac010f750ded97889815adcbe425dff1",
+          "at": "2026-10-30T08:36:01.695Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cheerful two-storey brick elementary school with big windows, a small white bell cupola on the roof, a fenced schoolyard with a yellow climbing frame and a slide beside it, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3001,
+            "prompt": "cheerful two-storey brick elementary school with big windows, a small white bell cupola on the roof, a fenced schoolyard with a yellow climbing frame and a slide beside it, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "bae69f59-2d2b-5398-941a-bbb007dab57e",
+            "source_image_id": "bae69f59-2d2b-5398-941a-bbb007dab57e"
+          },
+          "jobId": "81310be8-d29f-40aa-8019-a6b6513c8f2b",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "0a5ca255780840186058e597531cc9d96b640d7bd33778376439c97e7f49c434",
+          "at": "2026-10-30T08:36:07.093Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "same school, grey yard reads flatter",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): red-brick school with a white bell cupola and a fenced yellow schoolyard with a climbing frame and a slide",
+      "finalSha256": "789081d5339d1d7a688eb5473fd5b756085b6085eef92e643ead75badc38442c",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "cv_museum",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "classical museum with a triangular pediment on tall cream columns, wide stone steps, coloured banners hanging between the columns, a big glass pyramid skylight on the flat roof and a large dinosaur skeleton statue on the front lawn",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "classical museum with a triangular pediment on tall cream columns, wide stone steps, coloured banners hanging between the columns, a big glass pyramid skylight on the flat roof and a large dinosaur skeleton statue on the front lawn, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3001,
+            "prompt": "classical museum with a triangular pediment on tall cream columns, wide stone steps, coloured banners hanging between the columns, a big glass pyramid skylight on the flat roof and a large dinosaur skeleton statue on the front lawn, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "5580c7cc-6efa-5dba-993d-5c8d3fa1c7a6",
+            "source_image_id": "5580c7cc-6efa-5dba-993d-5c8d3fa1c7a6"
+          },
+          "jobId": "8c12b26d-d823-4710-af24-ec48917795e3",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "67ed0ef47e1b77c795f588aecdd7aa158600cf358d513d8127433d977578e7c3",
+          "at": "2026-10-30T08:36:12.811Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "classical museum with a triangular pediment on tall cream columns, wide stone steps, coloured banners hanging between the columns, a big glass pyramid skylight on the flat roof and a large dinosaur skeleton statue on the front lawn, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3000,
+            "prompt": "classical museum with a triangular pediment on tall cream columns, wide stone steps, coloured banners hanging between the columns, a big glass pyramid skylight on the flat roof and a large dinosaur skeleton statue on the front lawn, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "c231d431-d2a1-50b4-86c4-738c6d9be8a9",
+            "source_image_id": "c231d431-d2a1-50b4-86c4-738c6d9be8a9"
+          },
+          "jobId": "03595bb7-a861-4aca-b7ba-60403b6ab9fe",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "eca2cd76f3f7b490bf2f8ad8523aef4ae90b39d94830317ef1127ebfcf3449ca",
+          "at": "2026-10-30T08:36:12.738Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "pyramid and columns but the skeleton lies flat and reads as debris",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #1 (2026-10-30): classical museum with a glass pyramid skylight, banners between the columns and a big T-rex skeleton statue on the lawn",
+      "finalSha256": "423e9338e5d22228b5567b1999286ffd31718e094eb60815ef648a5332f62aca",
+      "chosenCandidate": 1
+    },
+    {
+      "id": "cv_changelog_stadium",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "small oval sports stadium: stepped grandstands with rows of blue and yellow seats all around a bright green football pitch with white lines, four tall floodlight masts at the corners, nothing else on the plot, no houses, no townhouses, no other buildings",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small oval sports stadium: stepped grandstands with rows of blue and yellow seats all around a bright green football pitch with white lines, four tall floodlight masts at the corners, nothing else on the plot, no houses, no townhouses, no other buildings, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3000,
+            "prompt": "small oval sports stadium: stepped grandstands with rows of blue and yellow seats all around a bright green football pitch with white lines, four tall floodlight masts at the corners, nothing else on the plot, no houses, no townhouses, no other buildings, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "71b45470-0fb8-5f54-b0f4-38db74c8e880",
+            "source_image_id": "71b45470-0fb8-5f54-b0f4-38db74c8e880"
+          },
+          "jobId": "143f1e58-c02f-4753-abd5-7ef5cf068c3b",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "9c0ed484ce4885ca2ba282ec8fe5d952ca1eaf61361e2810aaa9665d08d0c894",
+          "at": "2026-10-30T08:36:12.835Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small oval sports stadium: stepped grandstands with rows of blue and yellow seats all around a bright green football pitch with white lines, four tall floodlight masts at the corners, nothing else on the plot, no houses, no townhouses, no other buildings, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 3001,
+            "prompt": "small oval sports stadium: stepped grandstands with rows of blue and yellow seats all around a bright green football pitch with white lines, four tall floodlight masts at the corners, nothing else on the plot, no houses, no townhouses, no other buildings, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "76492321-718f-5d93-805a-9b8b6552e6e1",
+            "source_image_id": "76492321-718f-5d93-805a-9b8b6552e6e1"
+          },
+          "jobId": "ef8289a6-748f-422f-949f-6fd8419bb360",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "a7972b255e00ea0ed644faa9f089948f0acaab66a2b17aade075a38ba70f8f74",
+          "at": "2026-10-30T08:36:18.059Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "tidy oval but beige walls hide the seats",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): re-roll (report 6.25): an oval bowl of blue and yellow seats around a green pitch, four floodlight masts, nothing else on the plot (no townhouses)",
+      "finalSha256": "8da3bc132ece0cf539ce4ee9ae996c94a430231ce6c26be7d6b5d2547a94a703",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "cv_patch_hospital",
+      "class": "building3x3",
+      "source": "pixellab",
+      "canvas": [192, 224],
+      "footprint": [3, 3],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "large modern hospital of white and light blue panels with many windows, a round rooftop helipad circle, a covered entrance canopy with pink and white stripes, a big green cross sign on the front",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large modern hospital of white and light blue panels with many windows, a round rooftop helipad circle, a covered entrance canopy with pink and white stripes, a big green cross sign on the front, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#00ffff"],
+              "max_colors": 21
+            },
+            "seed": 3000,
+            "prompt": "large modern hospital of white and light blue panels with many windows, a round rooftop helipad circle, a covered entrance canopy with pink and white stripes, a big green cross sign on the front, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "0f0dd7ad-5afd-580c-b0cf-8e4e79c5600c",
+            "source_image_id": "0f0dd7ad-5afd-580c-b0cf-8e4e79c5600c"
+          },
+          "jobId": "aa427fa5-65c6-4591-a398-417a16943cdd",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "f42cb3a088d4f35e69268401e86d1d976923541704d23575d67b54972d66f317",
+          "at": "2026-10-30T08:36:18.124Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "large modern hospital of white and light blue panels with many windows, a round rooftop helipad circle, a covered entrance canopy with pink and white stripes, a big green cross sign on the front, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#00ffff"],
+              "max_colors": 21
+            },
+            "seed": 3001,
+            "prompt": "large modern hospital of white and light blue panels with many windows, a round rooftop helipad circle, a covered entrance canopy with pink and white stripes, a big green cross sign on the front, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat cyan background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "7321fd10-0be2-5133-b5ee-4bb49f3e7607",
+            "source_image_id": "7321fd10-0be2-5133-b5ee-4bb49f3e7607"
+          },
+          "jobId": "0265dc50-a03f-4879-8c6e-348789860775",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "848eb597ed54112c2c40098c42c9c7ec15a3a1251b9666e70648976df165f073",
+          "at": "2026-10-30T08:36:44.415Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "same, orange helipad competes with the canopy",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): white and light blue hospital block with a rooftop helipad, a green cross on the front, a pink and white striped entrance canopy",
+      "finalSha256": "dbbc1f18d7d6d1fd1dacc1171dc58072269245b80a64ac46c7884601837c2e97",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "cv_police",
       "class": "building2x2",
       "source": "pixellab",
       "canvas": [128, 160],
@@ -6842,170 +7172,8 @@
       "frames": [""],
       "variants": ["locked"],
       "district": "civic",
-      "coversBuildings": ["cv_police", "cv_fire", "cv_readme_library", "cv_courthouse"],
       "priority": "P2",
-      "subject": "civic building, stone walls, columns, flag",
-      "anchorRole": "anchor",
-      "placeholder": false,
-      "approved": true,
-      "gen": [
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1000,
-            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "700ed2c6-af96-511f-9ba7-b4cb82f62c15",
-            "source_image_id": "700ed2c6-af96-511f-9ba7-b4cb82f62c15"
-          },
-          "jobId": "8cd9f53e-6d1a-4e1b-ae54-e816aacba2cd",
-          "seed": 1000,
-          "candidate": 0,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "428880f152859a01df15dc83d031da7d41154c09b65ad63e3acd574535ac1046",
-          "at": "2026-10-29T07:04:31.921Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1001,
-            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "34fd4bc9-635f-5a4d-ba6b-6e598f1afd24",
-            "source_image_id": "34fd4bc9-635f-5a4d-ba6b-6e598f1afd24"
-          },
-          "jobId": "699252e0-fc1b-4ef6-b4ce-2f5ddd17eafc",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "bdb86cf79d91c79c396b1457d36b5b5740752a51ca060178c1854e01bac3c3ac",
-          "at": "2026-10-29T07:04:37.408Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1002,
-            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "c95d4d0c-4db5-5af6-a6b3-2acb4dd013f1",
-            "source_image_id": "c95d4d0c-4db5-5af6-a6b3-2acb4dd013f1"
-          },
-          "jobId": "f14c18f0-9f51-4757-9ddc-9169bce0b036",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "249c883be08197fe05ccfb5d2fd05b4db573c07b19cb760012606e515f1ceb7f",
-          "at": "2026-10-29T07:04:37.417Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1003,
-            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "e4ddfd64-dc5f-5201-964c-7a798943f42d",
-            "source_image_id": "e4ddfd64-dc5f-5201-964c-7a798943f42d"
-          },
-          "jobId": "a0d11f6f-ffcd-49a4-8baf-1fb396a19707",
-          "seed": 1003,
-          "candidate": 3,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "1af53ace1ca08f3fa65569fd4b0347e9b8241147bcd1a9d8fef5a3285cd6500c",
-          "at": "2026-10-29T07:04:59.014Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1005,
-            "prompt": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "be1da23a-b2a0-58e4-9cfc-4de7ff8c3b8a",
-            "source_image_id": "be1da23a-b2a0-58e4-9cfc-4de7ff8c3b8a"
-          },
-          "jobId": "784c00f9-b645-4f63-b069-fd7593e783f5",
-          "seed": 1005,
-          "candidate": 5,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "2ab6f1b40d449ab5100e9e9fc23d316b0e50cd5b3fc80bd04e518aa75bfa3945",
-          "at": "2026-10-29T07:20:03.988Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1004,
-            "prompt": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "244191a9-9703-5769-9e4d-37b07d8a2525",
-            "source_image_id": "244191a9-9703-5769-9e4d-37b07d8a2525"
-          },
-          "jobId": "5d386f4e-e22f-4dec-a744-2c4cea3bff42",
-          "seed": 1004,
-          "candidate": 4,
-          "cost": 6,
-          "downloadUrl": "",
-          "sha256": "7429edbf7b7028877cfb8079adfa3ee83811d3896b9b4c2ce616b07b51dfb452",
-          "at": "2026-10-29T07:20:03.988Z"
-        }
-      ],
-      "rejects": [],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "bf9605784b4995fe1b3889dd5b7ffb05c3b255a34ce867de62553090b96f7b1d",
-      "chosenCandidate": 3,
-      "approvedBy": "agent"
-    },
-    {
-      "id": "cv_pavilion",
-      "class": "building1x1",
-      "source": "pixellab",
-      "canvas": [64, 96],
-      "footprint": [1, 1],
-      "frames": [""],
-      "variants": ["locked"],
-      "district": "civic",
-      "coversBuildings": ["cv_park_pavilion"],
-      "priority": "P2",
-      "subject": "park pavilion with a round roof",
+      "subject": "small police station with dark blue walls and white trim, a blue lamp over the front door, a flagpole by the steps and a tall radio antenna on the flat roof",
       "placeholder": false,
       "approved": false,
       "gen": [
@@ -7013,89 +7181,424 @@
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "small police station with dark blue walls and white trim, a blue lamp over the front door, a flagpole by the steps and a tall radio antenna on the flat roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1001,
-            "prompt": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "a2c81289-9b82-5d03-9f6c-f8202eb47527",
-            "source_image_id": "a2c81289-9b82-5d03-9f6c-f8202eb47527"
+            "seed": 3000,
+            "prompt": "small police station with dark blue walls and white trim, a blue lamp over the front door, a flagpole by the steps and a tall radio antenna on the flat roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "73ea0744-6fdf-5d49-aded-2af348dce575",
+            "source_image_id": "73ea0744-6fdf-5d49-aded-2af348dce575"
           },
-          "jobId": "9b177d1e-fa75-40b9-9dcd-421e56699b7c",
-          "seed": 1001,
-          "candidate": 1,
-          "cost": 5,
-          "downloadUrl": "",
-          "sha256": "7055ae14a4107793cebdf808c5546a8df46aeddff82af575ea28ec02992c2d83",
-          "at": "2026-10-29T08:17:48.341Z"
-        },
-        {
-          "tool": "create-image-pro-flash",
-          "endpoint": "/create-image-pro-flash",
-          "params": {
-            "description": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "no_background": true,
-            "target_palette": {
-              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
-              "max_colors": 20
-            },
-            "seed": 1000,
-            "prompt": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "454386d8-9fab-5c5d-93ff-47ed6d10b7a8",
-            "source_image_id": "454386d8-9fab-5c5d-93ff-47ed6d10b7a8"
-          },
-          "jobId": "59beb57f-a15d-4f58-9d32-b70862fd6de6",
-          "seed": 1000,
+          "jobId": "25a5a137-0fa7-4bdb-8539-a256bda6a763",
+          "seed": 3000,
           "candidate": 0,
-          "cost": 5,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "87bb52d6891ee8458f8a20e1ea3ff63a86a84f556412631df75c5bd44af97250",
-          "at": "2026-10-29T08:17:48.160Z"
+          "sha256": "45f1703f86ed4830298ff6a093f287dbee465ad0268eb5143469cb5ede9e995c",
+          "at": "2026-10-30T08:36:45.675Z"
         },
         {
           "tool": "create-image-pro-flash",
           "endpoint": "/create-image-pro-flash",
           "params": {
-            "description": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "description": "small police station with dark blue walls and white trim, a blue lamp over the front door, a flagpole by the steps and a tall radio antenna on the flat roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
             "no_background": true,
             "target_palette": {
               "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
               "max_colors": 20
             },
-            "seed": 1002,
-            "prompt": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
-            "image_id": "46a2b60e-b18c-5775-a371-acc8f1b5d5ca",
-            "source_image_id": "46a2b60e-b18c-5775-a371-acc8f1b5d5ca"
+            "seed": 3001,
+            "prompt": "small police station with dark blue walls and white trim, a blue lamp over the front door, a flagpole by the steps and a tall radio antenna on the flat roof, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "6af917fd-c179-5d9d-bb59-63a4b1ecba13",
+            "source_image_id": "6af917fd-c179-5d9d-bb59-63a4b1ecba13"
           },
-          "jobId": "4f8fe4ee-b521-465d-b426-cb14e47c1626",
-          "seed": 1002,
-          "candidate": 2,
-          "cost": 5,
+          "jobId": "36b7b5cb-4496-4d17-ab2a-88497f864e12",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 6,
           "downloadUrl": "",
-          "sha256": "df65aeb792b6215ad446171884d0b7e5c48a3c8c88ed37e1f4f0ddcc842eb17b",
-          "at": "2026-10-29T08:18:02.886Z"
+          "sha256": "3329b934d82ea646ab7af8bc29e8ac5ed1c85bd6e670f8cc20caecf7cffc9b1d",
+          "at": "2026-10-30T08:36:47.854Z"
         }
       ],
       "rejects": [
         {
           "candidate": 0,
-          "reason": "closed rotunda",
+          "reason": "lighter blue walls and a big rooftop box",
           "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
-        },
-        {
-          "candidate": 1,
-          "reason": "closed rotunda",
-          "by": "claude",
-          "at": "2026-10-29T08:27:16.840Z"
+          "at": "2026-10-30T08:39:16.001Z"
         }
       ],
-      "note": "shared locked scenery: playtest 1 shows only the _locked frame",
-      "finalSha256": "a83f87fc208e3f9764043ad378c5e8f272fd8e75ab2e769834a4ff0de1a7374a",
-      "chosenCandidate": 2
+      "note": "agent pick #1 (2026-10-30): dark blue police station with white trim, a flag with a star badge by the steps and a tall radio antenna",
+      "finalSha256": "ad79ba68cb0aa3dc730bc15162db2b799e31336331d36500c95312804dcba4de",
+      "chosenCandidate": 1
+    },
+    {
+      "id": "cv_fire",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "fire station of orange brick with two big open garage doors and a bright fire engine peeking out of one, a tall narrow hose-drying tower at the side",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "fire station of orange brick with two big open garage doors and a bright fire engine peeking out of one, a tall narrow hose-drying tower at the side, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3001,
+            "prompt": "fire station of orange brick with two big open garage doors and a bright fire engine peeking out of one, a tall narrow hose-drying tower at the side, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "633a05b9-ea5d-5690-9402-eb7b691e05e7",
+            "source_image_id": "633a05b9-ea5d-5690-9402-eb7b691e05e7"
+          },
+          "jobId": "a8e054a4-10b0-44ca-9aa0-85eafa6f7269",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "7ec5ce029cf64af9693228f4ada57dd8540519808bea87289fbfbb17dcc5151e",
+          "at": "2026-10-30T08:36:49.538Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "fire station of orange brick with two big open garage doors and a bright fire engine peeking out of one, a tall narrow hose-drying tower at the side, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3000,
+            "prompt": "fire station of orange brick with two big open garage doors and a bright fire engine peeking out of one, a tall narrow hose-drying tower at the side, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no grid lines, no anti-aliasing",
+            "image_id": "29432e1a-44e7-5ccb-a577-15555245aee4",
+            "source_image_id": "29432e1a-44e7-5ccb-a577-15555245aee4"
+          },
+          "jobId": "d8c469bf-5675-4240-970e-a4f93aff0308",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "650f45e4f9458e4c1ec8a090e3ccaf4b7e511d7e2e85a973b2e3038eef7302b0",
+          "at": "2026-10-30T08:36:49.509Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "engine in a dark bay, plainer tower",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): orange brick fire station, two open bays with the fire engine in one, a hose-drying tower with the hose hanging",
+      "finalSha256": "afc691b38d0140d31f0af2bb9c4e8594563f54a0809467acf42a500edf4e7f7c",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "cv_readme_library",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "public library of warm sandstone with a row of tall arched windows, a huge open book sculpture over the entrance and two stone lion statues beside the steps",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "public library of warm sandstone with a row of tall arched windows, a huge open book sculpture over the entrance and two stone lion statues beside the steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3000,
+            "prompt": "public library of warm sandstone with a row of tall arched windows, a huge open book sculpture over the entrance and two stone lion statues beside the steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "82b16fd6-8cfe-54ef-8c13-9a4aecaf41f1",
+            "source_image_id": "82b16fd6-8cfe-54ef-8c13-9a4aecaf41f1"
+          },
+          "jobId": "94c425f1-dd19-4957-8a8d-6fd8e01e0315",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "59a284c43b58eb811213398fbf71887a8e509025afcd465a547631af3fc998b0",
+          "at": "2026-10-30T08:36:54.629Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "public library of warm sandstone with a row of tall arched windows, a huge open book sculpture over the entrance and two stone lion statues beside the steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3001,
+            "prompt": "public library of warm sandstone with a row of tall arched windows, a huge open book sculpture over the entrance and two stone lion statues beside the steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9b7e0883-ff7b-5d48-af0e-f099d9b5482d",
+            "source_image_id": "9b7e0883-ff7b-5d48-af0e-f099d9b5482d"
+          },
+          "jobId": "c83a429b-1ba0-4f41-8579-bb95dfdbc456",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "3b0ec225a0b3c6efd7a6e7a290926b33b8b39a66101c22c2d4a4e2b1d336c99f",
+          "at": "2026-10-30T08:36:57.314Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "book over the door but a heavy dark roof",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #1 (2026-10-30): sandstone library with arched windows, a big open-book sculpture over the entrance and two lion statues by the steps",
+      "finalSha256": "55c3a38365583a0d65952b5076b2278a579532ea4d71cb11457485be047c4ed1",
+      "chosenCandidate": 1
+    },
+    {
+      "id": "cv_courthouse",
+      "class": "building2x2",
+      "source": "pixellab",
+      "canvas": [128, 160],
+      "footprint": [2, 2],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "courthouse with a grey stone front of four columns under a triangular pediment, a yellow scales-of-justice statue on the roof and wide steps",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "courthouse with a grey stone front of four columns under a triangular pediment, a yellow scales-of-justice statue on the roof and wide steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3000,
+            "prompt": "courthouse with a grey stone front of four columns under a triangular pediment, a yellow scales-of-justice statue on the roof and wide steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9bc02909-edb4-50f5-9500-024887663113",
+            "source_image_id": "9bc02909-edb4-50f5-9500-024887663113"
+          },
+          "jobId": "045a696e-95c7-47d3-bde0-ab86c165ebb7",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "821d6266c8fec70deba84d64d739317ea6412c2d7df5c4d23cc216c4489915bb",
+          "at": "2026-10-30T08:37:11.525Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "courthouse with a grey stone front of four columns under a triangular pediment, a yellow scales-of-justice statue on the roof and wide steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3001,
+            "prompt": "courthouse with a grey stone front of four columns under a triangular pediment, a yellow scales-of-justice statue on the roof and wide steps, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "edf5fdb5-67f2-5124-8739-2577cbd94665",
+            "source_image_id": "edf5fdb5-67f2-5124-8739-2577cbd94665"
+          },
+          "jobId": "1265594c-0c6f-4b95-add8-f892434c9c95",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "a9111eea1b86eedfeafb0264c6eb943738e020f6b8b7e0e5ee75919e07873ba4",
+          "at": "2026-10-30T08:37:13.643Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "same, darker side wall",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): grey stone courthouse, four columns under a pediment with the yellow scales on top, wide steps, hedges",
+      "finalSha256": "78b067c60ff9c2f09878bebe34cad11d8a9a73976a37fb4164e25f45d4866d15",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "cv_park_pavilion",
+      "class": "building1x1",
+      "source": "pixellab",
+      "canvas": [64, 96],
+      "footprint": [1, 1],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "round white park bandstand pavilion on slim columns with a green cone roof, ringed by colourful flower beds",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "round white park bandstand pavilion on slim columns with a green cone roof, ringed by colourful flower beds, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3001,
+            "prompt": "round white park bandstand pavilion on slim columns with a green cone roof, ringed by colourful flower beds, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b9313ee1-ff71-5425-8960-268a48d796ab",
+            "source_image_id": "b9313ee1-ff71-5425-8960-268a48d796ab"
+          },
+          "jobId": "e7120e18-607f-4339-b232-9e401361fb17",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "786892d5184e2eaa5c9dbe1b823952e946ab57467a70113fccb05548256f9e91",
+          "at": "2026-10-30T08:37:15.258Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "round white park bandstand pavilion on slim columns with a green cone roof, ringed by colourful flower beds, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3000,
+            "prompt": "round white park bandstand pavilion on slim columns with a green cone roof, ringed by colourful flower beds, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "dfe50363-1bbd-5217-a926-9abb011d3162",
+            "source_image_id": "dfe50363-1bbd-5217-a926-9abb011d3162"
+          },
+          "jobId": "8c80e978-62a6-43bd-bd5d-50ae440c60c6",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "050af6185e9e80a6a90cf401a91b15ae6879b309a89713e18cb1f35a20642f21",
+          "at": "2026-10-30T08:37:15.133Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "darker ring of beds",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): round white bandstand on slim columns with a green cone roof, ringed by flower beds",
+      "finalSha256": "1c6d6aa84fc33f21b2a4380fc56829375d532dbc02b4f4233fa9fb789ca310ad",
+      "chosenCandidate": 0
+    },
+    {
+      "id": "fountain",
+      "class": "prop",
+      "source": "pixellab",
+      "canvas": [64, 128],
+      "frames": [""],
+      "variants": ["locked"],
+      "district": "civic",
+      "priority": "P2",
+      "subject": "round stone park fountain: a wide circular basin of blue water with a tiered centre column spraying water",
+      "placeholder": false,
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "round stone park fountain: a wide circular basin of blue water with a tiered centre column spraying water, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3000,
+            "prompt": "round stone park fountain: a wide circular basin of blue water with a tiered centre column spraying water, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "139174ef-0761-553a-9e93-28ffb7d57289",
+            "source_image_id": "139174ef-0761-553a-9e93-28ffb7d57289"
+          },
+          "jobId": "ea8303aa-9258-4ad3-b857-c838be9ba934",
+          "seed": 3000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "26d5ddccdafc9ec05f1053f6db31b8ce272a7fd63a394c3807b7683456b273c3",
+          "at": "2026-10-30T08:37:20.433Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "round stone park fountain: a wide circular basin of blue water with a tiered centre column spraying water, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 3001,
+            "prompt": "round stone park fountain: a wide circular basin of blue water with a tiered centre column spraying water, a single standalone object standing on the ground, isometric pixel art prop, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "c41815f9-2e85-5c71-9761-4556bbd19d20",
+            "source_image_id": "c41815f9-2e85-5c71-9761-4556bbd19d20"
+          },
+          "jobId": "e05ca004-da78-43ea-9822-cf93246c70cc",
+          "seed": 3001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "b8524278fd6565ca6d5eb82aeccbd0d91a7d77eb159eb27a479e69bc8963c7a6",
+          "at": "2026-10-30T08:37:25.662Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "the spray is a thin fringe",
+          "by": "claude",
+          "at": "2026-10-30T08:39:16.001Z"
+        }
+      ],
+      "note": "agent pick #0 (2026-10-30): round stone fountain: a wide blue basin and a tiered column with a tall jet",
+      "finalSha256": "b250d09d47535128448f05c6ac290946e6586679ce36b479323972c91eaa6899",
+      "chosenCandidate": 0
     },
     {
       "id": "dk_terminal_a",
@@ -9460,6 +9963,38 @@
       "finalSha256": "acf1215a31a51bd7966428457fb083fe85ecfaf846a3c66a30dcd52682e1cb76"
     },
     {
+      "id": "floor_t3",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): tier 3 floor — green epoxy with 32-px slab joints and a few sheen specks",
+      "finalSha256": "aba6d761d06514639c6a174fae38c1fd217ab6f0c669c0c3266abe7a3a99a9d6"
+    },
+    {
+      "id": "floor_t3_lane",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): floor_t3 with the 2-px yellow lane lines at x 0-1 / 30-31 (belt column c4), as floor_t2_lane",
+      "finalSha256": "cf478c964b5fbdac6c5fa5a23894d5ceca9d21c58f05d3a2d9a8c8491addfd05"
+    },
+    {
       "id": "wall_t1",
       "class": "interior-tile",
       "source": "procedural",
@@ -9490,6 +10025,22 @@
       "finalSha256": "9323fff254694f01c0ab16cac5018b8f7d5701e0d1393654bfdce37d858ec46d"
     },
     {
+      "id": "wall_t3",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): side wall top, red brick in running bond between two grey concrete copings",
+      "finalSha256": "384b93bb711ce6dc225c0a0250a3bf87946cf2c5034680ef17e776189431dbd8"
+    },
+    {
       "id": "wallface_t1",
       "class": "interior-tile",
       "source": "procedural",
@@ -9518,6 +10069,22 @@
       "gen": [],
       "rejects": [],
       "finalSha256": "ce7a270377c2dd9cc51d6930798fed01281e1515754fd3c1de11f74fdfc82c6b"
+    },
+    {
+      "id": "wallface_t3",
+      "class": "interior-tile",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): north wall face, red brick over a cream painted dado",
+      "finalSha256": "4380937491de1620d528d2605f3ad3627e40c169e1e2aa8ab700834825c55ed4"
     },
     {
       "id": "belt_h",
@@ -9625,6 +10192,22 @@
       "rejects": [],
       "note": "_locked is a drawn frame (docks 2-3), not the fog variant",
       "finalSha256": "e9783fc82f1e5550c3fdd1d828e853845bab3918c3486c9ce9f4c5c761e1adb3"
+    },
+    {
+      "id": "dock_pad",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [24, 56],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P0",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): the roller pad of docks 2-3 (conv2 / conv3) east of their door, room (32, door.y): horizontal rollers between side rails, hazard ends; six mini-parcel spots centred at (7, 11) (18, 11) (7, 27) (18, 27) (7, 43) (18, 43)",
+      "finalSha256": "e59f3ec33a8d8c71b70c63bd548d51657e38955a87c20869c92b162ff86eaa25"
     },
     {
       "id": "dock_tail_bike",
@@ -9798,7 +10381,7 @@
       "class": "interior-prop",
       "source": "procedural",
       "canvas": [8, 8],
-      "frames": ["_off", "_green", "_red", "_amber"],
+      "frames": ["_off", "_green", "_red", "_amber", "_lock"],
       "variants": [],
       "district": "warehouse",
       "priority": "P0",
@@ -9806,7 +10389,8 @@
       "approved": false,
       "gen": [],
       "rejects": [],
-      "finalSha256": "f6fe41f05bd0dda6518fb24971019b8720eacb8c088fa1fb1ef3fb0a9093432d"
+      "finalSha256": "c278e7b80abc0159c3968bd20a0e304d551f37579db930646279c8e768cc6e15",
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): _lock = a dim grey padlock for a dock the player does not own (DockView panel lamp row)"
     },
     {
       "id": "bin",
@@ -10002,6 +10586,22 @@
       "gen": [],
       "rejects": [],
       "finalSha256": "20a4cab462364a61acc590f24a61e48af0c724c25791a68aab654f2c50f74ea4"
+    },
+    {
+      "id": "shelf_t3",
+      "class": "fixture-shelf",
+      "source": "procedural",
+      "canvas": [224, 64],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): tier 3 pallet racking — five wire-deck rows matching the 20x5 @11 mini grid (parcels at x 3 + 11c, y 4 + 11r inside the canvas), blue uprights, orange front beam",
+      "finalSha256": "302358d244303721c42792d947067d9eb347be36b4ae359f69bab2b8c1d45a5c"
     },
     {
       "id": "desk",
@@ -12170,6 +12770,22 @@
       "finalSha256": "022cc73105f390a5cdb6f692264e77bf3eaa9579140fe79185a2ca2d77ee25b2"
     },
     {
+      "id": "sign_t3",
+      "class": "sign",
+      "source": "procedural",
+      "canvas": [200, 24],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): tier 3 enamel board — cream face (dark text, like t2), green border band with rivets; text area x 8..191, y 4..19",
+      "finalSha256": "9bb950351c131e736fa440163178874b4100919a91cd79db86bf0f1a47ae91cb"
+    },
+    {
       "id": "sign_crack",
       "class": "sign",
       "source": "procedural",
@@ -12247,6 +12863,22 @@
       "finalSha256": "b5fded5319cdb0ccb1e34cbf4e89a78c85c851eab230fc813153ed57c27868ff"
     },
     {
+      "id": "props_t3",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [48, 64],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): a shrink-wrapped pallet of boxes and an orange pallet jack (48x64, the props_t2 canvas)",
+      "finalSha256": "9f58d02f9f0821730cfc9f0a117380e4204de13a805bdb79ab9189f2288dd172"
+    },
+    {
       "id": "wanted_poster_t1",
       "class": "interior-prop",
       "source": "procedural",
@@ -12275,6 +12907,22 @@
       "gen": [],
       "rejects": [],
       "finalSha256": "74515e64e72c9b37f05bdb378a7e1bfb127ed83977fb6cafe40421687afdc55c"
+    },
+    {
+      "id": "wanted_poster_t3",
+      "class": "interior-prop",
+      "source": "procedural",
+      "canvas": [32, 32],
+      "frames": [""],
+      "variants": [],
+      "district": "warehouse",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): corkboard with a pinned WANTED sheet whose mugshot is the battery-strain parcel (L3) and a yellow sticky note",
+      "finalSha256": "2ba19792172a9f8650eac794e9cc52869baac309199e0c10b41e449a1a33a7b4"
     },
     {
       "id": "parcel_s",
@@ -13485,6 +14133,70 @@
       "finalSha256": "20edeab008eb0bddc08fdd7ad7a5164c22921618f2720417b91fc84b00f6f205"
     },
     {
+      "id": "ic_handoff",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "variants": [],
+      "district": "ui",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): parcel:handedOff — a parcel with a padlock (its value is locked at the pier)",
+      "finalSha256": "fc13822995c246647a3fc6398ad0b73209e99a560e3b365c1a4dd22019e67324"
+    },
+    {
+      "id": "ic_cleared",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "variants": [],
+      "district": "ui",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): parcel:cleared — a round green customs stamp with a check",
+      "finalSha256": "86f8a1d685c255bedbfe7c1ef14ac13fbe37c6aa20ddf761b1dc373d940d4fb7"
+    },
+    {
+      "id": "ic_ship",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "variants": [],
+      "district": "ui",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4): the Docks hub (DistrictPanel hub rows, toasts): a cargo ship with containers",
+      "finalSha256": "28bcbb7b39fbd1695c5477c2297606d0e8cf7a5d7296ba0949fc06e632c86c1d"
+    },
+    {
+      "id": "ic_plane",
+      "class": "icon16",
+      "source": "procedural",
+      "canvas": [16, 16],
+      "frames": [""],
+      "variants": [],
+      "district": "ui",
+      "priority": "P1",
+      "placeholder": false,
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "note": "build 2 M8 (B2 §4.1, §6.6; design-m8-m9 §6.4) (used from M9): the Airport hub: a cargo plane seen from above",
+      "finalSha256": "f742b043a1fa54a429b08ae1b464a9b3c03cc26e53dd38d1840f2b01ab3b8bed"
+    },
+    {
       "id": "ui_panel",
       "class": "ui",
       "source": "procedural",
@@ -14433,6 +15145,15 @@
       "usd": 0,
       "balanceBefore": 2708,
       "balanceAfter": 2690
+    },
+    {
+      "at": "2026-10-30T08:37:46.526Z",
+      "ids": ["ap_terminal", "ap_cargo_hangar", "ap_tower", "ap_plane", "cv_town_hall", "cv_lint_school", "cv_museum", "cv_changelog_stadium", "cv_patch_hospital", "cv_police", "cv_fire", "cv_readme_library", "cv_courthouse", "cv_park_pavilion", "fountain"],
+      "tool": "create-image-pro-flash",
+      "generations": 220,
+      "usd": 0,
+      "balanceBefore": 2690,
+      "balanceAfter": 2470
     }
   ],
   "retired": [
@@ -15387,6 +16108,532 @@
         }
       ],
       "note": "shared locked scenery: playtest 1 shows only the _locked frame"
+    },
+    {
+      "id": "ap_hangar",
+      "class": "building3x3",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T08:39:23.559Z",
+      "reason": "superseded in build 2 M8 by one unique sprite per L5 building (plan-build2 §6, B2 §6.5); shared locked-only scenery of playtest 1",
+      "replacedBy": ["ap_cargo_hangar"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "d62c12f2-235f-55a0-a66b-3569d36dfb8a",
+            "source_image_id": "d62c12f2-235f-55a0-a66b-3569d36dfb8a"
+          },
+          "jobId": "24f85286-227c-4c09-b104-431f4e20c8b6",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "57c27e0194a74370eb1f0d934766308e2dc78891838de38e382c220119e5fa5c",
+          "at": "2026-10-29T08:17:06.451Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "9b05a33e-8db9-5ca2-864f-44b2af6657b9",
+            "source_image_id": "9b05a33e-8db9-5ca2-864f-44b2af6657b9"
+          },
+          "jobId": "fd4a9d96-7f52-483d-b9a5-2aa3d245d82c",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "6588dba28671c19331e39847532101dacd727f5756b4988e2876a2f3de586c8a",
+          "at": "2026-10-29T08:17:06.686Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "cargo hangar with a curved roof and big doors, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, concrete apron, 1 to 2 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "b31e6ffd-2559-575a-afcb-3f53a78657ac",
+            "source_image_id": "b31e6ffd-2559-575a-afcb-3f53a78657ac"
+          },
+          "jobId": "cd452d1f-8c73-4bbe-b5a8-e7532dd0c78e",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "3201c2643a3bfc8c25f5011b16e0a9c16ef9dd483b752f43fa9371c0896715e1",
+          "at": "2026-10-29T08:17:06.856Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "doors on the shade side",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "smaller",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "superseded in build 2 M8 by the unique L5 rows (covers nothing; retired once the picks are in)"
+    },
+    {
+      "id": "cv_hall",
+      "class": "building3x3",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T08:39:23.561Z",
+      "reason": "superseded in build 2 M8 by one unique sprite per L5 building (plan-build2 §6, B2 §6.5); shared locked-only scenery of playtest 1",
+      "replacedBy": ["cv_town_hall", "cv_lint_school", "cv_museum", "cv_patch_hospital"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "a08fbaf9-ee5b-5410-ad74-0df9477348c0",
+            "source_image_id": "a08fbaf9-ee5b-5410-ad74-0df9477348c0"
+          },
+          "jobId": "495f87ad-9749-48b5-a7c3-ea050df845c2",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "96d8e41e4ec9d1785902991cbd1a7778f2dc232fee0ecd1d3426f7b4ad16eba4",
+          "at": "2026-10-29T08:17:26.827Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "ad625649-6323-5878-a6f5-21a718bae77e",
+            "source_image_id": "ad625649-6323-5878-a6f5-21a718bae77e"
+          },
+          "jobId": "96c40d9b-c0d7-4bbf-b805-fc38bbe1cdfa",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "3e35857592603896035cf82eb11b18b8dae057a93de5e8b7d73a3b6a8a51c246",
+          "at": "2026-10-29T08:17:23.025Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "civic hall with columns, a dome and a flag, a single chunky building whose walls fill most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f89076d1-6136-5247-a06c-6cf5ff322448",
+            "source_image_id": "f89076d1-6136-5247-a06c-6cf5ff322448"
+          },
+          "jobId": "79a16591-7e38-449c-a677-6c942d9c03eb",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "364fad07fb2e1286cffbd47d1a3d7b4c1b52fdee6a0818fe9a1a74b11f9c4849",
+          "at": "2026-10-29T08:17:37.880Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "tan stone",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "brick, off the anchor's material",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "superseded in build 2 M8 by the unique L5 rows (covers nothing; retired once the picks are in)"
+    },
+    {
+      "id": "cv_stadium",
+      "class": "building3x3",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T08:39:23.561Z",
+      "reason": "superseded in build 2 M8 by one unique sprite per L5 building (plan-build2 §6, B2 §6.5); shared locked-only scenery of playtest 1",
+      "replacedBy": ["cv_changelog_stadium"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f0561161-fd57-5f7c-b159-aee088a2ca45",
+            "source_image_id": "f0561161-fd57-5f7c-b159-aee088a2ca45"
+          },
+          "jobId": "5f2ebc43-c1e3-4b79-8ed9-8627899e638f",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "c35cc85a1c41c23f1309ac093a69166586ad11e98fd5a89c656132410a722580",
+          "at": "2026-10-29T08:17:42.433Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "f78b34a3-5132-5da9-b5ae-bab03d25ef07",
+            "source_image_id": "f78b34a3-5132-5da9-b5ae-bab03d25ef07"
+          },
+          "jobId": "c1dc86e3-1c9f-49ca-8541-1b7c51790148",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "4b95197e70bd50b044b6574a21557752bdd0da55c4dd7c8d9bcc04f3975911bb",
+          "at": "2026-10-29T08:17:47.918Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "small sports stadium with stands around a green pitch, a chunky group of buildings that fills most of a 192x96 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, the whole picture on a plain solid flat magenta background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "90579efd-fc9a-5055-bc24-7678fde2d9ba",
+            "source_image_id": "90579efd-fc9a-5055-bc24-7678fde2d9ba"
+          },
+          "jobId": "bb1711f0-25f7-4b89-ae78-f9df7da248b5",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 9,
+          "downloadUrl": "",
+          "sha256": "620d8800f21002520548c10970856a727792126a345be8ec843c20e7a2ee5a25",
+          "at": "2026-10-29T08:17:42.556Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "stadium smaller",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "stadium smallest",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "superseded in build 2 M8 by the unique L5 rows (covers nothing; retired once the picks are in)"
+    },
+    {
+      "id": "cv_civic_2x2",
+      "class": "building2x2",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T08:39:23.561Z",
+      "reason": "superseded in build 2 M8 by one unique sprite per L5 building (plan-build2 §6, B2 §6.5); shared locked-only scenery of playtest 1",
+      "replacedBy": ["cv_police", "cv_fire", "cv_readme_library", "cv_courthouse"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "700ed2c6-af96-511f-9ba7-b4cb82f62c15",
+            "source_image_id": "700ed2c6-af96-511f-9ba7-b4cb82f62c15"
+          },
+          "jobId": "8cd9f53e-6d1a-4e1b-ae54-e816aacba2cd",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "428880f152859a01df15dc83d031da7d41154c09b65ad63e3acd574535ac1046",
+          "at": "2026-10-29T07:04:31.921Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "34fd4bc9-635f-5a4d-ba6b-6e598f1afd24",
+            "source_image_id": "34fd4bc9-635f-5a4d-ba6b-6e598f1afd24"
+          },
+          "jobId": "699252e0-fc1b-4ef6-b4ce-2f5ddd17eafc",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "bdb86cf79d91c79c396b1457d36b5b5740752a51ca060178c1854e01bac3c3ac",
+          "at": "2026-10-29T07:04:37.408Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "c95d4d0c-4db5-5af6-a6b3-2acb4dd013f1",
+            "source_image_id": "c95d4d0c-4db5-5af6-a6b3-2acb4dd013f1"
+          },
+          "jobId": "f14c18f0-9f51-4757-9ddc-9169bce0b036",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "249c883be08197fe05ccfb5d2fd05b4db573c07b19cb760012606e515f1ceb7f",
+          "at": "2026-10-29T07:04:37.417Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1003,
+            "prompt": "civic building, stone walls, columns, flag, a single building standing on a 128x64 isometric diamond plot with a small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "e4ddfd64-dc5f-5201-964c-7a798943f42d",
+            "source_image_id": "e4ddfd64-dc5f-5201-964c-7a798943f42d"
+          },
+          "jobId": "a0d11f6f-ffcd-49a4-8baf-1fb396a19707",
+          "seed": 1003,
+          "candidate": 3,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "1af53ace1ca08f3fa65569fd4b0347e9b8241147bcd1a9d8fef5a3285cd6500c",
+          "at": "2026-10-29T07:04:59.014Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1005,
+            "prompt": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "be1da23a-b2a0-58e4-9cfc-4de7ff8c3b8a",
+            "source_image_id": "be1da23a-b2a0-58e4-9cfc-4de7ff8c3b8a"
+          },
+          "jobId": "784c00f9-b645-4f63-b069-fd7593e783f5",
+          "seed": 1005,
+          "candidate": 5,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "2ab6f1b40d449ab5100e9e9fc23d316b0e50cd5b3fc80bd04e518aa75bfa3945",
+          "at": "2026-10-29T07:20:03.988Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1004,
+            "prompt": "civic building, stone walls, columns, flag, a single chunky building whose walls fill most of a 128x64 isometric diamond plot, small paved yard, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "244191a9-9703-5769-9e4d-37b07d8a2525",
+            "source_image_id": "244191a9-9703-5769-9e4d-37b07d8a2525"
+          },
+          "jobId": "5d386f4e-e22f-4dec-a744-2c4cea3bff42",
+          "seed": 1004,
+          "candidate": 4,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "7429edbf7b7028877cfb8079adfa3ee83811d3896b9b4c2ce616b07b51dfb452",
+          "at": "2026-10-29T07:20:03.988Z"
+        }
+      ],
+      "rejects": [],
+      "note": "superseded in build 2 M8 by the unique L5 rows (covers nothing; retired once the picks are in)"
+    },
+    {
+      "id": "cv_pavilion",
+      "class": "building1x1",
+      "source": "pixellab",
+      "retiredAt": "2026-10-30T08:39:23.562Z",
+      "reason": "superseded in build 2 M8 by one unique sprite per L5 building (plan-build2 §6, B2 §6.5); shared locked-only scenery of playtest 1",
+      "replacedBy": ["cv_park_pavilion"],
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1001,
+            "prompt": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "a2c81289-9b82-5d03-9f6c-f8202eb47527",
+            "source_image_id": "a2c81289-9b82-5d03-9f6c-f8202eb47527"
+          },
+          "jobId": "9b177d1e-fa75-40b9-9dcd-421e56699b7c",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "7055ae14a4107793cebdf808c5546a8df46aeddff82af575ea28ec02992c2d83",
+          "at": "2026-10-29T08:17:48.341Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1000,
+            "prompt": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "454386d8-9fab-5c5d-93ff-47ed6d10b7a8",
+            "source_image_id": "454386d8-9fab-5c5d-93ff-47ed6d10b7a8"
+          },
+          "jobId": "59beb57f-a15d-4f58-9d32-b70862fd6de6",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "87bb52d6891ee8458f8a20e1ea3ff63a86a84f556412631df75c5bd44af97250",
+          "at": "2026-10-29T08:17:48.160Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "no_background": true,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#2d4d9c", "#4c7bd0", "#86b4ee", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a"],
+              "max_colors": 20
+            },
+            "seed": 1002,
+            "prompt": "park pavilion with a round roof, a single chunky building whose walls fill most of a 64x32 isometric diamond plot, small lawn with hedges, 2 to 3 storeys, bright cheerful city-builder style, 2:1 isometric pixel art, flat sunny daylight from the upper left, top faces lightest, left wall lighter than right wall, small sharp shadow, 1px dark outline, flat fills, saturated clean colours, strong readable silhouette, centred, transparent background, no text, no people, no vehicles, no grid lines, no anti-aliasing",
+            "image_id": "46a2b60e-b18c-5775-a371-acc8f1b5d5ca",
+            "source_image_id": "46a2b60e-b18c-5775-a371-acc8f1b5d5ca"
+          },
+          "jobId": "4f8fe4ee-b521-465d-b426-cb14e47c1626",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "df65aeb792b6215ad446171884d0b7e5c48a3c8c88ed37e1f4f0ddcc842eb17b",
+          "at": "2026-10-29T08:18:02.886Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "closed rotunda",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "closed rotunda",
+          "by": "claude",
+          "at": "2026-10-29T08:27:16.840Z"
+        }
+      ],
+      "note": "superseded in build 2 M8 by the unique L5 rows (covers nothing; retired once the picks are in)"
     }
   ]
 }

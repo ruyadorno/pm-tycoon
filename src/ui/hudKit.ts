@@ -52,7 +52,7 @@ export function levelLabel(data: GameData, level: number): string {
 export interface LevelProgress {
   /** Bar fill 0..1. */
   frac: number
-  /** `$1,240 / $2,000` (+ ` · Lv 3 coming soon` at the playtest cap). */
+  /** `$1,240 / $2,000` (+ ` · Lv 4 coming soon` at the playtest cap, 3 since M8). */
   text: string
   /**
    * The counter is held below an existing levels.json row by
@@ -103,7 +103,7 @@ export function levelProgress(
 /**
  * The level cell's tap toast: `Lv 2: Hoist Hill + trucks + Shaky shaker`
  * from the next levels.json row (region flavour names, vehicle names,
- * machine names); `Lv 3 coming soon` at the playtest cap.
+ * machine names); `Lv 4 coming soon` at the playtest cap (3 since M8).
  */
 export function nextUnlockLine(data: GameData, level: number): string {
   const row = data.levels.find((l) => l.level === level + 1)

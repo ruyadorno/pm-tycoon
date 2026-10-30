@@ -23,7 +23,18 @@
 //      its buffer head(s) in free stations — so a station freed this tick
 //      starts its next parcel this tick (1 inspector = 15/min exactly) and the
 //      buffer has room before the node upstream pushes;
-//   4. the conveyors feed the first slot round-robin, ≤ 1 parcel per tick;
+//   4. the conveyors feed the first slot round-robin, ≤ 1 parcel per tick:
+//      from lane.feedIndex on, the first conveyor holding a parcel is the
+//      candidate (none fed if the head has no room); a feed moves the pointer
+//      past it (M8 — with the 4 s desk slot 1 frees on a fixed tick parity,
+//      so a tick-parity rotation starved one conveyor; one conveyor keeps
+//      feedIndex 0, bit-identical to playtest 1) — except that while a dock
+//      in Q-RUN1 relief (docks.ts) has a parcel on its conveyor, the
+//      lowest-numbered such dock is the candidate and takes every feed: its
+//      vehicle unloads at the lane's full rate, as with one dock, instead of
+//      1/n of it while the other docks' conveyors push the shelf further past
+//      its cap (M8 review: a relieving truck stayed docked 2-3 min with two
+//      docks). One relieving dock at a time ends each relief soonest;
 //   5. the stall root (below).
 //
 // Stalls (§6.4, nothing is ever dropped): the most downstream node holding a
@@ -482,18 +493,29 @@ export function laneStep(sim: Sim): void {
     if (isActiveSlot(node)) seatFromBuffer(sim, node)
   }
 
-  // 4. conveyors → the first node, round-robin, ≤ 1 parcel per tick.
+  // 4. conveyors → the first node, round-robin from lane.feedIndex, ≤ 1
+  // parcel per tick — except that the lowest-numbered dock in Q-RUN1 relief
+  // whose conveyor holds a parcel takes every feed (see the header).
   const head = chain[0]
   const convs = conveyorIds(lane)
-  if (head && convs.length > 0) {
-    for (let k = 0; k < convs.length; k++) {
-      const conv = laneNode(lane, convs[(s.tick + k) % convs.length] as string)
+  const n = convs.length
+  if (head && n > 0) {
+    const ri = lane.docks.findIndex(
+      (d) =>
+        d.relief === true &&
+        (laneNode(lane, d.conveyorNodeId)?.queue.length ?? 0) > 0,
+    )
+    const from = ri >= 0 ? ri : lane.feedIndex % n
+    for (let k = 0; k < n; k++) {
+      const i = (from + k) % n
+      const conv = laneNode(lane, convs[i] as string)
       if (!conv || conv.queue.length === 0) continue
       const p = parcelOf(sim, conv.queue[0] ?? null)
       if (p && hasRoom(head)) {
         conv.queue.shift()
         enterNode(sim, p, head)
         moved[conv.id] = true
+        lane.feedIndex = (i + 1) % n
       }
       break
     }

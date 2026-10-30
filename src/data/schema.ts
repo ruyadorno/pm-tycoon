@@ -203,8 +203,9 @@ const liveDistrict = obj({
 const overseasDistrict = obj({
   ...districtBase,
   zoneDistricts: arr(snakeId),
-  clearanceS: nonNeg,
-  valueMult: nonNeg,
+  // hubs.ts: a 0 s clearance or a ×0 value would make the hub pointless.
+  clearanceS: pos,
+  valueMult: pos,
   malwareMult: nonNeg,
   hubWeight: nonNeg,
   sizes: arr(oneOf(SIZES), 1),
@@ -662,6 +663,18 @@ const mapShape = obj({
     1,
   ),
   props: arr(obj({ frame, tile: xy, region: snakeId })),
+  hubs: arr(
+    obj({
+      district: snakeId,
+      office: snakeId,
+      vessel: obj({
+        frame,
+        tile: xy,
+        exit: tuple(int(), int()),
+        liftPx: int(0, 256),
+      }),
+    }),
+  ),
   buildings: rec(null, obj({ doorOffset: xy })),
   lockedStyle: oneOf(['frames', 'fill']),
 })
@@ -1023,6 +1036,15 @@ function crossCheck(d: Tables, out: Problems): void {
     )
   if (mal.baseShare > mal.cap)
     bad('parcels.malware.baseShare', `above cap ${mal.cap}`)
+  // spawn.ts reads parcels.malware.overseasMult; the per-hub malwareMult is
+  // otherwise unread, so the two must agree (design-m8-m9 §1.4, R6).
+  d.districts.forEach((x, i) => {
+    if (x.kind === 'overseas' && x.malwareMult !== mal.overseasMult)
+      bad(
+        `districts[${i}].malwareMult`,
+        `${x.malwareMult} ≠ parcels.malware.overseasMult ${mal.overseasMult}`,
+      )
+  })
   if (d.parcels.decay.graceS >= d.parcels.onTimeMaxS)
     bad(
       'parcels.decay.graceS',
@@ -1037,7 +1059,12 @@ function crossCheck(d: Tables, out: Problems): void {
       'economy.playtestMaxLevel',
       `${eco.playtestMaxLevel} exceeds the ${nLevels} levels`,
     )
+  const dockIndices = new Set<number>()
   eco.docks.forEach((k, i) => {
+    // docks.ts / ViewSim dockSlots key a dock by its index: one row each.
+    if (dockIndices.has(k.index))
+      bad(`economy.docks[${i}].index`, `duplicate dock index ${k.index}`)
+    dockIndices.add(k.index)
     if (k.unlockLevel > nLevels)
       bad(
         `economy.docks[${i}].unlockLevel`,
@@ -1537,6 +1564,49 @@ function checkMap(
         `"${pr.region}" but the tile is in block region "${mb.region}"`,
       )
   })
+  // hubs (M8, design-m8-m9 §1.4): one row per overseas district, its office
+  // a building of that district, its vessel one of the district's props;
+  // every overseas district live at a level ≤ playtestMaxLevel has a row
+  // (M8: the Docks; test configs that raise the cap past the Airport's level
+  // before M9 ships its row add it — tests/sim/helpers.ts capConfig).
+  const hubIds = new Set<string>()
+  m.hubs.forEach((h, i) => {
+    const p = `map.hubs[${i}]`
+    const dist = d.districts.find((x) => x.id === h.district)
+    if (!dist || dist.kind !== 'overseas') {
+      bad(`${p}.district`, `"${h.district}" is not an overseas district`)
+      return
+    }
+    if (hubIds.has(h.district))
+      bad(`${p}.district`, `duplicate hub "${h.district}"`)
+    hubIds.add(h.district)
+    const office = d.buildings.find((b) => b.id === h.office)
+    if (!office || office.district !== h.district)
+      bad(`${p}.office`, `"${h.office}" is not a building of "${h.district}"`)
+    const v = h.vessel
+    const prop = m.props.some(
+      (pr) =>
+        pr.frame === v.frame &&
+        pr.tile[0] === v.tile[0] &&
+        pr.tile[1] === v.tile[1] &&
+        pr.region === h.district,
+    )
+    if (!prop)
+      bad(
+        `${p}.vessel`,
+        `no map.props row {frame "${v.frame}", tile [${v.tile[0]},${v.tile[1]}], region "${h.district}"}`,
+      )
+    if (v.exit[0] === 0 && v.exit[1] === 0)
+      bad(`${p}.vessel.exit`, 'is [0,0] (the vessel never leaves)')
+  })
+  for (const dist of d.districts) {
+    if (dist.kind !== 'overseas' || hubIds.has(dist.id)) continue
+    if (dist.unlockLevel <= d.economy.playtestMaxLevel)
+      bad(
+        'map.hubs',
+        `no row for "${dist.id}" (overseas, live at level ${dist.unlockLevel} ≤ playtestMaxLevel ${d.economy.playtestMaxLevel})`,
+      )
+  }
   m.ground.scenery.forEach((s, i) => {
     const [x0, y0, x1, y1] = s.rect
     if (x0 > x1 || y0 > y1 || x1 >= W || y1 >= H)

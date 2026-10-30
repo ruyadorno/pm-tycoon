@@ -16,6 +16,7 @@
 //                      (never latest.*), every window informational, exit 0
 //                      unless an invariant broke (`vlr sim:delegating`)
 //   --quick            the check gate: seeds 1-3 × 20 min → docs/gate/quick.*
+//                      (M8: every level window informational — "quick")
 //   --out dir          write the gate files there instead of docs/gate/
 //   --baseline path    (--gate) a previous gate JSON, e.g. the committed
 //                      docs/gate/latest.json: adds the Δ% of the seven
@@ -23,6 +24,11 @@
 //                      (plan-build2 §8.3 task 11); informational — the exit
 //                      code is unchanged. Read before the gate files are
 //                      written, so it may name the file being replaced.
+//
+// A gate (not --quick) with --minutes other than 30 writes
+// latest-<N>min.{json,md} (delegating-<N>min.*) and never replaces latest.*
+// (M8, design-m8-m9 §5.3): `vlr sim:gate -- --minutes 35` → latest-35min.*,
+// the Golden Release row's run.
 //
 // Prints one row per in-game minute (M7: + the active quest), '!' event
 // lines (M7: every quest offer / accept / completion / fail), a GATE line
@@ -198,6 +204,26 @@ export function parseCli(argv: readonly string[]): CliOptions {
   }
 }
 
+/**
+ * The gate files' base name: `delegating` (the delegating rows never
+ * replace latest.* / quick.*, B2 §7.2), `quick` (--quick), else `latest`; a
+ * non-quick run of other than 30 minutes appends `-<N>min` (M8), so only
+ * the 30-minute gate writes latest.*.
+ */
+export function gateFileBase(
+  opts: Pick<CliOptions, 'quick' | 'policy' | 'minutes'>,
+): string {
+  const base =
+    opts.policy === 'delegating'
+      ? 'delegating'
+      : opts.quick
+        ? 'quick'
+        : 'latest'
+  return opts.quick || opts.minutes === FULL.minutes
+    ? base
+    : `${base}-${opts.minutes}min`
+}
+
 /** A previous gate summary (docs/gate/*.json) for --baseline. */
 export function readBaseline(path: string): GateSummary {
   let raw: unknown
@@ -230,6 +256,8 @@ export interface RunHooks {
   onEvent?: (e: RecordedEvent, sim: Sim) => void
   /** The policy kind policyFactory builds (default 'competent'). */
   kind?: PolicyKind
+  /** M8: the quick gate — the level windows are informational per seed too. */
+  quick?: boolean
 }
 
 export interface RunResult {
@@ -319,6 +347,7 @@ export function runSeed(
       asserts,
       SIM_FEATURES,
       policy && kind === 'delegating' ? DELEGATING_NOTE : null,
+      hooks.quick === true,
     ),
     conservation: conservation(sim.state),
     perf: {
@@ -375,6 +404,7 @@ async function main(argv: readonly string[]): Promise<number> {
     const verbose = !opts.json && (!opts.gate || opts.seeds.length === 1)
     const run = runSeed(data, seed, opts.minutes, factory, {
       kind,
+      quick: opts.quick,
       onEvent: (e, sim) => {
         if (!verbose) return
         const line = lights.line(e, sim)
@@ -410,6 +440,7 @@ async function main(argv: readonly string[]): Promise<number> {
         policy: policyName,
         minutes: opts.minutes,
         targets: data.economy.pacingTargets,
+        quick: opts.quick,
       },
     )
     if (baseline && opts.baseline) {
@@ -417,10 +448,12 @@ async function main(argv: readonly string[]): Promise<number> {
     }
     for (const line of formatGate(summary)) out(line)
     const dir = opts.out ? resolve(opts.out) : GATE_DIR
-    // The delegating rows never replace the gate's latest.* (B2 §7.2).
-    const base = delegating ? 'delegating' : opts.quick ? 'quick' : 'latest'
+    const base = gateFileBase(opts)
     const extra = [
       ...(opts.quick ? ['--quick'] : []),
+      ...(!opts.quick && opts.minutes !== FULL.minutes
+        ? ['--minutes', String(opts.minutes)]
+        : []),
       ...(opts.baseline ? ['--baseline', opts.baseline] : []),
     ]
     const cmd = delegating

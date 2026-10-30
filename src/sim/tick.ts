@@ -8,6 +8,7 @@ import { SIM_FEATURES } from './features.ts'
 import type { Sim } from './sim.ts'
 import { dispatchStep, LEG_HOOKS } from './systems/dispatch.ts'
 import { docksStep } from './systems/docks.ts'
+import { clearanceStep } from './systems/hubs.ts'
 import { laneStep } from './systems/lane.ts'
 import { levelsStep } from './systems/levels.ts'
 import { paydayStep } from './systems/payroll.ts'
@@ -79,9 +80,13 @@ export function holdBay(sim: Sim, _ctx: TickContext): void {
   holdStationStep(sim)
 }
 
-/** 8. Overseas clearance timers → parcel:cleared (§5.6). */
-export function clearance(_sim: Sim, _ctx: TickContext): void {
-  // build 2: systems/clearance.ts.
+/**
+ * 8. Overseas clearance timers (§5.6, M8 systems/hubs.ts): due clearances
+ * pay the locked value (malware: $0 and a life — the ship has sailed), then
+ * one hub:departure per hub that cleared this tick. No rng.
+ */
+export function clearance(sim: Sim, _ctx: TickContext): void {
+  clearanceStep(sim)
 }
 
 /** 9. Waiting parcels crossing 180 s unpicked → the capped satisfaction penalty (§9.1). */

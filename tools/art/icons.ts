@@ -683,6 +683,62 @@ const ICONS: Record<string, readonly string[]> = {
     'CCCCCIICCCCC',
     'CCCCCIICCCCC',
   ],
+  // build 2 M8 (B2 §4.1, design-m8-m9 §6.2-§6.4): the overseas hubs.
+  // parcel:handedOff — the parcel's value is locked at the pier (a padlock
+  // on the box); parcel:cleared — a round green customs stamp with a check
+  ic_handoff: [
+    'nnnnnnnnn...',
+    'nnnnNnnnn...',
+    'nnnnNnnnn...',
+    'nnnnNnnnn...',
+    'tttttmmmm...',
+    'ttttmm..mm..',
+    'ttttm....m..',
+    'ttttyyyyyyyy',
+    'ttttyyyooyyy',
+    '....yyyooyyy',
+    '....yyyyoyyy',
+    '....yyyyyyyy',
+  ],
+  ic_cleared: [
+    '...gggggg...',
+    '.ggWWWWWWgg.',
+    '.gWWWWWWWEg.',
+    'gWWWWWWWEEWg',
+    'gWWWWWWEEWWg',
+    'gWEEWWEEWWWg',
+    'gWWEEEEWWWWg',
+    'gWWWEEWWWWWg',
+    '.gWWWWWWWWg.',
+    '.ggWWWWWWgg.',
+    '...gggggg...',
+  ],
+  // the hubs themselves (DistrictPanel hub rows, toasts): the Docks' cargo
+  // ship (orange hull, containers, white bridge) and, from M9, the Airport's
+  // cargo plane seen from above (nose up)
+  ic_ship: [
+    '........ww..',
+    '........wHw.',
+    '..bbyyggwww.',
+    '..bbyyggwww.',
+    '..bbyyggwww.',
+    'aaaaaaaaaaaa',
+    '.aaaaaaaaaaa',
+    '..aaaaaaaaaa',
+    '...AAAAAAAA.',
+  ],
+  ic_plane: [
+    '.....ll.....',
+    '.....ll.....',
+    '....llll....',
+    '....lHHl....',
+    '.bbllllllbb.',
+    'bblllllllllb',
+    '.....ll.....',
+    '.....ll.....',
+    '....llll....',
+    '...bb..bb...',
+  ],
   ic_honk: [
     '.wwwwwwwwww.',
     'wwwwwwwwwwww',

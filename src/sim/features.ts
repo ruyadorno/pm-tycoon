@@ -9,6 +9,12 @@
 // tools/sim/report.ts reads it for the people rows and the delegating policy.
 // `quests` (build 2, M7: offers, goal counters, rewards, the magic parcel,
 // the Golden Release) gates the quests tick step and its event observer.
+// `levels3plus` (build 2, M8: the L3 row live — hubs, docks 2-3, the
+// Battery checker) turns on the competent policy's L3 plan
+// (src/sim/policies/levelPlan.ts) and gates the level3Min /
+// firstOverseasClearedAfterLevel3MaxMin rows; `levels45` (M9: L4-L5) adds
+// the plan's L4-L5 rows and gates level4Min / level5Min. The sim itself
+// reads levels from data (economy.playtestMaxLevel), not from these flags.
 // tools/sim/report.ts reads the same flags so a gate window whose system is
 // not built yet prints as informational instead of failing.
 
@@ -19,6 +25,8 @@ export const SIM_FEATURES = {
   payroll: true,
   people: true,
   quests: true,
+  levels3plus: true,
+  levels45: false,
 }
 
 export type SimFeature = keyof typeof SIM_FEATURES
@@ -31,4 +39,6 @@ export const FEATURE_MILESTONE: Record<SimFeature, string> = {
   payroll: 'M3',
   people: 'M6',
   quests: 'M7',
+  levels3plus: 'M8',
+  levels45: 'M9',
 }

@@ -106,10 +106,12 @@ describe('§5.4 the rattle strain joins the readout once announced (L2)', () => 
 })
 
 describe('§5.2 tier 2 at L2', () => {
-  it('the visual tier follows levels.json warehouseTier (capped at the t2 art)', () => {
+  it('the visual tier follows levels.json warehouseTier (1..5 since M8; art falls back per frame)', () => {
     expect(lr.visualTier(data, 1)).toBe(1)
     expect(lr.visualTier(data, 2)).toBe(2)
-    expect(lr.visualTier(data, 5)).toBe(2)
+    expect(lr.visualTier(data, 3)).toBe(3)
+    expect(lr.visualTier(data, 5)).toBe(5)
+    expect(lr.visualTier(data, 99)).toBe(1)
   })
 
   it('every tier-keyed frame exists for both tiers', () => {

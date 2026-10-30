@@ -1,19 +1,23 @@
 // src/assets/attract.json — the Title's attract city (B2 §5, plan-build2 §8.2
-// task 2): a plain Sim.snapshot() of seed 7 under the competent policy
-// (src/sim/policy.ts, stepped before every tick like the CLI and ?policy=1)
-// ATTRACT_MINUTES sim minutes in. The Title loads it with ignoreDataHash and
-// ticks it at 1× with the competent policy attached, so the fleet keeps
-// collecting, unloading and delivering behind the logo; it is never saved and
-// never the player's. Regenerate (`vlr fixtures:attract`) after any change to
-// src/data/*.json, a sim rule that moves the run, or a save/state version bump
+// task 2, §8.5 task 10): a plain Sim.snapshot() of seed 7 under the competent
+// policy (src/sim/policy.ts, stepped before every tick like the CLI and
+// ?policy=1) at the first whole sim minute in [ATTRACT_MIN_MINUTES,
+// ATTRACT_MAX_MINUTES] whose city passes attractProblems(). The Title loads it
+// with ignoreDataHash and ticks it at 1× with the competent policy attached,
+// so the fleet keeps collecting, unloading and delivering behind the logo;
+// it is never saved and never the player's. Regenerate (`vlr
+// fixtures:attract`) after any change to src/data/*.json, a sim rule or a
+// policy change that moves the run, or a save/state version bump
 // (plan-build2 §8.8 R19) — tests/data/shot-fixtures.test.ts fails until the
 // committed file equals a fresh run.
 //
-// At M5 the sim caps at L2 (economy.playtestMaxLevel), so the run must show
-// the L2 city: level 2, ≥ 4 vehicles incl. a truck, Industrial live, the lane
-// not stalled; otherwise the script exits 1 and writes nothing. M8 task 10
-// upgrades these checks to L3 (≥ 6 vehicles incl. a van and two trucks, Docks
-// live) and regenerates the file with the same script.
+// M8 (design-m8-m9 §8 lane G, R15): the sim caps at L3, so the city must
+// show L3 — level ≥ 3 (at M9 the city may already be L4), ≥ 6 vehicles incl.
+// a van and two trucks, Industrial and Docks live, the lane not stalled, the
+// game not over. The run is scanned minute by minute from 24 to 30 min for
+// the first minute that holds (seed 7's 2nd truck comes at ~30:00 at M8);
+// if none does, the script exits 1 and writes nothing — tune the policy, not
+// the fixture. (M5 asserted the L2 city at exactly 24 min.)
 //
 // The JSON is JSON.stringify(sim.snapshot()) + "\n": the run is deterministic
 // (seeded PRNG, no clock), so the same tables give the same bytes.
@@ -28,40 +32,59 @@ import { TICKS_PER_S } from '../../src/sim/types.ts'
 import { loadGameData } from '../sim/load.node.ts'
 
 export const ATTRACT_SEED = 7
-export const ATTRACT_MINUTES = 24
-/** M5 expectations (the sim still caps at L2). */
-export const ATTRACT_LEVEL = 2
-export const ATTRACT_MIN_VEHICLES = 4
-export const ATTRACT_LIVE = ['industrial'] as const
+/** The scan's first and last whole sim minute (design R15). */
+export const ATTRACT_MIN_MINUTES = 24
+export const ATTRACT_MAX_MINUTES = 30
+/** M8 expectations: at least this level (L4 is fine at M9). */
+export const ATTRACT_MIN_LEVEL = 3
+export const ATTRACT_MIN_VEHICLES = 6
+/** At least this many of each vehicle type. */
+export const ATTRACT_FLEET = { van: 1, truck: 2 } as const
+export const ATTRACT_LIVE = ['industrial', 'docks'] as const
 export const ATTRACT_OUT = new URL(
   '../../src/assets/attract.json',
   import.meta.url,
 )
 export const REGENERATE = 'vlr fixtures:attract'
 
-/** The attract run: seed 7, the competent policy, ATTRACT_MINUTES in. */
+/** The run's sim minute (whole minutes only are snapshot). */
+export const attractMinute = (sim: Sim): number =>
+  sim.state.tick / (60 * TICKS_PER_S)
+
+/**
+ * The attract run: seed 7, the competent policy, stopped at the first whole
+ * minute in [ATTRACT_MIN_MINUTES, ATTRACT_MAX_MINUTES] where
+ * attractProblems() is empty — or at ATTRACT_MAX_MINUTES with its problems
+ * (the caller refuses to write it).
+ */
 export function runAttract(data: GameData): Sim {
   const sim = new Sim(data, ATTRACT_SEED)
   const policy = createPolicy(sim, 'competent')
-  const ticks = ATTRACT_MINUTES * 60 * TICKS_PER_S
-  while (sim.state.tick < ticks) {
-    policy.step()
-    sim.tick()
+  const perMin = 60 * TICKS_PER_S
+  for (let m = ATTRACT_MIN_MINUTES; m <= ATTRACT_MAX_MINUTES; m++) {
+    while (sim.state.tick < m * perMin) {
+      policy.step()
+      sim.tick()
+    }
+    if (attractProblems(sim).length === 0) break
   }
   policy.dispose?.()
   return sim
 }
 
-/** What the attract city must show at M5; empty = good. */
+/** What the attract city must show at M8; empty = good. */
 export function attractProblems(sim: Sim): string[] {
   const st = sim.state
   const out: string[] = []
-  if (st.level.level !== ATTRACT_LEVEL)
-    out.push(`level ${st.level.level}, want ${ATTRACT_LEVEL}`)
+  if (st.level.level < ATTRACT_MIN_LEVEL)
+    out.push(`level ${st.level.level}, want ≥ ${ATTRACT_MIN_LEVEL}`)
   const n = st.vehicles.length
   if (n < ATTRACT_MIN_VEHICLES)
     out.push(`${n} vehicles, want ≥ ${ATTRACT_MIN_VEHICLES}`)
-  if (!st.vehicles.some((v) => v.type === 'truck')) out.push('no truck')
+  for (const [type, want] of Object.entries(ATTRACT_FLEET)) {
+    const have = st.vehicles.filter((v) => v.type === type).length
+    if (have < want) out.push(`${have} ${type}s, want ≥ ${want}`)
+  }
   for (const id of ATTRACT_LIVE)
     if (!st.districts[id]?.live) out.push(`${id} is not live`)
   if (st.lane.stalled)
@@ -84,7 +107,7 @@ export function attractSummary(sim: Sim): string {
     .map(([id]) => id)
     .join(', ')
   return (
-    `tick ${st.tick} (${st.tick / TICKS_PER_S / 60} min), level ` +
+    `tick ${st.tick} (${attractMinute(sim)} min), level ` +
     `${st.level.level}, $${st.economy.balance}, fleet [${fleet}], ` +
     `live [${live}], lane ${st.lane.stalled ? 'stalled' : 'flowing'}`
   )
@@ -97,7 +120,9 @@ if (isMain) {
   console.log(`attract: ${attractSummary(sim)}`)
   if (problems.length > 0) {
     for (const p of problems) console.error(`attract: ${p}`)
-    console.error('attract: not written (the M5 attract city needs the above)')
+    console.error(
+      `attract: not written (no minute in ${ATTRACT_MIN_MINUTES}-${ATTRACT_MAX_MINUTES} shows the M8 attract city; tune the policy, not the fixture)`,
+    )
     process.exitCode = 1
   } else {
     const out = fileURLToPath(ATTRACT_OUT)

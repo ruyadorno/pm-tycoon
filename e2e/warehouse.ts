@@ -2,13 +2,15 @@
 // §6.9.3, warehouse-view.md §1.1 / §7.5). Room geometry comes from the
 // pure layout module (src/render/warehouse/RoomLayout.ts), so the specs tap
 // the same rects the scene hit-tests; scene / HUD internals are read through
-// casts like the M1 specs do. M6 (design-m6 §6.1-§6.2): the Hold Bay station
+// casts like the M1 specs do. M8 (design-m8-m9 §6.1): `dockHit(k)` — dock
+// k's door + pad tap rect from RoomLayout's dockGeom. M6 (design-m6 §6.1-§6.2): the Hold Bay station
 // (HOLD_STATION_HIT, the sorter's SORTER_STAND, the rack lamp's S badge),
 // the StationCard and the HireSheet (Warehouse id `wh:hire`, Garage id
 // `garage:hire`; its cards are `<id>:card:<i>`) join openSheet / hireSheet.
 import type { Page } from '@playwright/test'
 import {
   bayRect,
+  dockGeom,
   FixedLaneLayout,
   HOLD_STATION_HIT,
   ROOM_H,
@@ -18,8 +20,19 @@ import {
 } from '../src/render/warehouse/RoomLayout.ts'
 import { expect, type PmHelpers } from './fixtures.ts'
 
+/** The tier-1 room (tiers 1-3 share every rect the specs tap, M8). */
 export const roomLayout = new FixedLaneLayout()
-export { bayRect, HOLD_STATION_HIT, ROOM_H, ROOM_W, SORTER_STAND }
+export { bayRect, dockGeom, HOLD_STATION_HIT, ROOM_H, ROOM_W, SORTER_STAND }
+
+/**
+ * M8: dock k's tap rect (door + pad, 56 × 56; dock 1 is the layout's
+ * `dock1` node rect), room px.
+ */
+export function dockHit(index: number): Rect {
+  const g = dockGeom(index)
+  if (!g) throw new Error(`no dock ${index}`)
+  return g.hit
+}
 
 /** Where the room sits on screen and the HUD bands around it (logical px). */
 export interface RoomFit {

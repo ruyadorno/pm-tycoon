@@ -161,17 +161,22 @@ export function tickerTint(kind: TickerLineKind): number {
   return TICKER_TINT[kind] ?? THEME.textLight
 }
 
-/** The §2 daily summary: `Day 3: 14 delivered, $312 earned, payroll $28`. */
+/**
+ * The §2 daily summary: `Day 3: 14 delivered, $312 earned, payroll $28`;
+ * M8: the day's paid overseas clearances (`parcel:cleared`, not malware)
+ * after the deliveries — `Day 9: 14 delivered, 3 cleared overseas, $412
+ * earned` (the earned sum already counts their pay).
+ */
 export function dailyLine(
   day: number,
   delivered: number,
   earned: number,
   payroll: number,
+  cleared = 0,
 ): string {
-  const parts = [
-    `${formatInt(delivered)} delivered`,
-    `${formatMoney(earned)} earned`,
-  ]
+  const parts = [`${formatInt(delivered)} delivered`]
+  if (cleared > 0) parts.push(`${formatInt(cleared)} cleared overseas`)
+  parts.push(`${formatMoney(earned)} earned`)
   if (payroll > 0) parts.push(`payroll ${formatMoney(payroll)}`)
   return `Day ${day}: ${parts.join(', ')}`
 }

@@ -1,17 +1,20 @@
-// Randomized one-dock soak scenarios (run decision Q-RUN1; spec §4.6 "with
-// one dock the cycle cannot deadlock", §6.4 "nothing is dropped, ever").
+// Randomized loading-dock soak scenarios (run decision Q-RUN1; spec §4.6
+// "with one dock the cycle cannot deadlock", §6.4 "nothing is dropped,
+// ever"; M8: the same with docks 2-3 bought, design-m8-m9 §7 M8 4).
 // Each scenario is a quiet L2 game with a random fleet and random home
 // zones, a shelf filled to its cap with random destinations (often ones the
 // fleet cannot serve yet — the full-shelf jam), random parcels already in
 // the lane and waiting in the city, a player who Tosses every flag, and —
 // part-way through — a random "capability event" (every zone → any, or a
 // truck / van / bike bought). Afterwards, while some vehicle could carry a
-// shelf parcel, the dock must keep turning over and the shelf must drain.
-// The scenario rng is the test's own (never the sim stream).
+// shelf parcel, the docks must keep turning over and the shelf must drain.
+// The scenario rng is the test's own (never the sim stream); `docks: 1` (the
+// default) draws exactly as before M8, so its seeds are the M2 review's.
 
 import { auditState } from '../../src/sim/sim.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import { outboundEligible } from '../../src/sim/systems/dispatch.ts'
+import { addDock } from '../../src/sim/systems/docks.ts'
 import type {
   BuildingId,
   Size,
@@ -89,7 +92,13 @@ const DOCKED = new Set(['docked_unloading', 'docked_loading'])
  */
 export function soakScenario(
   seed: number,
-  opts: { beforeS?: number; afterS?: number; maxDockS?: number } = {},
+  opts: {
+    beforeS?: number
+    afterS?: number
+    maxDockS?: number
+    /** Loading docks owned (M8: 2 = dock 2 bought, 3 = docks 2 and 3). */
+    docks?: 1 | 2 | 3
+  } = {},
 ): SoakResult {
   const r = scenarioRng(seed)
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)] as T
@@ -104,6 +113,8 @@ export function soakScenario(
     }
   }
   sim.state.level.level = 2
+  const docks = opts.docks ?? 1
+  for (let k = 2; k <= docks; k++) addDock(sim, k)
   const industrial = r() < 0.6
   if (industrial) unlockDistrict(sim, 'industrial')
   const live = sim.state.level.unlocked.slice()
@@ -163,7 +174,12 @@ export function soakScenario(
     for (let k = 0; k < 20 && !nobodyCarries(x); k++) x = randomParcel()
     shelveParcel(sim, x.o, x.d, { size: x.size })
   }
-  const laneNodes = ['conv1', 'slot1', 'slot2', 'slot3']
+  const laneNodes = [
+    ...sim.state.lane.docks.map((d) => d.conveyorNodeId),
+    'slot1',
+    'slot2',
+    'slot3',
+  ]
   const inLane = Math.floor(r() * 10)
   for (let i = 0; i < inLane; i++) {
     const id = pick(laneNodes)

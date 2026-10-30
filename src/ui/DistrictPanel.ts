@@ -30,14 +30,29 @@
 // the sheet's tallest case (Industrial with every row) stays at M5's height.
 // Locked regions replace rows 2–6 with `Unlocks at Lv 2 — $2,000 lifetime
 // earned`, the trucks-only line for Industrial and the locked sign art.
+// M8 (spec-core §5.6, design-m8-m9 §6.3): an overseas hub (`stats.kind ===
+// 'overseas'`, live) has no satisfaction, favoured, waiting or homed rows
+// (hubs never send parcels and are no home zone); its rows are
+//   2 ic_ship / ic_plane `Overseas hub · pays ×1.5`
+//   (the M7 quest row, when a quest targets the hub)
+//   3 ic_cleared `Clearance 45 s · 3 clearing · next 0:32` (vs.hub(id); the
+//     2-Hz re-read keeps the countdown moving)
+//   4 `Earned here: $1,240` (the clearances paid)
+//   5 `Sizes: S M L XL` (Airport `Sizes: S M`)
+// and the sheet fits them like any other district (≤ the old half-sheet).
 // Opening emits pm:panTo {regionId, cover} so the City centres the label in
 // the part of the screen the sheet leaves uncovered. The panel never subscribes to the sim: HudScene
 // calls refresh() on the §5.1 events; it also re-reads at 2 Hz while open
 // (the oldest age ticks without an event).
 import type Phaser from 'phaser'
-import type { DistrictDef, GameData } from '../data/types.ts'
+import type {
+  DistrictDef,
+  GameData,
+  OverseasDistrictDef,
+} from '../data/types.ts'
 import type {
   DistrictStats,
+  HubView,
   QuestsView,
   QuestView,
   Trend,
@@ -46,9 +61,14 @@ import type {
 import type { Size, VehicleType } from '../sim/types.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { decayPhase, type DecayPhase } from '../render/decayPhase.ts'
-import { SIGN_LOCKED_FACE, type FrameName } from '../render/frames.ts'
+import {
+  frameOrNull,
+  SIGN_LOCKED_FACE,
+  type FrameName,
+} from '../render/frames.ts'
 import { toggleGarage } from '../scenes/GarageSheet.ts'
 import { Button } from './Button.ts'
+import { hubIcon, hubPanelRows, type HubPanelRows } from './hubText.ts'
 import { HUD_TOP_H, type Layout } from './layout.ts'
 import { addBar, barFrame, BAR_H, setBarFill, type BarColour } from './Panel.ts'
 import { questRowText } from './questText.ts'
@@ -116,12 +136,19 @@ export function districtContentBottom(rows: {
   rule?: boolean
   /** M7: a quest offered / active for this district (takes the mood note's row). */
   quest?: boolean
+  /** M8: a live overseas hub (pay, clearance, earned, sizes; no other row). */
+  hub?: boolean
 }): number {
   let y = TOP + ROW
   if (rows.locked) {
     y += ROW
     if (rows.rule) y += ROW
     return y + 8 + (rows.signH ?? 0)
+  }
+  if (rows.hub) {
+    y += ROW // pay
+    if (rows.quest) y += ROW
+    return y + 3 * ROW // clearance, earned, sizes
   }
   if (rows.satisfaction) y += ROW
   if (rows.moodNote || rows.quest) y += ROW
@@ -266,6 +293,27 @@ export function lockedLine(def: DistrictDef, data: GameData): string {
   return row ? `${at} — ${formatMoney(row.threshold)} lifetime earned` : at
 }
 
+/**
+ * M8: the hub rows of an overseas district — from `vs.hub(id)`, or from its
+ * districts.json row with nothing clearing when map.hubs has no row for it
+ * yet (a debug-forced level ahead of the hub's render row).
+ */
+export function districtHubRows(
+  hub: HubView | null,
+  def: OverseasDistrictDef,
+  tick: number,
+): HubPanelRows {
+  return hubPanelRows(
+    hub ?? {
+      valueMult: def.valueMult,
+      clearanceS: def.clearanceS,
+      sizes: def.sizes,
+      clearing: [],
+    },
+    tick,
+  )
+}
+
 /** The building with the most waiting parcels (ties: the oldest parcel). */
 export function busiestBuilding(
   buildings: readonly { id: string; district: string }[],
@@ -383,6 +431,12 @@ export class DistrictPanel {
   private questText: Phaser.GameObjects.BitmapText
   private questZone: Phaser.GameObjects.Rectangle
   private questId: string | null = null
+  private hubIcon: Phaser.GameObjects.Image
+  private hubPayText: Phaser.GameObjects.BitmapText
+  private clearIcon: Phaser.GameObjects.Image
+  private clearText: Phaser.GameObjects.BitmapText
+  private sizesIcon: Phaser.GameObjects.Image
+  private sizesText: Phaser.GameObjects.BitmapText
   private opts: DistrictPanelOptions
 
   constructor(
@@ -459,6 +513,13 @@ export class DistrictPanel {
       'district:quest',
       () => this.onQuestTap(),
     )
+    // M8 hub rows (icons resolved per hub at render: ship / plane).
+    this.hubIcon = img('ic_money')
+    this.hubPayText = addText(scene, 0, 0, '')
+    this.clearIcon = img(frameOrNull('ic_cleared') ?? 'ic_flat')
+    this.clearText = addText(scene, 0, 0, '')
+    this.sizesIcon = img('ic_parcel_m')
+    this.sizesText = addText(scene, 0, 0, '')
 
     this.sheet.add(
       this.title,
@@ -490,6 +551,12 @@ export class DistrictPanel {
       this.questIcon,
       this.questText,
       this.questZone,
+      this.hubIcon,
+      this.hubPayText,
+      this.clearIcon,
+      this.clearText,
+      this.sizesIcon,
+      this.sizesText,
     )
 
     scene.events.on('update', this.onUpdate, this)
@@ -589,6 +656,8 @@ export class DistrictPanel {
       this.layoutSign(def, y + 8)
       return y + 8 + Math.round(this.sign.height)
     }
+
+    if (def.kind === 'overseas') return this.renderHub(stats, def, y)
 
     // 2 satisfaction (districts only: hubs have none) + the mood note, or
     // (M7) the quest row in its place
@@ -727,6 +796,41 @@ export class DistrictPanel {
       { x: bx, y, w: this.garageBtn.btnWidth, h: TAP_ROW },
     )
     return y + TAP_ROW
+  }
+
+  /**
+   * M8: a live overseas hub's rows from `y` (under the header); returns
+   * their bottom. The M7 quest row (a quest targeting the hub) sits under
+   * the pay row.
+   */
+  private renderHub(
+    stats: DistrictStats,
+    def: OverseasDistrictDef,
+    y: number,
+  ): number {
+    const rows = districtHubRows(this.vs.hub(def.id), def, this.vs.tick)
+    const iconY = (rowY: number): number => rowY + Math.floor((ROW - ICON) / 2)
+    const tx = X + ICON + GAP
+    const icon = frameOrNull(hubIcon(this.vs.data, def.id))
+    if (icon) show(this.hubIcon).setFrame(icon).setPosition(X, iconY(y))
+    show(this.hubPayText).setText(rows.pay).setPosition(tx, textTop(y, ROW))
+    y += ROW
+    const quest = districtQuest(this.vs.quests(), def.id)
+    this.questId = quest?.id ?? null
+    if (quest) y = this.renderQuest(quest, y)
+    if (frameOrNull('ic_cleared')) show(this.clearIcon).setPosition(X, iconY(y))
+    show(this.clearText)
+      .setText(rows.clearance)
+      .setPosition(tx, textTop(y, ROW))
+    y += ROW
+    show(this.earnIcon).setPosition(X, iconY(y))
+    show(this.earnText)
+      .setText(earnedLine(stats.earned))
+      .setPosition(tx, textTop(y, ROW))
+    y += ROW
+    show(this.sizesIcon).setPosition(X, iconY(y))
+    show(this.sizesText).setText(rows.sizes).setPosition(tx, textTop(y, ROW))
+    return y + ROW
   }
 
   /** The quest row at `y`; returns the next y. */

@@ -50,6 +50,23 @@ describe('city-view §8.2: a 48×48 picture by kind', () => {
   it('level → the new tier wh_ext_tN (levels.json warehouseTier)', () => {
     expect(np.newsPicture('level', data, { level: 2 })).toBe('wh_ext_t2')
     expect(np.newsPicture('level', data, { level: 1 })).toBe('wh_ext_t1')
+    // M8: the L3 paper shows the tier-3 exterior.
+    expect(np.newsPicture('level', data, { level: 3 })).toBe('wh_ext_t3')
+  })
+
+  it('M8: a tier with no exterior art falls back to the nearest lower tier (design-m8-m9 §6.1)', () => {
+    const levels = [
+      { level: 9, warehouseTier: 9 },
+    ] as unknown as typeof data.levels
+    const pic = np.newsPicture('level', { ...data, levels }, { level: 9 })
+    expect(pic).toMatch(/^wh_ext_t[1-9]$/)
+    expect(pic).not.toBe('wh_ext_t9')
+  })
+
+  it('M8: the Docks region paper shows its hero building (a pier terminal)', () => {
+    const hero = np.heroBuilding(data, 'docks')
+    expect(hero?.district).toBe('docks')
+    expect(np.newsPicture('region', data, { district: 'docks' })).not.toBeNull()
   })
 
   it('incident → parcel_m_mal; walkout → the worker idle frame', () => {
@@ -166,6 +183,27 @@ describe('spec-build2 §2.5: a one-line "hired" item for star applicants only', 
 })
 
 describe('city-view §8.2: the headline wraps at 236 px, at most 4 lines', () => {
+  it('M8: every levels.json ticker line (the L3 row included) fits the paper in m5x7', async () => {
+    const { readFileSync } = await import('node:fs')
+    const xml = readFileSync(
+      new URL('../../src/assets/m5x7.xml', import.meta.url),
+      'utf8',
+    )
+    const adv = new Map<number, number>()
+    for (const m of xml.matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+      adv.set(Number(m[1]), Number(m[2]))
+    const width = (t: string): number =>
+      [...t].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
+    for (const row of data.levels) {
+      const lines = np.wrapHeadline(row.ticker, np.HEADLINE_W, 4, width)
+      expect(lines.join(' '), `L${row.level}`).toBe(row.ticker)
+      expect(lines.length, `L${row.level}`).toBeLessThanOrEqual(
+        np.HEADLINE_MAX_LINES,
+      )
+      for (const l of lines) expect(width(l), l).toBeLessThanOrEqual(236)
+    }
+  })
+
   it('wraps the levels.json L2 line on spaces inside 236 px', () => {
     const row = data.levels.find((l) => l.level === 2)!
     const lines = np.wrapHeadline(row.ticker, np.HEADLINE_W, 4, measure)

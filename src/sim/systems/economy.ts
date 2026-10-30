@@ -86,8 +86,8 @@ export function deliverParcel(sim: Sim, v: Vehicle | null, p: Parcel): void {
 }
 
 /**
- * §10: malware reached a consumer (a local delivery now; an overseas
- * clearance in build 2). One life (never below 0), the report, the incident
+ * §10: malware reached a consumer (a local delivery, or an overseas
+ * clearance — hubs.ts, M8). One life (never below 0), the report, the incident
  * counter, `life:lost`, and `game:over` when the last life goes. Off while
  * SIM_FEATURES.lives is (M1 behaviour: $0 and the satisfaction hit only).
  */
@@ -145,10 +145,24 @@ export function debugMalwareDelivery(sim: Sim): void {
       (x) => s.level.announced[x.id] !== undefined,
     )?.id ?? 'metal'
   const p = debugParcel(sim, s.nextId.parcel, true, strain)
+  const v = s.vehicles[0] ?? null
+  appendDebugRoute(sim, p, v)
+  deliverParcel(sim, v, p)
+}
+
+/**
+ * A debug parcel's plausible route up to its outbound leg, back-dated from
+ * now: spawned 60 s ago, picked up by `v` (45 s), unloaded at dock1 (30 s),
+ * each live slot "missed" or "empty" (28 s), shelved (25 s), loaded onto `v`
+ * (15 s). Shared by debugMalwareDelivery and (M8) hubs.ts
+ * debugOverseasMalware.
+ */
+export function appendDebugRoute(sim: Sim, p: Parcel, v: Vehicle | null): void {
+  const s = sim.state
+  const data = sim.data
   const at = (secondsAgo: number): number =>
     Math.max(0, s.tick - secondsAgo * TICKS_PER_S)
   p.spawnedTick = at(60)
-  const v = s.vehicles[0] ?? null
   const spawned = p.trace[0]
   if (spawned) spawned.tick = p.spawnedTick
   p.trace.push({
@@ -171,5 +185,4 @@ export function debugMalwareDelivery(sim: Sim): void {
     ref: v ? String(v.id) : null,
     text: v ? `Loaded onto ${v.name}` : 'Loaded',
   })
-  deliverParcel(sim, v, p)
 }

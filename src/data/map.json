@@ -140,6 +140,9 @@
     {"frame":"dk_containers","tile":[6,32],"region":"docks"},
     {"frame":"dk_containers","tile":[8,33],"region":"docks"}
   ],
+  "hubs": [
+    {"district":"docks","office":"dk_customs","vessel":{"frame":"dk_ship","tile":[1,29],"exit":[-5,0],"liftPx":0}}
+  ],
   "buildings": {
     "dt_registry_tower": {"doorOffset":[0,1]},
     "dt_semver_bank": {"doorOffset":[1,1]},

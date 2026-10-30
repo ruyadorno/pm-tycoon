@@ -49,6 +49,18 @@
 // once, so it glides through the slot, and the machine there keeps its
 // idle frame (machineScanning) — no scan, no catch, never dark. Shelf minis
 // are unchanged.
+//
+// M8 (spec-build2 §4.1, design-m8-m9 §6.1): parcels unloaded at dock 2 or 3
+// fly from that dock's door point onto its roller pad (the `conv2` / `conv3`
+// node) as 10 × 10 minis (`parcel_mini_<size>`), then hop north onto conv1's
+// line (PAD_EXIT) and grow back to the lane frame on the way to slot 1. Load
+// flights end at the loading vehicle's own door. Tiers run 1..5
+// (`visualTier`): every tier-keyed frame resolves `<stem>_t<t>` or the
+// nearest lower tier that exists (`tierFrame`), so missing art never
+// crashes; bulb t1, strip lights t2+, plates t2+, props per tier group
+// (RoomLayout propsFor). From tier 3 the shelf draws the 20 × 5 @ 11 grid:
+// a tier change swaps `layout` for `new FixedLaneLayout(tier)` and moves
+// the minis (the room keeps its rows through tier 3, so nothing else moves).
 import Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type { LaneNode, Parcel, Size, Strain } from '../../sim/types.ts'
@@ -78,6 +90,8 @@ import {
   PLATE_PAD,
   PROPS_T1,
   PROPS_T2,
+  PROPS_T3,
+  propGroup,
   RACK,
   RACK_LAMP,
   RACK_S_BADGE,
@@ -88,9 +102,7 @@ import {
   ROOM_ROWS,
   ROOM_W,
   SHELF_BADGE,
-  SHELF_COLS,
-  SHELF_ROWS,
-  shelfCell,
+  SHELF_MAX_CELLS,
   SIGN,
   SIGN_TEXT,
   SIGNAGE,
@@ -183,8 +195,11 @@ export function createRoomLayers(
 
 // ---- constants ----------------------------------------------------------------
 
-/** §1.5 pool: conveyor 6 + 4 × (2 + 3) + Hold Bay 5 + in-flight margin. */
-export const MAX_PARCELS = 48
+/**
+ * §1.5 pool: 3 conveyors × 6 + 6 slots × (2 + 3) + Hold Bay 5 + in-flight
+ * margin (M8, design-m8-m9 §6.1: 48 → 72 for docks 2–3).
+ */
+export const MAX_PARCELS = 72
 const BELT_FPS = 8
 const MACHINE_SCAN_FPS = 4
 const SHAKER_SCAN_FPS = 8
@@ -247,10 +262,71 @@ export const miniFrame = (size: Size): string => `parcel_mini_${SIZE_KEY[size]}`
 const flipFrames = (size: Size): string[] =>
   [0, 1, 2, 3, 4, 5].map((i) => `parcel_${SIZE_KEY[size]}_flip_f${i}`)
 
-/** Visual tier (only t1 / t2 art exists in playtest 1). */
-export function visualTier(data: GameData, level: number): 1 | 2 {
+/** The highest warehouse tier (levels.json warehouseTier 1..5). */
+export const TOP_TIER = 5
+
+/** Visual tier 1..5: the level's levels.json warehouseTier (M8: no t2 cap; art falls back per frame). */
+export function visualTier(data: GameData, level: number): number {
   const row = data.levels.find((l) => l.level === level)
-  return (row?.warehouseTier ?? 1) >= 2 ? 2 : 1
+  const t = Math.floor(row?.warehouseTier ?? 1)
+  return Math.min(TOP_TIER, Math.max(1, t))
+}
+
+/**
+ * `<stem>_t<tier>`, else the nearest lower tier the atlas has (`has` = the
+ * atlas lookup, frameOrNull by default), else null — so tiers 4–5 draw the
+ * tier-3 art until theirs is packed (design-m8-m9 §6.1).
+ */
+export function tierFrame(
+  stem: string,
+  tier: number,
+  has: (name: string) => boolean = (n) => frameOrNull(n) !== null,
+  suffix = '',
+): string | null {
+  for (let t = Math.floor(tier); t >= 1; t--) {
+    const name = `${stem}_t${t}${suffix}`
+    if (has(name)) return name
+  }
+  return null
+}
+
+/**
+ * Floor tile (c, r) of tier `tier`: the seeded crack variants at tier 1
+ * (§5.1), `floor_t<t>` / `floor_t<t>_lane` (the belt column c4) above,
+ * falling back tier by tier (tier 2 is always drawn).
+ */
+export function floorFrameFor(
+  tier: number,
+  c: number,
+  r: number,
+  has: (name: string) => boolean = (n) => frameOrNull(n) !== null,
+): string {
+  if (tier >= 2) {
+    const lane = c === 4 ? tierFrame('floor', tier, has, '_lane') : null
+    const plain = tierFrame('floor', tier, has)
+    const f = lane ?? plain
+    if (f && f !== 'floor_t1') return f
+  }
+  const h = (c * 73856093) ^ (r * 19349663)
+  const v = (h >>> 0) % 7
+  return `floor_t1_${v === 0 ? 1 : v === 3 ? 2 : 0}`
+}
+
+/** The tier-only parts a room of tier `tier` shows (§5; M8 tiers 3–5). */
+export function tierParts(tier: number): {
+  bulb: boolean
+  strips: boolean
+  plates: boolean
+  props: 1 | 2 | 3
+  signDark: boolean
+} {
+  return {
+    bulb: tier <= 1,
+    strips: tier >= 2,
+    plates: tier >= 2,
+    props: propGroup(tier),
+    signDark: tier >= 2,
+  }
 }
 
 /** `Lane: 15/min · Detection ` + `97%` (§1.9), or the stalled caption (§4). */
@@ -402,6 +478,8 @@ interface PSprite {
   bay: number | null
   /** M7: the quest's golden parcel (parcel_<size>_magic). */
   magic: boolean
+  /** M8: drawn as a 10 × 10 mini (on a dock 2–3 roller pad). */
+  mini: boolean
   actions: Action[]
   running: boolean
   tween: Phaser.Tweens.Tween | null
@@ -459,13 +537,13 @@ export interface TossInfo {
 
 export class LaneRenderer {
   readonly scene: Phaser.Scene
-  readonly layout: FixedLaneLayout
+  private lay: FixedLaneLayout
   private L: RoomLayers
   private vs: ViewSim
   private fx: Fx
   private gd: GameData
 
-  private tier: 1 | 2 = 1
+  private tier = 1
   private floorImgs: { img: Img; c: number; r: number }[] = []
   private wallImgs: Img[] = []
   private faceImgs: Img[] = []
@@ -475,8 +553,8 @@ export class LaneRenderer {
   private cracked = false
   private bulb!: Img
   private strips: Img[] = []
-  private props1: Img[] = []
-  private props2: Img[] = []
+  /** Tier props by group (RoomLayout propGroup): 1, 2, 3 (tiers ≥ 3). */
+  private props = new Map<1 | 2 | 3, Img[]>()
   private poster!: Img
   private plates: Box[] = []
   private shelfImg!: Img
@@ -540,11 +618,12 @@ export class LaneRenderer {
   ) {
     this.scene = scene
     this.L = layers
-    this.layout = layout
     this.vs = vs
     this.fx = fx
     this.gd = vs.data
     this.tier = visualTier(this.gd, vs.level)
+    this.lay =
+      layout.tier === this.tier ? layout : new FixedLaneLayout(this.tier)
     this.buildRoom()
     this.buildReadout()
     for (let i = 0; i < MAX_PARCELS; i++) {
@@ -555,6 +634,15 @@ export class LaneRenderer {
       this.pool.push(img)
       this.L.parcels.add(img)
     }
+  }
+
+  /**
+   * The room layout of the current tier (the scene, DockView and the
+   * workers share its tier-invariant geometry; the shelf grid follows the
+   * tier, M8).
+   */
+  get layout(): FixedLaneLayout {
+    return this.lay
   }
 
   // ================================================================ static room
@@ -599,11 +687,12 @@ export class LaneRenderer {
   }
 
   private floorFrame(c: number, r: number): string {
-    if (this.tier === 2) return c === 4 ? 'floor_t2_lane' : 'floor_t2'
-    // Seeded crack variants (§5.1): a cheap hash of (c, r).
-    const h = (c * 73856093) ^ (r * 19349663)
-    const v = (h >>> 0) % 7
-    return `floor_t1_${v === 0 ? 1 : v === 3 ? 2 : 0}`
+    return floorFrameFor(this.tier, c, r)
+  }
+
+  /** `<stem>_t<tier>` or the nearest lower tier's frame (tierFrame), else the t1 name. */
+  private tierName(stem: string, tier = this.tier): string {
+    return tierFrame(stem, tier) ?? `${stem}_t1`
   }
 
   private buildRoom(): void {
@@ -623,19 +712,28 @@ export class LaneRenderer {
     }
     // Walls: west c0 / east c10 below the north face r0.
     for (let r = 1; r < ROOM_ROWS; r++) {
-      this.wallImgs.push(this.img(this.L.walls, 0, r * TILE, `wall_t${t}`))
       this.wallImgs.push(
-        this.img(this.L.walls, ROOM_W - TILE, r * TILE, `wall_t${t}`),
+        this.img(this.L.walls, 0, r * TILE, this.tierName('wall', t)),
+      )
+      this.wallImgs.push(
+        this.img(
+          this.L.walls,
+          ROOM_W - TILE,
+          r * TILE,
+          this.tierName('wall', t),
+        ),
       )
     }
     for (let c = 0; c < ROOM_COLS; c++)
-      this.faceImgs.push(this.img(this.L.walls, c * TILE, 0, `wallface_t${t}`))
+      this.faceImgs.push(
+        this.img(this.L.walls, c * TILE, 0, this.tierName('wallface', t)),
+      )
     const base = this.scene.add
       .rectangle(0, ROOM_H - 2, ROOM_W, 2, PALETTE.outline, 1)
       .setOrigin(0, 0)
     this.L.walls.add(base)
     // North-wall sign, crack overlay, lights.
-    this.sign = this.img(this.L.walls, SIGN.x, SIGN.y, `sign_t${t}`)
+    this.sign = this.img(this.L.walls, SIGN.x, SIGN.y, this.tierName('sign', t))
     this.signText = this.text(this.L.walls, SIGN_TEXT.x, 0, '', THEME.textLight)
     // the walls are a back layer: the same m5x7 from `interior` keeps the
     // sign text in the back batch (PreloadScene registers ROOM_FONT_KEY)
@@ -707,15 +805,20 @@ export class LaneRenderer {
     this.bin = this.img(this.L.fixtures, binR.x, binR.y, 'bin_closed')
     this.binText = this.text(this.L.badges, 0, 0, '×0', THEME.textDark)
 
-    // Shelf + mini grid + badge.
+    // Shelf + mini grid (the largest tier's cell count, placed per tier) + badge.
     const sh = lay.rectFor('shelf') as Rect
-    this.shelfImg = this.img(this.L.fixtures, sh.x, sh.y, `shelf_t${t}`)
-    for (let i = 0; i < SHELF_COLS * SHELF_ROWS; i++) {
-      const c = shelfCell(i)
-      const m = this.img(this.L.fixtures, c.x - 3, c.y - 3, 'parcel_mini_s')
+    this.shelfImg = this.img(
+      this.L.fixtures,
+      sh.x,
+      sh.y,
+      this.tierName('shelf', t),
+    )
+    for (let i = 0; i < SHELF_MAX_CELLS; i++) {
+      const m = this.img(this.L.fixtures, 0, 0, 'parcel_mini_s')
       m.setVisible(false)
       this.minis.push(m)
     }
+    this.placeMinis()
     this.badge = this.img(
       this.L.badges,
       SHELF_BADGE.x,
@@ -724,16 +827,23 @@ export class LaneRenderer {
     )
     this.badgeText = this.text(this.L.badges, 0, 0, '', THEME.textDark)
 
-    // Tier props + the wanted poster.
-    for (const p of PROPS_T1)
-      this.props1.push(this.img(this.L.fixtures, p.x, p.y, 'props_t1'))
-    for (const p of PROPS_T2)
-      this.props2.push(this.img(this.L.fixtures, p.x, p.y, 'props_t2'))
+    // Tier props (one set per group; tiers 4–5 reuse group 3 with their
+    // own frame when drawn) + the wanted poster.
+    const groups: [1 | 2 | 3, readonly Point[], string][] = [
+      [1, PROPS_T1, 'props_t1'],
+      [2, PROPS_T2, 'props_t2'],
+      [3, PROPS_T3, this.tierName('props', Math.max(3, t))],
+    ]
+    for (const [g, pts, f] of groups)
+      this.props.set(
+        g,
+        pts.map((p) => this.img(this.L.fixtures, p.x, p.y, f)),
+      )
     this.poster = this.img(
       this.L.fixtures,
       POSTER.x,
       POSTER.y,
-      `wanted_poster_t${t}`,
+      this.tierName('wanted_poster', t),
     )
     // Tier-2 signage plates.
     for (const s of SIGNAGE) {
@@ -958,37 +1068,59 @@ export class LaneRenderer {
   // ================================================================ tiers
 
   /**
-   * Tier switch hook (§5): t1 → t2 art. `fade` = the 400 ms cross-fade of a
-   * level-up seen from inside (every tier-keyed frame under a fading copy of
-   * its old look, the tier-only parts and the sign text faded); without it
-   * the new tier shows at once (create, waking after the level-up).
+   * Tier switch hook (§5; M8 tiers 1..5): `fade` = the 400 ms cross-fade of
+   * a level-up seen from inside (every tier-keyed frame under a fading copy
+   * of its old look, the tier-only parts and the sign text faded); without
+   * it the new tier shows at once (create, waking after the level-up). A
+   * new shelf grid (tier 3) re-places the minis at once.
    */
-  applyTier(tier: 1 | 2, fade: boolean): void {
+  applyTier(tier: number, fade: boolean): void {
     const prev = this.tier
     this.tier = tier
     const cross = fade && prev !== tier
-    const swap = (img: Img, frame: string): void => {
-      const f = frameOrNull(frame)
+    if (this.lay.tier !== tier) {
+      this.lay = new FixedLaneLayout(tier)
+      this.placeMinis()
+    }
+    const swap = (img: Img, frame: string | null): void => {
+      const f = frame === null ? null : frameOrNull(frame)
       if (!f || img.frame.name === f) return
       if (cross) this.ghost(img)
       img.setFrame(f)
     }
     for (const f of this.floorImgs) swap(f.img, this.floorFrame(f.c, f.r))
-    for (const w of this.wallImgs) swap(w, `wall_t${tier}`)
-    for (const w of this.faceImgs) swap(w, `wallface_t${tier}`)
-    swap(this.sign, `sign_t${tier}`)
-    swap(this.shelfImg, `shelf_t${tier}`)
-    swap(this.poster, `wanted_poster_t${tier}`)
-    const tint = tier === 1 ? THEME.textLight : THEME.textDark
+    for (const w of this.wallImgs) swap(w, tierFrame('wall', tier))
+    for (const w of this.faceImgs) swap(w, tierFrame('wallface', tier))
+    swap(this.sign, tierFrame('sign', tier))
+    swap(this.shelfImg, tierFrame('shelf', tier))
+    swap(this.poster, tierFrame('wanted_poster', tier))
+    const parts = tierParts(tier)
+    for (const p of this.props.get(3) ?? [])
+      swap(p, tierFrame('props', Math.max(3, tier)))
+    const tint = parts.signDark ? THEME.textDark : THEME.textLight
     if (cross && this.signText.tintTopLeft !== tint)
       this.ghostText(this.signText)
     this.signText.setTint(tint)
-    this.fadeShown(this.bulb, tier === 1, cross)
-    for (const s of this.strips) this.fadeShown(s, tier === 2, cross)
-    for (const p of this.props1) this.fadeShown(p, tier === 1, cross)
-    for (const p of this.props2) this.fadeShown(p, tier === 2, cross)
-    for (const p of this.plates) this.fadeShown(p, tier === 2, cross)
+    this.fadeShown(this.bulb, parts.bulb, cross)
+    for (const s of this.strips) this.fadeShown(s, parts.strips, cross)
+    for (const [g, imgs] of this.props)
+      for (const p of imgs) this.fadeShown(p, parts.props === g, cross)
+    for (const p of this.plates) this.fadeShown(p, parts.plates, cross)
     this.refreshSign()
+  }
+
+  /** Put every shelf mini on this tier's grid (syncShelf moves the check badges). */
+  private placeMinis(): void {
+    const cells = this.lay.shelfCapacity()
+    this.minis.forEach((m, i) => {
+      if (i >= cells) {
+        m.setVisible(false)
+        return
+      }
+      const c = this.lay.shelfCell(i)
+      this.scene.tweens.killTweensOf(m)
+      m.setAlpha(1).setPosition(Math.round(c.x - 3), Math.round(c.y - 3))
+    })
   }
 
   /** Show / hide a tier-only part, over TIER_FADE_MS when `fade`. */
@@ -1394,19 +1526,22 @@ export class LaneRenderer {
   private syncShelf(): void {
     const ids = this.vs.shelf.ids
     const cap = this.vs.shelf.cap
-    const cells = this.minis.length
-    // Departures since the last frame: loaded parcels fly to the door (§1.4).
+    const cells = this.lay.shelfCapacity()
+    // Departures since the last frame: loaded parcels fly to the door of
+    // the dock their vehicle stands in (§1.4; M8 docks 2–3).
     if (!this.instant && this.prevShelf.length > 0) {
       const now = new Set(ids)
       this.prevShelf.forEach((id, i) => {
         if (now.has(id)) return
         const p = this.vs.parcel(id)
         if (p && p.state !== 'loaded' && p.state !== 'in_transit_out') return
-        this.loadFlight(p?.size ?? 'S', i % cells)
+        this.loadFlight(p?.size ?? 'S', i % cells, this.loadDoor(p))
       })
     }
     const before = this.instant ? null : new Set(this.prevShelf)
     this.prevShelf = ids.slice()
+    for (let i = cells; i < this.minis.length; i++)
+      (this.minis[i] as Img).setVisible(false)
     for (let i = 0; i < cells; i++) {
       const m = this.minis[i] as Img
       const id = ids[i]
@@ -1421,7 +1556,7 @@ export class LaneRenderer {
       m.setVisible(true)
       // Arrived without a lane sprite (returned cargo of a sold vehicle,
       // §1.8, or a long advance): a 200 ms pop.
-      if (before && !before.has(id)) this.popMini(m, shelfCell(i))
+      if (before && !before.has(id)) this.popMini(m, this.lay.shelfCell(i))
     }
     // Cleared parcels keep a check badge until loaded (§3.4).
     for (const [id, img] of this.miniChecks) {
@@ -1430,7 +1565,7 @@ export class LaneRenderer {
         img.destroy()
         this.miniChecks.delete(id)
       } else {
-        const c = shelfCell(i)
+        const c = this.lay.shelfCell(i)
         img.setPosition(c.x + CHECK_DX, c.y + CHECK_DY)
       }
     }
@@ -1442,7 +1577,7 @@ export class LaneRenderer {
       }
       if (i >= cells || this.miniChecks.has(id) || this.sprites.has(id))
         continue
-      const c = shelfCell(i)
+      const c = this.lay.shelfCell(i)
       const img = this.img(
         this.L.badges,
         c.x + CHECK_DX,
@@ -1479,12 +1614,21 @@ export class LaneRenderer {
     })
   }
 
-  private loadFlight(size: Size, cell: number): void {
+  /** The door point of the dock where `p`'s vehicle loads (dock 1 when unknown). */
+  private loadDoor(p: Parcel | null): Point {
+    const vid = p?.vehicleId ?? null
+    const v =
+      vid === null ? null : (this.vs.vehicles.find((x) => x.id === vid) ?? null)
+    const g = v?.dockId ? this.lay.dockGeom(v.dockId) : null
+    return g?.doorPoint ?? DOOR_POINT
+  }
+
+  private loadFlight(size: Size, cell: number, door: Point): void {
     if (this.flights >= MAX_FLIGHTS) return
-    const c = shelfCell(cell)
+    const c = this.lay.shelfCell(cell)
     const m = this.img(this.L.parcels, c.x - 3, c.y - 3, miniFrame(size))
     this.flights += 1
-    moveAlong(this.scene, m, [{ x: DOOR_POINT.x - 8, y: DOOR_POINT.y - 8 }], {
+    moveAlong(this.scene, m, [{ x: door.x - 8, y: door.y - 8 }], {
       ms: LOAD_MS,
       onDone: () => {
         this.flights -= 1
@@ -1520,12 +1664,20 @@ export class LaneRenderer {
     if (rec.check) this.L.parcels.bringToTop(rec.check)
   }
 
-  private spawn(id: number, at: Point, node: string | null): PSprite | null {
+  private spawn(
+    id: number,
+    at: Point,
+    node: string | null,
+    padMini = false,
+  ): PSprite | null {
     const p = this.vs.parcel(id)
     if (!p) return null
     const img = this.acquire()
     if (!img) return null
-    img.setFrame(parcelFrame(p.size, false, p.magic)).setPosition(at.x, at.y)
+    const mini = padMini
+    img
+      .setFrame(mini ? miniFrame(p.size) : parcelFrame(p.size, false, p.magic))
+      .setPosition(at.x, at.y)
     const rec: PSprite = {
       id,
       img,
@@ -1535,6 +1687,7 @@ export class LaneRenderer {
       at: { ...at },
       bay: null,
       magic: p.magic,
+      mini,
       actions: [],
       running: false,
       tween: null,
@@ -1643,10 +1796,20 @@ export class LaneRenderer {
     }
   }
 
+  /** M8: draw the parcel as a pad mini (dock 2–3 roller pad) or its lane frame. */
+  private setMini(rec: PSprite, mini: boolean): void {
+    if (rec.mini === mini) return
+    rec.mini = mini
+    rec.img.setFrame(
+      mini ? miniFrame(rec.size) : parcelFrame(rec.size, rec.dark, rec.magic),
+    )
+  }
+
   private setDark(rec: PSprite, dark: boolean, strain: Strain | null): void {
     rec.dark = dark
     rec.catching = false
     rec.strain = dark ? strain : null
+    rec.mini = false
     rec.img.setFrame(parcelFrame(rec.size, dark, rec.magic))
     if (dark && strain) {
       const f = frameOrNull(`ic_strain_${strain}`)
@@ -1741,11 +1904,15 @@ export class LaneRenderer {
     for (const [id, w] of this.wants) {
       let rec = this.sprites.get(id) ?? null
       if (!rec) {
-        const fromDock = !this.instant && w.nodeId.startsWith('conv')
+        // Unloaded: from the door of the conveyor's own dock (M8 docks 2–3
+        // land on their pad as minis).
+        const dock = this.unloadDock(w.nodeId)
+        const fromDock = !this.instant && dock !== null
         rec = this.spawn(
           id,
-          fromDock ? DOOR_POINT : w.point,
-          fromDock ? 'dock1' : w.nodeId,
+          fromDock ? dock.door : w.point,
+          fromDock ? dock.id : w.nodeId,
+          this.lay.isPad(w.nodeId),
         )
         if (!rec) continue
         if (!fromDock) rec.at = { ...w.point }
@@ -1764,16 +1931,26 @@ export class LaneRenderer {
           x: rec.img.x,
           y: rec.img.y,
         })
-        const opts: MoveOpts = from === 'dock1' ? { ms: UNLOAD_MS } : {}
+        const opts: MoveOpts = /^dock\d+$/.test(from) ? { ms: UNLOAD_MS } : {}
         rec.node = w.nodeId
         rec.at = { ...w.point }
         const divert = w.nodeId === 'hold' && this.isSlot(from)
-        this.enqueue(
-          rec,
-          divert
-            ? this.divertAction(rec, from, w.point)
-            : this.moveAction(rec, pts, opts),
-        )
+        const toPad = this.lay.isPad(w.nodeId)
+        if (divert) this.enqueue(rec, this.divertAction(rec, from, w.point))
+        else if (rec.mini && !toPad && pts.length > 1) {
+          // Off the pad (M8): hop onto conv1's line as a mini, then the
+          // lane frame for the run down to slot 1.
+          const [hop, ...rest] = pts as [Point, ...Point[]]
+          this.enqueue(rec, this.moveAction(rec, [hop]))
+          this.enqueue(rec, (done) => {
+            this.setMini(rec, false)
+            done()
+          })
+          this.enqueue(rec, this.moveAction(rec, rest))
+        } else {
+          this.setMini(rec, toPad)
+          this.enqueue(rec, this.moveAction(rec, pts, opts))
+        }
       } else if (rec.at.x !== w.point.x || rec.at.y !== w.point.y) {
         rec.at = { ...w.point }
         this.enqueue(rec, this.moveAction(rec, [w.point]))
@@ -1782,6 +1959,19 @@ export class LaneRenderer {
     for (const rec of this.sprites.values()) {
       if (!rec.seen && !rec.leaving) this.leave(rec)
     }
+  }
+
+  /**
+   * The dock a parcel arriving at conveyor `nodeId` was unloaded at (the
+   * conveyor's dockId: `conv2` → dock 2) and its door point; null for any
+   * other node.
+   */
+  private unloadDock(nodeId: string): { id: string; door: Point } | null {
+    const n = this.vs.lane.nodes().find((x) => x.id === nodeId)
+    if (!n || n.kind !== 'conveyor') return null
+    const id = n.dockId ?? 'dock1'
+    const g = this.lay.dockGeom(id)
+    return { id, door: g?.doorPoint ?? DOOR_POINT }
   }
 
   private isSlot(nodeId: string): boolean {
@@ -1803,10 +1993,12 @@ export class LaneRenderer {
     const i = ids.indexOf(rec.id)
     if (p && p.state === 'on_shelf' && i >= 0 && !this.instant) {
       rec.leaving = 'shelf'
-      const cell = this.layout.anchorsFor('shelf').buffer[i % this.minis.length]
-      const dest = cell ?? this.layout.anchorsFor('shelf').entry
+      const shelf = this.layout.anchorsFor('shelf')
+      const cell = shelf.buffer[i % Math.max(1, shelf.buffer.length)]
+      const dest = cell ?? shelf.entry
       const cleared = this.cleared.has(rec.id)
       this.enqueue(rec, (done) => {
+        this.setMini(rec, false)
         if (rec.dark) this.setDark(rec, false, null)
         if (cleared) this.setCheck(rec, true)
         rec.ring?.destroy()

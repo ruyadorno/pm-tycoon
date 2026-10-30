@@ -3,7 +3,7 @@
 // cross-references and conservation identity (sim.ts). A save with the
 // running data hash can still be damaged (a flipped digit that stays valid
 // JSON, a hand-edited payload, a build that changed the state shape without
-// bumping `version` — types.ts STATE_VERSION, 4 since M7, the only value
+// bumping `version` — types.ts STATE_VERSION, 5 since M8, the only value
 // accepted); every field the tick and the command handlers read must
 // then have its type, its enum value or a data id, or tick() throws on the
 // first frame after Continue. Problems here make the Title discard the
@@ -16,7 +16,7 @@ import type { GameData } from '../data/types.ts'
 import { roadGraph } from './roads.ts'
 import { FACE_LOOKS, ROLES } from './systems/people.ts'
 import { QUEST_KINDS } from './systems/quests.ts'
-import { STATE_VERSION, type SimState } from './types.ts'
+import { dockNumber, laneNode, STATE_VERSION, type SimState } from './types.ts'
 
 type Add = (m: string) => void
 /** Checks `v` at `path`; returns false when it is not even the right kind. */
@@ -197,6 +197,12 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
   }
   const buildingIds = data.buildings.map((b) => b.id)
   const districtIds = data.districts.map((d) => d.id)
+  const buildingDistrict: Record<string, string> = Object.fromEntries(
+    data.buildings.map((b) => [b.id, b.district]),
+  )
+  const districtKind: Record<string, string> = Object.fromEntries(
+    data.districts.map((d) => [d.id, d.kind]),
+  )
   const strainIds = data.parcels.malware.strains.map((s) => s.id)
   const building = oneOf(buildingIds)
   const district = oneOf(districtIds)
@@ -556,6 +562,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
         fixture: stationFixture,
         nextDecisionTick: nullable(tick),
       }),
+      feedIndex: count,
       dockQueue: ids,
       'debugForceFlag?': strain,
     }),
@@ -576,6 +583,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       holdBayEvents: count,
       minutes: arr(obj({ min: count, tick })),
       victoryTick: nullable(tick),
+      cleared: count,
     }),
     lastLostLife: nullable(
       obj({ tick, parcelId: id, label: str, path: arr(obj({ tick })) }),
@@ -624,6 +632,17 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     if (v.stopIndex > v.stops.length) {
       add(`${at}.stopIndex: ${v.stopIndex} > ${v.stops.length} stops`)
     }
+    // M8: dispatch.ts plans a 'handoff' stop exactly at an overseas pier /
+    // terminal, a 'deliver' / 'collect' stop anywhere else.
+    v.stops.forEach((st, i) => {
+      const overseas =
+        districtKind[buildingDistrict[st.buildingId] ?? ''] === 'overseas'
+      if ((st.kind === 'handoff') !== overseas) {
+        add(
+          `${at}.stops[${i}].kind: ${st.kind} at ${st.buildingId} (${overseas ? 'an overseas hub: handoff' : 'not a hub: deliver / collect'})`,
+        )
+      }
+    })
   }
   const n = s.nextId
   const parcelMax = maxId(Object.values(s.parcels).map((p) => p.id))
@@ -660,5 +679,73 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     ),
   )
   if (n.quest <= questMax) add(`state.nextId.quest: ${n.quest} ≤ q${questMax}`)
+  laneDockProblems(s, data, add)
+  // M8: a parcel's destRegion is its dest's district (spawn.ts; hubs.ts and
+  // dispatch.ts deliverAt read it), and a handed-off parcel waits for its
+  // clearance at an overseas hub.
+  for (const p of Object.values(s.parcels)) {
+    const at = `state.parcels.${p.id}`
+    if (buildingDistrict[p.dest] !== p.destRegion) {
+      add(`${at}.destRegion: ${p.destRegion} ≠ ${p.dest}'s district`)
+    }
+    if (p.state !== 'handed_off') continue
+    const lv = p.lockedValue
+    if (lv === null || !Number.isSafeInteger(lv) || lv < 0)
+      add(`${at}.lockedValue: ${JSON.stringify(lv)} (handed off: integer ≥ 0)`)
+    if (p.clearTick === null)
+      add(`${at}.clearTick: null (handed off: the clearance tick)`)
+    const d = data.districts.find((x) => x.id === p.destRegion)
+    if (d?.kind !== 'overseas')
+      add(`${at}.destRegion: ${p.destRegion} is not an overseas hub`)
+  }
   return out
+}
+
+/**
+ * M8 (design-m8-m9 §2.3): the loading docks — dock1 plus economy.docks rows,
+ * unique and in number order; each `dockN` has its node pair `dockN` (dock,
+ * next [convN]) → `convN` (conveyor, next = conv1's); the feed pointer
+ * inside the conveyor list.
+ */
+function laneDockProblems(s: SimState, data: GameData, add: Add): void {
+  const lane = s.lane
+  const allowed = [1, ...data.economy.docks.map((r) => r.index)]
+  const conv1 = laneNode(lane, 'conv1')
+  let last = 0
+  for (const d of lane.docks) {
+    const at = `state.lane.docks(${d.id})`
+    const k = dockNumber(d.id)
+    if (!allowed.includes(k)) {
+      add(`${at}: not dock1 or an economy.docks index`)
+      continue
+    }
+    if (k <= last) add(`${at}: docks not unique and in number order`)
+    last = k
+    const dockNode = laneNode(lane, d.id)
+    const convId = `conv${k}`
+    if (d.conveyorNodeId !== convId)
+      add(`${at}.conveyorNodeId: ${d.conveyorNodeId} ≠ ${convId}`)
+    if (
+      !dockNode ||
+      dockNode.kind !== 'dock' ||
+      dockNode.next.length !== 1 ||
+      dockNode.next[0] !== convId
+    )
+      add(`${at}: no dock node ${d.id} → ${convId}`)
+    const conv = laneNode(lane, convId)
+    if (
+      !conv ||
+      conv.kind !== 'conveyor' ||
+      conv.dockId !== d.id ||
+      !conv1 ||
+      conv.next.join() !== conv1.next.join()
+    )
+      add(`${at}: no conveyor node ${convId} feeding conv1's next`)
+  }
+  if (!lane.docks.some((d) => d.id === 'dock1'))
+    add('state.lane.docks: no dock1')
+  if (lane.feedIndex >= Math.max(1, lane.docks.length))
+    add(
+      `state.lane.feedIndex: ${lane.feedIndex} ≥ ${lane.docks.length} conveyors`,
+    )
 }

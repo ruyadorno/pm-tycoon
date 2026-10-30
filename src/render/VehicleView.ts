@@ -12,7 +12,13 @@
 // Dock pose (art-install hand-off): the map's dock tile (20, 22) is on the
 // warehouse sprite's hidden NW side, so near it (cityFx.dockBlend) the
 // vehicle is drawn toward the pose in front of bay 1's open door, over the
-// wall, nose in (`_ne_`) while docked. Quality (src/render/quality.ts) cut 5
+// wall, nose in (`_ne_`) while docked. M8 (design-m8-m9 §6.2, docks 2–3):
+// the dock tiles of bays 1..n (lot.docks, n = the highest dock owned) form a
+// run (cityFx.dockRunBlend) mapped onto the SW face's bays, so a vehicle at
+// dock k's tile stands in front of bay k and one driving along the run
+// slides from bay to bay — a function of the position, never of the
+// vehicle's dockId, so taking or leaving a bay never jumps. Bays further
+// along the face draw over the earlier ones (DOCK_BAY_DEPTH). Quality (src/render/quality.ts) cut 5
 // pins the wheel frame to 0. The scene's `sortDepth` (vehicleDepth.ts) lifts
 // a vehicle over the multi-tile footprints it is in front of (M4).
 //
@@ -30,7 +36,13 @@ import Phaser from 'phaser'
 import type { VehicleSnapshot } from '../sim/view-api.ts'
 import { WORLD_ATLAS } from './atlases.ts'
 import { DEPTH } from './BuildingView.ts'
-import { dockBlend, honkShown } from './cityFx.ts'
+import {
+  DOCK_BAY_DEPTH,
+  dockPoseAt,
+  dockRunBlend,
+  honkShown,
+  type DockRunHit,
+} from './cityFx.ts'
 import { VEHICLE_FOOT, vehicleFrame } from './frames.ts'
 import { tileToScreen } from './iso.ts'
 import type { SpriteRect } from './vehicleDepth.ts'
@@ -103,18 +115,26 @@ const DOT_FRAME = 'ui_bar_track'
 type Glyph = 'ic_cross' | 'ic_alert' | 'ic_bell' | 'ic_honk' | null
 
 /**
- * Where a docked vehicle is drawn (CityScene, from the warehouse anchor and
- * the exterior frame's dockPose; one object, moved in place on a tier swap).
+ * Where docked vehicles are drawn (CityScene, from the warehouse anchor and
+ * the exterior frame's per-bay dockPoses; one object shared by every
+ * VehicleView, moved in place on a tier swap or a dock purchase).
  */
 export interface DockPose {
-  /** The map dock tile the sim parks a docked vehicle on. */
-  tile: readonly [number, number]
+  /**
+   * M8: the map dock tiles of bays 1..n (lot.docks, n = the highest dock
+   * number owned) — the run a docked / passing vehicle is drawn along.
+   */
+  tiles: readonly (readonly [number, number])[]
   /** First lot column (the avenue is lotX0 − 1). */
   lotX0: number
-  /** World offset from that tile's centre to the drawn foot point. */
-  dx: number
-  dy: number
-  /** Depth while drawn at / toward the pose (over the warehouse wall). */
+  /**
+   * World offset from bay k's tile centre (lot.docks[k]) to its drawn foot
+   * point, for every bay of the lot (index = bay − 1).
+   */
+  poses: readonly { readonly dx: number; readonly dy: number }[]
+  /** Blend radius in tiles (cityFx.dockRunRadius: never moves the queue head). */
+  radius: number
+  /** Depth of bay 1's pose (over the warehouse wall); bay k adds DOCK_BAY_DEPTH × (k − 1). */
   depth: number
 }
 
@@ -148,6 +168,8 @@ export class VehicleView {
   private type: VehicleSnapshot['type']
   private readonly pose: DockPose | null
   private readonly pt = { x: 0, y: 0 }
+  private readonly hit: DockRunHit = { w: 0, at: 0 }
+  private readonly off = { dx: 0, dy: 0 }
   private readonly rect: SpriteRect = { left: 0, top: 0, right: 0, bottom: 0 }
   /** Interpolated tile position of the last update. */
   tx = 0
@@ -222,10 +244,20 @@ export class VehicleView {
     let depth = this.tx + this.ty
     const docked = DOCKED.has(v.state)
     const pose = this.pose
-    const w = pose ? dockBlend(this.tx, this.ty, pose.tile, pose.lotX0) : 0
+    const w = pose
+      ? dockRunBlend(
+          this.tx,
+          this.ty,
+          pose.tiles,
+          pose.lotX0,
+          pose.radius,
+          this.hit,
+        ).w
+      : 0
     if (pose && w > 0) {
-      this.pt.x += pose.dx * w
-      this.pt.y += pose.dy * w
+      const o = dockPoseAt(pose.poses, this.hit.at, this.off)
+      this.pt.x += o.dx * w
+      this.pt.y += o.dy * w
     }
     const bob = v.stopAt !== null && nowMs % BOB_PERIOD_MS < BOB_UP_MS ? -1 : 0
     const x = Math.round(this.pt.x)
@@ -234,7 +266,7 @@ export class VehicleView {
       this.type = v.type
       this.applyOrigin()
     }
-    const heading = docked && pose ? 'ne' : v.heading
+    const heading = docked && w > 0 ? 'ne' : v.heading
     const name = vehicleFrame(v.type, heading, opts.staticWheels ? 0 : v.wheel)
     if (name !== this.frameName) {
       this.frameName = name
@@ -248,7 +280,8 @@ export class VehicleView {
       r.bottom = r.top + this.img.height
       depth = opts.sortDepth(this.tx, this.ty, depth, r)
     }
-    if (pose && w > 0) depth = Math.max(depth, pose.depth)
+    if (pose && w > 0)
+      depth = Math.max(depth, pose.depth + DOCK_BAY_DEPTH * this.hit.at)
     this.img.setPosition(x, y).setDepth(depth)
     const inactive = v.state === 'inactive'
     this.img.setAlpha(inactive ? 0.5 : 1)

@@ -26,6 +26,7 @@ import {
 } from '@napi-rs/canvas'
 import type { StepOpts } from './draw-api.ts'
 import { ATLAS_KEYS } from './atlas.ts'
+import { portScene } from './contact.ts'
 import { decodePng, writeIfChanged } from './iso.ts'
 import {
   type Manifest,
@@ -326,6 +327,34 @@ function citySample(m: Manifest): Canvas | null {
   return big
 }
 
+/**
+ * docks@4x.png (build 2 M8, plan-build2 §6 G5 "docks@4x regenerated"): the
+ * port as the map lays it out, in colour (Docks go live at L3) at 2x, above
+ * the frame cells.
+ */
+function withPort(m: Manifest, frames: Canvas): Canvas {
+  const port = portScene(m, false)
+  const P = 2
+  const gap = 6 * S
+  const head = 16 * S
+  const W = Math.max(frames.width, port.width * P + 2 * gap)
+  const H = head + port.height * P + gap + frames.height
+  const cv = createCanvas(W, H)
+  const ctx = cv.getContext('2d')
+  ctx.imageSmoothingEnabled = false
+  ctx.fillStyle = backdrop('docks')
+  ctx.fillRect(0, 0, W, H)
+  label(
+    ctx,
+    'the port on the map (tiles x 0-12, y 26-38), in colour: live from L3 (M8)',
+    gap,
+    gap / 2,
+  )
+  ctx.drawImage(port, gap, head, port.width * P, port.height * P)
+  ctx.drawImage(frames, 0, head + port.height * P + gap)
+  return cv
+}
+
 // ---------------------------------------------------------------------------
 // Staleness (lint A12) and candidates
 
@@ -419,7 +448,8 @@ export function run(opts: StepOpts): number {
     const cells = cellsFor(m, cat)
     if (cells.length === 0) continue
     const max = cat === 'warehouse-interior' || cat === 'procedural' ? 640 : 720
-    const cv = sheet(cells, backdrop(cat), max)
+    const frames = sheet(cells, backdrop(cat), max)
+    const cv = cat === 'docks' ? withPort(m, frames) : frames
     const p = join(CONTACT_DIR, `${cat}@4x.png`)
     if (writeIfChanged(p, cv.toBuffer('image/png'))) written.push(cat)
   }

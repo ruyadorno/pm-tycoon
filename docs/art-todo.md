@@ -1,5 +1,80 @@
 # Art to-do (playtest 1, build 2)
 
+## Build 2 — M8 (L3 Regional, plan-build2 §6 / §8.5, design-m8-m9 §6.1-§6.4, B2 §4.1, §6.5, §6.6)
+
+Sheets: `art/contact/warehouse-tier3@4x.png` (`node tools/art/contact.ts tier3`: room mocks t1 / t2 / t3 with the M8
+dock geometry — dock 1 open, dock 2 bought with its roller pad, dock 3 locked —, the tier-3 pieces on the floor, the
+shelf at 60 / 100, the overseas icons), `art/contact/docks@4x.png` (the gallery's docks sheet now opens with the port
+on the map in colour, live at L3), `art/contact/airport@4x.png` and `art/contact/civic@4x.png` (`node
+tools/art/contact.ts airport|civic`: the L5 uniques on their map positions in colour and as the `_locked` look they
+ship with until M9, then each one close up), `art/contact/tiers@4x.png` (re-made: every bay's docked pose marked).
+Atlas fill after M8: world 80.1 % (509 frames; 72.2 % after M7), interior 31.8 % (2048×512). Over the M5 target of 75 %
+(`art:atlas` warns), under plan-build2 §8.8 R13's trigger (no pack / > 90 %), so the R13 fallback is not applied:
+the `_locked` twins stay per building and there is no `city2` atlas. `tests/render/atlases.test.ts` now holds the
+90 % line (`WORLD_FILL_R13`); M9 adds little to `world` (its exteriors, machines and the L4 uniques are already in).
+
+Procedural (by design, no PixelLab id) — frame names are the contract for the warehouse lane:
+
+- Tier 3 "Regional" room (interior atlas, the room's back layers): `floor_t3` (green epoxy, 32-px slab joints),
+  `floor_t3_lane` (the same with the 2-px yellow lane lines at x 0-1 / 30-31, as `floor_t2_lane`), `wall_t3` (red brick
+  between two grey copings), `wallface_t3` (red brick over a cream dado), `sign_t3` (200×24, a cream enamel face in a
+  green band with rivets: a light board, so the sign text is the dark tint as at t2), `shelf_t3` (224×64 pallet
+  racking: five wire-deck rows for the 20 × 5 @ 11 grid — minis at canvas (3 + 11c, 4 + 11r), i.e. room (35, 388) with
+  the shelf at (32, 384), seam rows at y 14 + 11r, cell dividers at x 13 + 11c, blue uprights, the orange front beam at
+  y 59-61), `props_t3` (48×64 like `props_t2`: a shrink-wrapped pallet of boxes and an orange pallet jack),
+  `wanted_poster_t3` (32×32 corkboard: a WANTED sheet whose mugshot is the battery-strain parcel, a yellow sticky
+  note), `dock_pad` (interior-prop 24×56, the roller pad of docks 2-3 at room (32, door.y): rollers across the
+  northward flow, hazard ends; the six mini spots centred at (7|18, 11|27|43) = room (39|50, y + 11|27|43)).
+- `lamp_lock` (a fifth frame of `lamp`, 8×8, world like the other lamps): a dim grey padlock for a dock the player does
+  not own (DockView's three-lamp row; the design names `ic_lock` 8×8, which is a 16×16 icon).
+- Overseas icons (icon16, both atlases): `ic_handoff` (a parcel with a padlock: the value is locked at the pier),
+  `ic_cleared` (a round green customs stamp with a check), `ic_ship` (the Docks hub: a cargo ship), `ic_plane` (the
+  Airport hub, used from M9: a plane from above). The design's popups are text (`LOCKED $18`, `CLEARED +$18`), so the
+  icons are optional for the city / HUD lanes. The clearance ring reuses `ring_0` … `ring_8` (fx, both atlases).
+- Per-bay docked poses (design-m8-m9 §6.2 `DOCK_POSES_CANVAS`): `frames.generated.ts WH_ANCHORS` rows carry
+  `dockPoses` (one per bay light, `[0]` = `dockPose`); a manifest row may list them (`dockPoses`, validated), else
+  `manifest.ts dockPosesOf` derives bay k as `dockPose + (bayLights[k] − bayLights[0])` — the vehicle keeps bay 1's place
+  relative to its own lamp. t1 (4, 166) (31, 180) (58, 195); t2 (4, 166) (32, 180) (59, 194); t3 (4, 185) (42, 205); t4
+  (4, 186) (32, 201) (61, 213); t5 (6, 192) (24, 203) (43, 213).
+- Unchanged and reused: `dock_door_{closed,open,locked}`, `dock_tail_*`, `lamp_*`, `bay_pad` (bays 4-5),
+  `strip_light` (t2-t4), the runway tiles `tarmac`, `runway`, `runway_stripe` (+ `_locked`).
+
+PixelLab (agent picks, `node tools/art/decide.ts --manifest`; `approved: false` until the author's gate G5; shipped
+`_locked` until M9, one row per `buildings.json` id, no `coversBuildings`):
+
+- `ap_terminal` #4 (re-roll for live quality: a terminal under a sweeping white wave roof over a blue glass front, two
+  jet bridges, a row of flags; no tower — `ap_tower` is its own prop), `ap_cargo_hangar` #0 (barrel-vault hangar, an
+  orange checkered band, open doors with blue and orange containers, a blue office box).
+- `ap_tower` #1 (prop: slim white tower, wide blue glass cab, radar dish), `ap_plane` #1 (dock-prop 128×96: a white
+  jet with a blue tail, nose to the lower right — it taxis east along +x, `prompts.ts DOCK_PROP_HEADING`).
+- `cv_town_hall` #0 (colonnade, clock tower with a green copper dome and a flag), `cv_lint_school` #0 (brick school,
+  bell cupola, a yellow schoolyard with a climbing frame and a slide), `cv_museum` #1 (glass pyramid, banners, a T-rex
+  skeleton on the lawn), `cv_changelog_stadium` #0 (re-roll, report §6.25: blue and yellow stands round the pitch,
+  floodlights, nothing else on the plot — no townhouses), `cv_patch_hospital` #0 (white and blue block, rooftop
+  helipad, green cross, striped canopy).
+- `cv_police` #1 (dark blue, white trim, flag, radio antenna), `cv_fire` #0 (orange brick, two open bays with the fire
+  engine, a hose tower; `VEHICLE_OK`), `cv_readme_library` #1 (sandstone, arched windows, a big open-book sculpture,
+  two lions), `cv_courthouse` #0 (four columns, the yellow scales on top), `cv_park_pavilion` #0 (white bandstand,
+  green cone roof, flower beds), `fountain` #0 (prop: a blue basin and a tiered column with a tall jet).
+- Retired (`decide.ts --retire … --reason`, finals deleted, provenance in `manifest.retired[]`): `ap_hangar`,
+  `cv_hall`, `cv_stadium`, `cv_civic_2x2` (also the playtest-1 G2 civic anchor: `prompts.ts DISTRICT_ANCHOR` now lends
+  civic / rural / map `hr_async_arms`, used only by `--style anchor`), `cv_pavilion` — the shared locked-only scenery.
+
+PixelLab spend (M8 cap 260 incl. re-rolls; run budget 1,500 / 300 reserve): 220 generations in one batch (`--batch
+m8-l5`, 2 candidates per id, Q-B2-15 rule for L5; balance 2,690 → 2,470; $0 credits; run spent 609 → 829). No failed
+jobs, no pre-filter rejects, no re-rolls; no PixelLab id fell back to procedural.
+
+Follow-ups:
+
+- M9 map rows (Lane A): `ap_plane` at (45, 10) and `ap_tower` at (44, 16) as design-m8-m9 §1.2 lists them (both
+  shown there on `airport@4x.png`); the `fountain` prop is not on the map — `civic@4x.png` shows it at the suggested
+  tile (22, 41) in the park block beside the pavilion.
+- `ap_plane` faces +x (the exit of §1.2), i.e. across the runway, which runs along y; a plane rolling along the runway
+  would need its own heading sprite (≈ 12 generations) and an exit along ±y.
+- `dk_ship`'s bow points to the lower left (+y) while its `map.hubs` exit is [-5, 0] (−x, upper left): the departure
+  tween slides it broadside. A bow-first exit would run along +y (or a second ship heading, ≈ 12 generations).
+- `cv_museum` and `cv_changelog_stadium` carry 17 colours (lint A12 warnings, as the other uniques).
+
 ## Build 2 — M7 (quests, plan-build2 §6 / §8.4, design-m7 §6.1, §6.9, B2 §3, §6.5, §6.6)
 
 Sheets: `art/contact/rural@4x.png` (`node tools/art/contact.ts rural`: the ten Rural uniques on their map
@@ -227,17 +302,17 @@ signs, the m5x7 glyph sheet) are procedural by design and final; they are listed
 These were the style anchors of the bulk pass; confirm each (or reject it, which re-opens everything styled after it):
 `art/contact/anchors@4x.png`, `art/contact/anchors-incontext@4x.png`.
 
-| id                   | class       | district                                                          |
-| -------------------- | ----------- | ----------------------------------------------------------------- |
-| `dt_scope_offices`   | building2x2 | downtown                                                          |
-| `hr_async_arms`      | building2x2 | highres                                                           |
-| `in_esbuild_engines` | building2x2 | industrial                                                        |
-| `cv_civic_2x2`       | building2x2 | civic (locked scenery: playtest 1 shows only its `_locked` frame) |
-| `van`                | vehicle-van | —                                                                 |
-| `worker`             | worker      | warehouse                                                         |
-| `metal_detector`     | machine     | warehouse                                                         |
+| id                   | class       | district                                                            |
+| -------------------- | ----------- | ------------------------------------------------------------------- |
+| `dt_scope_offices`   | building2x2 | downtown                                                            |
+| `hr_async_arms`      | building2x2 | highres                                                             |
+| `in_esbuild_engines` | building2x2 | industrial                                                          |
+| `cv_civic_2x2`       | building2x2 | civic (locked scenery; retired in build 2 M8 for the civic uniques) |
+| `van`                | vehicle-van | —                                                                   |
+| `worker`             | worker      | warehouse                                                           |
+| `metal_detector`     | machine     | warehouse                                                           |
 
-Confirm: `vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines cv_civic_2x2 van worker metal_detector`
+Confirm: `vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines van worker metal_detector`
 (sets `approvedBy: 'author'`; no image changes).
 
 ## G3 — generated sprites awaiting the author's confirmation (`approved: false`)
@@ -258,8 +333,8 @@ Confirm: `vlr art:approve -- dt_scope_offices hr_async_arms in_esbuild_engines c
   `in_glob_silos` (2×2).
 - **Locked scenery** (playtest 1 shows only the fogged `_locked` frame): `lr_house_a`, `lr_house_b`, `lr_house_c`,
   `lr_villa` (all four retired in build 2 M6 for the ten Low-density uniques), `ru_farm`, `ru_barn`, `ru_orchard`, `ru_farmhouse`, `dk_pier` and `dk_customs` (both rejected by the
-  author and retired in build 2 M5), `ap_terminal`,
-  `ap_hangar`, `cv_hall`, `cv_stadium`, `cv_pavilion`.
+  author and retired in build 2 M5), `ap_terminal` (re-rolled in build 2 M8),
+  `ap_hangar`, `cv_hall`, `cv_stadium`, `cv_pavilion` (the last four retired in build 2 M8 for the L5 uniques).
 - **Docks and map props**: `dk_crane`, `dk_ship`, `dk_containers`, `tree_round`, `tree_pine`, `bush`.
 - **Vehicles, warehouse, machines**: `bike`, `truck`, `wh_ext` (`_t1` + its `_t2` edit), `shaky_shaker`.
 

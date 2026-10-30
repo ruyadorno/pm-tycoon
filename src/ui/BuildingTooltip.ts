@@ -11,6 +11,12 @@
 //     `Already rushed · 0:42`); omitted when neither applies
 //   4 `Registry Row · favours van` + the `District ▸` link (CityScene routes a
 //     tap on it to pm:select {kind: 'district'}).
+// M8 (spec-core §5.6, design-m8-m9 §6.3): an overseas hub building carries
+// `model.hub` (hubText.hubTip over vs.hubs()): a pier / terminal reads
+// `Prefetch Pier 2 · overseas ×1.5` + `2 clearing · next 0:12` (`Clears in
+// 45 s` when none), the port office `Shrinkwrap Customs House` + `Port
+// office · 3 clearing · next 0:32`; the hub line replaces row 2 (hubs never
+// send parcels, so there is no waiting count, size icon or rush line).
 // The owning scene builds the model (it reads the sim) and refreshes it at
 // 2 Hz while the tooltip is visible; this class only lays it out.
 import Phaser from 'phaser'
@@ -21,6 +27,7 @@ import {
   phaseSuffix,
   type DecayPhase,
 } from '../render/decayPhase.ts'
+import { hubTipRows, type HubTip } from './hubText.ts'
 import { minHitFor } from './layout.ts'
 import { FONT_SIZE, PALETTE, THEME } from './theme.ts'
 
@@ -60,6 +67,11 @@ export interface TooltipModel {
   rush: RushLine | null
   /** `Registry Row · favours van` (or the trucks-only note). */
   footer: string
+  /**
+   * M8: an overseas hub building's tag and clearance line (hubText.hubTip);
+   * absent / null for every other building.
+   */
+  hub?: HubTip | null
 }
 
 /** World-space rect the tooltip must stay inside. */
@@ -204,16 +216,33 @@ export class BuildingTooltip {
   private layout(): void {
     const m = this.model
     if (!m) return
-    // Row texts.
-    const waitText =
+    const [tName, tWait, tRush, tFoot] = this.lines
+    // Row texts (M8: a hub's line replaces the waiting row).
+    const hub = m.hub ?? null
+    let nameText = m.name
+    let waitText =
       m.waiting > 0 ? `Waiting: ${m.waiting} · oldest ` : 'Nothing waiting'
-    const ageText =
+    let ageText =
       m.waiting > 0 && m.oldestS !== null
         ? `${formatMmSs(m.oldestS)}${phaseSuffix(m.phase)}`
         : ''
+    let hubExtra: string | null = null
+    if (hub) {
+      const rows = hubTipRows(
+        m.name,
+        hub,
+        (row) => !tName || PAD * 2 + tName.setText(row).width <= TOOLTIP_MAX_W,
+      )
+      nameText = rows.name
+      waitText = rows.line
+      ageText = ''
+      hubExtra = rows.extra
+    }
     let rushText = ''
     let rushColour: number = THEME.textDark
-    if (m.rush?.kind === 'rushed')
+    // M8: a hub tag that fit neither row takes the (otherwise unused) rush row.
+    if (hubExtra) rushText = hubExtra
+    else if (m.rush?.kind === 'rushed')
       rushText = `Rushed · ${formatMmSs(m.rush.remainingS)}`
     else if (m.rush?.kind === 'already')
       rushText = `Already rushed · ${formatMmSs(m.rush.remainingS)}`
@@ -221,12 +250,11 @@ export class BuildingTooltip {
       rushText = m.rush.text
       rushColour = PALETTE.red0
     }
-    const bellOn = m.rush !== null && m.rush.kind !== 'failed'
-    const [tName, tWait, tRush, tFoot] = this.lines
-    const iconsN = Math.min(MAX_ICONS, m.sizes.length)
+    const bellOn = !hubExtra && m.rush !== null && m.rush.kind !== 'failed'
+    const iconsN = hub ? 0 : Math.min(MAX_ICONS, m.sizes.length)
 
     let w = 0
-    tName?.setText(m.name)
+    tName?.setText(nameText)
     tWait?.setText(waitText + ageText)
     if (tWait) {
       // -1 clears the per-character tint (the object tint applies again).

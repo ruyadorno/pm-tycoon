@@ -29,7 +29,8 @@ vi.mock('phaser', () => {
 
 const bs = await import('../../src/ui/warehouse/BuySheet.ts')
 const { computeLayout, HUD_TOP_H } = await import('../../src/ui/layout.ts')
-const { dataFixture, fund, makeSim } = await import('../sim/helpers.ts')
+const { capConfig, dataFixture, fund, makeSim } =
+  await import('../sim/helpers.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { frameOrNull } = await import('../../src/render/frames.ts')
 const { textTop } = await import('../../src/ui/text.ts')
@@ -125,21 +126,56 @@ describe('§2.1 BuySheet rows: unlocked first, desk rows, locked last', () => {
   })
 
   it('Q34: locked rows read "Unlocks at Lv N", + " · coming soon" past playtestMaxLevel', () => {
-    const rows = bs.buyRows(data, 1, [])
+    // The cap mechanism at the playtest-1 cap (M8 raised the shipped cap to
+    // 3, design-m8-m9 R1; tests pin the mechanism with an override).
+    const capped = dataFixture({ economy: { playtestMaxLevel: 2 } })
+    const rows = bs.buyRows(capped, 1, [])
     const line = (id: string) => rows.find((r) => r.id === id)?.lines[1]
-    expect(data.economy.playtestMaxLevel).toBe(2)
+    expect(capped.economy.playtestMaxLevel).toBe(2)
     expect(line('shaky_shaker')).toBe('60/min · Unlocks at Lv 2')
     expect(line('battery_checker')).toBe(
       '60/min · Unlocks at Lv 3 · coming soon',
     )
     expect(line('desk2')).toBe('Unlocks at Lv 3 · coming soon')
     expect(line('xray')).toBe('30/min · Unlocks at Lv 4 · coming soon')
-    expect(bs.unlockText(data, 2)).toBe('Unlocks at Lv 2')
+    expect(bs.unlockText(capped, 2)).toBe('Unlocks at Lv 2')
+  })
+
+  it('M8 (design-m8-m9 R1): at the shipped cap 3 the L3 rows lose the suffix, L4 keeps it; the Battery checker opens at L3', () => {
+    expect(data.economy.playtestMaxLevel).toBe(3)
+    const l1 = bs.buyRows(data, 1, [])
+    const line = (id: string) => l1.find((r) => r.id === id)?.lines[1]
+    expect(line('battery_checker')).toBe('60/min · Unlocks at Lv 3')
+    expect(line('desk2')).toBe('Unlocks at Lv 3')
+    expect(line('xray')).toBe('30/min · Unlocks at Lv 4 · coming soon')
+    const l3 = bs.buyRows(data, 3, [])
+    expect(l3.map((r) => r.id)).toEqual([
+      'metal_detector',
+      'shaky_shaker',
+      'battery_checker',
+      'desk',
+      'desk2',
+      'xray',
+    ])
+    const bc = l3.find((r) => r.id === 'battery_checker')
+    expect(bc).toMatchObject({
+      kind: 'machine',
+      name: 'Battery checker',
+      price: def('battery_checker').price,
+      priceText: `$${def('battery_checker').price}`,
+      locked: false,
+      lines: [bs.catchLine(def('battery_checker')), '60/min'],
+    })
+    expect(bs.rowState(bc!, def('battery_checker').price)).toBe('ok')
+    expect(bs.rowState(bc!, def('battery_checker').price - 1)).toBe('poor')
+    // Its BuySheet icon is the machine art (packed into both atlases: the
+    // sheet is src/ui/**, world-bound).
+    expect(bs.machineFrame('battery_checker')).toBe('battery_checker_f0')
   })
 
   it('plan-build2 §8.2 task 11: the suffix vanishes by data once the cap rises', () => {
     const top = Math.max(...data.levels.map((l) => l.level))
-    const open = dataFixture({ economy: { playtestMaxLevel: top } })
+    const open = dataFixture(capConfig(top))
     expect(bs.unlockText(open, 3)).toBe('Unlocks at Lv 3')
     expect(bs.unlockText(open, top)).toBe(`Unlocks at Lv ${top}`)
   })

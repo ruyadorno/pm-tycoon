@@ -1,7 +1,7 @@
 // Autosave and the localStorage keys (plan.md §5 "localStorage keys", §6.4
 // "Save and load"; spec §2 "autosave every 10 s and on hide"; city-view.md
-// §9.5; spec-build2 §8): the payload shape {version: SAVE_VERSION (4 since
-// M7), savedAt, build, dataHash, seed, state, onboarding} under pm.save.v2
+// §9.5; spec-build2 §8): the payload shape {version: SAVE_VERSION (5 since
+// M8), savedAt, build, dataHash, seed, state, onboarding} under pm.save.v2
 // (pm.save.v2:cfg:<name> in a ?config= session, report-playtest1 §6.13), the
 // Title header `Day 7 · $1,240 · Lv 2`, Continue only for the current
 // version + same dataHash (an M5 version-2 payload included; else "Save
@@ -193,9 +193,10 @@ describe('spec §2: autosave every 10 s of real time and on hide', () => {
         'version',
       ].toSorted(),
     )
-    // M6 bumped the state shape (design-m6 D18), M7 again (design-m7 §2.5);
-    // the key stays pm.save.v2.
-    expect(SAVE_VERSION).toBe(4)
+    // M6 bumped the state shape (design-m6 D18), M7 again (design-m7 §2.5),
+    // M8 again (design-m8-m9 §2.4: lane.feedIndex, stats.cleared); the key
+    // stays pm.save.v2.
+    expect(SAVE_VERSION).toBe(5)
     expect(p.version).toBe(SAVE_VERSION)
     expect(p.state.version).toBe(SAVE_VERSION)
     expect(p.build).toBe('test-build')

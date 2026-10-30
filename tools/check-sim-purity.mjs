@@ -8,9 +8,11 @@ const HEADLESS_FILES = ['src/render/iso.ts']
 const PHASER_FREE = [
   'src/ui/layout.ts',
   'src/ui/questText.ts',
+  'src/ui/hubText.ts',
   'src/render/warehouse/RoomLayout.ts',
   'src/render/decayPhase.ts',
   'src/render/cityFx.ts',
+  'src/render/cityHub.ts',
   'src/render/quality.ts',
   'src/render/vehicleDepth.ts',
   'src/render/AttractCamera.ts',

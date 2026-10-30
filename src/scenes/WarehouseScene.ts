@@ -41,6 +41,15 @@
 // The city ↔ warehouse transition (§5.3): the City plays its pan / snap /
 // fade (nav.ts); this scene fades in 150 ms while the room drops 16 px, and
 // fades out 120 ms (transitionOut) on the way back.
+//
+// M8 (spec-build2 §4.1, design-m8-m9 §6.1): docks 2–3. A tap on a dock not
+// owned opens the buy Dialog once its level is reached (`Loading dock 2`,
+// `$800 · a second door into slot 1`, `Buy $800` → lane.buyDock; a refusal
+// shakes the door, plays deny and tooltips the reason), else the unlock
+// tooltip; an owned dock 2–3 (door + pad) tooltips its own activity, the
+// panel the summary. `dock:bought` opens the new door while its pad fades
+// in (DockView.onBought). The room layout is the LaneRenderer's, which
+// follows the warehouse tier (the tier-3 shelf grid).
 import Phaser from 'phaser'
 import {
   EV_GARAGE_OPENING,
@@ -56,11 +65,16 @@ import { bindSim, getViewSim, REG } from '../boot/simBinding.ts'
 import type { GameData } from '../data/types.ts'
 import { formatMmSs } from '../render/decayPhase.ts'
 import { atlasOf, frameOrNull } from '../render/frames.ts'
-import { DockView, lockedDockText } from '../render/warehouse/DockView.ts'
+import {
+  DockView,
+  dockBuyDialog,
+  lockedDockText,
+} from '../render/warehouse/DockView.ts'
 import { Fx, reducedMotion } from '../render/warehouse/Fx.ts'
 import {
   createRoomLayers,
   LaneRenderer,
+  visualTier,
   type RoomLayers,
 } from '../render/warehouse/LaneRenderer.ts'
 import {
@@ -82,7 +96,8 @@ import {
 import { WorkerSprites } from '../render/warehouse/WorkerSprites.ts'
 import type { SimEventPayloads } from '../sim/events.ts'
 import type { LaneNode, Strain } from '../sim/types.ts'
-import type { ViewSim } from '../sim/view-api.ts'
+import type { DockSlotView, ViewSim } from '../sim/view-api.ts'
+import { Dialog } from '../ui/Dialog.ts'
 import { HireSheet } from '../ui/HireSheet.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
 import { addPanel } from '../ui/Panel.ts'
@@ -125,7 +140,9 @@ type Pick =
   | { kind: 'bay'; bay: number; rect: Rect }
   | { kind: 'bin'; rect: Rect }
   | { kind: 'shelf'; rect: Rect }
-  | { kind: 'dock'; rect: Rect }
+  /** dockId null = the status panel (the summary tooltip). */
+  | { kind: 'dock'; dockId: string | null; rect: Rect }
+  /** A dock not owned: `index` = its number (economy.docks row). */
   | { kind: 'lockedDock'; index: number; rect: Rect }
   | { kind: 'ext'; rect: Rect }
   | { kind: 'poster'; rect: Rect }
@@ -206,7 +223,6 @@ export function wantedGroups(
 export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   private vs!: ViewSim
   private gd!: GameData
-  private layout!: FixedLaneLayout
   private L!: Layout
   private roomX = 0
   private roomY = 0
@@ -222,6 +238,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   /** The open HireSheet (a card's request) and its token. */
   private hireSheet: HireSheet | null = null
   private hireToken: object | null = null
+  /** M8: the open buy-dock confirm. */
+  private dockDialog: Dialog | null = null
   private press: Press | null = null
   private drag: Drag | null = null
   private moveFrom: string | null = null
@@ -254,12 +272,18 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.stationCard = null
     this.hireSheet = null
     this.hireToken = null
+    this.dockDialog = null
+  }
+
+  /** The room layout of the current tier (the LaneRenderer's, M8). */
+  private get layout(): FixedLaneLayout {
+    return this.lane.layout
   }
 
   create(): void {
     this.vs = getViewSim(this)
     this.gd = this.vs.data
-    this.layout = new FixedLaneLayout()
+    const layout = new FixedLaneLayout(visualTier(this.gd, this.vs.level))
     this.cameras.main.setBackgroundColor(PALETTE.outline)
     this.L = this.computeL()
     const place = this.placement()
@@ -267,13 +291,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.roomY = place.roomY
     this.layers = createRoomLayers(this, this.roomX, this.roomY)
     this.fx = new Fx(this, this.layers.fx)
-    this.lane = new LaneRenderer(
-      this,
-      this.layers,
-      this.layout,
-      this.vs,
-      this.fx,
-    )
+    this.lane = new LaneRenderer(this, this.layers, layout, this.vs, this.fx)
     this.dock = new DockView(this, this.layers, this.vs)
     this.workers = new WorkerSprites(this, this.layers, this.layout, this.vs)
     this.buildSheets()
@@ -298,6 +316,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         'lane:resumed': () => this.lane.refreshReadout(),
         'worker:walkedOut': (p) => this.workers.onWalkedOut(p.employeeId),
         'level:up': () => this.lane.onLevelUp(),
+        'dock:bought': (p) => this.dock.onBought(p.index),
         'life:lost': () => this.lane.onLifeLost(),
         'day:ended': () => this.lane.refreshSign(),
         'game:over': () => this.onGameOver(),
@@ -431,6 +450,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.holdCard?.relayout(sheetL)
     this.stationCard?.relayout(sheetL)
     if (this.hireSheet?.isOpen()) this.hireSheet.relayout(this.hireLayout())
+    this.dockDialog?.relayout(this.L)
     this.closePopover()
   }
 
@@ -459,12 +479,15 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       this.slotCard?.isOpen() ||
       this.holdCard?.isOpen() ||
       this.stationCard?.isOpen() ||
-      this.hireSheet?.isOpen(),
+      this.hireSheet?.isOpen() ||
+      this.dockDialog?.isOpen(),
     )
   }
 
   private closeSheets(instant = false): void {
     this.dropHire()
+    this.dockDialog?.destroy()
+    this.dockDialog = null
     this.buy?.close(instant)
     this.slotCard?.close(instant)
     this.holdCard?.close(instant)
@@ -744,11 +767,12 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       const r = bayRect(i)
       if (inside(r, x, y)) return { kind: 'bay', bay: i, rect: r }
     }
-    const lockedDoor = this.dock.lockedDoorAt(x, y)
-    if (lockedDoor !== null) {
-      const r = { x: 0, y: 100 + 64 * lockedDoor, w: 32, h: 56 }
-      return { kind: 'lockedDock', index: lockedDoor, rect: r }
-    }
+    // Docks 2–3 (door + pad, M8): owned → its tooltip, else buy / unlock.
+    const bay = this.dock.bayAt(x, y)
+    if (bay)
+      return bay.owned
+        ? { kind: 'dock', dockId: `dock${bay.index}`, rect: bay.rect }
+        : { kind: 'lockedDock', index: bay.index, rect: bay.rect }
     // The desk's west strip belongs to the desk slot (§1.3).
     for (const n of this.vs.lane.nodes()) {
       if (n.fixture?.kind !== 'desk') continue
@@ -757,13 +781,16 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         return { kind: 'slot', nodeId: n.id, rect: lay.rectFor(n.id) as Rect }
     }
     const panel = DockView.panel
-    if (inside(panel, x, y)) return { kind: 'dock', rect: { ...DOCK_PANEL } }
+    if (inside(panel, x, y))
+      return { kind: 'dock', dockId: null, rect: { ...DOCK_PANEL } }
     const id = lay.nodeAt(x, y)
     if (!id) return null
     const r = lay.rectFor(id) as Rect
     if (id === 'bin') return { kind: 'bin', rect: r }
     if (id === 'shelf') return { kind: 'shelf', rect: r }
-    if (id === 'dock1') return { kind: 'dock', rect: lay.hitFor(id) as Rect }
+    if (id === 'dock1')
+      return { kind: 'dock', dockId: id, rect: lay.hitFor(id) as Rect }
+    if (/^dock\d+$/.test(id)) return null
     if (id === 'hold') return null
     if (!lay.isBeltSlot(id)) return { kind: 'ext', rect: lay.extRect() }
     return { kind: 'slot', nodeId: id, rect: r }
@@ -804,10 +831,15 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         this.tooltip(this.shelfText(), top)
         return
       case 'dock':
-        this.tooltip(this.dock.tooltipText(), top)
+        this.tooltip(
+          pick.dockId === null
+            ? this.dock.panelTooltipText()
+            : this.dock.tooltipText(pick.dockId),
+          top,
+        )
         return
       case 'lockedDock':
-        this.tooltip(lockedDockText(this.gd, pick.index) ?? '', top)
+        this.tapLockedDock(pick.index, top)
         return
       case 'ext': {
         const locked = this.vs.lane
@@ -858,6 +890,45 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       return
     }
     this.buy?.open(nodeId)
+  }
+
+  /**
+   * A dock not owned (M8): the buy Dialog once its level is reached, else
+   * `Loading dock 2 — unlocks at Lv 3 ($800)`.
+   */
+  private tapLockedDock(index: number, top: Point): void {
+    const slot = this.vs.lane.dockSlots().find((s) => s.index === index)
+    if (slot && slot.available && !slot.owned) {
+      this.openDockDialog(slot, top)
+      return
+    }
+    this.tooltip(lockedDockText(this.gd, index) ?? '', top)
+  }
+
+  /** `Loading dock 2` · `$800 · a second door into slot 1` · `Buy $800` → lane.buyDock. */
+  private openDockDialog(slot: DockSlotView, top: Point): void {
+    this.dockDialog?.destroy()
+    const owned = this.vs.lane.dockSlots().filter((s) => s.owned).length
+    const text = dockBuyDialog(slot, owned)
+    const L = this.L
+    this.dockDialog = new Dialog(this, {
+      ...text,
+      W: L.W,
+      H: L.H,
+      minHit: L.minHit,
+      id: 'wh:dockDialog',
+      onConfirm: () => {
+        this.dockDialog = null
+        const res = this.vs.lane.buyDock(slot.index)
+        if (res.ok) return
+        this.game.events.emit(EV_UI_SFX, { name: 'deny' })
+        this.dock.shake(slot.index)
+        this.tooltip(warehouseFailText(res.reason, this.gd), top)
+      },
+      onCancel: () => {
+        this.dockDialog = null
+      },
+    })
   }
 
   /** The Hold Bay station (B2 §2.6): StationCard, or the unlock tooltip while locked. */

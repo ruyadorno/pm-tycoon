@@ -1,11 +1,14 @@
 // spec §8 company levels (+ §3.5 region unlock, §5.4 strain announcement,
 // §6.2 lane growth; plan.md §12.6 tasks 1 + 11): lifetime earned vs the
 // levels.json thresholds → `level:up` the tick the threshold is crossed; the
-// playtest cap (economy.playtestMaxLevel = 2: no `level:up {3}`, the bar keeps
-// counting toward the L3 threshold); the L2 unlocks (Industrial live at
+// playtest cap (economy.playtestMaxLevel — 3 since M8, design-m8-m9 R1; the
+// mechanism is pinned with a cap-2 override: no `level:up {3}`, the bar
+// keeps counting toward the L3 threshold); the L2 unlocks (Industrial live at
 // satisfaction 60 with its first spawn firstSpawnDelayS later, the truck,
 // the Shaky shaker, slot 4, shelf 45, tier 2, the ticker line) and rattle,
-// announced at the level-up and drawn only newStrainDelayS later.
+// announced at the level-up and drawn only newStrainDelayS later; the L3
+// row (spec-build2 §4.1: Docks live without a spawn timer, Hold Bay 5,
+// shelf 60, tier 3, battery, the Battery checker, dock 2).
 
 import { describe, expect, it } from 'vitest'
 import { availableStrains } from '../../src/sim/systems/spawn.ts'
@@ -31,7 +34,10 @@ import {
 const data = dataFixture()
 const L2 = data.levels.find((l) => l.level === 2)!
 const L3 = data.levels.find((l) => l.level === 3)!
+const L4 = data.levels.find((l) => l.level === 4)!
 const cap = data.economy.playtestMaxLevel
+/** The playtest-1 cap: pins the cap mechanism below the shipped one. */
+const CAP2 = { economy: { playtestMaxLevel: 2 } }
 
 describe('level-ups (spec §8)', () => {
   it('level:up fires at lifetime $2,000 — not a dollar before — on the tick it is crossed', () => {
@@ -69,14 +75,14 @@ describe('level-ups (spec §8)', () => {
     expect(up?.tick).toBe(delivered!.tick)
   })
 
-  it('no level:up past playtestMaxLevel: lifetime far past the L3-L5 thresholds levels up to 2 only', () => {
-    expect(cap).toBe(2)
-    const sim = quietSim(1)
+  it('no level:up past playtestMaxLevel: lifetime far past the L3-L5 thresholds levels up to 2 only (cap 2)', () => {
+    const sim = quietSim(1, CAP2)
+    expect(sim.data.economy.playtestMaxLevel).toBe(2)
     const ups = collect(sim, 'level:up')
     sim.state.economy.lifetimeEarned = 100_000
     runTicks(sim, 600 * 3)
     expect(ups).toEqual([{ level: 2 }])
-    expect(sim.state.level.level).toBe(cap)
+    expect(sim.state.level.level).toBe(2)
     expect(Object.keys(sim.state.stats.levelTick).toSorted()).toEqual([
       '1',
       '2',
@@ -87,9 +93,23 @@ describe('level-ups (spec §8)', () => {
     expect(sim.state.level.announced.battery).toBeUndefined()
   })
 
-  it('a 30-minute competent run (seeds 1-3) never fires level:up {3}', () => {
+  it('the shipped cap is L3 (design-m8-m9 R1): lifetime far past the L4-L5 thresholds levels up to 3 only, the bar counting toward L4', () => {
+    expect(cap).toBe(3)
+    const sim = quietSim(1)
+    const ups = collect(sim, 'level:up')
+    sim.state.economy.lifetimeEarned = 100_000
+    runTicks(sim, 600 * 3)
+    expect(ups).toEqual([{ level: 2 }, { level: 3 }])
+    expect(sim.state.level.level).toBe(3)
+    expect(sim.state.level.nextThreshold).toBe(L4.threshold)
+    expect(sim.state.districts.lowres!.live).toBe(false)
+    expect(sim.state.level.announced.dense).toBeUndefined()
+    expect(liveSlotIds(sim.state.lane)).toHaveLength(L3.slots)
+  })
+
+  it('a 30-minute competent run (seeds 1-3) never levels past the cap (cap 2: never level:up {3})', () => {
     for (const seed of [1, 2, 3]) {
-      const sim = makeSim(seed)
+      const sim = makeSim(seed, CAP2)
       const policy = createPolicy(sim, 'competent')
       const ups = collect(sim, 'level:up')
       for (let i = 0; i < 18000; i++) {
@@ -104,19 +124,18 @@ describe('level-ups (spec §8)', () => {
     }
   }, 30_000)
 
-  it('nextThreshold stays $5,000 at the cap (the HUD bar keeps counting toward the L3 row)', () => {
-    const sim = quietSim(1)
+  it('nextThreshold stays at the L3 threshold at the cap (the HUD bar keeps counting toward the L3 row; cap 2)', () => {
+    const sim = quietSim(1, CAP2)
     const vs = createViewSim(sim)
     expect(vs.nextThreshold).toBe(L2.threshold)
     sim.state.economy.lifetimeEarned = L2.threshold
     runTicks(sim, 1)
     expect(vs.level).toBe(2)
     expect(vs.nextThreshold).toBe(L3.threshold)
-    expect(L3.threshold).toBe(5000)
     sim.state.economy.lifetimeEarned = 40_000
     runTicks(sim, 600)
     expect(vs.level).toBe(2)
-    expect(vs.nextThreshold).toBe(5000)
+    expect(vs.nextThreshold).toBe(L3.threshold)
   })
 })
 
@@ -301,5 +320,133 @@ describe('L2 unlocks (spec §8, §3.5, §6.2)', () => {
     expect(lines).toEqual([
       { text: strainSpottedText('rattle'), kind: 'strain' },
     ])
+  })
+})
+
+describe('L3 "Regional" unlocks (spec-build2 §4.1; design-m8-m9 §4.5, §7 M8 1)', () => {
+  it('the L3 row applies: Docks live without a spawn timer, Hold Bay 5, shelf 60, tier 3, slots stay 4, battery announced now and spawnable 60 s later; level:up → ticker → region:unlocked', () => {
+    const sim = quietSim(1)
+    fund(sim)
+    sim.state.economy.lifetimeEarned = L2.threshold
+    runTicks(sim, 1)
+    expect(sim.state.level.level).toBe(2)
+    // Below L3: the Battery checker and dock 2 are locked.
+    expect(
+      sim.dispatch({
+        kind: 'buyMachine',
+        defId: 'battery_checker',
+        nodeId: 'slot2',
+      }),
+    ).toEqual({ ok: false, reason: 'locked' })
+    expect(sim.dispatch({ kind: 'buyDock', index: 2 })).toEqual({
+      ok: false,
+      reason: 'locked',
+    })
+    const log = eventLog(sim)
+    sim.state.economy.lifetimeEarned = L3.threshold
+    runTicks(sim, 1)
+    const at = sim.state.tick
+    const s = sim.state
+    expect(s.level).toMatchObject({
+      level: 3,
+      slots: 4,
+      holdBayCap: 5,
+      shelfCap: 60,
+      warehouseTier: 3,
+      nextThreshold: L4.threshold,
+    })
+    expect(L3).toMatchObject({ holdBayCap: 5, shelfCap: 60, warehouseTier: 3 })
+    expect(s.stats.levelTick['3']).toBe(at)
+    const lane = s.lane
+    expect(laneNode(lane, 'hold')!.cap).toBe(5)
+    expect(laneNode(lane, 'shelf')!.cap).toBe(60)
+    expect(liveSlotIds(lane)).toEqual(['slot1', 'slot2', 'slot3', 'slot4'])
+    expect(laneNode(lane, 'slot5')!.locked).toEqual({ level: 4 })
+    const docks = s.districts.docks!
+    expect(docks.live).toBe(true)
+    expect(docks.nextSpawnTick).toBeNull()
+    expect(s.level.unlocked).toEqual([
+      'highres',
+      'downtown',
+      'industrial',
+      'docks',
+    ])
+    expect(createViewSim(sim).regionState('docks')).toBe('live')
+    expect(createViewSim(sim).hub('docks')).toMatchObject({
+      live: true,
+      office: 'dk_customs',
+      clearanceS: 45,
+      valueMult: 1.5,
+      clearing: [],
+    })
+    // The level-up moment, in order.
+    expect(
+      log
+        .filter((e) =>
+          ['level:up', 'ticker:news', 'region:unlocked'].includes(e.name),
+        )
+        .map((e) => [e.name, e.p]),
+    ).toEqual([
+      ['level:up', { level: 3 }],
+      ['ticker:news', { text: L3.ticker, kind: 'level' }],
+      ['region:unlocked', { district: 'docks' }],
+    ])
+    // battery: announced at the level-up (Detection % counts it), drawn
+    // newStrainDelayS later with its "New strain spotted" line.
+    expect(L3.strain).toBe('battery')
+    expect(s.level.announced.battery).toBe(at)
+    expect(
+      createViewSim(sim)
+        .laneStats()
+        .byStrain.map((x) => x.strain),
+    ).toEqual(['metal', 'rattle', 'battery'])
+    const delay = data.parcels.malware.newStrainDelayS * TICKS_PER_S
+    expect(delay).toBe(600)
+    runTicks(sim, delay - 1)
+    expect(availableStrains(sim)).not.toContain('battery')
+    runTicks(sim, 1)
+    expect(availableStrains(sim)).toContain('battery')
+    expect(
+      log.filter(
+        (e) =>
+          e.name === 'ticker:news' &&
+          (e.p as { text: string }).text === strainSpottedText('battery'),
+      ),
+    ).toEqual([
+      {
+        tick: at + delay,
+        name: 'ticker:news',
+        p: { text: strainSpottedText('battery'), kind: 'strain' },
+      },
+    ])
+    // L3 purchases: the Battery checker and dock 2; dock 3 waits for L4.
+    expect(
+      sim.dispatch({
+        kind: 'buyMachine',
+        defId: 'battery_checker',
+        nodeId: 'slot2',
+      }),
+    ).toEqual({ ok: true })
+    expect(sim.dispatch({ kind: 'buyDock', index: 2 })).toEqual({ ok: true })
+    expect(sim.dispatch({ kind: 'buyDock', index: 3 })).toEqual({
+      ok: false,
+      reason: 'locked',
+    })
+    expect(s.lane.docks.map((d) => d.id)).toEqual(['dock1', 'dock2'])
+    expect(auditState(s, data)).toEqual([])
+  })
+
+  it('debug.forceLevel(3) applies the same row (past a cap-2 config)', () => {
+    const sim = quietSim(2, CAP2)
+    const res = createViewSim(sim, { debug: true }).debug!.forceLevel(3)
+    expect(res).toEqual({ ok: true })
+    expect(sim.state.level).toMatchObject({
+      level: 3,
+      holdBayCap: 5,
+      shelfCap: 60,
+      warehouseTier: 3,
+    })
+    expect(sim.state.districts.docks!.live).toBe(true)
+    expect(sim.state.economy.lifetimeEarned).toBe(L3.threshold)
   })
 })

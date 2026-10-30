@@ -2,11 +2,31 @@
 // data. Pins the §7.5 Vitest hooks — rects never overlap except the
 // documented pairs, every lane node id at L1 and L2 has a rect, pathBetween
 // is defined for every `next` / `divert` edge — plus the §1.1 screen fit.
+// M8 (design-m8-m9 §6.1, §7 M8 item 7): docks 2–3 (doors, tails, lamps,
+// door points, roller pads, hits; the desk strip / w1 / aisle moved off the
+// pads), every lane node with both docks bought, the tier-3 shelf grid and
+// props, no overlaps at 360 × 604 and 393 × 659.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   AISLE_X,
   BAY_COUNT,
+  DESK_HIT_X,
+  DOCK_COUNT,
+  DOCK_PAD,
+  dockGeom,
+  dockIndexOf,
+  PAD_EXIT,
+  PAD_SPOTS,
+  PROP_T3_SIZE,
+  PROPS_T3,
+  propGroup,
+  propsFor,
+  SHELF_GRID_T1,
+  SHELF_GRID_T3,
+  SHELF_MAX_CELLS,
+  shelfGrid,
+  W1_X,
   bayRect,
   BIN_COUNTER,
   DOCK_PANEL,
@@ -48,6 +68,7 @@ import {
 } from '../../src/render/warehouse/RoomLayout.ts'
 import { HUD_BOTTOM_H, HUD_TOP_H } from '../../src/ui/layout.ts'
 import { CAP_H, CAP_TOP } from '../../src/ui/text.ts'
+import { addDock } from '../../src/sim/systems/docks.ts'
 import { laneNode } from '../../src/sim/types.ts'
 import type { LaneNode } from '../../src/sim/types.ts'
 import { dataFixture, makeSim } from '../sim/helpers.ts'
@@ -63,12 +84,19 @@ const inside = (p: Point, r: Rect): boolean =>
 const finite = (p: Point): boolean =>
   Number.isFinite(p.x) && Number.isFinite(p.y)
 
-/** Lane nodes of a fresh game (L1) and with slot 4 unlocked (L2, §6.2). */
-function laneAt(level: 1 | 2): readonly LaneNode[] {
+/**
+ * Lane nodes of a fresh game (L1), with slot 4 unlocked (L2, §6.2), and with
+ * docks 2 and 3 bought on top (3: the M8 room, dock 3 first to pin R8).
+ */
+function laneAt(level: 1 | 2 | 3): readonly LaneNode[] {
   const sim = makeSim(1)
-  if (level === 2) {
+  if (level >= 2) {
     const n = laneNode(sim.state.lane, 'slot4')
     if (n) delete n.locked
+  }
+  if (level === 3) {
+    addDock(sim, 3)
+    addDock(sim, 2)
   }
   return sim.state.lane.nodes
 }
@@ -77,12 +105,15 @@ function laneAt(level: 1 | 2): readonly LaneNode[] {
 const DOCUMENTED = new Set([
   // The dock conveyor runs inside the dock area (dock1 = 0,32,160,64).
   'conv1|dock1',
+  // M8: the dock 2–3 roller pads sit inside their dock (door + pad) rects.
+  'conv2|dock2',
+  'conv3|dock3',
   // Slots 5–6 are one dashed extension outline (§1.3 `ext`).
   'slot5|slot6',
 ])
 
 describe('warehouse-view §7.5: RoomLayout rects', () => {
-  for (const level of [1, 2] as const) {
+  for (const level of [1, 2, 3] as const) {
     it(`every lane node id at L${level} has a rect inside the room`, () => {
       const nodes = laneAt(level)
       expect(nodes.length).toBeGreaterThan(0)
@@ -98,8 +129,9 @@ describe('warehouse-view §7.5: RoomLayout rects', () => {
     })
   }
 
-  it('rects never overlap except the documented pairs', () => {
-    const ids = laneAt(2).map((n) => n.id)
+  it('rects never overlap except the documented pairs (docks 2–3 bought)', () => {
+    const ids = laneAt(3).map((n) => n.id)
+    expect(ids).toEqual(expect.arrayContaining(['dock2', 'conv2', 'dock3']))
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const a = ids[i] as string
@@ -115,7 +147,7 @@ describe('warehouse-view §7.5: RoomLayout rects', () => {
 
   it('tap rects of different nodes never overlap and are ≥ 44 px', () => {
     const ids = ['dock1', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5']
-    ids.push('hold', 'bin', 'shelf')
+    ids.push('hold', 'bin', 'shelf', 'dock2', 'dock3')
     for (const id of ids) {
       const h = layout.hitFor(id)
       expect(h, id).not.toBeNull()
@@ -201,7 +233,7 @@ describe('warehouse-view §1.3: anchors', () => {
 })
 
 describe('warehouse-view §7.5 / §8: pathBetween', () => {
-  for (const level of [1, 2] as const) {
+  for (const level of [1, 2, 3] as const) {
     it(`is defined for every next and divert edge at L${level}`, () => {
       const nodes = laneAt(level)
       let edges = 0
@@ -360,7 +392,7 @@ const signagePlates = (): [string, Rect][] =>
     { x: p.x, y: p.y, w: textW(p.text) + PLATE_PAD, h: PLATE_H },
   ])
 
-const propRects = (): { tier: 1 | 2; name: string; r: Rect }[] => [
+const propRects = (): { tier: 1 | 2 | 3; name: string; r: Rect }[] => [
   ...PROPS_T1.map((p, i) => ({
     tier: 1 as const,
     name: `props_t1[${i}]`,
@@ -370,6 +402,11 @@ const propRects = (): { tier: 1 | 2; name: string; r: Rect }[] => [
     tier: 2 as const,
     name: `props_t2[${i}]`,
     r: { x: p.x, y: p.y, ...PROP_T2_SIZE },
+  })),
+  ...PROPS_T3.map((p, i) => ({
+    tier: 3 as const,
+    name: `props_t3[${i}]`,
+    r: { x: p.x, y: p.y, ...PROP_T3_SIZE },
   })),
 ]
 
@@ -382,7 +419,9 @@ function tapRects(): [string, Rect][] {
     ['dock panel', DOCK_PANEL],
   ]
   for (let i = 0; i < BAY_COUNT; i++) out.push([`bay ${i}`, bayRect(i)])
-  LOCKED_DOORS.forEach((r, i) => out.push([`locked door ${i + 2}`, r]))
+  // Docks 2–3 (M8): one 56 × 56 tap rect (door + pad) whether owned or not.
+  for (let k = 2; k <= DOCK_COUNT; k++)
+    out.push([`dock ${k} hit`, (dockGeom(k) as { hit: Rect }).hit])
   for (const id of ['dock1', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5']) {
     out.push([`${id} hit`, layout.hitFor(id) as Rect])
   }
@@ -620,5 +659,279 @@ describe('spec-build2 §4.4 (M6): the Hold Bay station, the poster and the props
     expect(cap.y).toBeGreaterThanOrEqual(lamp.y + lamp.h)
     for (let i = 0; i < BAY_COUNT; i++)
       expect(overlaps(cap, bayRect(i)), `bay ${i}`).toBe(false)
+  })
+})
+
+// ---- M8: docks 2–3 and tier 3 (design-m8-m9 §6.1, R7, R8, R13) --------------
+
+/** The 10 × 10 mini parcel (its 16 × 16 canvas, transparent margin aside) centred on `p`. */
+const miniBox = (p: Point): Rect => ({ x: p.x - 5, y: p.y - 5, w: 10, h: 10 })
+
+describe('design-m8-m9 §6.1 (M8): docks 2–3 geometry', () => {
+  it('dock k is dock 1 moved down 64(k − 1): door, tail, lamp, door point (the design table)', () => {
+    expect(dockGeom(1)).toEqual({
+      index: 1,
+      door: { x: 0, y: 36, w: 32, h: 56 },
+      tail: { x: 0, y: 44, w: 40, h: 40 },
+      lamp: { x: 12, y: 24 },
+      doorPoint: { ...DOOR_POINT },
+      pad: null,
+      hit: layout.hitFor('dock1'),
+    })
+    expect(dockGeom(2)).toEqual({
+      index: 2,
+      door: { x: 0, y: 100, w: 32, h: 56 },
+      tail: { x: 0, y: 108, w: 40, h: 40 },
+      lamp: { x: 12, y: 92 },
+      doorPoint: { x: 20, y: 128 },
+      pad: { x: 32, y: 100, w: 24, h: 56 },
+      hit: { x: 0, y: 100, w: 56, h: 56 },
+    })
+    expect(dockGeom(3)).toEqual({
+      index: 3,
+      door: { x: 0, y: 164, w: 32, h: 56 },
+      tail: { x: 0, y: 172, w: 40, h: 40 },
+      lamp: { x: 12, y: 156 },
+      doorPoint: { x: 20, y: 192 },
+      pad: { x: 32, y: 164, w: 24, h: 56 },
+      hit: { x: 0, y: 164, w: 56, h: 56 },
+    })
+    expect(dockGeom(0)).toBeNull()
+    expect(dockGeom(DOCK_COUNT + 1)).toBeNull()
+    // The playtest-1 locked doors are docks 2–3's doors (economy.docks order).
+    expect(LOCKED_DOORS).toEqual([dockGeom(2)?.door, dockGeom(3)?.door])
+    const docks = dataFixture().economy.docks.map((r) => r.index)
+    expect(docks).toEqual([2, 3])
+  })
+
+  it('the layout finds a dock by its node or its conveyor id; pads are the dock 2–3 conveyors only', () => {
+    expect(dockIndexOf('dock3')).toBe(3)
+    expect(dockIndexOf('conv2')).toBe(2)
+    expect(dockIndexOf('slot2')).toBeNaN()
+    expect(layout.dockGeom('conv3')).toEqual(dockGeom(3))
+    expect(layout.dockGeom('dock1')).toEqual(dockGeom(1))
+    expect(layout.isPad('conv1')).toBe(false)
+    expect(layout.isPad('conv2')).toBe(true)
+    expect(layout.isPad('conv3')).toBe(true)
+    expect(layout.isPad('dock2')).toBe(false)
+    expect(layout.labelFor('dock2')).toBe('Dock 2')
+    expect(layout.labelFor('dock3')).toBe('Dock 3')
+  })
+
+  it('each pad conveyor: six spots head first (north pair leaves next), every 10 × 10 mini inside the pad and apart, entry on it', () => {
+    const cap = dataFixture().machines.conveyorCapPerDock
+    expect(PAD_SPOTS).toHaveLength(cap)
+    for (const k of [2, 3]) {
+      const pad = dockGeom(k)?.pad as Rect
+      expect(layout.rectFor(`conv${k}`)).toEqual(pad)
+      expect(pad).toMatchObject({ x: DOCK_PAD.x, w: DOCK_PAD.w })
+      const a = layout.anchorsFor(`conv${k}`)
+      expect(a.buffer).toHaveLength(cap)
+      // The design's spots: (39|50, y + 11|27|43).
+      expect(a.buffer).toEqual([
+        { x: 39, y: pad.y + 11 },
+        { x: 50, y: pad.y + 11 },
+        { x: 39, y: pad.y + 27 },
+        { x: 50, y: pad.y + 27 },
+        { x: 39, y: pad.y + 43 },
+        { x: 50, y: pad.y + 43 },
+      ])
+      for (const p of a.buffer) {
+        expect(within(miniBox(p), pad), `conv${k} ${p.x},${p.y}`).toBe(true)
+        for (const q of a.buffer)
+          if (q !== p) expect(overlaps(miniBox(p), miniBox(q))).toBe(false)
+      }
+      for (let i = 1; i < a.buffer.length; i++)
+        expect((a.buffer[i] as Point).y).toBeGreaterThanOrEqual(
+          (a.buffer[i - 1] as Point).y,
+        )
+      expect(inside(a.entry, pad)).toBe(true)
+      expect(layout.hitFor(`conv${k}`)).toBeNull()
+      expect(within(pad, layout.rectFor(`dock${k}`) as Rect)).toBe(true)
+    }
+  })
+
+  it('a pad parcel hops north onto conv1’s line, then the corner and slot 1; a dock unloads straight onto its pad', () => {
+    const head = layout.anchorsFor('slot1').buffer[0] as Point
+    for (const k of [2, 3]) {
+      const path = layout.pathBetween(`conv${k}`, 'slot1', head)
+      expect(path).toEqual([PAD_EXIT, { x: 144, y: 64 }, head])
+      const conv1 = layout.rectFor('conv1') as Rect
+      expect(inside(PAD_EXIT, conv1)).toBe(true)
+      // The hop leaves the pad north, east of dock 1's tail (x 0–39).
+      expect(PAD_EXIT.x).toBeGreaterThanOrEqual(
+        (dockGeom(1)?.tail.x ?? 0) + (dockGeom(1)?.tail.w ?? 0),
+      )
+      const spot = layout.anchorsFor(`conv${k}`).buffer[0] as Point
+      expect(layout.pathBetween(`dock${k}`, `conv${k}`, spot)).toEqual([spot])
+    }
+    expect(layout.pathBetween('conv1', 'slot1', head)).toEqual([
+      { x: 144, y: 64 },
+      head,
+    ])
+  })
+
+  it('doors, tails and lamps stay on the west wall and never overlap each other; each lamp sits just above its door', () => {
+    const parts: [string, Rect][] = []
+    for (let k = 1; k <= DOCK_COUNT; k++) {
+      const g = dockGeom(k)
+      if (!g) continue
+      const lamp = { ...g.lamp, w: 8, h: 8 }
+      expect(lamp.y + lamp.h, `lamp ${k}`).toBeLessThanOrEqual(g.door.y)
+      expect(g.door.y - (lamp.y + lamp.h), `lamp ${k}`).toBeLessThanOrEqual(4)
+      expect(inside(g.doorPoint, g.door) || inside(g.doorPoint, g.tail)).toBe(
+        true,
+      )
+      expect(within(g.tail, { x: 0, y: 0, w: ROOM_W, h: ROOM_H })).toBe(true)
+      parts.push([`door ${k}`, g.door], [`lamp ${k}`, lamp])
+    }
+    for (let i = 0; i < parts.length; i++)
+      for (let j = i + 1; j < parts.length; j++) {
+        const [a, ra] = parts[i] as [string, Rect]
+        const [b, rb] = parts[j] as [string, Rect]
+        expect(overlaps(ra, rb), `${a} vs ${b}`).toBe(false)
+      }
+    // Tails of different docks never touch (three vehicles at once).
+    const tails = [1, 2, 3].map((k) => dockGeom(k)?.tail as Rect)
+    expect(overlaps(tails[0] as Rect, tails[1] as Rect)).toBe(false)
+    expect(overlaps(tails[1] as Rect, tails[2] as Rect)).toBe(false)
+  })
+
+  it('R7: the desk strip, w1 and the aisle moved east off the pads on every desk slot', () => {
+    expect(DESK_HIT_X).toBe(56)
+    expect(W1_X).toBe(68)
+    expect(AISLE_X).toBe(68)
+    const pads = [2, 3].map((k) => dockGeom(k)?.pad as Rect)
+    const dockHits = [2, 3].map((k) => dockGeom(k)?.hit as Rect)
+    for (let k = 1; k <= 4; k++) {
+      const id = `slot${k}`
+      const strip = layout.deskHit(id) as Rect
+      const slot = layout.rectFor(id) as Rect
+      expect(strip).toEqual({ x: 56, y: slot.y, w: 40, h: 64 })
+      // The strip meets the slot's own hit (x 96) — one continuous desk tap.
+      expect(strip.x + strip.w).toBe((layout.hitFor(id) as Rect).x)
+      for (const h of dockHits)
+        expect(overlaps(strip, h), `${id} strip vs dock`).toBe(false)
+      const w1 = layout.standPoints(id)[0] as Point
+      expect(w1).toEqual({ x: 68, y: slot.y + 36 })
+      for (const p of pads)
+        expect(overlaps(spriteBox(w1), p), `${id} w1 vs pad`).toBe(false)
+      const desk = layout.deskAt(id) as Point
+      expect(overlaps(spriteBox(w1), { ...desk, w: 48, h: 32 })).toBe(false)
+    }
+  })
+
+  it('every walk to a desk stand point (and the sorter’s) keeps the walker off the dock 2–3 pads and doors', () => {
+    const avoid: [string, Rect][] = [2, 3].flatMap((k) => {
+      const g = dockGeom(k)
+      return g?.pad
+        ? ([
+            [`pad ${k}`, g.pad],
+            [`door ${k}`, g.door],
+          ] as [string, Rect][])
+        : []
+    })
+    const walks: Point[][] = [layout.stationWalkPath()]
+    for (let k = 1; k <= 4; k++)
+      for (const st of layout.standPoints(`slot${k}`))
+        walks.push(layout.walkPath(`slot${k}`, st))
+    for (const path of walks) {
+      expect(path[0]).toEqual(DOOR_POINT)
+      // Only the stretch past dock 1's row (y ≥ 96) can reach the pads.
+      for (const pt of samples(path[0] as Point, path.slice(1))) {
+        if (pt.y < 96) continue
+        const box = spriteBox({ x: Math.round(pt.x), y: Math.round(pt.y) })
+        for (const [n, r] of avoid)
+          expect(overlaps(box, r), `${n} at ${pt.x},${pt.y}`).toBe(false)
+      }
+    }
+  })
+
+  it('nodeAt resolves docks 2–3 (door + pad) and their hits are ≥ 44 px, inside the room', () => {
+    for (const k of [2, 3]) {
+      const h = layout.hitFor(`dock${k}`) as Rect
+      expect(h).toEqual(dockGeom(k)?.hit)
+      expect(Math.min(h.w, h.h)).toBeGreaterThanOrEqual(44)
+      expect(layout.nodeAt(h.x + h.w / 2, h.y + h.h / 2)).toBe(`dock${k}`)
+      expect(layout.nodeAt(4, h.y + 4)).toBe(`dock${k}`)
+    }
+    // Between the docks' hits (x 56) the desk strip belongs to the scene.
+    expect(layout.nodeAt(60, 130)).toBeNull()
+  })
+})
+
+describe('design-m8-m9 §6.1 / R13 (M8): tier-3 shelf grid and props', () => {
+  it('tiers 1–2 keep 18 × 3 @ 12 from (38, 390); tiers ≥ 3 draw 20 × 5 @ 11 from (35, 388)', () => {
+    expect(shelfGrid(1)).toEqual(SHELF_GRID_T1)
+    expect(shelfGrid(2)).toEqual(SHELF_GRID_T1)
+    expect(SHELF_GRID_T1).toEqual({
+      cols: 18,
+      rows: 3,
+      pitch: 12,
+      origin: { x: 38, y: 390 },
+    })
+    for (const t of [3, 4, 5]) expect(shelfGrid(t)).toEqual(SHELF_GRID_T3)
+    expect(SHELF_GRID_T3).toEqual({
+      cols: 20,
+      rows: 5,
+      pitch: 11,
+      origin: { x: 35, y: 388 },
+    })
+    expect(SHELF_MAX_CELLS).toBe(100)
+    expect(new FixedLaneLayout(2).shelfCapacity()).toBe(54)
+    expect(new FixedLaneLayout(3).shelfCapacity()).toBe(100)
+    expect(new FixedLaneLayout().tier).toBe(1)
+  })
+
+  it('the tier-3 grid holds every shelf cap of L3–L5 inside the shelf rect; minis never overlap and clear the badge', () => {
+    const lay = new FixedLaneLayout(3)
+    const shelf = lay.rectFor('shelf') as Rect
+    const caps = dataFixture()
+      .levels.filter((l) => l.warehouseTier >= 3)
+      .map((l) => l.shelfCap)
+    expect(caps.length).toBeGreaterThan(0)
+    expect(lay.shelfCapacity()).toBeGreaterThanOrEqual(Math.max(...caps))
+    const cells: Rect[] = []
+    for (let i = 0; i < lay.shelfCapacity(); i++) {
+      const c = lay.shelfCell(i)
+      const mini = { x: c.x, y: c.y, w: 10, h: 10 }
+      expect(within(mini, shelf), `cell ${i}`).toBe(true)
+      expect(overlaps(mini, SHELF_BADGE), `cell ${i} vs badge`).toBe(false)
+      cells.push(mini)
+    }
+    for (let i = 0; i < cells.length; i++)
+      for (let j = i + 1; j < cells.length; j++)
+        expect(overlaps(cells[i] as Rect, cells[j] as Rect)).toBe(false)
+    // The shelf node's anchors follow the tier (the flight targets).
+    const a = lay.anchorsFor('shelf').buffer
+    expect(a).toHaveLength(100)
+    expect(a[0]).toEqual({ x: 40, y: 393 })
+    expect(a[99]).toEqual({ x: 35 + 19 * 11 + 5, y: 388 + 4 * 11 + 5 })
+    // Every other rect is the same at tier 1 and tier 3 (rows unchanged).
+    for (const n of laneAt(3))
+      expect(lay.rectFor(n.id), n.id).toEqual(layout.rectFor(n.id))
+  })
+
+  it('props per tier: one set per group, tiers 4–5 on the tier-3 spot; the tier-3 props clear the poster, the station and the plates', () => {
+    expect(propGroup(1)).toBe(1)
+    expect(propGroup(2)).toBe(2)
+    expect(propGroup(3)).toBe(3)
+    expect(propGroup(5)).toBe(3)
+    expect(propsFor(1)).toEqual(PROPS_T1)
+    expect(propsFor(2)).toEqual(PROPS_T2)
+    expect(propsFor(3)).toEqual(PROPS_T3)
+    expect(propsFor(5)).toEqual(PROPS_T3)
+    expect(new FixedLaneLayout(3).props()).toEqual(PROPS_T3)
+    for (const p of PROPS_T3) {
+      const r = { ...p, ...PROP_T3_SIZE }
+      for (const [n, o] of [
+        ['poster hit', POSTER_HIT],
+        ['station hit', HOLD_STATION_HIT],
+        ['rack', RACK],
+        ...signagePlates(),
+      ] as [string, Rect][])
+        expect(overlaps(r, o), n).toBe(false)
+      expect(within(r, ROOM_FLOOR)).toBe(true)
+    }
   })
 })

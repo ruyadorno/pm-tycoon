@@ -12,9 +12,9 @@
 //      undecided only anchors are generated (G2), 4 candidates each;
 //    - budget guard: GET /balance before the batch; refuse when the
 //      estimate would leave fewer than PIXELLAB_RESERVE (default 300)
-//      generations or exceed the run budget PIXELLAB_RUN_BUDGET (build 2:
-//      1,500, counted over the batches since PIXELLAB_RUN_SINCE) or
-//      --max-gens N;
+//      generations or exceed the run budget PIXELLAB_RUN_BUDGET (build 3:
+//      400 counted over the batches since PIXELLAB_RUN_SINCE, the last
+//      PIXELLAB_RUN_RESERVE = 100 only with --use-reserve) or --max-gens N;
 //    - at most 8 background jobs in flight (pixellab.ts semaphore);
 //    - each candidate gets art/candidates/<id>/<n>/ with raw/<name>.png
 //      (every download), <frame>.png (normalize -> quantize -> outline,
@@ -55,6 +55,7 @@ import {
   processBuilding,
   processExterior,
   processMachine,
+  processPicture,
   processProp,
   processShelf,
   processVehicle,
@@ -107,13 +108,16 @@ export const GEN_LOG = join(CANDIDATES, 'gen-log.json')
 export const CHOICES = join(CANDIDATES, 'choices.json')
 export const RESERVE = Number(process.env.PIXELLAB_RESERVE ?? 300)
 /**
- * Build-2 run budget (the author's override of plan-build2 Q-B2-15: 1,500
- * generations, 300 of them reserve): counted over the batches logged at or
- * after RUN_SINCE, so playtest 1's 1,700 do not count against it.
+ * Run budget, counted over the batches logged at or after RUN_SINCE (so
+ * earlier runs never count against it). Build 2 (Q-B2-15): 1,500 from
+ * 2026-10-30. Build 3 (Q-B3-9, plan-build3 §6): 400 generations from
+ * 2026-10-31, RUN_RESERVE (100) of them held back — a batch that would
+ * dip into the reserve needs --use-reserve (the re-roll rounds of R24).
  */
-export const RUN_BUDGET = Number(process.env.PIXELLAB_RUN_BUDGET ?? 1500)
+export const RUN_BUDGET = Number(process.env.PIXELLAB_RUN_BUDGET ?? 400)
+export const RUN_RESERVE = Number(process.env.PIXELLAB_RUN_RESERVE ?? 100)
 export const RUN_SINCE =
-  process.env.PIXELLAB_RUN_SINCE ?? '2026-10-30T00:00:00Z'
+  process.env.PIXELLAB_RUN_SINCE ?? '2026-10-31T00:00:00Z'
 
 /** generations of the batches inside the current run (RUN_SINCE on) */
 export function runSpent(batches: readonly Batch[]): number {
@@ -439,7 +443,9 @@ export async function processFromRaw(
             ? processProp(e, img)
             : e.class === 'fixture-shelf'
               ? processShelf(e, img)
-              : processMachine(e, img)
+              : e.class === 'event-pic' || e.class === 'ui'
+                ? processPicture(e, img)
+                : processMachine(e, img)
     // follow-up edits (wh_ext _t2): raw/edit_<frame>_<k>.png; every edit is
     // written as <frame>_<k>.png for review, the picked one as <frame>.png
     for (const [k, buf] of raw) {
@@ -1099,6 +1105,14 @@ export async function run(opts: StepOpts): Promise<number> {
   }
   if (spent + estimate > RUN_BUDGET) {
     problems.push(`run budget ${RUN_BUDGET} (spent ${spent}, +${estimate})`)
+  } else if (
+    spent + estimate > RUN_BUDGET - RUN_RESERVE &&
+    !args.includes('--use-reserve')
+  ) {
+    problems.push(
+      `run reserve: ${RUN_BUDGET - RUN_RESERVE} spendable without ` +
+        `--use-reserve (spent ${spent}, +${estimate})`,
+    )
   }
   if (maxGens !== null && estimate > maxGens) {
     problems.push(`--max-gens ${maxGens} < estimate ${estimate}`)

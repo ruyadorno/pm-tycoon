@@ -41,6 +41,10 @@
 //   M9 (G5): lowres / rural / airport / civic show the region live in
 //     colour in context (contextScene: the window baked as the city does
 //     at level 4 / 5, every district's buildings and props in it).
+//   art/contact/events@4x.png             M12 / G7 (build 3): `node
+//     tools/art/contact.ts events` — the 13 category pictures as shipped,
+//     EventCard mocks, the victory art on a VictoryCard mock with the
+//     confetti, ic_event, the procedural fallbacks (eventsSheet).
 //   art/contact/docks@4x.png is the gallery's docks category (gallery.ts):
 //     since M8 it opens with the port on the map in colour (live at L3);
 //     since M9 with dk_ship faint along its departure (portScene).
@@ -398,7 +402,36 @@ function fixtureBlock(m: Manifest, e: ManifestEntry, src: Source): Block[] {
   return [{ cv, label: src.tag }]
 }
 
+/** a picture (event-pic, the victory art) on a cream card panel at 1x */
+function pictureBlock(m: Manifest, e: ManifestEntry, src: Source): Block[] {
+  const [W, H] = e.canvas
+  const im = src.get(e.frames[0] ?? '')
+  const raw = src.n >= 0 ? rawCanvas(e.id, src.n) : null
+  const cv = panel(W + 8 + (raw ? W + 4 : 0), H + 8)
+  const ctx = cv.getContext('2d')
+  if (im) ctx.drawImage(im, 4, 4)
+  // the download before keying / palette / outline, for the vision pass
+  if (raw) ctx.drawImage(raw, W + 8, 4, W, H)
+  return [{ cv, label: `${src.tag}${raw ? '  (| raw)' : ''}` }]
+}
+
+/** candidate n's raw download (the first non-original image), or null */
+function rawCanvas(id: string, n: number): Canvas | null {
+  const dir = join(CANDIDATES, id, String(n), 'raw')
+  if (!existsSync(dir)) return null
+  const f = readdirSync(dir)
+    .toSorted()
+    .find((x) => x.endsWith('.png') && !x.startsWith('orig_'))
+  return f ? pngCanvas(join(dir, f)) : null
+}
+
 function blocksFor(m: Manifest, e: ManifestEntry, src: Source): Block[] {
+  if (
+    e.class === 'event-pic' ||
+    (e.class === 'ui' && e.source === 'pixellab')
+  ) {
+    return pictureBlock(m, e, src)
+  }
   if (e.class.startsWith('building') || e.class === 'warehouse-ext') {
     return buildingBlock(m, e, src)
   }
@@ -2480,6 +2513,233 @@ export function g6Sheet(m: Manifest): string {
   return out.replace(ROOT, '')
 }
 
+// ---------------------------------------------------------------------------
+// Build 3 (B3 §5, plan-build3 §6, G7): art/contact/events@4x.png — the 13
+// category pictures as shipped, in situ on EventCard mocks, the victory art
+// on a VictoryCard mock with the confetti burst over its top edge, the
+// confetti frames, ic_event beside the rush ic_bell and in an EventChip
+// mock, and the procedural fallbacks (eventPics.ts) for comparison.
+
+/** a category picture's short name (ev_pic_staff -> staff) */
+function shortPic(id: string): string {
+  return id.replace('ev_pic_', '')
+}
+
+/** where a shipped frame comes from, for the labels */
+function provenance(e: ManifestEntry | undefined): string {
+  if (!e) return 'missing'
+  if (e.source === 'procedural') return 'procedural'
+  if (e.placeholder) return 'procedural fallback'
+  return `pixellab #${e.chosenCandidate ?? '?'}${e.approved ? '' : ' (agent pick)'}`
+}
+
+/** greeked text: a run of `w` px on row y (m5x7 x-height bars) */
+function greek(
+  ctx: SKRSContext2D,
+  x: number,
+  y: number,
+  w: number,
+  colour: string,
+  h = 3,
+): void {
+  ctx.fillStyle = PALETTE.hex(colour)
+  let cx = x
+  let k = 0
+  while (cx < x + w) {
+    const word = 6 + ((k * 7 + w) % 13)
+    const run = Math.min(word, x + w - cx)
+    ctx.fillRect(cx, y, run, h)
+    cx += run + 3
+    k++
+  }
+}
+
+/** a button: 1-px outline, face colour, a darker lip under it */
+function button(
+  ctx: SKRSContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  face: string,
+  lip: string,
+): void {
+  ctx.fillStyle = PALETTE.hex('outline')
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = PALETTE.hex(lip)
+  ctx.fillRect(x + 1, y + 1, w - 2, h - 2)
+  ctx.fillStyle = PALETTE.hex(face)
+  ctx.fillRect(x + 1, y + 1, w - 2, h - 4)
+  greek(ctx, x + 6, y + Math.floor(h / 2) - 2, w - 12, 'grey5')
+}
+
+/**
+ * An EventCard mock at 1x (layout of B3 §3.4, greeked text, not the game's
+ * renderer): a dark masthead with ic_event and the PAUSED pill, the 48x48
+ * category picture beside the title and body, an effects line in the
+ * gain / danger colours, two option buttons — 344 px = the card at 360.
+ */
+function eventCardMock(m: Manifest, pic: Canvas | null): Canvas {
+  const W = 344
+  const cv = panel(W, 140)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('grey0')
+  ctx.fillRect(1, 1, W - 2, 18)
+  const bell = fin(m, 'ic_event')
+  if (bell) ctx.drawImage(bell, 4, 2)
+  greek(ctx, 24, 8, 70, 'grey5')
+  ctx.fillStyle = PALETTE.hex('grey4')
+  ctx.fillRect(W - 54, 4, 48, 11)
+  greek(ctx, W - 50, 8, 40, 'grey1')
+  if (pic) ctx.drawImage(pic, 8, 26)
+  greek(ctx, 64, 28, 150, 'outline', 4)
+  for (let r = 0; r < 4; r++) greek(ctx, 64, 40 + r * 9, 260 - r * 30, 'grey1')
+  greek(ctx, 8, 84, 120, 'grass1')
+  greek(ctx, 136, 84, 90, 'red1')
+  button(ctx, 8, 100, 160, 32, 'blue1', 'blue0')
+  button(ctx, 176, 100, 160, 32, 'grey4', 'grey2')
+  return cv
+}
+
+/** the EventChip mock: a 24-px dark pill, ic_event, greeked label */
+function eventChipMock(m: Manifest): Canvas {
+  const cv = createCanvas(96, 24)
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = PALETTE.hex('outline')
+  ctx.fillRect(2, 0, 92, 24)
+  ctx.fillRect(0, 2, 96, 20)
+  ctx.fillStyle = PALETTE.hex('grey0')
+  ctx.fillRect(3, 1, 90, 22)
+  ctx.fillRect(1, 3, 94, 18)
+  const bell = fin(m, 'ic_event')
+  if (bell) ctx.drawImage(bell, 5, 4)
+  greek(ctx, 25, 10, 60, 'grey5')
+  return cv
+}
+
+/**
+ * The VictoryCard mock: the TYCOON masthead (a gold band), the victory art
+ * 1:1 between it and the greeked stats, confetti frames over the top edge.
+ */
+function victoryMock(m: Manifest, frame: number): Canvas {
+  const W = 240
+  const top = 16
+  const cv = createCanvas(W, top + 196)
+  const ctx = cv.getContext('2d')
+  ctx.drawImage(panel(W, 196), 0, top)
+  ctx.fillStyle = PALETTE.hex('gold1')
+  ctx.fillRect(1, top + 1, W - 2, 22)
+  ctx.fillStyle = PALETTE.hex('gold0')
+  ctx.fillRect(1, top + 21, W - 2, 2)
+  greek(ctx, 80, top + 9, 80, 'outline', 5)
+  const art = fin(m, 'victory_art')
+  if (art) ctx.drawImage(art, Math.floor((W - art.width) / 2), top + 28)
+  for (let r = 0; r < 5; r++)
+    greek(ctx, 16, top + 140 + r * 9, 200 - r * 18, 'grey1')
+  const conf = fin(m, 'fx_confetti', `_f${frame}`)
+  if (conf) {
+    for (const x of [8, 64, 120, 176]) ctx.drawImage(conf, x, 0)
+  }
+  return cv
+}
+
+export async function eventsSheet(m: Manifest): Promise<string> {
+  const { EVENT_PIC_IDS, eventPic, victoryPlate } =
+    await import('./eventPics.ts')
+  const hex = { hex: (n: string) => PALETTE.hex(n) } as unknown as Parameters<
+    ReturnType<typeof eventPic>['paint']
+  >[1]
+  const gridCanvas = (g: ReturnType<typeof eventPic>): Canvas => {
+    const cv = createCanvas(g.w, g.h)
+    g.paint(cv.getContext('2d'), hex)
+    return cv
+  }
+  const shipped: Block[] = EVENT_PIC_IDS.map((id) => {
+    const cv = panel(56, 56)
+    const pic = fin(m, id)
+    if (pic) cv.getContext('2d').drawImage(pic, 4, 4)
+    const e = entry(m, id)
+    const tag = !e || e.placeholder ? 'proc' : `PL #${e.chosenCandidate ?? '?'}`
+    return { cv, label: `${shortPic(id)} ${tag}` }
+  })
+  const inSitu: Block[] = [
+    'ev_pic_underworld',
+    'ev_pic_staff',
+    'ev_pic_money',
+    'ev_pic_job',
+  ].map((id) => ({
+    cv: eventCardMock(m, fin(m, id)),
+    label: `EventCard mock — ${shortPic(id)}`,
+  }))
+  const fallbacks: Block[] = EVENT_PIC_IDS.map((id) => {
+    const cv = panel(56, 56)
+    cv.getContext('2d').drawImage(gridCanvas(eventPic(id)), 4, 4)
+    return { cv, label: shortPic(id) }
+  })
+  const confetti: Block[] = Array.from({ length: 8 }, (_, f) => {
+    const cv = panel(40, 40)
+    const c = fin(m, 'fx_confetti', `_f${f}`)
+    if (c) cv.getContext('2d').drawImage(c, 4, 4)
+    return { cv, label: `f${f}` }
+  })
+  const icons: Block[] = [
+    { id: 'ic_event', tag: 'ic_event' },
+    { id: 'ic_bell', tag: 'ic_bell (rush)' },
+  ].map(({ id, tag }) => {
+    // wide enough for the tag, so neighbouring labels never overlap
+    const cv = panel(64, 24)
+    const c = fin(m, id)
+    if (c) cv.getContext('2d').drawImage(c, 24, 4)
+    return { cv, label: tag }
+  })
+  const fallbackVictory = panel(216, 112)
+  fallbackVictory.getContext('2d').drawImage(gridCanvas(victoryPlate()), 4, 4)
+  const va = entry(m, 'victory_art')
+  const sections: Section[] = [
+    {
+      title:
+        'G7 — the 13 category pictures (event-pic 48x48, world atlas) as ' +
+        'they ship',
+      blocks: shipped,
+    },
+    {
+      title:
+        'in situ: EventCard mocks at 1x (344 px = the card at 360; greeked ' +
+        'text, masthead with ic_event, effects line gain / danger)',
+      blocks: inSitu,
+    },
+    {
+      title: `victory_art (ui 208x104, ${provenance(va)}) on a VictoryCard mock, the confetti burst over its top edge (f2, f4)`,
+      blocks: [
+        { cv: victoryMock(m, 2), label: 'VictoryCard, confetti f2' },
+        { cv: victoryMock(m, 4), label: 'VictoryCard, confetti f4' },
+      ],
+    },
+    {
+      title:
+        'fx_confetti f0-f7 (fx 32x32, world); ic_event beside the rush ' +
+        'ic_bell; the EventChip mock',
+      blocks: [
+        ...confetti,
+        ...icons,
+        { cv: eventChipMock(m), label: 'EventChip mock' },
+      ],
+    },
+    {
+      title:
+        'procedural fallbacks (tools/art/eventPics.ts): what ships with no ' +
+        'token or after three failed rounds (R24)',
+      blocks: [
+        ...fallbacks,
+        { cv: fallbackVictory, label: 'victory_art fallback' },
+      ],
+    },
+  ]
+  const out = join(CONTACT, 'events@4x.png')
+  writeIfChanged(out, render(sections, PALETTE.hex('grey4'), 1420))
+  return out.replace(ROOT, '')
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url)
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2)
@@ -2504,10 +2764,12 @@ if (isMain) {
     console.log(`contact: ${warehouseTier3Sheet(loadManifest())}`)
   } else if (cmd === 'g6') {
     console.log(`contact: ${g6Sheet(loadManifest())}`)
+  } else if (cmd === 'events') {
+    console.log(`contact: ${await eventsSheet(loadManifest())}`)
   } else {
     console.error(
       'usage: node tools/art/contact.ts fixes [--hop <crop.png>] | people | ' +
-        'lowres | rural | tiers | tier3 | g6 | airport | civic',
+        'lowres | rural | tiers | tier3 | g6 | airport | civic | events',
     )
     process.exitCode = 1
   }

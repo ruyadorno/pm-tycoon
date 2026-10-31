@@ -126,16 +126,44 @@ export const INTERIOR_CLASSES: readonly AssetClass[] = [
  */
 export const RAMP_RULES: Readonly<Record<string, readonly AssetClass[]>> = {
   mal: [...FULL_PALETTE_CLASSES],
-  gold: [...FULL_PALETTE_CLASSES, 'fx'],
-  red: [...FULL_PALETTE_CLASSES, 'fx', ...INTERIOR_CLASSES],
-  water: [...FULL_PALETTE_CLASSES, 'fx', 'tile', 'dock-prop'],
+  // build 3 (B3 §5): the event category pictures are card art — coins and
+  // stars (gold), a heart or a warning (red), rain and sea (water) — but
+  // never the malware ramp (a purple mask must not read as malware)
+  gold: [...FULL_PALETTE_CLASSES, 'fx', 'event-pic'],
+  red: [...FULL_PALETTE_CLASSES, 'fx', 'event-pic', ...INTERIOR_CLASSES],
+  water: [...FULL_PALETTE_CLASSES, 'fx', 'event-pic', 'tile', 'dock-prop'],
 }
 
 /** Districts whose building sprites may paint water (piers stand in it). */
 export const WATER_DISTRICTS: readonly string[] = ['docks']
 
+/**
+ * Build 3 (B3 §5, STYLE.md §4 "one meaning per colour"): the event pictures
+ * whose subject is a reward — the coins, the job board's gold star, the
+ * gift — are the only event-pic ids that keep the reserved gold ramp; on
+ * the other ten (a clipboard board, a magnifier rim) gold would borrow the
+ * reward meaning, so it snaps to the yellow ramp instead.
+ */
+export const GOLD_PICTURES: readonly string[] = [
+  'ev_pic_money',
+  'ev_pic_job',
+  'ev_pic_luck',
+]
+
+/**
+ * Per-id narrowing of RAMP_RULES for ids whose class takes the full
+ * palette: the victory art (class ui) never paints the malware ramp —
+ * STYLE.md §4 keeps `mal` for malware parcels and the Hold Bay border, and
+ * a night sky or a dark van shade in it would read as malware.
+ */
+export const ID_RAMP_DENY: Readonly<Record<string, readonly string[]>> = {
+  victory_art: ['mal'],
+}
+
 export interface SubsetOpts {
   district?: string
+  /** the manifest id: GOLD_PICTURES and ID_RAMP_DENY narrow by id */
+  id?: string
 }
 
 export function rampAllowed(
@@ -143,6 +171,12 @@ export function rampAllowed(
   cls: AssetClass,
   opts: SubsetOpts = {},
 ): boolean {
+  if (opts.id !== undefined) {
+    if (ID_RAMP_DENY[opts.id]?.includes(ramp)) return false
+    if (cls === 'event-pic' && ramp === 'gold') {
+      return GOLD_PICTURES.includes(opts.id)
+    }
+  }
   const allowed = RAMP_RULES[ramp]
   if (!allowed) return true
   if (allowed.includes(cls)) return true

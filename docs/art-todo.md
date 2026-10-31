@@ -1,4 +1,74 @@
-# Art to-do (playtest 1 + build 2)
+# Art to-do (playtest 1 + builds 2–3)
+
+## For the author: G7 — the build-3 pictures (B3 §5) — start here
+
+Build 3 adds the only art of the run: **13 category pictures** (`ev_pic_*`, new class `event-pic`, 48×48, `world`
+atlas, district `ui`) for the EventCard and the Newspaper's picture slot, the **victory illustration** `victory_art`
+(`ui`, 208×104, `world`) for the VictoryCard and the victory newspaper item, plus three procedural pieces: `ic_event`
+(the ringing orange event bell, icon16, both atlases like `ic_quest`), `fx_confetti` (`_f0`…`_f7`, fx 32×32, `world`)
+and the fallbacks in `tools/art/eventPics.ts`. Two PixelLab rounds on 2026-10-31, Pro Flash on a magenta key: the
+first batch (`b3-events`, 3 candidates per id, **213 generations**, balance 2,422 → 2,209) and one re-roll of
+`ev_pic_port` (4 candidates, **20 generations**, 2,209 → 2,189). After an independent vision review, two picks were
+swapped to another first-round candidate, `ev_pic_port` was re-rolled, and `victory_art` was reprocessed from its raw
+download without the malware ramp (no spend). Every id has a PixelLab pick, so **no picture ships procedural**. Every
+pick is `approved: false` and waits for your yes or no.
+
+Sheet: **`art/contact/events@4x.png`** shows the 13 pictures as they ship, four EventCard mocks at 1× (344 px = the
+card at 360), the victory art on a VictoryCard mock with the confetti over its top edge, the confetti frames,
+`ic_event` beside the rush `ic_bell`, an EventChip mock, and the procedural fallbacks for comparison. The candidates
+are on `art/contact/candidates-b3-events@4x.png` and `candidates-b3-port-reroll@4x.png` (processed | raw download per
+candidate). Both are gitignored like every candidate sheet.
+
+| id                  | Agent pick | What it shows                                                                                                                                                            |
+| ------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ev_pic_staff`      |         #2 | a dark-clipped clipboard (its board snapped from gold to yellow) beside a big white coffee mug                                                                           |
+| `ev_pic_fleet`      |         #2 | a dark spoked bike wheel crossed by a grey wrench                                                                                                                        |
+| `ev_pic_customers`  |         #0 | a blue mailbox on a post, red heart, raised flag, grass tuft                                                                                                             |
+| `ev_pic_security`   |         #2 | a crisp cardboard parcel, a magnifier (rim snapped from gold to yellow), a round red skull tag (swapped from #1, whose top was lumpy and whose tag was half hidden)      |
+| `ev_pic_money`      |         #0 | gold coin stacks on a green ledger                                                                                                                                       |
+| `ev_pic_cityhall`   |         #0 | a symmetric blue-roofed civic hall with a clock, columns, a flag and bushes (swapped from #1, busy at 1× with a red roof); no stamp, the `CITY HALL` masthead carries it |
+| `ev_pic_weather`    |         #2 | a grey rain cloud, a yellow sun behind it, blue drops                                                                                                                    |
+| `ev_pic_press`      |         #2 | a newspaper with a photo box and a blue-ball microphone                                                                                                                  |
+| `ev_pic_underworld` |         #2 | a red crowbar and a dark burglar domino mask                                                                                                                             |
+| `ev_pic_tech`       |         #0 | a grey gear with an orange bug on it                                                                                                                                     |
+| `ev_pic_port`       |         #5 | a blue shipping container with door bars and corner castings, a round red customs stamp with a plain check mark (re-roll: every first-round stamp held a glyph)          |
+| `ev_pic_luck`       |         #0 | a four-leaf clover rising from a red gift with a gold bow                                                                                                                |
+| `ev_pic_job`        |         #2 | the job board's clipboard with a gold star and ruled lines                                                                                                               |
+| `victory_art`       |         #2 | a full-bleed night scene: the glass HQ with a winged parcel emblem (no letters), fireworks, courier bikes, vans and trucks lined up, confetti on the street              |
+
+```sh
+vlr art:approve -- ev_pic_staff ev_pic_fleet ev_pic_customers ev_pic_security ev_pic_money ev_pic_cityhall ev_pic_weather
+vlr art:approve -- ev_pic_press ev_pic_underworld ev_pic_tech ev_pic_port ev_pic_luck ev_pic_job victory_art
+vlr art:reject -- ev_pic_cityhall "reason"   # one line per id you reject
+```
+
+Notes for the review:
+
+- **The victory art is a night scene.** Pro Flash ignored the magenta key on all three victory candidates and painted
+  its own night sky. On #0 and #1 the key flood ate part of that sky and left ragged skylines; #2 kept the whole scene
+  and ships framed by a 1-px outline. It is the one picture that breaks STYLE.md §1's "no dark grading". That is on
+  purpose, since the B3 §5 prompt asks for the HQ at night with fireworks; say so if you want a daylight re-roll. The
+  raw had painted the sky band and the dark shades of the building, vans and bikes in the malware ramp (2,504 px of
+  `mal0`/`mal1`). It is now quantized without `mal` (palette.ts `ID_RAMP_DENY`), so the sky reads `purple0`/`blue0`.
+  It has 18 colours, which gives a lint A12 warning (> 16).
+- **Colour meaning**: `event-pic` may use `gold`, `red` and `water` but never the `mal` ramp, so a purple mask cannot
+  read as malware. Gold stays on the reward pictures only (palette.ts `GOLD_PICTURES`: `ev_pic_money`, `ev_pic_job`,
+  `ev_pic_luck`). On the other ten, a gold pixel snaps to the matching yellow: the staff clipboard board and the
+  security magnifier rim. Lint A07 enforces both rules per id.
+- **Weak spots that are still shipped**: `ev_pic_staff`'s mug and paper are cream `grey5`, the `ui_panel` colour, so on
+  the card the mug reads as a line drawing; the press paper is the same. A darker inset behind the 48×48 slot on the
+  EventCard / Newspaper would fix both without new art (a UI call). `ev_pic_cityhall` lost its stamp in the swap.
+  `ev_pic_security` #2 has one stray purple pixel at the magnifier's top-left.
+- **`ic_event`** is the rush bell's shape with two white ringing ticks and an orange body. The ticks alone were too
+  faint to tell it from the yellow `ic_bell` at 16 px.
+- **Fallbacks (R24)**: until a picture is approved, or if you reject one and no re-roll is made, `vlr art:reject` leaves
+  the current image in place. To go back to the procedural composition, set the row's `placeholder: true`, drop its
+  `chosenCandidate`, then run `vlr art:build`. The fallbacks are two existing icon templates on a 48×48 plate (the main
+  one redrawn at 2×, the second a 1× badge; weather and press use small templates of their own) and a
+  skyline-and-fireworks plate for the victory art.
+- **Budget**: build 3's PixelLab budget is 400 generations with a 100 reserve (Q-B3-9). `tools/art/gen.ts` counts from
+  2026-10-31 (`PIXELLAB_RUN_SINCE`), refuses batches past 300 without `--use-reserve` (`PIXELLAB_RUN_RESERVE`) and past
+  400 outright (`PIXELLAB_RUN_BUDGET`). 233 are spent, so 67 are left before the reserve.
 
 ## For the author: what to approve or reject (build 2, G4–G6) — start here
 
@@ -139,16 +209,17 @@ build VM (it needs the raw downloads in `art/candidates/`) and then `vlr art:bui
 
 ### PixelLab spend (from `art/manifest.json` `batches[]`)
 
-| Milestone   | Batches | Generations | Balance before → after | What                                                                          |
-| ----------- | ------: | ----------: | ---------------------- | ----------------------------------------------------------------------------- |
-| M5          |       7 |         126 | 3,299 → 3,173          | `wh_ext` (3 + two `_t2` edits), `bike`, `dk_terminal_a/b`, `dk_port_office`   |
-| M6          |       3 |         207 | 3,173 → 2,966          | `battery_checker`, `xray`, `sorter_arm`; the ten Low-density uniques; a retry |
-| M7          |       3 |         276 | 2,966 → 2,690          | the ten Rural uniques; `wh_ext_t3`, `_t5`, `_t4` (two edits)                  |
-| M8          |       1 |         220 | 2,690 → 2,470          | the Airport (4) and Park & civic (11) ids, 2 candidates each                  |
-| M9          |       2 |          48 | 2,470 → 2,422          | re-rolls: `dk_ship`, `xray` (twice)                                           |
-| M10         |       0 |           0 | —                      | none (as of the M10 docs)                                                     |
-| **Build 2** |  **16** |     **877** | **3,299 → 2,422**      | 47 ids                                                                        |
-| Playtest 1  |      25 |       1,700 | 5,000 → 3,300          | 66 ids                                                                        |
+| Milestone   | Batches | Generations | Balance before → after | What                                                                           |
+| ----------- | ------: | ----------: | ---------------------- | ------------------------------------------------------------------------------ |
+| M5          |       7 |         126 | 3,299 → 3,173          | `wh_ext` (3 + two `_t2` edits), `bike`, `dk_terminal_a/b`, `dk_port_office`    |
+| M6          |       3 |         207 | 3,173 → 2,966          | `battery_checker`, `xray`, `sorter_arm`; the ten Low-density uniques; a retry  |
+| M7          |       3 |         276 | 2,966 → 2,690          | the ten Rural uniques; `wh_ext_t3`, `_t5`, `_t4` (two edits)                   |
+| M8          |       1 |         220 | 2,690 → 2,470          | the Airport (4) and Park & civic (11) ids, 2 candidates each                   |
+| M9          |       2 |          48 | 2,470 → 2,422          | re-rolls: `dk_ship`, `xray` (twice)                                            |
+| M10         |       0 |           0 | —                      | none (as of the M10 docs)                                                      |
+| **Build 2** |  **16** |     **877** | **3,299 → 2,422**      | 47 ids                                                                         |
+| Build 3 M12 |       2 |         233 | 2,422 → 2,189          | the 13 `ev_pic_*` pictures + `victory_art` (3 each); `ev_pic_port` re-roll (4) |
+| Playtest 1  |      25 |       1,700 | 5,000 → 3,300          | 66 ids                                                                         |
 
 $0 in credits throughout (Tier 2 subscription generations only). The build-2 run budget was 1,500 generations with a
 300 reserve (Q-B2-15 as set by the run prompt; `tools/art/gen.ts` `PIXELLAB_RUN_BUDGET` / `PIXELLAB_RESERVE`, counted

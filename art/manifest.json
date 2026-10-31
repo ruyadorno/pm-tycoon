@@ -15383,6 +15383,1583 @@
       "rejects": [],
       "note": "glyph sheet from vlr font:build (art/final/font/m5x7.png); canvas 0x0 = variable",
       "finalSha256": "0158f4c8637912cea68e311bec33b370ee0fe2841b71a897ea4b974c29e8ceac"
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a clipboard and a coffee mug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a clipboard and a coffee mug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "360cd1cd-0949-5d7c-bbee-5582a0bd57a7",
+            "source_image_id": "360cd1cd-0949-5d7c-bbee-5582a0bd57a7"
+          },
+          "jobId": "2f8c54cb-0e6a-4b6e-8f6b-b701e69e4121",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "e69153fb7c03fc1aff088329f5bde3dd62a0c61883a70fa0858bddd593ed65ea",
+          "at": "2026-10-31T02:32:59.210Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a clipboard and a coffee mug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a clipboard and a coffee mug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "a4c113ce-0a3d-5c10-8f24-fa74243fea23",
+            "source_image_id": "a4c113ce-0a3d-5c10-8f24-fa74243fea23"
+          },
+          "jobId": "fe8a0b9a-94e7-4070-8fe0-00544e384725",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "7d4312fe8648dee2ca3a9e3f739e5a28541506d28d64f65392932bd851af6105",
+          "at": "2026-10-31T02:32:59.210Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a clipboard and a coffee mug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a clipboard and a coffee mug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "1ededaff-e36f-5e63-8f5d-c7d584883ed3",
+            "source_image_id": "1ededaff-e36f-5e63-8f5d-c7d584883ed3"
+          },
+          "jobId": "4f1e6797-84f3-4133-8944-440231f632b5",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "4c041654eacb4ca486201f529d01afd864a09056589380d8792e757db24ab0fe",
+          "at": "2026-10-31T02:32:59.210Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "steaming mug is charming but the pair is smaller and the clip is gold (the reward ramp)",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "clean but the mug and board merge at 1x",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_staff",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a clipboard and a coffee mug",
+      "note": "agent pick #2 (2026-10-31): B3 §5 staff picture: the boldest clipboard (dark clip, ruled sheet) beside a big white coffee mug, reads at arm's length",
+      "finalSha256": "91ad4ad0efd6097c5056f78699efef381c4d812a97f59da6cbe601e47e385608",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a bike wheel and a wrench, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a bike wheel and a wrench, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "2d07e6fb-e511-5f7e-9ceb-3ca6a5113e62",
+            "source_image_id": "2d07e6fb-e511-5f7e-9ceb-3ca6a5113e62"
+          },
+          "jobId": "097262f8-5b8b-4cc4-8629-d8e44e972856",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "5fca090426ab85164f7e8aa135b9c5916e069a4d6dc4f53cee014dbe7b65c4bb",
+          "at": "2026-10-31T02:32:59.210Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a bike wheel and a wrench, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a bike wheel and a wrench, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "5a8b64ac-dd08-56fb-a258-64e779fb6fd5",
+            "source_image_id": "5a8b64ac-dd08-56fb-a258-64e779fb6fd5"
+          },
+          "jobId": "1396c625-2a9b-4c24-8416-e8f0127e615e",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "02c2bb01ca508bb35b0d26fc4852514729127f49682197b5321f14e44c65e5bb",
+          "at": "2026-10-31T02:32:59.210Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a bike wheel and a wrench, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a bike wheel and a wrench, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "f2e38f19-a68f-5417-91c0-e5bdcd24b7de",
+            "source_image_id": "f2e38f19-a68f-5417-91c0-e5bdcd24b7de"
+          },
+          "jobId": "8cf2e70d-e598-4e14-bb43-ae3512d3999f",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "ae9435071be003bb9f2872a96f04c6da85d7e74084a208c08f5b983f77f16ae3",
+          "at": "2026-10-31T02:32:59.210Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "white spokes vanish on the cream card",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "blue rim fills the wheel; reads as a disc more than a bike wheel",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_fleet",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a bike wheel and a wrench",
+      "note": "agent pick #2 (2026-10-31): B3 §5 fleet picture: a dark spoked bike wheel crossed by a grey wrench, the clearest silhouette of the three",
+      "finalSha256": "46c045ab2c69faa0e72c363bc6ffaaf9d0c1c83d7d9c7c904875893d0a841cc8",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a mailbox with a heart, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a mailbox with a heart, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "d0265528-b3a8-5638-ae36-3cd9b2f7c8db",
+            "source_image_id": "d0265528-b3a8-5638-ae36-3cd9b2f7c8db"
+          },
+          "jobId": "efd9892c-8d19-472b-9b4e-5fd179621854",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "84814631ef3216a7a885ccadf01262cfddf67a816427588a8a78741abb51eaa7",
+          "at": "2026-10-31T02:32:59.210Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a mailbox with a heart, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a mailbox with a heart, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "fde4ec95-374d-5f41-ae66-321567167dbd",
+            "source_image_id": "fde4ec95-374d-5f41-ae66-321567167dbd"
+          },
+          "jobId": "dd8644f1-c249-451b-9682-5a39eae56845",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "07c2ce21db4f8c5d758b16ce5d7c96d65ce23ed00b37147fb9ad2e6f657d44c7",
+          "at": "2026-10-31T02:32:59.210Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a mailbox with a heart, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a mailbox with a heart, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "19cff390-3cfc-536a-b580-b44ad3b65d4e",
+            "source_image_id": "19cff390-3cfc-536a-b580-b44ad3b65d4e"
+          },
+          "jobId": "d50f0399-da5c-418f-909f-696a3f49bfe5",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "191b3897dccfb9ff355a1695a05410dc734e722846c52ace8d24c8b49418e3ae",
+          "at": "2026-10-31T02:33:15.710Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "red mailbox: the danger ramp for the whole object",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "red mailbox, heavier, same issue",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_customers",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a mailbox with a heart",
+      "note": "agent pick #0 (2026-10-31): B3 §5 customers picture: a blue mailbox on a post with a red heart, raised flag, grass tuft; blue keeps red for the heart",
+      "finalSha256": "fd779bf546f191c2ec0821f3f12dc960b784cb9dd099076a8fdc43f80e69d1de",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a parcel with a magnifier and a skull tag, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a parcel with a magnifier and a skull tag, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "02d6f21d-e252-54d7-9aa8-6b4ad6366dab",
+            "source_image_id": "02d6f21d-e252-54d7-9aa8-6b4ad6366dab"
+          },
+          "jobId": "e8a23c9e-4db3-4add-b991-0a34d91107a7",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "b94f1c3226f20510dc66b19ad10f2d7341eaeb536cd2dc4c710bc4d0502797df",
+          "at": "2026-10-31T02:33:26.513Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a parcel with a magnifier and a skull tag, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a parcel with a magnifier and a skull tag, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "5f912d13-65f4-5015-a090-d9f8df165a85",
+            "source_image_id": "5f912d13-65f4-5015-a090-d9f8df165a85"
+          },
+          "jobId": "3d01178c-6e10-46d8-86e9-50ee7c232696",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "bb3552f308946d4d6be55cb5d594a9f755c4ff5af1b3ff5bbd6f490ad3966ea4",
+          "at": "2026-10-31T02:33:26.415Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a parcel with a magnifier and a skull tag, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a parcel with a magnifier and a skull tag, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "8f8242e2-d715-561e-8826-3ebcabd73b23",
+            "source_image_id": "8f8242e2-d715-561e-8826-3ebcabd73b23"
+          },
+          "jobId": "4bb32728-f411-41ba-a063-68de497423c9",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "e142f9ba7dbdc157d55580439a5b66ff9956b0fb6afdc68c29ef6d2105e18575",
+          "at": "2026-10-31T02:33:26.509Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "busy: magnifier and tag on opposite sides, cream tag fades",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "lumpy, blotchy gold-taped top; the skull tag half hidden behind the box",
+          "by": "claude",
+          "at": "2026-10-31T02:47:16.670Z"
+        }
+      ],
+      "id": "ev_pic_security",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a parcel with a magnifier and a skull tag",
+      "note": "agent pick #2 (2026-10-31): B3 §5 security picture (judge swap): crisp flat cardboard faces like the game's parcels, a clear magnifier and a round red skull tag that reads as a danger badge at 1x; the magnifier rim snaps from gold to yellow (palette.ts GOLD_PICTURES)",
+      "finalSha256": "6cf6f75659bc0c0a5a0bb9ebbe97e0a61988e9b82e0e45d7bb847e1e90abac52",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a coin stack on a ledger, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a coin stack on a ledger, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "5557aa78-0ba8-55b0-89de-2cfffeff7525",
+            "source_image_id": "5557aa78-0ba8-55b0-89de-2cfffeff7525"
+          },
+          "jobId": "5a03021c-46bc-4066-873e-867d69aec84a",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "49626cd8ea874c15918eb736e6554fee2f289fea3a25e68410017c6394b48559",
+          "at": "2026-10-31T02:33:33.593Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a coin stack on a ledger, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a coin stack on a ledger, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "ac19b321-23f3-56f8-b9f6-7fe09faab08b",
+            "source_image_id": "ac19b321-23f3-56f8-b9f6-7fe09faab08b"
+          },
+          "jobId": "e5fc9ebd-ad66-4398-9f59-391521b45009",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "379078d2e2ec5d976ef6d39810a9810773879eaddad49f0cf6c66c2adb5a2784",
+          "at": "2026-10-31T02:33:31.706Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a coin stack on a ledger, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a coin stack on a ledger, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "02bd4ad0-689e-56d8-b6f6-3c8319dac042",
+            "source_image_id": "02bd4ad0-689e-56d8-b6f6-3c8319dac042"
+          },
+          "jobId": "38e0a3a3-2231-40d4-be65-737fe20a2cfc",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "29757c3798f06d4517b3f1e186f7eeb73a0ea3f5521d46e39a8f3c828d3d49d6",
+          "at": "2026-10-31T02:33:26.600Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "fewer coins, a lumpier pile",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "brown ledger merges with the coin shading",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_money",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a coin stack on a ledger",
+      "note": "agent pick #0 (2026-10-31): B3 §5 money picture: gold coin stacks on a green ledger, the most legible stacks",
+      "finalSha256": "a5eaffe6d3fbdbbae8aabfe36ec057bae698a0d524ceea1745565c392b8b176d",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a town hall with a stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a town hall with a stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "471c6e2e-8f52-5ced-ad68-c42948d22e3f",
+            "source_image_id": "471c6e2e-8f52-5ced-ad68-c42948d22e3f"
+          },
+          "jobId": "190789d9-f7ec-4d69-8049-4455b1ba126c",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "20f3d90961344e62bf7649d8adeebb5318a7d9418a431b6031f0692f0066d52e",
+          "at": "2026-10-31T02:33:34.358Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a town hall with a stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a town hall with a stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "ec1816eb-a7e1-55f5-ba14-ed14b88b7a18",
+            "source_image_id": "ec1816eb-a7e1-55f5-ba14-ed14b88b7a18"
+          },
+          "jobId": "c76f898e-0cd6-4104-8505-6867a7358fe5",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "ddd4b68c5437cfa3cfa53d8ed2cd6d17595bec43585bb750cb170954d4e6016a",
+          "at": "2026-10-31T02:33:44.026Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a town hall with a stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a town hall with a stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "39c0e227-6589-5433-bf3a-6dde82256400",
+            "source_image_id": "39c0e227-6589-5433-bf3a-6dde82256400"
+          },
+          "jobId": "85570d05-97ab-4925-b2a9-93e442932102",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "5c842fb5cbb4faebe542943a70c84c444808aea14881fca5797cf62272a85ee5",
+          "at": "2026-10-31T02:33:41.797Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 2,
+          "reason": "the cleanest hall, no stamp",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "ragged roof edge under the stamp handle, a red roof, the stamp a red blob at 1x",
+          "by": "claude",
+          "at": "2026-10-31T02:47:16.670Z"
+        }
+      ],
+      "id": "ev_pic_cityhall",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a town hall with a stamp",
+      "note": "agent pick #0 (2026-10-31): B3 §5 city hall picture (judge swap): a symmetric civic hall with a blue roof, clock, columns, a flag and bushes; reads instantly at 1x, red only on the banners and flag; no stamp, the CITY HALL masthead carries the meaning",
+      "finalSha256": "9abbee2694279f7c97dc314322d0f07d62d66ef2d76a5fbc25c9083f67207a34",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a cloud with rain and sun, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a cloud with rain and sun, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "2b49dde0-ad23-5ad6-afe0-2ecdde5b6072",
+            "source_image_id": "2b49dde0-ad23-5ad6-afe0-2ecdde5b6072"
+          },
+          "jobId": "b55f1661-f2a1-44f1-b82b-d0f0200c4da9",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "84e0deef7c05714069e05c96828fff006b5525f7c21dec12fbcef6bdd5c29020",
+          "at": "2026-10-31T02:33:52.474Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a cloud with rain and sun, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a cloud with rain and sun, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "42472444-57a6-56a9-8db2-e402b90ec447",
+            "source_image_id": "42472444-57a6-56a9-8db2-e402b90ec447"
+          },
+          "jobId": "eee3d09e-c041-4fdd-bb16-aac00b83dc77",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "20194fc0ca9884cc18d2ec98ce6e2ceb894dbb11d214d5ee8a706d92067f2b1e",
+          "at": "2026-10-31T02:33:49.904Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a cloud with rain and sun, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a cloud with rain and sun, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "1b9145a1-a0df-5b92-a3c8-ec697e8ad915",
+            "source_image_id": "1b9145a1-a0df-5b92-a3c8-ec697e8ad915"
+          },
+          "jobId": "2617dc4e-e88f-4898-9efd-c4b058fe9c06",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0866ddf1e5a62e643bd49d8c6789048d1d8eb6ef87c2e7c2a97aa4803c62921a",
+          "at": "2026-10-31T02:33:57.368Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "white cloud loses contrast on the cream card",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "smaller drops",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_weather",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a cloud with rain and sun",
+      "note": "agent pick #2 (2026-10-31): B3 §5 weather picture: a grey rain cloud with a yellow sun behind and blue drops, bold shapes",
+      "finalSha256": "09552011507e955a3c359a2b400cc7435e703e65c790045117d49eff19a7e114",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a newspaper and a microphone, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a newspaper and a microphone, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "a5534e0a-4c22-5830-8250-ffbfc5b250d0",
+            "source_image_id": "a5534e0a-4c22-5830-8250-ffbfc5b250d0"
+          },
+          "jobId": "0825ae6c-78c9-4ac9-aac7-46e1151c5520",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "ba53bf9d2b5efe80f5f52b50217e73b464dc8c25ff6d26b8f2b5fef23d22b50d",
+          "at": "2026-10-31T02:33:57.742Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a newspaper and a microphone, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a newspaper and a microphone, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "b8e2fbbf-8ff3-5faa-a8cb-7370b8a70fd1",
+            "source_image_id": "b8e2fbbf-8ff3-5faa-a8cb-7370b8a70fd1"
+          },
+          "jobId": "cc29e167-f8e4-4330-b018-e4fccd478fba",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "e0c1556f3aceb9a8d40e5bb4c3a9ad6b52f7fe971c0a7b65765b90abe92345de",
+          "at": "2026-10-31T02:33:58.172Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a newspaper and a microphone, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a newspaper and a microphone, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "ee065b11-fae5-5b1b-89f5-8b45dbffabea",
+            "source_image_id": "ee065b11-fae5-5b1b-89f5-8b45dbffabea"
+          },
+          "jobId": "c1c3da6d-8563-4203-9e8c-3836bde00885",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "90f595a3e39bc3f190911f4db8bd6165ff938ee5f94686b72bd41f22ace7901a",
+          "at": "2026-10-31T02:33:59.656Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "dark mic reads as a torch",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "gold mic, the reward ramp",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_press",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a newspaper and a microphone",
+      "note": "agent pick #2 (2026-10-31): B3 §5 press picture: a newspaper with a photo box and a classic blue-ball microphone",
+      "finalSha256": "bd91dcd9ca4fe72f9b40fe13f8a5d04fed4c3bf44038669af5bb7bced7e7eff6",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a crowbar and a domino mask, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a crowbar and a domino mask, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "a9679ed1-5ad6-531a-bca9-8f9f847ad54e",
+            "source_image_id": "a9679ed1-5ad6-531a-bca9-8f9f847ad54e"
+          },
+          "jobId": "847c15ed-5a41-42e1-9c14-c9ee7f75e441",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "c7166b8e92a2bfc785fdf6bf4ed77a5c64cebaca86ee50e5d27cf4bd95037555",
+          "at": "2026-10-31T02:34:07.511Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a crowbar and a domino mask, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a crowbar and a domino mask, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "2f47f669-b440-559c-bbaf-30bbeba0375a",
+            "source_image_id": "2f47f669-b440-559c-bbaf-30bbeba0375a"
+          },
+          "jobId": "265a048f-2e34-4b6c-af01-00ffa7373599",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "7f4f2775f2678aff53564a6e4da11d6a5726efc3e3d124f44f8120450e6703f7",
+          "at": "2026-10-31T02:34:03.390Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a crowbar and a domino mask, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a crowbar and a domino mask, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "19d24ee3-2a00-535e-9140-ebb39ceee9b9",
+            "source_image_id": "19d24ee3-2a00-535e-9140-ebb39ceee9b9"
+          },
+          "jobId": "85305858-69dc-464c-a37e-ac4d8a55b6cf",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0c891f9d1d597789352034d5b8e7fc8d4bda8a0b858ad1445b1f80527644cee8",
+          "at": "2026-10-31T02:34:13.291Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "gold mask reads as a carnival / reward",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "purple mask, softer read",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_underworld",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a crowbar and a domino mask",
+      "note": "agent pick #2 (2026-10-31): B3 §5 underworld picture: a red crowbar and a dark burglar domino mask, unmistakable",
+      "finalSha256": "d4d5144fb21dd144218e916d2c93b8cf079ecefd52caf2e5ac2d255f08cd16d8",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a gear with a bug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a gear with a bug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "5cc3b8d1-e47f-5dcd-b272-6c1a7c9c22d3",
+            "source_image_id": "5cc3b8d1-e47f-5dcd-b272-6c1a7c9c22d3"
+          },
+          "jobId": "322c25d2-fc9d-40be-a6c0-0c7f7e854532",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "c3594a4502b0cbf8ab34d0035a2201c785ae75f0538b7ee89e7103a6291d4ba3",
+          "at": "2026-10-31T02:34:20.914Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a gear with a bug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a gear with a bug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "8b0e5c89-5528-507f-8aab-5c67368223ab",
+            "source_image_id": "8b0e5c89-5528-507f-8aab-5c67368223ab"
+          },
+          "jobId": "efb6ec21-ac83-485c-9219-8d0911ed2ea3",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "081a7467d68e6ad82718f7275b00e3ca9b4d77f53295edd46a0cabc9be2c6fe3",
+          "at": "2026-10-31T02:34:18.775Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a gear with a bug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a gear with a bug, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "8522cc61-1b6b-5934-b67f-f9f8f207d72e",
+            "source_image_id": "8522cc61-1b6b-5934-b67f-f9f8f207d72e"
+          },
+          "jobId": "559e9fe7-35c2-4d8d-bcbd-cb196eec9bf4",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "4f864404e9dec6e14c6cc0a346fa380fc72acf0c201f20a5c0cb0748341aab52",
+          "at": "2026-10-31T02:34:23.086Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "a ladybug inside the gear reads as luck",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "gold gear borrows the reward ramp",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_tech",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a gear with a bug",
+      "note": "agent pick #0 (2026-10-31): B3 §5 tech picture: a grey gear with an orange bug crawling on it — the bug-in-the-machine read",
+      "finalSha256": "a2afb3d1246e6257d4b5fe4d3d59f03e689c3c984f5b09d28b2fd92821812209",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a shipping container with a customs stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a shipping container with a customs stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "bad83240-57bf-5148-ad33-0fe31d71b4fb",
+            "source_image_id": "bad83240-57bf-5148-ad33-0fe31d71b4fb"
+          },
+          "jobId": "b276ff25-6063-4f4d-9618-747dce04314b",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "91f5b905a6abd218bdb3ab9b4279b6970cff148499c1b43a89dcd072d6bd3023",
+          "at": "2026-10-31T02:34:23.935Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a shipping container with a customs stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a shipping container with a customs stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "357a18dc-aa1f-58eb-b7b7-a064ade163e1",
+            "source_image_id": "357a18dc-aa1f-58eb-b7b7-a064ade163e1"
+          },
+          "jobId": "8660e2f8-9c9f-40a2-af1b-cabadba7e82e",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "b182550ca3ef864dc7a4463fb0065d80e7cba6107405182ea88d74eea602a2ad",
+          "at": "2026-10-31T02:34:38.588Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a shipping container with a customs stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a shipping container with a customs stamp, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "599a81ab-9d5b-5420-b253-32dabae2602f",
+            "source_image_id": "599a81ab-9d5b-5420-b253-32dabae2602f"
+          },
+          "jobId": "6810b424-41db-4a95-bc11-e11f0a07ec6f",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "6308ddbb1d88843810de26c6100310bbdbf95eeee04caf787835ce71b0073535",
+          "at": "2026-10-31T02:34:25.518Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1005,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "34670607-a210-5bed-bbee-ad997ff82528",
+            "source_image_id": "34670607-a210-5bed-bbee-ad997ff82528"
+          },
+          "jobId": "cf5d804e-859c-4bc6-a3d7-2fc47c2814c4",
+          "seed": 1005,
+          "candidate": 5,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "976178d17f7362d7d6a3d25ece31843c78e6de975c56c3c3b9bb24cbcfe89b33",
+          "at": "2026-10-31T02:48:45.540Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1004,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "da7383ef-50bc-5a5b-8e94-20b825ec2442",
+            "source_image_id": "da7383ef-50bc-5a5b-8e94-20b825ec2442"
+          },
+          "jobId": "6790526a-3def-4a49-a61f-0a08ee8e1691",
+          "seed": 1004,
+          "candidate": 4,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "4d3e46888bc5aacfb05ce3b1b02ab4fb0e4e7c72761e0d8ad8275c2e6c6be9bb",
+          "at": "2026-10-31T02:48:45.540Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1006,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "17bc61a1-9e05-554d-9f91-58e5a720caf3",
+            "source_image_id": "17bc61a1-9e05-554d-9f91-58e5a720caf3"
+          },
+          "jobId": "6c65cc6e-e579-490b-afce-90d9f37f42e1",
+          "seed": 1006,
+          "candidate": 6,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "af97b7867499022eafffe7af008aa4ef8f50e3e60e1a666771080be4bcb3482f",
+          "at": "2026-10-31T02:48:45.540Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1003,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a blue shipping container with a big round red customs stamp on its side showing a plain check mark, no letters, no writing, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "e0c63a1b-cc77-5895-a7e2-e3006a6e2f5d",
+            "source_image_id": "e0c63a1b-cc77-5895-a7e2-e3006a6e2f5d"
+          },
+          "jobId": "7acb863b-607d-47b9-8c08-bc98d41f9799",
+          "seed": 1003,
+          "candidate": 3,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "f9a30dada6ac9ef4c1587380a675ebae58ec8a47a1508e450af66c6af650767a",
+          "at": "2026-10-31T02:48:45.540Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "green container, yellow seal: fine but less official",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "dark seal on dark blue, low contrast",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "the stamp holds a writing-like glyph (a kana), against the no-text rule",
+          "by": "claude",
+          "at": "2026-10-31T02:49:58.749Z"
+        },
+        {
+          "candidate": 3,
+          "reason": "blotchy: an orange double-ring stamp, ragged door bars",
+          "by": "claude",
+          "at": "2026-10-31T02:49:58.749Z"
+        },
+        {
+          "candidate": 4,
+          "reason": "the boldest check, but no doors or castings: a blue crate with a UI tick",
+          "by": "claude",
+          "at": "2026-10-31T02:49:58.749Z"
+        },
+        {
+          "candidate": 6,
+          "reason": "a crisp inked ring stamp, but dark red on blue loses contrast at 1x; no doors",
+          "by": "claude",
+          "at": "2026-10-31T02:49:58.749Z"
+        }
+      ],
+      "id": "ev_pic_port",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a shipping container with a customs stamp",
+      "note": "agent pick #5 (2026-10-31): B3 §5 port picture (re-roll, check-mark stamp prompt): a blue shipping container with door bars and corner castings and a round red customs stamp holding a plain check mark, no glyph; reads at 1x on cream and on grey0",
+      "finalSha256": "d41720c674f81f569d83b3ed51031a2becb35eb60b181b98f4e9827561effd43",
+      "chosenCandidate": 5
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a four-leaf clover on a gift, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a four-leaf clover on a gift, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "f9db9c57-efad-50b2-a70c-c74d20fc0935",
+            "source_image_id": "f9db9c57-efad-50b2-a70c-c74d20fc0935"
+          },
+          "jobId": "d2ad6c77-70ed-4140-918a-473d67b2d4dc",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "a35f97eae3a2888035fa88f77fe1f75d0300f766935795c11cfcd5d73edf36d5",
+          "at": "2026-10-31T02:34:41.522Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a four-leaf clover on a gift, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a four-leaf clover on a gift, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "9e4f1962-73b6-57da-b1d8-ec1581450c42",
+            "source_image_id": "9e4f1962-73b6-57da-b1d8-ec1581450c42"
+          },
+          "jobId": "48e0529f-c63d-4157-a683-fa9eb124066b",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "5aa94c6d8d305889757620841bc8e52d0377e188a8f437883af736f2d3446967",
+          "at": "2026-10-31T02:34:44.106Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: a four-leaf clover on a gift, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: a four-leaf clover on a gift, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "67bbd782-5ada-55d2-8a72-b4952baa5233",
+            "source_image_id": "67bbd782-5ada-55d2-8a72-b4952baa5233"
+          },
+          "jobId": "72c95c8e-5160-4b44-b521-be0aad1e09fa",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "7fbcb4a0b217e702999033ce9a88ebe2fcc5dd8cfd68dc4dfa0e2ef91c4cbad8",
+          "at": "2026-10-31T02:34:39.322Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 1,
+          "reason": "clover squashed into the box",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 2,
+          "reason": "clover and box blur together",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_luck",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a four-leaf clover on a gift",
+      "note": "agent pick #0 (2026-10-31): B3 §5 luck picture: a tall four-leaf clover rising from a red gift with a gold bow",
+      "finalSha256": "c428c50c9168d7113502825a06aac07ab314168bc410cee31ea6f143f77f27e3",
+      "chosenCandidate": 0
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: the job board's clipboard with a gold star, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1000,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: the job board's clipboard with a gold star, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "1c3157a9-3099-5ffc-9eb3-81b92a10105c",
+            "source_image_id": "1c3157a9-3099-5ffc-9eb3-81b92a10105c"
+          },
+          "jobId": "070fa326-6a3f-4bd5-9c4e-f3548d5474fa",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "0acd529c7ad5ba6317488cbff05bdab8169c3a02aa47355bc8c744538d9c946c",
+          "at": "2026-10-31T02:34:44.571Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: the job board's clipboard with a gold star, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1002,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: the job board's clipboard with a gold star, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "77e4d547-b670-5295-8799-f42d1645e6f7",
+            "source_image_id": "77e4d547-b670-5295-8799-f42d1645e6f7"
+          },
+          "jobId": "d88f72a0-faa5-48d3-9519-d402ecee8913",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "8b24ebf607937143fed2d2af0426ca65cff38bb616d7a3f3246df79f39629bf1",
+          "at": "2026-10-31T02:34:54.119Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "48×48 pixel art icon, one object group, flat palette, no text: the job board's clipboard with a gold star, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 17
+            },
+            "seed": 1001,
+            "prompt": "48×48 pixel art icon, one object group, flat palette, no text: the job board's clipboard with a gold star, chunky simple readable shapes, 1px dark outline, flat fills, saturated clean colours, lit from the top left, the object group fills most of the picture, centred, the whole picture on a plain solid flat magenta background, no letters, no numbers, no anti-aliasing",
+            "image_id": "3fb692a8-77f2-5da4-b961-d53347602479",
+            "source_image_id": "3fb692a8-77f2-5da4-b961-d53347602479"
+          },
+          "jobId": "cd6ef20f-03a4-472d-9afc-ffda9b567ae4",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 5,
+          "downloadUrl": "",
+          "sha256": "1dfc22f64b47bb9645366a134d864010a7e36f98aeedf972b8ade4dbe0ce54d6",
+          "at": "2026-10-31T02:34:44.659Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "smallest of the three",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "big star, plain sheet",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "ev_pic_job",
+      "class": "event-pic",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [48, 48],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "the job board's clipboard with a gold star",
+      "note": "agent pick #2 (2026-10-31): B3 §5 job picture: the job board's clipboard with a gold star and ruled lines, close to ic_quest",
+      "finalSha256": "aa75568e504047c026c9136fa2e8fa5a55d1a374a941a6d0611247ea3fb2aad9",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art, wide landscape picture, the scene spans the full width, bright cheerful city-builder style, 1px dark outline, flat fills, saturated clean colours, the whole picture on a plain solid flat magenta background, no text, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#301442", "#4b1f66", "#75399a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1000,
+            "prompt": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art, wide landscape picture, the scene spans the full width, bright cheerful city-builder style, 1px dark outline, flat fills, saturated clean colours, the whole picture on a plain solid flat magenta background, no text, no letters, no numbers, no anti-aliasing",
+            "image_id": "f529af7a-b473-5cdc-b147-5f456c1b5002",
+            "source_image_id": "f529af7a-b473-5cdc-b147-5f456c1b5002"
+          },
+          "jobId": "802513f1-2be8-4765-8bce-962f2a0c032f",
+          "seed": 1000,
+          "candidate": 0,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "1aebe3b5b09769b6cbfdaa9936368b60e64ec51ab0b4a5110516a7af471438a8",
+          "at": "2026-10-31T02:34:54.122Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art, wide landscape picture, the scene spans the full width, bright cheerful city-builder style, 1px dark outline, flat fills, saturated clean colours, the whole picture on a plain solid flat magenta background, no text, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#301442", "#4b1f66", "#75399a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1001,
+            "prompt": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art, wide landscape picture, the scene spans the full width, bright cheerful city-builder style, 1px dark outline, flat fills, saturated clean colours, the whole picture on a plain solid flat magenta background, no text, no letters, no numbers, no anti-aliasing",
+            "image_id": "7c7a3026-89ba-5797-a4ec-b95a0a10f5f8",
+            "source_image_id": "7c7a3026-89ba-5797-a4ec-b95a0a10f5f8"
+          },
+          "jobId": "9e9fba60-32fc-4a31-b56d-b5bf3c831f5c",
+          "seed": 1001,
+          "candidate": 1,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "95411db01a2e52f48d51c5c2e026abb8f3ffdeb88dc06a9bd3511cbfb8d23624",
+          "at": "2026-10-31T02:34:56.434Z"
+        },
+        {
+          "tool": "create-image-pro-flash",
+          "endpoint": "/create-image-pro-flash",
+          "params": {
+            "description": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art, wide landscape picture, the scene spans the full width, bright cheerful city-builder style, 1px dark outline, flat fills, saturated clean colours, the whole picture on a plain solid flat magenta background, no text, no letters, no numbers, no anti-aliasing",
+            "no_background": false,
+            "target_palette": {
+              "colors": ["#241e32", "#4e4858", "#716a74", "#948e90", "#b7b0a8", "#d9d2c4", "#fcf9f1", "#2f7d3a", "#47a048", "#6cc05a", "#9bdc74", "#1f6a4a", "#2f8d5e", "#4bb27a", "#1d6fae", "#2f9bd6", "#5ec6ea", "#a5e8f4", "#2d4d9c", "#4c7bd0", "#86b4ee", "#a8232e", "#e63e3e", "#ff7f68", "#8a3a1f", "#c4582b", "#ea853d", "#f6b168", "#b5760f", "#e8a526", "#f8d13e", "#fff38e", "#5a3b86", "#8a60bc", "#bd99e0", "#d4567c", "#f6a0b6", "#5a3a24", "#8a5a3a", "#c08a58", "#e2bb8a", "#f2ad7a", "#301442", "#4b1f66", "#75399a", "#cc7d00", "#f5b000", "#ffe066", "#ff00ff"],
+              "max_colors": 21
+            },
+            "seed": 1002,
+            "prompt": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art, wide landscape picture, the scene spans the full width, bright cheerful city-builder style, 1px dark outline, flat fills, saturated clean colours, the whole picture on a plain solid flat magenta background, no text, no letters, no numbers, no anti-aliasing",
+            "image_id": "1b6f4f18-6b02-5c9d-8f38-6f8d15712533",
+            "source_image_id": "1b6f4f18-6b02-5c9d-8f38-6f8d15712533"
+          },
+          "jobId": "9e5a58db-28be-40ff-ab41-9a7ecfcc8bfa",
+          "seed": 1002,
+          "candidate": 2,
+          "cost": 6,
+          "downloadUrl": "",
+          "sha256": "d66dc86e12a8a441242d171c486edcfddb945747eb559757f742a41029406391",
+          "at": "2026-10-31T02:35:07.324Z"
+        }
+      ],
+      "rejects": [
+        {
+          "candidate": 0,
+          "reason": "the key flood ate the sky: ragged half-transparent skyline",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        },
+        {
+          "candidate": 1,
+          "reason": "the key flood ate the sky: ragged edges, vans cut",
+          "by": "claude",
+          "at": "2026-10-31T02:37:39.541Z"
+        }
+      ],
+      "id": "victory_art",
+      "class": "ui",
+      "source": "pixellab",
+      "placeholder": false,
+      "canvas": [208, 104],
+      "frames": [""],
+      "district": "ui",
+      "atlas": "world",
+      "subject": "a glass courier HQ at night with a neon sign, fireworks, a row of delivery bikes, vans and trucks lined up in front, confetti, celebratory, pixel art",
+      "note": "agent pick #2 (2026-10-31): B3 §5 victory art: the full-bleed night scene — glass HQ with a winged parcel emblem (no letters), fireworks, courier bikes, vans and trucks lined up, confetti on the street; the model painted its own night sky (no key), framed by the 1-px outline",
+      "finalSha256": "e92e7198640521ff4448771e158246229bfc35b03f49d7d0b09d4cc01da11020",
+      "chosenCandidate": 2
+    },
+    {
+      "variants": [],
+      "priority": "P0",
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "ic_event",
+      "class": "icon16",
+      "source": "procedural",
+      "placeholder": false,
+      "canvas": [16, 16],
+      "frames": [""],
+      "district": "ui",
+      "note": "build 3 (B3 §5): the event bell, ringing (EventChip, EventCard masthead, ticker lines); packed into both atlases like ic_quest",
+      "finalSha256": "df8a7c5a5050aa5b5afebab1804c33430eb0529d9be2fbca4dfcec992b6bbf31"
+    },
+    {
+      "variants": [],
+      "priority": "P1",
+      "approved": false,
+      "gen": [],
+      "rejects": [],
+      "id": "fx_confetti",
+      "class": "fx",
+      "source": "procedural",
+      "placeholder": false,
+      "canvas": [32, 32],
+      "frames": ["_f0", "_f1", "_f2", "_f3", "_f4", "_f5", "_f6", "_f7"],
+      "district": "ui",
+      "atlas": "world",
+      "note": "build 3 (B3 §5): the victory confetti burst over the VictoryCard top edge on the victory tick, reused by the Golden Release QUEST COMPLETE stamp (sprite frames, no scale / rotation / filters)",
+      "finalSha256": "6183a3348693be44705a7d3643a70230a394d4a6875218c270e5a92d9916d4c2"
     }
   ],
   "batches": [
@@ -15754,6 +17331,24 @@
       "usd": 0,
       "balanceBefore": 2437,
       "balanceAfter": 2422
+    },
+    {
+      "at": "2026-10-31T02:35:39.167Z",
+      "ids": ["ev_pic_staff", "ev_pic_fleet", "ev_pic_customers", "ev_pic_security", "ev_pic_money", "ev_pic_cityhall", "ev_pic_weather", "ev_pic_press", "ev_pic_underworld", "ev_pic_tech", "ev_pic_port", "ev_pic_luck", "ev_pic_job", "victory_art"],
+      "tool": "create-image-pro-flash",
+      "generations": 213,
+      "usd": 0,
+      "balanceBefore": 2422,
+      "balanceAfter": 2209
+    },
+    {
+      "at": "2026-10-31T02:49:07.475Z",
+      "ids": ["ev_pic_port"],
+      "tool": "create-image-pro-flash",
+      "generations": 20,
+      "usd": 0,
+      "balanceBefore": 2209,
+      "balanceAfter": 2189
     }
   ],
   "retired": [

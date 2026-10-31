@@ -66,7 +66,7 @@ export function nearestIndexFn(
 }
 
 export function entrySubset(e: ManifestEntry): PaletteColor[] {
-  return subsetFor(e.class, { district: e.district })
+  return subsetFor(e.class, { district: e.district, id: e.id })
 }
 
 /** generated (non-placeholder PixelLab) art: geometry gets normalized */

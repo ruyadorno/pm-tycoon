@@ -172,6 +172,14 @@ function intoManifest(decisions: Record<string, Decision>): void {
       e.chosenCandidate = n
       e.approved = false
       delete e.approvedBy
+      // a re-decision (build 3: a judge's swap) lifts the agent's own
+      // earlier reject of the candidate it now picks; lint rejects stay
+      e.rejects = e.rejects.filter(
+        (r) =>
+          r.candidate !== n ||
+          r.by !== 'claude' ||
+          r.reason.startsWith('lint:'),
+      )
       if (d.t2Edit !== undefined) e.editPick = d.t2Edit
       e.note = `agent pick #${n} (${at.slice(0, 10)}): ${d.reason}`
     }

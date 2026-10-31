@@ -22,6 +22,9 @@ const OUTLINED: readonly AssetClass[] = [
   'vehicle-bike',
   'vehicle-van',
   'vehicle-truck',
+  // build 3 (B3 §5): the category pictures keep the 1-px outline rule
+  // (procedural fallbacks and generated candidates alike)
+  'event-pic',
 ]
 
 const NEVER: readonly AssetClass[] = [

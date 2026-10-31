@@ -48,6 +48,7 @@ import {
   newImg,
   opaque,
   exteriorBaseOk,
+  outlineImg,
   put,
   rgbaToImg,
   stairStepOk,
@@ -1185,6 +1186,93 @@ export function processMachine(e: ManifestEntry, src: Img): Processed {
     for (const s of e.frames.slice(1)) frames.set(s, scan)
   } else frames.set(e.frames[0] as string, f0)
   return { frames, reject: reject ?? prefilter(e, f0), notes }
+}
+
+// ---------------------------------------------------------------------------
+// Pictures (build 3, B3 §5): the 48x48 event-pic category pictures and the
+// 208x104 victory_art illustration (class 'ui')
+
+/** event-pic: specks of at most this many px left by the key are dropped */
+export const PICTURE_SPECK = 2
+
+/**
+ * Drop opaque 4-connected components of at most `max` px (key specks) —
+ * an absolute size, so rain drops and sparkles of a few px survive where
+ * dropFragments' fraction of the largest component would take them.
+ */
+export function dropSpecks(img: Img, max: number): number {
+  const W = img.w
+  const seen = new Uint8Array(W * img.h)
+  let cleared = 0
+  for (let i = 0; i < seen.length; i++) {
+    if (seen[i] || (img.px[i] as number) < 0) continue
+    const comp: number[] = []
+    const stack = [i]
+    seen[i] = 1
+    while (stack.length) {
+      const k = stack.pop() as number
+      comp.push(k)
+      const x = k % W
+      for (const j of [
+        x > 0 ? k - 1 : -1,
+        x < W - 1 ? k + 1 : -1,
+        k - W,
+        k + W,
+      ]) {
+        if (j < 0 || j >= seen.length || seen[j] || (img.px[j] as number) < 0)
+          continue
+        seen[j] = 1
+        stack.push(j)
+      }
+    }
+    if (comp.length > max) continue
+    for (const k of comp) {
+      img.px[k] = -1
+      img.depth[k] = Number.NEGATIVE_INFINITY
+      cleared += 1
+    }
+  }
+  return cleared
+}
+
+/**
+ * A keyed picture on its canvas: key specks dropped (event-pic only — the
+ * victory art's firework sparks are single pixels), the opaque bbox centred
+ * on the canvas, then quantize + the outline rule. event-pic is an outlined
+ * class (outlineFinal); the 'ui' victory art is outlined here once, on its
+ * silhouette — for a full-bleed scene (the model paints its own night sky
+ * whatever the key asks) that is a crisp 1-px frame, not a dark rim on
+ * every spark (the ui class stays out of the outline pass and lint A10).
+ */
+export function processPicture(e: ManifestEntry, src: Img): Processed {
+  const [W, H] = e.canvas
+  const notes: string[] = []
+  const work = cloneImg(src)
+  if (e.class === 'event-pic') {
+    const n = dropSpecks(work, PICTURE_SPECK)
+    if (n) notes.push(`${n} speck px dropped`)
+  }
+  const b = bbox(work)
+  if (!b) return { frames: new Map(), reject: 'lint:A05 empty', notes }
+  const bw = b.x1 - b.x0 + 1
+  const bh = b.y1 - b.y0 + 1
+  const dx = Math.floor((W - bw) / 2) - b.x0
+  const dy = Math.floor((H - bh) / 2) - b.y0
+  const placed = shifted(work, W, H, dx, dy)
+  if (placed.lost > 0) notes.push(`${placed.lost} px outside the canvas`)
+  const img = finishImg(e, placed.img)
+  if (e.class === 'ui') outlineImg(img)
+  const colours = new Set<number>()
+  for (const i of img.px) if (i >= 0) colours.add(i)
+  notes.push(`content ${bw}x${bh}, ${colours.size} colours`)
+  // a picture that keeps less than a third of its canvas side is a speck
+  // on a plate, not a readable card picture
+  const small = bw < W / 3 && bh < H / 3
+  return {
+    frames: new Map([[e.frames[0] ?? '', img]]),
+    reject: small ? 'lint:A05 picture too small' : prefilter(e, img),
+    notes,
+  }
 }
 
 // ---------------------------------------------------------------------------

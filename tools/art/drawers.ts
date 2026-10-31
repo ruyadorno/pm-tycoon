@@ -81,6 +81,7 @@ export function loadDrawers(): Promise<void> {
     await import('./faces.ts') // build 2 M6: face_00 … face_11
     await import('./ui.ts') // §2.8 ui_*, badge_new, sign_title
     await import('./fx.ts') // §2.8 fx_*, ring, rush_ring
+    await import('./eventPics.ts') // build 3 (B3 §5): ev_pic_*, victory_art
   })()
   return loaded
 }

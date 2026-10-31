@@ -125,7 +125,7 @@ export function checkFrames(e: ManifestEntry, frames: DrawnFrame[]): string[] {
 }
 
 export function drawCtxFor(e: ManifestEntry): DrawCtx {
-  const subset = subsetFor(e.class, { district: e.district })
+  const subset = subsetFor(e.class, { district: e.district, id: e.id })
   const allowed = new Set(subset.map((c) => c.id))
   return {
     entry: e,

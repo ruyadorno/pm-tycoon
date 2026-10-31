@@ -871,6 +871,24 @@ const ICONS: Record<string, readonly string[]> = {
     '.....DD.....',
     '.....DD.....',
   ],
+  // build 3 (B3 §5): the event bell — ringing (white ticks) and orange, so
+  // it reads apart from the rush order's still yellow ic_bell at 16 px on
+  // cream and on grey0 (chip, EventCard masthead, ticker lines); the ticks
+  // alone were too faint to tell the two apart at 1x
+  ic_event: [
+    '.....mm.....',
+    '....aaaa....',
+    'W..aaaaaa..W',
+    '.W.aaaaaa.W.',
+    '...aaaaaa...',
+    '..aaaaaaaa..',
+    '..aaaaaaaa..',
+    '..aaaaaaaa..',
+    '.aaaaaaaaaa.',
+    'aaaaaaaaaaaa',
+    'AAAAAAAAAAAA',
+    '.....dd.....',
+  ],
   ic_lock: [
     '...mmmmmm...',
     '..mm....mm..',

@@ -153,6 +153,12 @@ export const SUBJECT_OVERRIDES: Record<string, string> = {
     'long wide wooden inspection desk seen from above, its rectangular ' +
     'desk top fills the whole picture, a grey parcel tray, a magnifying ' +
     'glass and a paper sheet on the desk top, chunky legs',
+  // build 3 re-roll (B3 §5 subject "a shipping container with a customs
+  // stamp"): all three first-round stamps held a writing-like glyph (a kana,
+  // a £), against the no-text rule, so the stamp's mark is spelled out
+  ev_pic_port:
+    'a blue shipping container with a big round red customs stamp on its ' +
+    'side showing a plain check mark, no letters, no writing',
 }
 
 /**
@@ -422,7 +428,7 @@ export function anchorFor(
 
 /** palette hexes allowed for the entry's class (target_palette.colors) */
 export function paletteColors(e: ManifestEntry): string[] {
-  const subset = subsetFor(e.class, { district: e.district })
+  const subset = subsetFor(e.class, { district: e.district, id: e.id })
   const hint = PALETTE_HINTS[e.id] ?? PALETTE_HINTS[e.class]
   const ramps = new Set([
     ...(hint ?? []),
@@ -441,10 +447,15 @@ export const FLOOR_TILE_PNG = join(
   'art/final/interior-tile/floor_t1_0.png',
 )
 
-/** Pro Flash create cost in generations by longest side (5 / 6 / 9) */
+/**
+ * Pro Flash create cost in generations by longest side (5 / 6 / 9).
+ * Re-measured with GET /pro-flash/cost on 2026-10-31 (build 3): 48x48 and
+ * 96x96 -> 5; 100x100, 160x160, 208x104 and 208x208 -> 6; 192x224 and
+ * 256x256 -> 9 (the 6-generation band reaches 208, not 160).
+ */
 export function proFlashCost(w: number, h: number): number {
   const s = Math.max(w, h)
-  return s <= 96 ? 5 : s <= 160 ? 6 : 9
+  return s <= 96 ? 5 : s <= 208 ? 6 : 9
 }
 
 /** Pro Flash sizes are multiples of 4 in 16..256 */
@@ -464,6 +475,8 @@ export const BG_KEY = '#ff00ff'
  */
 export function wantsKey(e: ManifestEntry): boolean {
   if (e.class === 'fixture-desk' || e.class === 'fixture-shelf') return true
+  // build 3 (B3 §5): the category pictures and the victory art are keyed
+  if (e.class === 'event-pic' || isPicture(e)) return true
   return (
     e.canvas[0] > 160 &&
     (e.class.startsWith('building') || e.class === 'warehouse-ext')
@@ -476,6 +489,7 @@ function proFlashImage(
   attach: Prompt['attach'],
   styleAnchor: StyleAnchor | null = null,
   key = false,
+  maxColors = 20,
 ): Prompt {
   const [W, H] = e.canvas
   const w = pfSize(W)
@@ -503,7 +517,7 @@ function proFlashImage(
         colors: key
           ? [...colors, keyWord === 'cyan' ? '#00ffff' : BG_KEY]
           : colors,
-        max_colors: key ? 21 : 20,
+        max_colors: key ? maxColors + 1 : maxColors,
       },
     },
     attach: styleAnchor ? [...attach, 'style_anchor_fit'] : attach,
@@ -576,6 +590,36 @@ export const EXTERIOR_SUBJECTS: Record<string, string> = {
     'pink and purple neon sign shaped like a parcel box on the tower roof ' +
     'without any letters, rooftop garden with small trees, proud tycoon ' +
     'look',
+}
+
+// ---------------------------------------------------------------------------
+// Build 3 (B3 §5, plan-build3 §6): the event category pictures and the
+// victory art — Pro Flash create on a solid key background (candidates.ts
+// processPicture keys it out, snaps to the palette and, for event-pic,
+// applies the outline rule)
+
+/** the frozen B3 §5 prefix of every category picture prompt */
+export const EVENT_PIC_PREFIX =
+  '48×48 pixel art icon, one object group, flat palette, no text'
+
+export const EVENT_PIC_SUFFIX =
+  ', chunky simple readable shapes, 1px dark outline, flat fills, ' +
+  'saturated clean colours, lit from the top left, the object group fills ' +
+  'most of the picture, centred, transparent background, no letters, no ' +
+  'numbers, no anti-aliasing'
+
+/** max colours of a 48x48 picture (lint A12 warns above 16) */
+export const EVENT_PIC_COLORS = 16
+
+export const PICTURE_SUFFIX =
+  ', wide landscape picture, the scene spans the full width, bright ' +
+  'cheerful city-builder style, 1px dark outline, flat fills, saturated ' +
+  'clean colours, transparent background, no text, no letters, no ' +
+  'numbers, no anti-aliasing'
+
+/** a generated 'ui' illustration (victory_art), not a nine-slice */
+export function isPicture(e: ManifestEntry): boolean {
+  return e.class === 'ui' && e.source === 'pixellab'
 }
 
 export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
@@ -776,7 +820,22 @@ export function promptFor(e: ManifestEntry, ctx: PromptCtx = {}): Prompt {
         })),
       }
     }
+    case 'event-pic': {
+      const text = `${EVENT_PIC_PREFIX}: ${subject}${EVENT_PIC_SUFFIX}`
+      return proFlashImage(
+        e,
+        text,
+        [],
+        null,
+        ctx.key ?? wantsKey(e),
+        EVENT_PIC_COLORS,
+      )
+    }
     default: {
+      if (isPicture(e)) {
+        const text = `${subject}${PICTURE_SUFFIX}`
+        return proFlashImage(e, text, [], null, ctx.key ?? wantsKey(e))
+      }
       const ed = EDIT_OF[e.id]
       if (ed) return editPrompt(e, ed)
       // machines, fixtures, desk, shelves: Pro Flash at the class canvas;

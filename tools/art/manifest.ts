@@ -1,4 +1,5 @@
-// art/manifest.json — every sprite of playtest 1 (style-guide.md §2).
+// art/manifest.json — every sprite of playtest 1 (style-guide.md §2), and of
+// builds 2-3 (build 3 adds the 'event-pic' class, B3 §5).
 //
 // File shape: { version: 1, entries: ManifestEntry[], batches: Batch[] }.
 // Frame name (atlas key) = id + frame suffix [+ variant suffix]:
@@ -42,6 +43,7 @@ export const ASSET_CLASSES = [
   'ui',
   'font',
   'logo',
+  'event-pic',
 ] as const
 
 export type AssetClass = (typeof ASSET_CLASSES)[number]
@@ -90,6 +92,9 @@ export const CLASS_CANVAS: Readonly<
   // the author's logo (B2 §5): brand art outside the palette contract,
   // written to src/assets/logo.png by tools/art/logo.ts, never in an atlas
   logo: [352, 176],
+  // build 3 (B3 §5): one 48x48 picture per event category (EventCard,
+  // Newspaper picture slot); keyed background, world atlas, district 'ui'
+  'event-pic': [48, 48],
 }
 
 /** Classes whose rows may override the class canvas (prop boards 64x40 / 96x52). */

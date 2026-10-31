@@ -194,7 +194,8 @@ function checkPixels(
     const c = PALETTE.byId.get(id)
     const reserved = c && RAMP_RULES[c.ramp] !== undefined
     const code =
-      reserved && !rampAllowed(c.ramp, e.class, { district: e.district })
+      reserved &&
+      !rampAllowed(c.ramp, e.class, { district: e.district, id: e.id })
         ? 'A07'
         : 'A01'
     r.errors.push(

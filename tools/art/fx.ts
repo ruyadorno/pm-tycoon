@@ -13,10 +13,15 @@
 //   rush_ring 16x16 _0.._3  rush timer ring, _0 = full, _3 = a quarter left
 //   magic_ring 16x16 _0.._3 the magic parcel's countdown (build 2 M7,
 //                           design-m7 §6.1): rush_ring geometry, gold ramp
+//   fx_confetti 32x32 _f0.._f7 the victory burst (build 3, B3 §5): a flash
+//                           and a fan of outlined confetti flying up and
+//                           out, spinning (the piece's shape cycles) and
+//                           falling, thinning out over the last frames
 
 import type { DrawCtx } from './draw-api.ts'
 import { registerDrawer } from './drawers.ts'
 import { Grid, gridFrames } from './icons.ts'
+import { makeRng, hash } from './rng.ts'
 
 type Shades = readonly [string, string, string] // base, light, dark
 
@@ -463,8 +468,90 @@ function coinRing(k: number, steps: number, fill: Shades, coin: boolean): Grid {
 }
 
 // ---------------------------------------------------------------------------
+// fx_confetti (build 3, B3 §5): 8 frames, 32x32, world atlas
+
+/** confetti colours: mid steps that read on the cream card and on the art */
+export const CONFETTI_COLOURS = [
+  'pink0',
+  'blue1',
+  'grass1',
+  'water1',
+  'orange2',
+  'purple1',
+  'gold1',
+  'yellow2',
+] as const
+
+/** piece shapes [w, h] cycled frame by frame (the spin) */
+const SPIN: readonly (readonly [number, number])[] = [
+  [3, 2],
+  [2, 2],
+  [2, 3],
+  [1, 2],
+]
+
+interface Piece {
+  vx: number
+  vy: number
+  colour: string
+  spin: number
+  /** last frame the piece is drawn (thinning out at the end) */
+  last: number
+}
+
+/** the burst, fixed by a seed of its own (same pieces in every frame) */
+export const CONFETTI_PIECES: readonly Piece[] = (() => {
+  const rng = makeRng(hash('fx_confetti'))
+  const out: Piece[] = []
+  const n = 16
+  for (let k = 0; k < n; k++) {
+    // a fan from -160 deg to -20 deg (up and out), evenly spread + jitter
+    const a = ((-160 + (140 * (k + 0.5)) / n + rng.int(-6, 6)) * Math.PI) / 180
+    const v = 2.3 + rng.next() * 1.6
+    out.push({
+      vx: Math.cos(a) * v * 1.15,
+      vy: Math.sin(a) * v,
+      colour: CONFETTI_COLOURS[k % CONFETTI_COLOURS.length] as string,
+      spin: rng.int(0, SPIN.length - 1),
+      last: k % 4 === 0 ? 5 : k % 4 === 1 ? 6 : 7,
+    })
+  }
+  return out
+})()
+
+export const CONFETTI_ORIGIN: readonly [number, number] = [16, 22]
+const CONFETTI_G = 0.55
+
+function confetti(i: number): Grid {
+  const g = new Grid(32, 32)
+  const [ox, oy] = CONFETTI_ORIGIN
+  const layer = new Grid(32, 32)
+  if (i === 0) {
+    // the pop: a small yellow star flash at the origin
+    layer.rect(ox - 1, oy - 3, 2, 6, 'yellow3')
+    layer.rect(ox - 3, oy - 1, 6, 2, 'yellow3')
+    layer.rect(ox - 1, oy - 1, 2, 2, 'grey5')
+  }
+  const t = i + 0.7
+  CONFETTI_PIECES.forEach((p, k) => {
+    if (i > p.last) return
+    // frame 0 shows only every other piece, close to the flash
+    if (i === 0 && k % 2 === 1) return
+    const x = Math.round(ox + p.vx * t)
+    const y = Math.round(oy + p.vy * t + 0.5 * CONFETTI_G * t * t)
+    const [w, h] = SPIN[(p.spin + i) % SPIN.length] as [number, number]
+    // a piece whose outline would leave the 1-px frame margin has flown
+    // out of the frame: it is not drawn (never a piece cut in half)
+    if (x < 2 || y < 2 || x + w > 30 || y + h > 30) return
+    layer.rect(x, y, w, h, p.colour)
+  })
+  layer.outline()
+  g.blit(layer, 0, 0)
+  return g
+}
 
 const FRAME_SETS: Record<string, (i: number) => Grid> = {
+  fx_confetti: confetti,
   fx_ping: ping,
   fx_pop: pop,
   fx_boom: boom,

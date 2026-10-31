@@ -8,7 +8,7 @@ Run (build 3): started 2026-10-31 — plan-build3.md DRAFT v3 + spec-build3.md �
 never run (M11 → M15 in one run; no author feel-check notes; docs/decisions.md "Run decisions (build 3)") — Node v26 /
 vlt 1.6.x — Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab
 token: present; budget 400 generations with a 100 reserve; 233 spent (2,422 → 2,189) — M11 7d2ec44, M12 617e97b, M13
-f4cb2a4, M14 3b8bc50, M15 + the hand-off docs commit; zip dist-zip/pm-tycoon-<M15 sha>.zip.
+f4cb2a4, M14 3b8bc50, M15 + the hand-off docs commit; zip dist-zip/pm-tycoon-a3c090e.zip; Pages dispatch refused (HTTP 403).
 
 Run (build 2): started 2026-10-30 00:46 UTC — plan-build2.md DRAFT v2 + spec-build2.md — Node v26 / vlt 1.6.1 —
 Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab token: present,
@@ -62,9 +62,10 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M15 — playtest-3 build — 2026-10-31 14:30 UTC — DONE at (this commit; sha recorded in the hand-off docs commit)
+## M15 — playtest-3 build — 2026-10-31 14:30 UTC — DONE at a3c090e
 
-M14 is 3b8bc50.
+M14 is 3b8bc50. The hand-off: dist-zip/pm-tycoon-a3c090e.zip + the shots zip sent; `main` pushed; the one Pages
+dispatch refused (HTTP 403, as in build 2) — the live site still serves an earlier build.
 Built: the playtest recorder v3 (`src/metrics/playtest.ts`, `pm.playtest.v3`: `events {offered, decided, byCategory,
 choices[] (id, option, default, kind, atS, thinkS, chain), thinkMedianS, chainsStarted, chainsFinished, chainsRunning,
 livesLost, livesGained, vehiclesLost, workersLost, gameOverByEvent, modifiersPeak}` and `beats[]` in sim time; think

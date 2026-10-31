@@ -3,7 +3,7 @@
 Package Management Tycoon build 3: the event cards (a deck of 115 decision, news and job cards that pause the game and
 print each option's effects before you choose), stories that run across several cards, the job board folded into the
 deck, and a game about 8 % shorter. Built in one autonomous run on 2026-10-31 (02:19 UTC, 2db4c6e → the M15 commit
-`<pending: M15 sha>`) from plans/pm-tycoon/plan-build3.md (DRAFT v3) and spec-build3.md (cited `B3 §N`). Node v26,
+`a3c090e`) from plans/pm-tycoon/plan-build3.md (DRAFT v3) and spec-build3.md (cited `B3 §N`). Node v26,
 vlt 1.6.x, Phaser 4.2.1, Chromium (Chrome for Testing, SwiftShader WebGL) with the Playwright `iPhone 16` profile.
 Sources for every number below: docs/status.md (M11–M14 entries), docs/decisions.md ("Run decisions (build 3)"),
 docs/art-todo.md, docs/gate/{latest,latest-35min,delegating}.md, the 40-seed gate output and the M15 review-fix and
@@ -68,7 +68,7 @@ c6726f8 the art and 9a928db the engine skeleton)
 - The M13 copy polish (the gang's `Pay up ($300)` / `Refuse`, the watch's `Hide the fleet` / `Carry on`, the poach's
   `Pay a bonus ($180)`, …); fixtures regenerated (the victory fixture now from seed 7).
 
-**M15 — the playtest-3 build** (this report; commit `<pending: M15 sha>`)
+**M15 — the playtest-3 build** (this report; commit `a3c090e`)
 
 - `src/metrics/playtest.ts` v3 (`pm.playtest.v3`, B3 §6): `events` {offered, decided, byCategory, `choices[]` with
   each card's think time, `thinkMedianS`, chains started / finished / running, lives, vehicles and workers lost,
@@ -90,15 +90,15 @@ Nothing in the plan-build3 §8.7 cut order was cut.
 
 ### 2.1 Get the build
 
-Hand-off bundle: `dist-zip/pm-tycoon-<pending: M15 sha>.zip` (`vlr bundle` of `dist/` built at the M15 commit), sent
+Hand-off bundle: `dist-zip/pm-tycoon-a3c090e.zip` (`vlr bundle` of `dist/` built at the M15 commit), sent
 with this report and the shots zip. Rebuild any time with `vlr build && vlr bundle`.
 
-| Path                  | How                                                                                                                                                                                                                  |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Desktop devtools   | Serve `dist/` (path 2), open `http://localhost:4173/` in Chrome, devtools → device toolbar → **iPhone 16** (393 × 852, DPR 3), reload. Add a custom 393 × 659 (or 360 × 604) device to see the tall rooms scroll.    |
-| 2. iPhone via the Mac | Unzip, `cd dist && python3 -m http.server 4173`, open `http://<mac-lan-ip>:4173/` in Safari (same Wi-Fi; `ipconfig getifaddr en0`).                                                                                  |
-| 3. GitHub Pages       | `https://ruyadorno.com/pm-tycoon/`, only if the M15 dispatch went through: `<pending: Pages dispatch result>` (§13.1). Otherwise Actions → **Pages** → Run workflow (or `gh workflow run pages.yml`) deploys `main`. |
-| SSH tunnel            | Only with a route to the VM: `vlr preview -- --host` there, `ssh -g -L 4173:localhost:4173 <vm>` on the Mac, then the LAN URL on the phone.                                                                          |
+| Path                  | How                                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Desktop devtools   | Serve `dist/` (path 2), open `http://localhost:4173/` in Chrome, devtools → device toolbar → **iPhone 16** (393 × 852, DPR 3), reload. Add a custom 393 × 659 (or 360 × 604) device to see the tall rooms scroll.                |
+| 2. iPhone via the Mac | Unzip, `cd dist && python3 -m http.server 4173`, open `http://<mac-lan-ip>:4173/` in Safari (same Wi-Fi; `ipconfig getifaddr en0`).                                                                                              |
+| 3. GitHub Pages       | `https://ruyadorno.com/pm-tycoon/`, only if the M15 dispatch went through: the M15 dispatch was refused (HTTP 403, §13.1) (§13.1). Otherwise Actions → **Pages** → Run workflow (or `gh workflow run pages.yml`) deploys `main`. |
+| SSH tunnel            | Only with a route to the VM: `vlr preview -- --host` there, `ssh -g -L 4173:localhost:4173 <vm>` on the Mac, then the LAN URL on the phone.                                                                                      |
 
 Plain http works (localStorage, WebGL, the audio-unlock tap; no service worker). Each origin keeps its own save and
 profile. A build-2 save is discarded with the stale-save toast (`STATE_VERSION` 6, Q-B3-12); a v2 profile is never
@@ -721,12 +721,14 @@ the table and the regeneration one-liner.
 ### 13.1 GitHub state, Pages and hand-off
 
 - `main` was pushed at every checkpoint (M11 7d2ec44, M12 617e97b, M13 f4cb2a4, M14 3b8bc50) and at the end (M15
-  `<pending: M15 sha>`), always `git push origin main`, no branches or PRs.
-- Pages: `<pending: the result of the one gh workflow run pages.yml dispatch>`. In build 2 it was refused (`HTTP 403:
-  Resource not accessible by integration`: the GitHub App has Contents: write but not Actions: write, Q-RUN11), and the
-  site still served the playtest-1 build. To deploy by hand: Actions → **Pages** → **Run workflow** (or
-  `gh workflow run pages.yml`).
-- Hand-off: `dist-zip/pm-tycoon-<pending: M15 sha>.zip` and the shots zip, both sent with this report; `dist-zip/` is
+  `a3c090e`), always `git push origin main`, no branches or PRs.
+- Pages: **the dispatch was refused again.** `gh workflow run pages.yml` with the ruy-bot token returned `HTTP 403:
+  Resource not accessible by integration` (the GitHub App has Contents: write for the pushes but not Actions: write),
+  exactly as in build 2. The one GET of `https://ruyadorno.com/pm-tycoon/` returned HTTP 200 with the bundle
+  `assets/index-D5uYfGIt.js` — an earlier build, not build 3 (`assets/index-TREuloRD.js`). Deploy build 3 with one
+  manual run: Actions → **Pages** → **Run workflow** (or `gh workflow run pages.yml` from your account), or grant the
+  app Actions: write.
+- Hand-off: `dist-zip/pm-tycoon-a3c090e.zip` and the shots zip, both sent with this report; `dist-zip/` is
   gitignored. docs/status.md gets its M15 entry and is copied back to `plans/pm-tycoon/status.md`.
 
 ### 13.2 What `playtest.json` v3 should answer

@@ -155,6 +155,8 @@ export class TickerQueue {
 export const TICKER_TINT: Readonly<Partial<Record<TickerLineKind, number>>> = {
   quest: THEME.gold,
   questFailed: THEME.textMuted,
+  /** Build 3: card offered / modifier ended / chain end lines. */
+  event: THEME.gold,
 }
 
 export function tickerTint(kind: TickerLineKind): number {

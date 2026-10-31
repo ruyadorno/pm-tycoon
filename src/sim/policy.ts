@@ -81,6 +81,7 @@
 import type { CheckerDef, VehicleTypeDef } from '../data/types.ts'
 import { laneCatchRate } from './detection.ts'
 import { bestApplicant } from './policies/applicants.ts'
+import { newTally } from './policies/eventPolicy.ts'
 import {
   delegatingHireSorter,
   delegatingHoldBay,
@@ -162,7 +163,7 @@ export function weakestCounter(sim: Sim): CheckerDef | null {
   let best: { counter: string; d: number } | null = null
   for (const st of sim.data.parcels.malware.strains) {
     if (sim.state.level.announced[st.id] === undefined) continue
-    const d = laneCatchRate(sim.state.lane, st.id)
+    const d = laneCatchRate(sim.state.lane, st.id, [], sim)
     if (best === null || d < best.d) best = { counter: st.counter, d }
   }
   return best ? machineDef(sim, best.counter) : null
@@ -197,11 +198,26 @@ class CompetentPolicy implements Policy {
   readonly name: PolicyKind
   readonly #sim: Sim
   readonly #delegating: boolean
+  /** Build 3 (D-9): the hold never stops a sim this policy plays (Sim.attachPolicy). */
+  readonly #detach: () => void
+  /** Build 3: the event policy's EV tally (metrics only, B3 §3.8). */
+  readonly #tally = newTally()
 
   constructor(sim: Sim, kind: PolicyKind = 'competent') {
     this.#sim = sim
     this.name = kind
     this.#delegating = kind === 'delegating'
+    this.#detach = sim.attachPolicy()
+  }
+
+  /** Detach from the sim (idempotent): without a policy an open card holds tick(). */
+  dispose(): void {
+    this.#detach()
+  }
+
+  /** Metrics-only tallies (the gate's EV / non-default rows); never read by the sim. */
+  metrics(): Record<string, number> {
+    return { ...this.#tally }
   }
 
   step(): void {

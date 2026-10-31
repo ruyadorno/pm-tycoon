@@ -38,6 +38,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { loadGameData } from '../sim/load.node.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
 import { Sim } from '../../src/sim/sim.ts'
+import { assertNoCard, plainTick, settleCards } from './cards.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 import type { Parcel } from '../../src/sim/types.ts'
 
@@ -61,6 +62,7 @@ type Name = 'holdbay-full' | 'malware-cleared' | 'one-life'
 const NAMES: readonly Name[] = ['holdbay-full', 'malware-cleared', 'one-life']
 
 function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
+  assertNoCard(sim, name)
   const snap = {
     ...sim.snapshot(),
     fixture: {
@@ -92,6 +94,7 @@ function holdbayFull(): void {
     policy.step()
     sim.tick()
   }
+  settleCards(sim, policy)
   policy.dispose?.()
   const found: { stall: { nodeId: string; tick: number } | null } = {
     stall: null,
@@ -101,11 +104,11 @@ function holdbayFull(): void {
       found.stall = { nodeId: p.nodeId, tick: sim.state.tick }
   })
   const cap = CAP_S * TICKS_PER_S
-  while (found.stall === null && sim.state.tick < cap) sim.tick()
+  while (found.stall === null && sim.state.tick < cap) plainTick(sim)
   const at = found.stall as { nodeId: string; tick: number } | null
   if (at === null)
     throw new Error(`holdbay-full: no Hold Bay stall by ${CAP_S} s`)
-  for (let i = 0; i < STALL_SETTLE_S * TICKS_PER_S; i++) sim.tick()
+  for (let i = 0; i < STALL_SETTLE_S * TICKS_PER_S; i++) plainTick(sim)
   const st = sim.state
   const lane = st.lane
   const hold = laneNode(lane, lane.holdBayNodeId)!
@@ -158,6 +161,7 @@ function clearedRun(debugLosses: boolean, stopTick: number | null): ClearedRun {
       run.loadedTick = sim.state.tick
   })
   sim.events.on('life:lost', (p) => {
+    if (p.cause === 'event') return // build 3: no parcel
     if (run.parcel && p.parcelId === run.parcel.id)
       run.lifeLostTick = sim.state.tick
   })
@@ -192,6 +196,7 @@ function clearedRun(debugLosses: boolean, stopTick: number | null): ClearedRun {
   }
   if (run.parcel === null)
     throw new Error(`no malware reached the Hold Bay by ${CAP_S} s`)
+  settleCards(sim, policy)
   policy.dispose?.()
   return run as ClearedRun
 }

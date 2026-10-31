@@ -286,7 +286,7 @@ export function questProgress01(sim: Sim, q: Quest): number {
 export function gainLives(
   sim: Sim,
   n: number,
-  reason: 'magic' | 'quest',
+  reason: 'magic' | 'quest' | 'event',
 ): number {
   const eco = sim.state.economy
   const next = Math.min(sim.data.economy.lives.cap, eco.lives + n)
@@ -588,15 +588,16 @@ function magicReady(sim: Sim, t: QuestTemplateDef): boolean {
   return magicRoute(sim, t.goal.maxRoadTiles, false) !== null
 }
 
-interface Candidate {
+/** An offerable template with its resolved target (build 3: a job card's draw pool). */
+export interface JobCandidate {
   t: QuestTemplateDef
   target: DistrictId | null
 }
 
 /** Templates offerable now (quests.json order) with their resolved targets. */
-export function eligibleTemplates(sim: Sim): Candidate[] {
+export function eligibleTemplates(sim: Sim): JobCandidate[] {
   const level = sim.state.level.level
-  const out: Candidate[] = []
+  const out: JobCandidate[] = []
   for (const t of sim.data.quests.templates) {
     if (t.unlockLevel > level) continue
     if (!conditionHolds(sim, t) || !requiresHolds(sim, t)) continue
@@ -609,6 +610,74 @@ export function eligibleTemplates(sim: Sim): Candidate[] {
     out.push({ t, target })
   }
   return out
+}
+
+/**
+ * The regular draw pool (B2 §3.1; build 3: the job card's): eligible
+ * templates with weight > 0 (a weight-0 template is never drawn, so it never
+ * counts), the newest history entry's template left out when another is
+ * eligible (no back-to-back repeat). No draw.
+ */
+export function jobCandidates(sim: Sim): JobCandidate[] {
+  const all = eligibleTemplates(sim).filter((c) => c.t.weight > 0)
+  const last = sim.state.quests.history.at(-1)?.templateId
+  const fresh = all.filter((c) => c.t.id !== last)
+  return fresh.length > 0 ? fresh : all
+}
+
+/**
+ * The Golden Release is due: its level reached and no Victory yet (B2 §3.4;
+ * build 3 B3 §3.2: no job card while it is pending, its cooldown included).
+ */
+export function ultimatePending(sim: Sim): boolean {
+  const u = ultimateDef(sim.data)
+  return (
+    u !== null && sim.state.level.level >= u.level && !sim.state.economy.victory
+  )
+}
+
+/**
+ * B3 §3.2: a job card may be drawn now — quests on, not game over, both
+ * slots empty, the Golden Release not pending and the job cooldown
+ * (quests.jobReadyTick) over. Build 3 M11: read by the event deck
+ * (systems/deck.ts); the wave-0 build-2 scheduler does not use it.
+ */
+export function jobsOpen(sim: Sim): boolean {
+  const s = sim.state
+  const qs = s.quests
+  return (
+    SIM_FEATURES.quests &&
+    !s.economy.gameOver &&
+    qs.offer === null &&
+    qs.active === null &&
+    !ultimatePending(sim) &&
+    s.tick >= qs.jobReadyTick
+  )
+}
+
+/**
+ * Build 3 (B3 §3.1): put template `templateId` in the offer slot for a job
+ * card — no draw; `quest:offered` + the quest ticker line (offerQuest).
+ * `debug` resolves the target with the debug fallbacks. Null when the
+ * template is unknown or its target does not resolve.
+ * M11 wave 0: the offer keeps the build-2 expiry; stream B makes it
+ * card-held (expiresTick null).
+ */
+export function offerJob(
+  sim: Sim,
+  templateId: string,
+  opts: { debug?: boolean } = {},
+): Quest | null {
+  const t = questTemplate(sim.data, templateId)
+  if (t === null) return null
+  let target: DistrictId | null = null
+  if (t.target !== undefined) {
+    target = resolveTarget(sim, t, opts.debug === true)
+    if (target === null) return null
+  }
+  const q = makeQuest(sim, t, target)
+  offerQuest(sim, q)
+  return q
 }
 
 // The tick step ------------------------------------------------------------------------
@@ -664,7 +733,9 @@ function stepActive(sim: Sim, a: Quest, ctx: TickContext): void {
   } else if (pr.kind === 'detectionAllStrains') {
     const g = goalDef(sim, a)
     const rate = g?.kind === 'detectionAllStrains' ? g.rate : 1
-    const rates = announcedStrains(s, data).map((x) => laneCatchRate(s.lane, x))
+    const rates = announcedStrains(s, data).map((x) =>
+      laneCatchRate(s.lane, x, [], sim),
+    )
     const ok = rates.length > 0 && rates.every((d) => d >= rate)
     if (!ok) pr.sinceTick = null
     else if (pr.sinceTick === null) pr.sinceTick = s.tick
@@ -753,19 +824,13 @@ export function questsStep(sim: Sim, ctx: TickContext): void {
   }
   // 4. a regular offer (one quest-stream draw; none when nothing is eligible)
   //    — never while the ultimate is pending (its cooldown after a fail too)
-  const ultimatePending =
-    u !== null && s.level.level >= u.level && !s.economy.victory
   if (
-    !ultimatePending &&
+    !ultimatePending(sim) &&
     qs.offer === null &&
     qs.active === null &&
     s.tick >= qs.nextOfferTick
   ) {
-    // A weight-0 template is never drawn, so it never counts as eligible.
-    const all = eligibleTemplates(sim).filter((c) => c.t.weight > 0)
-    const last = qs.history.at(-1)?.templateId
-    const fresh = all.filter((c) => c.t.id !== last)
-    const pool = fresh.length > 0 ? fresh : all
+    const pool = jobCandidates(sim)
     if (pool.length === 0) return
     const c = questRng(sim).weighted(pool, (x) => x.t.weight)
     if (c) offerQuest(sim, makeQuest(sim, c.t, c.target))
@@ -902,7 +967,6 @@ function failQuest(sim: Sim, q: Quest, reason: QuestFailReason): void {
 export function acceptQuest(sim: Sim, questId: string): CommandResult {
   if (!SIM_FEATURES.quests) return fail('locked')
   const s = sim.state
-  const data = sim.data
   const qs = s.quests
   if (s.economy.gameOver) return fail('invalid')
   const o = qs.offer
@@ -912,6 +976,19 @@ export function acceptQuest(sim: Sim, questId: string): CommandResult {
     return fail(gone ? 'quest-expired' : 'invalid')
   }
   if (qs.active !== null) return fail('quest-active')
+  return activateOffer(sim, o)
+}
+
+/**
+ * Make the open offer `o` the active quest (acceptQuest after its checks;
+ * build 3: a job card's Accept): the deadline, the satisfaction start, the
+ * magic parcel. A magic quest with no route now is withdrawn instead
+ * (`{ok: false, reason: 'quest-expired', applied: true}`, logged for replay).
+ */
+export function activateOffer(sim: Sim, o: Quest): CommandResult {
+  const s = sim.state
+  const data = sim.data
+  const qs = s.quests
   const pr = o.progress
   if (pr.kind === 'magicParcel') {
     const g = goalDef(sim, o)
@@ -965,6 +1042,17 @@ export function declineQuest(sim: Sim, questId: string): CommandResult {
   if (s.economy.gameOver) return fail('invalid')
   const o = qs.offer
   if (o === null || o.id !== questId || o.ultimate) return fail('invalid')
+  return declineOffer(sim, o)
+}
+
+/**
+ * Decline the open regular offer `o` (declineQuest after its checks; build
+ * 3: a job card's Decline): history `declined`, the decline cooldown,
+ * `quest:declined {declined}`.
+ */
+export function declineOffer(sim: Sim, o: Quest): CommandResult {
+  const s = sim.state
+  const qs = s.quests
   record(sim, o, 'declined', null)
   qs.offer = null
   qs.nextOfferTick =

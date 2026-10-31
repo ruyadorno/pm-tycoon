@@ -114,8 +114,8 @@ const LEVEL_UP_FIXTURE = 'tests/fixtures/level-up.json'
 const MAX_DRAW_CALLS = 8
 /** src/sim/save.ts SAVE_KEY (build 2: save v2, plan-build2 §8.2 task 9). */
 const SAVE_KEY = 'pm.save.v2'
-/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (5 since M8, design-m8-m9 §2.4). */
-const SAVE_VERSION = 5
+/** src/sim/save.ts SAVE_VERSION = types.ts STATE_VERSION (6 since M11, M11 contract §2.2). */
+const SAVE_VERSION = 6
 /** A new game at seed 7 without the policy (the player's own buys). */
 const NEW_URL = '/?seed=7&debug=1&skipTitle=1&audio=0'
 

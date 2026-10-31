@@ -5,9 +5,11 @@
 // event. Payload fields are JSON values (no undefined).
 
 import { EventEmitter } from 'eventemitter3'
+import type { EventCategoryId, EventKind, ModifierKey } from '../data/types.ts'
 import type {
   BuildingId,
   DistrictId,
+  EventLostLifeReport,
   Fixture,
   LostLifeReport,
   Pips,
@@ -18,6 +20,7 @@ import type {
   Strain,
   Tick,
   TraceEntry,
+  VehicleType,
 } from './types.ts'
 
 /** An event without fields. */
@@ -35,6 +38,10 @@ export type MoneyReason =
   | 'purchase'
   | 'hire'
   | 'refund'
+  /** Build 3: an event option's cost or money effect. */
+  | 'event'
+  /** Build 3 (D-34): the payrollAdd modifier, debited at payday apart from payroll. */
+  | 'subscriptions'
 
 export type TickerKind =
   | 'level'
@@ -52,6 +59,8 @@ export type TickerKind =
   | 'quest'
   /** M7: a quest timed out or failed (grey). */
   | 'questFailed'
+  /** Build 3: card offered / modifier ended / chain end lines (gold). */
+  | 'event'
 
 export interface VehicleRef {
   id: number
@@ -74,13 +83,25 @@ export interface LifeLostPayload {
   inspectorRate: number | null
   sorterCall: LostLifeReport['sorterCall']
   report: LostLifeReport
+  /** Build 3; emitted 'malware'. */
+  cause?: 'malware'
+}
+
+/** Build 3 (B3 §3.5, D-7): a life an event option took (no parcel). */
+export interface LifeLostEventPayload {
+  cause: 'event'
+  eventId: string
+  title: string
+  option: string
+  lives: number
+  report: EventLostLifeReport
 }
 
 /** Who tossed a parcel (M6): the player, the seated sorter, or the Sorter Arm. */
 export type TossSource = 'player' | 'sorter' | 'arm'
 
 /** Why an employee left for good (M6). */
-export type FireReason = 'fired' | 'replaced' | 'deskRemoved'
+export type FireReason = 'fired' | 'replaced' | 'deskRemoved' | 'event'
 
 /** Why an applicant pool changed (M6). */
 export type ApplicantsReason = 'day' | 'ad' | 'hire' | 'star' | 'starLeft'
@@ -155,7 +176,8 @@ export interface SimEventPayloads {
     onTime: boolean
   }
   // vehicles / docks (§4.6, §6.5)
-  'vehicle:bought': VehicleRef
+  /** Build 3: `free` = an event gift (no purchase). */
+  'vehicle:bought': { id: number; free: boolean }
   'vehicle:parked': VehicleRef
   /** position = 0-based place in the dock queue. */
   'vehicle:queued': { id: number; position: number }
@@ -225,8 +247,9 @@ export interface SimEventPayloads {
   // progress
   'level:up': { level: number }
   'region:unlocked': { district: DistrictId }
-  'life:lost': LifeLostPayload
-  'game:over': NoPayload
+  /** Build 3: the union is discriminated on `cause` ('event' = an event option took it). */
+  'life:lost': LifeLostPayload | LifeLostEventPayload
+  'game:over': { cause: 'malware' | 'event' }
   'satisfaction:changed': { district: DistrictId; value: number; delta: number }
   'ticker:news': { text: string; kind: TickerKind }
   /** M7 quests (spec-build2 §3, §8; design-m7 §3.1). */
@@ -258,7 +281,11 @@ export interface SimEventPayloads {
   /** The Golden Release completed (spec-build2 §3.4). */
   'game:victory': { day: number }
   /** ADDITION (M7, design-m7 Q9): lives went up (a magic parcel, a quest reward). */
-  'life:gained': { lives: number; delta: number; reason: 'magic' | 'quest' }
+  'life:gained': {
+    lives: number
+    delta: number
+    reason: 'magic' | 'quest' | 'event'
+  }
   /** day = completed in-game days (= state.day after the clock step). */
   'day:ended': { day: number }
   // additions beyond §11 (default — confirm, plan.md §14 Q16)
@@ -272,6 +299,39 @@ export interface SimEventPayloads {
   'lane:fixturePlaced': { nodeId: string; fixture: Fixture }
   'lane:fixtureMoved': { from: string; to: string; swapped: boolean }
   'lane:fixtureRemoved': { nodeId: string; refund: number }
+  // build 3 events (spec-build3 §3, §6)
+  'event:offered': {
+    eventId: string
+    kind: EventKind
+    category: EventCategoryId
+    chain: boolean
+    questId: string | null
+  }
+  /** `effects` = the generated effect lines (plain text), as offered (D-31). */
+  'event:decided': {
+    eventId: string
+    option: number
+    label: string
+    default: boolean
+    kind: EventKind
+    effects: string[]
+  }
+  'event:withdrawn': { eventId: string }
+  'event:queued': { eventId: string }
+  'modifier:applied': {
+    id: string
+    key: ModifierKey
+    untilTick: Tick | null
+    eventId: string
+  }
+  'modifier:expired': { id: string; key: ModifierKey }
+  'vehicle:lost': {
+    id: number
+    type: VehicleType
+    eventId: string
+    last: boolean
+  }
+  'parcel:lost': { id: number }
 }
 
 export type SimEventName = keyof SimEventPayloads
@@ -387,6 +447,14 @@ export const SIM_EVENT_NAMES = [
   'lane:fixturePlaced',
   'lane:fixtureMoved',
   'lane:fixtureRemoved',
+  'event:offered',
+  'event:decided',
+  'event:withdrawn',
+  'event:queued',
+  'modifier:applied',
+  'modifier:expired',
+  'vehicle:lost',
+  'parcel:lost',
 ] as const satisfies readonly SimEventName[]
 
 type Unlisted = Exclude<SimEventName, (typeof SIM_EVENT_NAMES)[number]>

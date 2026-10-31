@@ -10,6 +10,7 @@ import buildings from './buildings.json'
 import districts from './districts.json'
 import economy from './economy.json'
 import employees from './employees.json'
+import events from './events.json'
 import levels from './levels.json'
 import machines from './machines.json'
 import map from './map.json'
@@ -41,6 +42,7 @@ export function rawGameData(): RawGameData {
     economy,
     levels,
     quests,
+    events,
     puns,
     map,
   })

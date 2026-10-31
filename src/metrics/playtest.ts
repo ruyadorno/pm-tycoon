@@ -1207,6 +1207,7 @@ export class PlaytestRecorder {
       if (p.malware) this.r.malwareAtClearance += 1
     })
     on('life:lost', (p) => {
+      if (p.cause === 'event') return // M12: the event variant (metrics v3)
       const atS = ticksToS(p.report?.tick ?? this.tick())
       // A replayed loss (a reload just before it) is recorded once: the same
       // parcel id (ids are unique per run — two parcels sharing a label can

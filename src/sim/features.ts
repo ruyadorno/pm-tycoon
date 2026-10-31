@@ -15,6 +15,8 @@
 // firstOverseasClearedAfterLevel3MaxMin rows; `levels45` (M9: L4-L5) adds
 // the plan's L4-L5 rows and gates level4Min / level5Min. The sim itself
 // reads levels from data (economy.playtestMaxLevel), not from these flags.
+// `events` (build 3, M11-M12: the event deck's decision cards) gates the
+// deck's decision draw; job cards and the rescue come regardless.
 // tools/sim/report.ts reads the same flags so a gate window whose system is
 // not built yet prints as informational instead of failing.
 
@@ -27,6 +29,12 @@ export const SIM_FEATURES = {
   quests: true,
   levels3plus: true,
   levels45: true,
+  /**
+   * build 3, M11: the decision draw of the event deck (job cards come
+   * regardless; `vlr sim -- --events on|off`); report gates the event rows;
+   * on at M12.
+   */
+  events: false,
 }
 
 export type SimFeature = keyof typeof SIM_FEATURES
@@ -41,4 +49,5 @@ export const FEATURE_MILESTONE: Record<SimFeature, string> = {
   quests: 'M7',
   levels3plus: 'M8',
   levels45: 'M9',
+  events: 'M12',
 }

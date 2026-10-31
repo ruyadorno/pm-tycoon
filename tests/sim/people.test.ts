@@ -517,7 +517,7 @@ describe('drivers (spec-build2 §2.5, design D2)', () => {
       applicantId: null,
     })
     expect(res).toEqual({ ok: true, vehicleId: 1 })
-    expect(bought).toEqual([{ id: 1 }])
+    expect(bought).toEqual([{ id: 1, free: false }])
     expect(inactive).toEqual([{ id: 1 }])
     const v = sim.state.vehicles[0]!
     expect(v).toMatchObject({ state: 'inactive', driverId: null })

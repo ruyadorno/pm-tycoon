@@ -568,7 +568,7 @@ function missed(sim: Sim, n: number, strain: Strain): Parcel[] {
 }
 
 function lose(sim: Sim, p: Parcel): LifeLostPayload {
-  const lost = helpers.collect(sim, 'life:lost')
+  const lost = helpers.collectLost(sim)
   takeFrom(laneNode(sim.state.lane, 'shelf')!, p.id)
   deliverParcel(sim, null, p)
   return lost[0]!
@@ -801,7 +801,7 @@ describe('M8 end to end: a real clearance life:lost through the card model', () 
     expect(sim.dispatch({ kind: 'debugForceLevel', level: 3 }).ok).toBe(true)
     for (const d of Object.values(sim.state.districts)) d.nextSpawnTick = null
     helpers.fund(sim)
-    const lost = helpers.collect(sim, 'life:lost')
+    const lost = helpers.collectLost(sim)
     expect(
       sim.dispatch({ kind: 'debugOverseasMalware', hub: 'docks' }).ok,
     ).toBe(true)
@@ -838,7 +838,7 @@ describe('M9 end to end (design R11): an Airport clearance at the real L5, six l
     expect(
       sim.state.lane.nodes.filter((n) => /^slot\d$/.test(n.id)).length,
     ).toBe(6)
-    const lost = helpers.collect(sim, 'life:lost')
+    const lost = helpers.collectLost(sim)
     expect(
       sim.dispatch({ kind: 'debugOverseasMalware', hub: 'airport' }).ok,
     ).toBe(true)

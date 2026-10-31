@@ -11,7 +11,8 @@
 //   interval; the HUD mood is the mean of live districts (types.ts).
 
 import type { Sim } from '../sim.ts'
-import { districtDef } from '../map.ts'
+import { districtDef, mapIndex } from '../map.ts'
+import type { ModCtx } from '../modifiers.ts'
 import type { DistrictId } from '../types.ts'
 import { ticksFromS } from '../types.ts'
 
@@ -105,4 +106,54 @@ export function driftStep(sim: Sim): void {
     const step = Math.sign(gap) * Math.min(Math.abs(gap), c.driftStep)
     changeSatisfaction(sim, d.id, step, 'other')
   }
+}
+
+// Build 3 event targets (B3 §3.4; pure reads, no draw) -------------------------------
+
+/** Live spawning districts (kind 'district'), in districts.json order. */
+export function liveSpawningDistricts(sim: ModCtx): DistrictId[] {
+  return sim.data.districts
+    .filter((d) => d.kind === 'district' && sim.state.districts[d.id]?.live)
+    .map((d) => d.id)
+}
+
+/** Parcels waiting (reserved or not) at a district's buildings. */
+export function waitingInDistrict(sim: ModCtx, id: DistrictId): number {
+  let n = 0
+  for (const b of mapIndex(sim.data).buildingsByDistrict[id] ?? []) {
+    n += sim.state.buildings[b.id]?.waiting.length ?? 0
+  }
+  return n
+}
+
+/**
+ * The live spawning district with the most waiting parcels (ties → file
+ * order); with nothing waiting anywhere, the first live spawning district.
+ */
+export function busiestDistrict(sim: ModCtx): DistrictId | null {
+  const live = liveSpawningDistricts(sim)
+  let best: DistrictId | null = null
+  let most = 0
+  for (const d of live) {
+    const n = waitingInDistrict(sim, d)
+    if (n > most) {
+      best = d
+      most = n
+    }
+  }
+  return best ?? live[0] ?? null
+}
+
+/** The live spawning district with the lowest satisfaction (ties → file order). */
+export function lowestDistrict(sim: ModCtx): DistrictId | null {
+  let low: DistrictId | null = null
+  let lowSat = Infinity
+  for (const d of liveSpawningDistricts(sim)) {
+    const sat = sim.state.districts[d]?.satisfaction ?? 0
+    if (sat < lowSat) {
+      low = d
+      lowSat = sat
+    }
+  }
+  return low
 }

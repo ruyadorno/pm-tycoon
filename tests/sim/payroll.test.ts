@@ -8,7 +8,7 @@
 // goes negative; walked-out inspectors keep their desk seat.
 
 import { describe, expect, it } from 'vitest'
-import { auditState, replay, Sim, stateHash } from '../../src/sim/sim.ts'
+import { auditState, Sim, stateHash } from '../../src/sim/sim.ts'
 import type { Command } from '../../src/sim/commands.ts'
 import {
   payOrder,
@@ -29,6 +29,7 @@ import {
   makeSim,
   openingA,
   quietSim,
+  replayOf,
   runTicks,
   runUntil,
   shelveParcel,
@@ -667,7 +668,7 @@ describe('money and the clock (spec §7.2-§7.3)', () => {
               .level.level === 1,
         ).length
       }
-      const again = replay(live.data, seed, live.commandLog, end)
+      const again = replayOf(live, end)
       expect(stateHash(again.state), `seed ${seed} replay`).toBe(
         stateHash(live.state),
       )

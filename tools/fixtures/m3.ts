@@ -35,6 +35,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { loadGameData } from '../sim/load.node.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
+import { assertNoCard, plainTick, settleCards } from './cards.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
 
@@ -58,6 +59,7 @@ type Name = 'level-up' | 'payroll-short' | 'l2-lane'
 const NAMES: readonly Name[] = ['level-up', 'payroll-short', 'l2-lane']
 
 function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
+  assertNoCard(sim, name)
   const snap = {
     ...sim.snapshot(),
     fixture: {
@@ -88,6 +90,7 @@ function runPolicy(stop: (sim: Sim) => boolean): Sim {
     policy.step()
     sim.tick()
   }
+  settleCards(sim, policy)
   policy.dispose?.()
   return sim
 }
@@ -147,7 +150,7 @@ function payrollShort(): void {
     probe.events.on('payroll:paid', (p) => {
       paid += p.amount
     })
-    for (let i = 0; i < LEAD_TICKS; i++) probe.tick()
+    for (let i = 0; i < LEAD_TICKS; i++) plainTick(probe)
     const unpaid = short as number[] | null
     if (paid > 0 || unpaid === null || unpaid.length !== workers.length)
       continue

@@ -1,0 +1,83 @@
+{
+  "schedule":{
+    "firstEventS":200,
+    "intervalS":{"1":[60,100],"2":[60,110],"3":[70,120],"4":[80,130],"5":[90,140]},
+    "linkRestartsTimer":false,
+    "maxOpen":1,
+    "maxQueued":1,
+    "afterLevelUpS":15,
+    "rescueDelayS":30,
+    "jobShare":0.65,
+    "jobCooldownDays":1,
+    "recentDays":2,
+    "linkMaxDays":3,
+    "chainMaxLinks":5,
+    "historyMax":60,
+    "weightDefault":{"decision":3,"news":1}
+  },
+  "categories":{
+    "staff":{"word":"STAFF","picture":"ev_pic_staff"},
+    "fleet":{"word":"FLEET","picture":"ev_pic_fleet"},
+    "customers":{"word":"CUSTOMERS","picture":"ev_pic_customers"},
+    "security":{"word":"SECURITY","picture":"ev_pic_security"},
+    "money":{"word":"MONEY","picture":"ev_pic_money"},
+    "cityhall":{"word":"CITY HALL","picture":"ev_pic_cityhall"},
+    "weather":{"word":"WEATHER","picture":"ev_pic_weather"},
+    "press":{"word":"PRESS","picture":"ev_pic_press"},
+    "underworld":{"word":"UNDERWORLD","picture":"ev_pic_underworld"},
+    "tech":{"word":"TECH","picture":"ev_pic_tech"},
+    "port":{"word":"PORT","picture":"ev_pic_port"},
+    "luck":{"word":"LUCK","picture":"ev_pic_luck"},
+    "job":{"word":"JOB BOARD","picture":"ev_pic_job"}
+  },
+  "modifiers":{
+    "bounds":{"speed":[0.5,1.5],"stop":[0.5,1.5],"inspectorP":[-0.35,0.21],"machineP":[-0.7,0.29],"processS":[0.5,2],"payrollMult":[0,2],"payrollAdd":[0,200],"income":[0.7,1.3],"malwareShare":[-0.05,0.15],"decoyShare":[-0.1,0.4],"spawn":[0.4,2],"tossBounty":[0,3],"wrongTossFee":[0,3],"vehiclePrice":[0.5,1.5],"machinePrice":[0.5,1.5],"onTimeMaxS":[-100,140],"clearanceS":[0.3,3],"shelfCap":[0,40]},
+    "goodDirection":{"speed":"up","stop":"down","inspectorP":"up","machineP":"up","processS":"down","payrollMult":"down","payrollAdd":"down","income":"up","malwareShare":"down","decoyShare":"down","spawn":"down","tossBounty":"up","wrongTossFee":"down","vehiclePrice":"down","machinePrice":"down","onTimeMaxS":"up","clearanceS":"down","shelfCap":"up"},
+    "permanentDaysForScore":15,
+    "deskPFloor":0.5,
+    "machinePClamp":[0.1,0.99],
+    "shelfCapMax":140
+  },
+  "policy":{
+    "weights":{
+      "money":1,
+      "life":600,
+      "satisfactionPerPoint":6,
+      "vehicleGainShare":0.5,
+      "staffQuit":200,
+      "absentPerDay":60,
+      "wantedPerLabel":80,
+      "capPerUnit":1,
+      "chain":-20,
+      "parcelSpawnShare":1,
+      "parcelLostEach":20,
+      "pips":{"eye":150,"judgement":100,"speed":120,"pace":60,"energy":60,"charisma":40},
+      "mod":{"speed":500,"stop":150,"inspectorP":900,"machineP":500,"processS":150,"payrollMult":120,"payrollAdd":1,"income":350,"malwareShare":1500,"decoyShare":150,"spawn":300,"tossBounty":40,"wrongTossFee":20,"vehiclePrice":150,"machinePrice":120,"onTimeMaxS":1,"clearanceS":80,"shelfCap":1}
+    },
+    "evBand":[-20,40],
+    "evMax":400,
+    "nonDefaultShareMin":0.4
+  },
+  "deck":[
+    {"id":"ev_staff_training","category":"staff","title":"Scanner course","minLevel":1,"cooldownDays":5,"pick":"inspector","cond":{"balanceAtLeast":60},"body":"A one-day scanning course is on offer in Registry Row.","options":[{"label":"Send everyone","cost":150,"effects":[{"kind":"pips","role":"inspector","stat":"eye","delta":1,"scope":"all"}]},{"label":"Send {inspector}","cost":60,"effects":[{"kind":"pips","role":"inspector","stat":"eye","delta":1,"scope":"one"}]},{"label":"Skip","default":true,"effects":[]}]},
+    {"id":"ev_fleet_tyres","category":"fleet","title":"Bargain tyres","minLevel":1,"cooldownDays":5,"cond":{"vehiclesAtLeast":{"type":"bike","n":1}},"body":"A supplier offers cheap tyres — slower, but you keep the change.","options":[{"label":"Take them","effects":[{"kind":"money","delta":60},{"kind":"mod","key":"speed","mult":0.92,"scope":"bike","days":2}]},{"label":"No","default":true,"effects":[]}]},
+    {"id":"ev_cust_refund","category":"customers","title":"Squashed","minLevel":1,"cooldownDays":3,"target":"busiest","body":"{district} demands a refund for a squashed parcel.","options":[{"label":"Refund it","cost":40,"effects":[{"kind":"satisfaction","scope":"target","delta":3}]},{"label":"Refuse","default":true,"effects":[{"kind":"satisfaction","scope":"target","delta":-3}]}]},
+    {"id":"ev_sec_recall","category":"security","title":"The recall","minLevel":2,"cooldownDays":10,"cond":{"balanceAtLeast":250},"body":"The registry traced a malware parcel you delivered last week. Pay the fine, or take the strike?","options":[{"label":"Pay the fine ($250)","cost":250,"default":true,"effects":[]},{"label":"Take the strike","danger":true,"effects":[{"kind":"lives","delta":-1}]}]},
+    {"id":"ev_money_grant","category":"money","title":"Small-business grant","minLevel":1,"once":true,"body":"A small-business grant — one form, one afternoon.","options":[{"label":"Apply","effects":[{"kind":"money","delta":150}]},{"label":"Skip","default":true,"effects":[]}]},
+    {"id":"ev_wx_rain","category":"weather","title":"Rain","minLevel":1,"cooldownDays":5,"body":"Rain all day. The bikes crawl.","options":[{"label":"OK","default":true,"effects":[{"kind":"mod","key":"speed","mult":0.85,"scope":"bike","days":1}]}]},
+    {"id":"ev_press_ad","category":"press","title":"Radio ad","minLevel":1,"cooldownDays":6,"body":"Buy a radio ad?","options":[{"label":"Buy ($120)","cost":120,"effects":[{"kind":"mod","key":"spawn","mult":0.8,"days":2}]},{"label":"No","default":true,"effects":[]}]},
+    {"id":"ev_tech_barcode","category":"tech","title":"New barcodes","minLevel":1,"once":true,"body":"New barcode labels from the registry.","options":[{"label":"Adopt ($50)","cost":50,"effects":[{"kind":"mod","key":"processS","mult":0.9}]},{"label":"Keep the old","default":true,"effects":[]}]},
+    {"id":"ev_port_fastlane","category":"port","title":"Fast lane","minLevel":3,"cooldownDays":8,"cond":{"hubLive":"docks"},"body":"Customs offers a fast lane for a fee.","options":[{"label":"Pay ($200)","cost":200,"effects":[{"kind":"mod","key":"clearanceS","mult":0.5,"days":3}]},{"label":"No","default":true,"effects":[]}]},
+    {"id":"ev_luck_friend","category":"luck","title":"An old friend","minLevel":2,"once":true,"body":"An old friend from the depot days is looking for work.","options":[{"label":"Hire them","effects":[{"kind":"staff","star":{"role":"driver","name":"Dot","pips":{"speed":4,"energy":4,"charisma":2}}}]},{"label":"No","default":true,"effects":[]}]},
+    {"id":"ev_luck_loaner","category":"luck","title":"The loaner","minLevel":1,"rescue":true,"drawable":false,"cond":{"fleetAtMost":0,"balanceBelowVehiclePrice":"bike"},"body":"A neighbour wheels over an old bike. Her nephew Mo will ride it until you're back on your feet.","options":[{"label":"OK","default":true,"effects":[{"kind":"vehicle","gain":"bike","withDriver":{"role":"driver","name":"Mo","pips":{"speed":3,"energy":3,"charisma":0}}}]}]},
+    {"id":"ev_crime_gang","category":"underworld","title":"Protection","minLevel":2,"once":true,"body":"A local gang leader is asking for money.","options":[{"label":"Accept ($300)","cost":300,"effects":[]},{"label":"Deny","default":true,"effects":[{"kind":"next","eventId":"ev_crime_gang_watch","days":1}]}]},
+    {"id":"ev_crime_gang_watch","category":"underworld","title":"On the doorstep","drawable":false,"body":"Gang members have been seen around the HQ today. Hide the fleet for now?","options":[{"label":"Yes","effects":[{"kind":"mod","key":"speed","mult":0.85,"days":1},{"kind":"next","eventId":"ev_crime_gang_return","days":2}]},{"label":"No","default":true,"danger":true,"effects":[{"kind":"vehicle","lose":"bike","fallback":-250},{"kind":"next","eventId":"ev_crime_gang_return","days":2}]}]},
+    {"id":"ev_crime_gang_return","category":"underworld","title":"The price went up","drawable":false,"body":"They're back, and the price went up.","options":[{"label":"Pay ($500)","cost":500,"effects":[{"kind":"flag","set":"gang_paid"}]},{"label":"Call the police","default":true,"effects":[{"kind":"satisfaction","scope":"all","delta":-2},{"kind":"next","eventId":"ev_crime_gang_bust","days":1}]}]},
+    {"id":"ev_crime_gang_bust","category":"underworld","title":"The raid","drawable":false,"body":"The police raid the gang's lock-up, find a stash of malware parcels — and a \"delivered\" one of yours that never was.","options":[{"label":"OK","default":true,"effects":[{"kind":"wanted","reveal":1},{"kind":"satisfaction","scope":"all","delta":3},{"kind":"money","delta":100},{"kind":"lives","delta":1}]}]},
+    {"id":"ev_city_audit","category":"cityhall","title":"Safety audit","minLevel":2,"once":true,"body":"A safety audit is scheduled in two days.","options":[{"label":"Hire a consultant ($120)","cost":120,"effects":[{"kind":"flag","set":"audit_ready"},{"kind":"next","eventId":"ev_city_audit_day","days":2}]},{"label":"Wing it","default":true,"effects":[{"kind":"next","eventId":"ev_city_audit_day","days":2}]}]},
+    {"id":"ev_city_audit_day","category":"cityhall","title":"Audit day","router":true,"drawable":false,"next":{"days":0,"branches":[{"if":{"anyOf":[{"flag":"audit_ready"},{"laneRateAtLeast":0.95}]},"id":"ev_city_audit_pass"},{"id":"ev_city_audit_fail"}]}},
+    {"id":"ev_city_audit_pass","category":"cityhall","title":"Passed","drawable":false,"body":"Passed with distinction.","options":[{"label":"OK","default":true,"effects":[{"kind":"money","delta":100},{"kind":"satisfaction","scope":"all","delta":2}]}]},
+    {"id":"ev_city_audit_fail","category":"cityhall","title":"Failed","drawable":false,"body":"Failed: fix the lane or pay.","options":[{"label":"Pay the fine","cost":250,"effects":[]},{"label":"Fix it first","default":true,"effects":[{"kind":"next","days":2,"hint":"your catch rate in 2 days (95 % or better)","branches":[{"if":{"laneRateAtLeast":0.95},"id":"ev_city_audit_pass"},{"id":"ev_city_audit_fine"}]}]}]},
+    {"id":"ev_city_audit_fine","category":"cityhall","title":"Double fine","drawable":false,"cond":{"balanceAtLeast":400},"body":"Still failing. The fine doubled — or the registry logs a strike.","options":[{"label":"Pay ($400)","cost":400,"default":true,"effects":[]},{"label":"Take the strike","danger":true,"effects":[{"kind":"lives","delta":-1}]}]}
+  ]
+}

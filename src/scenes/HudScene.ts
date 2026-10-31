@@ -3475,7 +3475,12 @@ export class HudScene extends Phaser.Scene {
           this.refreshGarageBadge()
           this.refreshStep1()
         },
-        'life:lost': (p) => this.onLifeLost(p),
+        'life:lost': (p) => {
+          // M12: the event variant (until then an event's life skips the
+          // lives decrement and the flash here).
+          if (p.cause === 'event') return
+          this.onLifeLost(p)
+        },
         'game:over': () => this.onGameOver(),
         // The daily line is built at the flush, after this tick's payday.
         'day:ended': (p) => {

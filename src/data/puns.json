@@ -16,5 +16,7 @@
   "tickerFiller":["Local cat delivered to itself, again","Semver Savings Bank raises rates by 0.0.1","Downtown pigeons unionise"],
   "quests":{"rush_district":"{district} is swamped — get their parcels moving","cheer_up":"{district} is grumbling; win them back","magic_parcel":"A golden parcel for a VIP — it must not be late","clean_sweep":"Three in a row, no false alarms","on_time_day":"A whole day on time — can the fleet do it?","big_haul":"Hoist Hill wants its big crates shipped","night_shift":"Six calls, no backlog","customs_run":"Shrinkwrap Shore wants volume","inspector_general":"Every strain, every time","express_lane":"Prefetch International wants it yesterday","golden_release":"Five perfect days — the Golden Release"},
   "tickerQuest":{"offered":"New job on the board: {name}","completed":"Quest complete: {name} — {reward}","failed":"Quest expired: {name}","star":"{name} is looking for work — ★ applicant in the {role} pool","victory":"The Golden Release ships — {company} is a Tycoon!","endless":"Endless mode — the malware keeps evolving"},
-  "ultimateQuestName":"The Golden Release"
+  "ultimateQuestName":"The Golden Release",
+  "tickerEvent":{"offered":"{category}: {title}","modifierEnded":"{label} is over","chainDone":"{title} — the story ends","subscriptionsUnpaid":"Subscriptions unpaid"},
+  "eventWords":{"then":"…then: {title} (in {days})","thenNow":"…then: {title}","cantAfford":"Can't afford","outcome":"Outcome depends on {hint}","youChose":"You chose: {option}"}
 }

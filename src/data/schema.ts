@@ -8,10 +8,12 @@
 import type {
   BuildingDef,
   DataFileName,
+  EventCategory,
   GameData,
   MapBlockDef,
   MapData,
   MapSegment,
+  ModifierKey,
   Rect,
   ThemedRoadDef,
   XY,
@@ -30,6 +32,7 @@ export const DATA_FILES: readonly DataFileName[] = [
   'economy',
   'levels',
   'quests',
+  'events',
   'puns',
   'map',
 ]
@@ -448,6 +451,9 @@ const economy = obj({
     payrollShareOfGrossMax: prob,
     goldenReleaseOfferedMaxMin: nonNeg,
     victoryMaxMin: nonNeg,
+    eventsOfferedBy30MinMin: int(0),
+    eventsOpenMaxTicks: int(0),
+    eventsL1PlateauMin: int(0),
   }),
 })
 
@@ -607,6 +613,322 @@ const puns = obj({
     endless: str,
   }),
   ultimateQuestName: str,
+  tickerEvent: obj({
+    offered: str,
+    modifierEnded: str,
+    chainDone: str,
+    subscriptionsUnpaid: str,
+  }),
+  eventWords: obj({
+    // A data key (puns.json eventWords.then), never a thenable.
+    // oxlint-disable-next-line unicorn/no-thenable
+    then: str,
+    thenNow: str,
+    cantAfford: str,
+    outcome: str,
+    youChose: str,
+  }),
+})
+
+// events.json (spec-build3 §3, §7) ----------------------------------------------
+
+/** The deck's card categories (the job card's 'job' is extra: categories only). */
+export const EVENT_CATEGORIES = [
+  'staff',
+  'fleet',
+  'customers',
+  'security',
+  'money',
+  'cityhall',
+  'weather',
+  'press',
+  'underworld',
+  'tech',
+  'port',
+  'luck',
+] as const satisfies readonly EventCategory[]
+/** Every modifier key (B3 §3.6), in data order; modifiers.ts splits them into MULT_KEYS / ADD_KEYS. */
+export const MODIFIER_KEYS = [
+  'speed',
+  'stop',
+  'inspectorP',
+  'machineP',
+  'processS',
+  'payrollMult',
+  'payrollAdd',
+  'income',
+  'malwareShare',
+  'decoyShare',
+  'spawn',
+  'tossBounty',
+  'wrongTossFee',
+  'vehiclePrice',
+  'machinePrice',
+  'onTimeMaxS',
+  'clearanceS',
+  'shelfCap',
+] as const satisfies readonly ModifierKey[]
+type UnlistedCategory = Exclude<
+  EventCategory,
+  (typeof EVENT_CATEGORIES)[number]
+>
+type UnlistedModifier = Exclude<ModifierKey, (typeof MODIFIER_KEYS)[number]>
+/** Compile-time proof that the two lists cover their unions. */
+export const EVENT_LISTS_COMPLETE: [
+  UnlistedCategory | UnlistedModifier,
+] extends [never]
+  ? true
+  : UnlistedCategory | UnlistedModifier = true
+const PICK_ROLES = ['inspector', 'sorter', 'driver', 'vehicle'] as const
+const STATS = ['eye', 'pace', 'charisma', 'judgement', 'speed', 'energy']
+
+const evId = pattern(/^ev_[a-z0-9_]+$/, 'an ev_<snake_case> id')
+const flagName = snakeId
+const satCond = obj({ scope: str, value: num(0, 100) })
+const condShape: Check = obj(
+  {},
+  {
+    fleetAtLeast: int(0),
+    fleetAtMost: int(0),
+    vehiclesAtLeast: obj({ type: oneOf(VEHICLES), n: int(0) }),
+    livesAtLeast: int(0),
+    livesBelowCap: oneOf([true]),
+    inspectorsAtLeast: int(0),
+    driversAtLeast: int(0),
+    hasSorter: oneOf([true]),
+    hasArm: oneOf([true]),
+    hasDesk2: oneOf([true]),
+    hubLive: snakeId,
+    satBelow: satCond,
+    satAtLeast: satCond,
+    balanceAtLeast: int(0),
+    balanceBelow: int(0),
+    balanceBelowVehiclePrice: oneOf(VEHICLES),
+    laneRateAtLeast: prob,
+    flag: flagName,
+    notFlag: flagName,
+    livesLostAtLeast: int(0),
+    wrongTossTodayAtLeast: int(0),
+    questFailedRecently: oneOf([true]),
+    // Lazy: `cond` is declared below (a direct reference would hit the TDZ).
+    anyOf: arr((v, p, out) => cond(v, p, out), 1),
+  },
+)
+/** EventCond (B3 §4.1): every key optional; `anyOf` recurses. */
+const cond: Check = (v, p, out) => condShape(v, p, out)
+
+const branch = obj({ id: evId }, { if: cond })
+const starDef = obj(
+  { role: oneOf(ROLES), name: str, pips: rec(null, int(0, 5)) },
+  { affinity: oneOf(['none', ...VEHICLES]) },
+)
+
+/** Sub-discriminated on which key is present (the first of `variants` found). */
+function byKey(variants: [key: string, check: Check][]): Check {
+  return (v, p, out) => {
+    const r = v as Record<string, unknown>
+    const hit = variants.find(([k]) => k in r)
+    if (!hit)
+      return fail(
+        out,
+        p,
+        `expected one of the keys ${variants.map(([k]) => k).join('|')}`,
+      )
+    return hit[1](v, p, out)
+  }
+}
+
+const ek = str
+const EVENT_EFFECTS: Record<string, Check> = {
+  money: obj({ kind: ek, delta: int() }),
+  moneyPerVehicle: obj({ kind: ek, delta: int() }, { type: oneOf(VEHICLES) }),
+  moneyPct: obj({ kind: ek, pct: num(-1, 1) }),
+  lives: obj({ kind: ek, delta: int() }),
+  satisfaction: obj({ kind: ek, scope: str, delta: int() }),
+  mod: obj(
+    { kind: ek, key: oneOf(MODIFIER_KEYS) },
+    { mult: nonNeg, add: num(), scope: str, days: pos },
+  ),
+  pips: obj({
+    kind: ek,
+    role: oneOf(ROLES),
+    stat: oneOf(STATS),
+    delta: int(),
+    scope: oneOf(['all', 'one']),
+  }),
+  vehicle: byKey([
+    [
+      'lose',
+      obj({
+        kind: ek,
+        lose: oneOf([...VEHICLES, 'any']),
+        fallback: int(-1e6, 0),
+      }),
+    ],
+    ['gain', obj({ kind: ek, gain: oneOf(VEHICLES) }, { withDriver: starDef })],
+  ]),
+  staff: byKey([
+    [
+      'quit',
+      obj({
+        kind: ek,
+        quit: oneOf(ROLES),
+        pick: oneOf(['one', 'best', 'worst']),
+      }),
+    ],
+    ['star', obj({ kind: ek, star: starDef })],
+    [
+      'absent',
+      obj({
+        kind: ek,
+        absent: oneOf([...ROLES, 'vehicles']),
+        pick: oneOf(['one', 'all']),
+        days: pos,
+      }),
+    ],
+  ]),
+  wanted: obj({ kind: ek, reveal: int(1) }),
+  parcels: byKey([
+    [
+      'spawn',
+      obj({
+        kind: ek,
+        spawn: obj({ size: oneOf(SIZES), count: int(1), at: str }),
+      }),
+    ],
+    [
+      'lose',
+      obj({
+        kind: ek,
+        lose: obj({ where: oneOf(['shelf']), count: int(1) }),
+      }),
+    ],
+  ]),
+  cap: obj({ kind: ek, cap: oneOf(['shelf']), add: int(1) }),
+  end: obj({ kind: ek, eventId: evId }),
+  flag: byKey([
+    ['set', obj({ kind: ek, set: flagName })],
+    ['clear', obj({ kind: ek, clear: flagName })],
+  ]),
+  next: byKey([
+    [
+      'branches',
+      obj({ kind: ek, days: nonNeg, hint: str, branches: arr(branch, 1) }),
+    ],
+    ['eventId', obj({ kind: ek, eventId: evId, days: nonNeg })],
+  ]),
+}
+const EFFECT_KINDS = Object.keys(EVENT_EFFECTS)
+
+/** Discriminated on `kind` (the questGoal pattern); `job` / `jobDecline` are synthesized only. */
+const effect: Check = (v, p, out) => {
+  if (!isRecord(v)) return fail(out, p, `expected an object, got ${show(v)}`)
+  if (v.kind === 'job' || v.kind === 'jobDecline')
+    return fail(
+      out,
+      `${p}.kind`,
+      '"job" effects are synthesized, never in events.json',
+    )
+  if (!oneOf(EFFECT_KINDS)(v.kind, `${p}.kind`, out)) return false
+  return EVENT_EFFECTS[v.kind as string]!(v, p, out)
+}
+
+const eventOption = obj(
+  { label: str, effects: arr(effect) },
+  {
+    cost: int(1),
+    default: oneOf([true]),
+    danger: oneOf([true]),
+    if: cond,
+  },
+)
+
+const eventCard = obj(
+  { id: evId, category: oneOf(EVENT_CATEGORIES), title: str },
+  {
+    body: str,
+    minLevel: lvl,
+    weight: nonNeg,
+    cond,
+    target: str,
+    pick: oneOf(PICK_ROLES),
+    once: oneOf([true]),
+    cooldownDays: nonNeg,
+    drawable: bool,
+    router: oneOf([true]),
+    rescue: oneOf([true]),
+    options: arr(eventOption, 1, 3),
+    next: obj({ days: nonNeg, branches: arr(branch, 1) }),
+  },
+)
+
+/** Level key ("1", "2", …) → an ascending [lo, hi] of whole seconds (Rng.int needs integers). */
+const intervalBand: Check = (v, p, out) =>
+  tuple(int(0), int(0))(v, p, out) &&
+  ((v as number[])[0]! <= (v as number[])[1]! ||
+    fail(out, p, `range ${show(v)} is not ascending`))
+const intervalS: Check = (v, p, out) => {
+  if (!rec(null, intervalBand)(v, p, out)) return false
+  let ok = true
+  for (const k of Object.keys(v as Record<string, unknown>))
+    if (!/^[1-9]\d*$/.test(k))
+      ok = fail(out, `${p}.${k}`, 'expected a level number key ("1", "2", …)')
+  if (!('1' in (v as Record<string, unknown>)))
+    ok = fail(out, `${p}.1`, 'missing (the level-1 band)')
+  return ok
+}
+
+const eventsShape = obj({
+  schedule: obj({
+    firstEventS: nonNeg,
+    intervalS,
+    // B3 §3.2 / D-39: links never restart the draw timer; one card at a time.
+    linkRestartsTimer: oneOf([false]),
+    maxOpen: oneOf([1]),
+    maxQueued: int(0),
+    afterLevelUpS: nonNeg,
+    rescueDelayS: nonNeg,
+    jobShare: prob,
+    jobCooldownDays: nonNeg,
+    recentDays: nonNeg,
+    linkMaxDays: nonNeg,
+    chainMaxLinks: int(1),
+    historyMax: int(1),
+    weightDefault: obj({ decision: nonNeg, news: nonNeg }),
+  }),
+  categories: rec(
+    [...EVENT_CATEGORIES, 'job'],
+    obj({ word: str, picture: snakeId }),
+  ),
+  modifiers: obj({
+    bounds: rec(MODIFIER_KEYS, range()),
+    goodDirection: rec(MODIFIER_KEYS, oneOf(['up', 'down'])),
+    permanentDaysForScore: nonNeg,
+    deskPFloor: prob,
+    machinePClamp: range(0, 1),
+    shelfCapMax: int(1),
+  }),
+  policy: obj({
+    weights: obj({
+      money: nonNeg,
+      life: nonNeg,
+      satisfactionPerPoint: nonNeg,
+      vehicleGainShare: nonNeg,
+      staffQuit: nonNeg,
+      absentPerDay: nonNeg,
+      wantedPerLabel: nonNeg,
+      capPerUnit: nonNeg,
+      chain: num(),
+      parcelSpawnShare: nonNeg,
+      parcelLostEach: nonNeg,
+      pips: rec(null, nonNeg),
+      mod: rec(MODIFIER_KEYS, nonNeg),
+    }),
+    evBand: range(),
+    evMax: num(0),
+    nonDefaultShareMin: num(0),
+  }),
+  deck: arr(eventCard, 1),
 })
 
 const segment = {
@@ -693,6 +1015,7 @@ const SHAPES: Record<DataFileName, Check> = {
   economy,
   levels,
   quests,
+  events: eventsShape,
   puns,
   map: mapShape,
 }
@@ -1100,8 +1423,16 @@ function crossCheck(d: Tables, out: Problems): void {
   }
 
   checkQuests(d, nLevels, checkerIds, out)
+  checkEvents(d, out)
   checkMap(d, districtIds, buildingIds, out)
 }
+
+/**
+ * events.json relations (spec-build3 §3, §7): ids, the next graph, defaults,
+ * the harsh-consequence rule, targets and picks. M11 wave 1 (stream E) fills
+ * it; the shape check above already holds the seed deck.
+ */
+function checkEvents(_d: Tables, _out: Problems): void {}
 
 /**
  * quests.json relations (spec-build2 §3.2, §9; design-m7 §1.5): ids, levels,

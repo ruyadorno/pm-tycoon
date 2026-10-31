@@ -40,9 +40,10 @@
 // while a Replace waits for that vehicle — the swap lets them go anyway);
 // `worker:hired {rehire: true}`.
 
+import { modAdd, modMult, type ModCtx } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type { Employee, LaneNode, SimState, Vehicle } from '../types.ts'
-import { ticksFromS } from '../types.ts'
+import { isAbsent, ticksFromS } from '../types.ts'
 import type { GameData } from '../../data/types.ts'
 import { goIdle, goInactive } from './dispatch.ts'
 import { dropPendingDriver, syncDesk } from './people.ts'
@@ -108,11 +109,20 @@ export function payOrder(sim: Sim): Employee[] {
   return out
 }
 
-/** Sum of the active workers' daily salaries (the Garage "Payroll $28/day"). */
-export function payrollPerDay(state: SimState): number {
-  return state.employees
-    .filter((e) => e.active)
-    .reduce((sum, e) => sum + e.salaryPerDay, 0)
+/**
+ * What the next payday debits per day (the Garage "Payroll $28/day"; build 3
+ * B3 §3.6, D-4): Σ over the active, present workers of round(salary ×
+ * payrollMult) + round(payrollAdd) — the subscriptions, debited apart
+ * (D-34). M11 wave 0: both folds are the identity; stream A wires payday.
+ */
+export function payrollDuePerDay(ctx: ModCtx): number {
+  const tick = ctx.state.tick
+  const mult = modMult(ctx, 'payrollMult')
+  let sum = 0
+  for (const e of ctx.state.employees) {
+    if (e.active && !isAbsent(e, tick)) sum += Math.round(e.salaryPerDay * mult)
+  }
+  return sum + Math.round(modAdd(ctx, 'payrollAdd'))
 }
 
 /** Day step (tick step 11): payday on a payrollIntervalS boundary. */

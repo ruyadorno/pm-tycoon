@@ -1,11 +1,14 @@
-// The tick loop (plan.md §6.4): one call = 100 ms of sim time, thirteen
-// steps in a fixed order (M7 adds `quests` between `levels` and `day`). Each step is a named function over (sim, ctx); later
+// The tick loop (plan.md §6.4): one call = 100 ms of sim time, fourteen
+// steps in a fixed order (M7 adds `quests` between `levels` and `day`;
+// build 3 M11 adds `deck` between `levels` and `quests`). Each step is a named function over (sim, ctx); later
 // milestones replace the TODO bodies with calls into src/sim/systems/*.ts
 // (keep the order — the rng stream depends on it). Commands never run inside
 // a tick: they apply immediately in Sim.dispatch.
 
 import { SIM_FEATURES } from './features.ts'
+import { modAdd } from './modifiers.ts'
 import type { Sim } from './sim.ts'
+import { deckStep } from './systems/deck.ts'
 import { dispatchStep, LEG_HOOKS } from './systems/dispatch.ts'
 import { docksStep } from './systems/docks.ts'
 import { clearanceStep } from './systems/hubs.ts'
@@ -104,6 +107,16 @@ export function levels(sim: Sim, _ctx: TickContext): void {
 }
 
 /**
+ * 10b. B3 §3.2 / plan §4: the event deck (systems/deck.ts) — modifier
+ * expiry, absences, the wrong-toss day, then the queue, due links, the
+ * rescue and the random draw (job cards folded in). After `levels` (a
+ * level-up's quiet window), before `quests`.
+ */
+export function deck(sim: Sim, _ctx: TickContext): void {
+  deckStep(sim)
+}
+
+/**
  * 11. Quests (M7, systems/quests.ts): the active quest's derived values, day
  * close, completion / fail and progress; offer expiry; the ultimate quest
  * from its level on; a regular offer when due (one quest-stream draw — never
@@ -167,12 +180,17 @@ export function day(sim: Sim, ctx: TickContext): void {
   }
 }
 
-/** 13. Delete terminal parcels (delivered / tossed / cleared). */
+/** 13. Delete terminal parcels (delivered / tossed / cleared / lost). */
 export function gc(sim: Sim, _ctx: TickContext): void {
   const parcels = sim.state.parcels
   for (const key of Object.keys(parcels)) {
     const st = parcels[key]?.state
-    if (st === 'delivered' || st === 'tossed' || st === 'cleared') {
+    if (
+      st === 'delivered' ||
+      st === 'tossed' ||
+      st === 'cleared' ||
+      st === 'lost'
+    ) {
       delete parcels[key]
     }
   }
@@ -190,6 +208,7 @@ export const TICK_STEPS: readonly (readonly [string, TickStep])[] = [
   ['clearance', clearance],
   ['waiting', waiting],
   ['levels', levels],
+  ['deck', deck],
   ['quests', quests],
   ['day', day],
   ['gc', gc],
@@ -229,7 +248,7 @@ export function buildMinuteRow(sim: Sim): MinuteRow {
     spawn: s.spawn.spawnedCount,
     deliv: st.deliveries,
     late: st.late,
-    malShare: malwareShare(s, sim.data),
+    malShare: malwareShare(s, sim.data, false, modAdd(sim, 'malwareShare')),
     malSpawned: st.malwareSpawned,
     malCaught: st.malwareCaught,
     malMissed: st.malwareMissed,

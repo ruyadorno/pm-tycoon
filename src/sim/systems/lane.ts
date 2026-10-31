@@ -253,6 +253,7 @@ export function returnToConveyor(
   p: Parcel,
   dockId: string | null,
   vehicleName: string,
+  why = 'sold',
 ): void {
   const lane = sim.state.lane
   const dock = lane.docks.find((d) => d.id === dockId) ?? lane.docks[0]
@@ -268,7 +269,7 @@ export function returnToConveyor(
     tick: sim.state.tick,
     what: 'unloaded',
     ref: dock.id,
-    text: `Unloaded (${vehicleName} sold)`,
+    text: `Unloaded (${vehicleName} ${why})`,
   })
   sim.emit('parcel:unloaded', { id: p.id, dockId: dock.id })
 }

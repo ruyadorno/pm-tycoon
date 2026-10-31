@@ -33,6 +33,7 @@
 
 import type { LevelDef } from '../../data/types.ts'
 import { SIM_FEATURES } from '../features.ts'
+import { modAdd } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type { Strain } from '../types.ts'
 import { laneNode, ticksFromS } from '../types.ts'
@@ -99,7 +100,6 @@ export function levelUp(sim: Sim, row: LevelDef): void {
   lvl.nextThreshold = nextLevelRow(sim, row.level)?.threshold ?? null
   lvl.slots = row.slots
   lvl.holdBayCap = row.holdBayCap
-  lvl.shelfCap = row.shelfCap
   lvl.warehouseTier = row.warehouseTier
   s.stats.levelTick[String(row.level)] = s.tick
 
@@ -111,8 +111,7 @@ export function levelUp(sim: Sim, row: LevelDef): void {
   })
   const hold = laneNode(lane, lane.holdBayNodeId)
   if (hold) hold.cap = row.holdBayCap
-  const shelf = laneNode(lane, lane.shelfNodeId)
-  if (shelf) shelf.cap = row.shelfCap
+  syncShelfCap(sim)
 
   // Regions (§3.5): live, satisfaction start, spawn timer firstSpawnDelayS out.
   const opened: string[] = []
@@ -142,6 +141,26 @@ export function levelUp(sim: Sim, row: LevelDef): void {
   sim.emit('level:up', { level: row.level })
   sim.emit('ticker:news', { text: row.ticker, kind: 'level' })
   for (const district of opened) sim.emit('region:unlocked', { district })
+}
+
+/**
+ * Build 3 (B3 §3.6, D-24): the shelf cap = the current level row's shelfCap
+ * + the shelfCap modifier fold (rounded), at most modifiers.shelfCapMax —
+ * into LevelState.shelfCap and the shelf node's cap. levelUp calls it (so a
+ * `cap` bonus survives a level-up); modifierOps calls it after a shelfCap
+ * row is applied or ends.
+ */
+export function syncShelfCap(sim: Sim): void {
+  const s = sim.state
+  const row = sim.data.levels.find((l) => l.level === s.level.level)
+  if (!row) return
+  const cap = Math.min(
+    sim.data.events.modifiers.shelfCapMax,
+    row.shelfCap + Math.round(modAdd(sim, 'shelfCap')),
+  )
+  s.level.shelfCap = cap
+  const shelf = laneNode(s.lane, s.lane.shelfNodeId)
+  if (shelf) shelf.cap = cap
 }
 
 /**

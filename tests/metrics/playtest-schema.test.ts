@@ -40,7 +40,7 @@ import {
 import { createPolicy } from '../../src/sim/policy.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { salaryOf } from '../../src/sim/systems/people.ts'
-import { dataFixture, makeSim } from '../sim/helpers.ts'
+import { dataFixture, makeSim, parcelLoss } from '../sim/helpers.ts'
 
 const data = dataFixture()
 const EXAMPLE = 'tests/playtest/seed-7.json'
@@ -713,9 +713,9 @@ describe('plan.md §12.9: lives, stalls, payroll and the Hold Bay from sim event
     expect(pt.livesLost).toHaveLength(1)
     expect(problems({ array: LIFE }, pt.livesLost)).toEqual([])
     const l = pt.livesLost[0]!
-    expect(l.parcelId).toBe(sim.state.lastLostLife?.parcelId)
+    expect(l.parcelId).toBe(parcelLoss(sim)?.parcelId)
     expect(l.atS).toBe(sim.state.tick / 10)
-    expect(l.label).toBe(sim.state.lastLostLife?.label)
+    expect(l.label).toBe(parcelLoss(sim)?.label)
     expect(l.clearedByPlayer).toBe(false)
     expect(l.sorter).toBeNull()
     expect(l.hub).toBeNull()
@@ -726,7 +726,7 @@ describe('plan.md §12.9: lives, stalls, payroll and the Hold Bay from sim event
     const sim = makeSim(3)
     const r = rig(sim)
     expect(sim.dispatch({ kind: 'debugMalwareDelivery' }).ok).toBe(true)
-    const first = sim.state.lastLostLife!
+    const first = parcelLoss(sim)!
     const ev = (parcelId: number) => ({
       parcelId,
       label: first.label,
@@ -759,7 +759,7 @@ describe('plan.md §12.9: lives, stalls, payroll and the Hold Bay from sim event
     const sim = makeSim(3)
     const r = rig(sim)
     expect(sim.dispatch({ kind: 'debugMalwareDelivery' }).ok).toBe(true)
-    const first = sim.state.lastLostLife!
+    const first = parcelLoss(sim)!
     const stored = JSON.parse(JSON.stringify(r.rec.persisted())) as {
       restore: { livesLost: Record<string, unknown>[] }
     }

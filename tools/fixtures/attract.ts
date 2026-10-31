@@ -35,6 +35,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { GameData } from '../../src/data/types.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
+import { assertNoCard, settleCards } from './cards.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { TICKS_PER_S } from '../../src/sim/types.ts'
 import { loadGameData } from '../sim/load.node.ts'
@@ -76,6 +77,7 @@ export function runAttract(data: GameData): Sim {
     }
     if (attractProblems(sim).length === 0) break
   }
+  settleCards(sim, policy)
   policy.dispose?.()
   return sim
 }
@@ -103,6 +105,7 @@ export function attractProblems(sim: Sim): string[] {
 
 /** The committed bytes for `sim`. */
 export function attractJson(sim: Sim): string {
+  assertNoCard(sim, 'attract')
   return `${JSON.stringify(sim.snapshot())}\n`
 }
 

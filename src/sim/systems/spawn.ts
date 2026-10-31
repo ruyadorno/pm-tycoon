@@ -49,6 +49,7 @@ import {
   vehicleTypeDef,
   zonePermits,
 } from '../map.ts'
+import type { Rng } from '../rng.ts'
 import type { Sim } from '../sim.ts'
 import type { Parcel, Strain } from '../types.ts'
 import { malwareShare, ticksFromS, TICKS_PER_S } from '../types.ts'
@@ -98,9 +99,13 @@ function forcedMode(sim: Sim): Forced {
   return s.tick >= sp.scriptedDeferredUntilTick ? 'ordinary' : 'none'
 }
 
-const underCap = (sim: Sim, b: BuildingDef): boolean =>
-  (sim.state.buildings[b.id]?.waiting.length ?? 0) <
-  sim.data.parcels.spawn.maxWaitingPerBuilding
+/** The building has room for another waiting parcel (maxWaitingPerBuilding). */
+export function underCap(sim: Sim, b: BuildingDef): boolean {
+  return (
+    (sim.state.buildings[b.id]?.waiting.length ?? 0) <
+    sim.data.parcels.spawn.maxWaitingPerBuilding
+  )
+}
 
 /**
  * Origin pool of the scripted malware (§5.4 servableOrigin): buildings of the
@@ -187,13 +192,17 @@ function liveHubs(sim: Sim, size: SizeId): OverseasDistrictDef[] {
 
 const recv = (b: BuildingDef): number => b.recv
 
-/** §5.2 destination: same district / overseas hub / another live district. */
+/**
+ * §5.2 destination: same district / overseas hub / another live district.
+ * Build 3: `rng` = the stream to draw on (an event's injected parcels draw
+ * on the content stream, Sim.eventPicksRng — D-44); default the main one.
+ */
 export function pickDestination(
   sim: Sim,
   origin: BuildingDef,
   size: SizeId,
+  rng: Rng = sim.rng,
 ): BuildingDef | null {
-  const rng = sim.rng
   const idx = mapIndex(sim.data)
   const sp = sim.data.parcels.spawn
   const sameDistrict = (): BuildingDef | null =>

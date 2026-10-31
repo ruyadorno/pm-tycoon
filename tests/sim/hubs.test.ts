@@ -22,6 +22,7 @@ import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   buy,
   collect,
+  collectLost,
   dataFixture,
   eventLog,
   fund,
@@ -393,7 +394,7 @@ describe('hand-off and clearance (spec §5.6)', () => {
     p.mult = docksDef.valueMult
     p.trace.push({ tick: p.spawnedTick, what: 'spawned', ref: p.origin })
     const handed = collect(sim, 'parcel:handedOff')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     const cleared = collect(sim, 'parcel:cleared')
     runUntil(sim, () => handed.length > 0, 6000)
     const at = sim.state.tick
@@ -507,13 +508,13 @@ describe('hand-off and clearance (spec §5.6)', () => {
     const b = handedOff(sim, 'dk_pier_2', { malware: true })
     const c = handedOff(sim, 'dk_pier_2')
     expect(a.clearTick).toBe(b.clearTick)
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     const over = collect(sim, 'game:over')
     const cleared = collect(sim, 'parcel:cleared')
     runTicks(sim, DOCKS_TICKS)
     expect(lost.map((x) => x.parcelId)).toEqual([a.id, b.id])
     expect(lost.every((x) => x.report.viaClearance)).toBe(true)
-    expect(over).toEqual([{}])
+    expect(over).toEqual([{ cause: 'malware' }])
     expect(sim.state.economy).toMatchObject({ lives: 0, gameOver: true })
     // The clean one due the same tick still clears and pays.
     expect(cleared.map((x) => [x.id, x.paid])).toEqual([
@@ -603,7 +604,7 @@ describe('hand-off and clearance (spec §5.6)', () => {
       hub: 'docks',
     })
     expect(auditState(sim.state, data)).toEqual([])
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     runTicks(sim, DOCKS_TICKS - 1)
     expect(lost).toEqual([])
     runTicks(sim, 1)
@@ -772,7 +773,7 @@ describe('the Airport at the real L5 (spec-build2 §4.3; design-m8-m9 §7 M9 2)'
       ref: 'ap_terminal',
     })
     expect(auditState(sim.state, data)).toEqual([])
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     runTicks(sim, AIR_TICKS - 1)
     expect(lost).toEqual([])
     runTicks(sim, 1)

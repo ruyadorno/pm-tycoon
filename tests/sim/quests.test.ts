@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest'
 import type { SimEventName, SimEventPayloads } from '../../src/sim/events.ts'
 import { isCommand } from '../../src/sim/commands.ts'
 import { Rng } from '../../src/sim/rng.ts'
-import { auditState, replay, Sim, stateHash } from '../../src/sim/sim.ts'
+import { auditState, Sim, stateHash } from '../../src/sim/sim.ts'
 import {
   eligibleTemplates,
   gainLives,
@@ -41,6 +41,7 @@ import {
   openingA,
   placeMachine,
   quietSim,
+  replayOf,
   runTicks,
   startQuest,
   unlockDistrict,
@@ -1027,7 +1028,7 @@ describe('determinism and saves mid-quest (plan.md §6.4)', () => {
       expect(stateHash(a.state)).toBe(stateHash(b.state))
       expect(a.state.quests.history.length).toBeGreaterThan(0)
       expect(auditState(a.state, a.data)).toEqual([])
-      const again = replay(a.data, seed, a.commandLog, a.state.tick)
+      const again = replayOf(a)
       expect(stateHash(again.state)).toBe(stateHash(a.state))
     }
   }, 30_000)

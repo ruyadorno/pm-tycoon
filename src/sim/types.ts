@@ -8,8 +8,13 @@
 import type {
   AffinityId,
   BuildingId,
+  CardPickRole,
   DistrictId,
+  EventCategoryId,
+  EventKind,
   GameData,
+  ModifierKey,
+  NextBranchDef,
   PipsDef,
   QuestGoalDef,
   RoleId,
@@ -63,9 +68,13 @@ export interface TilePos {
  * roles with pips, the Hold Bay station, the wanted list; same save key);
  * 4 = M7 quests (state.quests, nextId.quest, stats.victoryTick, the
  * MinuteRow quest columns; same save key); 5 = M8 L3 (lane.feedIndex,
- * stats.cleared; same save key).
+ * stats.cleared; same save key); 6 = build 3 M11 (state.events,
+ * state.modifiers, Employee/Vehicle.absentUntilTick,
+ * Parcel.source/handOffTick, the 'lost' parcel state, quests.jobReadyTick,
+ * stats.livesLost/lost, nextId.modifier, an event-kind lastLostLife; same
+ * save key).
  */
-export const STATE_VERSION = 5
+export const STATE_VERSION = 6
 
 export interface SimState {
   version: typeof STATE_VERSION
@@ -96,11 +105,15 @@ export interface SimState {
   wanted: string[]
   /** M7 (spec-build2 §3): the quest slots, scheduler, history, vouchers, the quest rng stream. */
   quests: QuestsState
+  /** Build 3 (spec-build3 §3, §6): the event deck — the open card, links, flags, the two rng words. */
+  events: EventsState
+  /** Build 3 (spec-build3 §3.6): live modifier rows (application order). */
+  modifiers: Modifier[]
   /** Key String(id); terminal parcels are removed at the end of the tick (gc). */
   parcels: Record<string, Parcel>
   lane: Lane
   stats: RunStats
-  lastLostLife: LostLifeReport | null
+  lastLostLife: LostLifeReport | EventLostLifeReport | null
   nextId: {
     parcel: number
     vehicle: number
@@ -110,6 +123,8 @@ export interface SimState {
     applicant: number
     /** M7: quest ids 'q<n>' (offer order). */
     quest: number
+    /** Build 3: modifier ids 'm<n>' (application order). */
+    modifier: number
   }
 }
 
@@ -213,6 +228,8 @@ export interface Vehicle {
   collectedThisLeg: boolean
   purchasePrice: number
   boughtTick: Tick
+  /** B3 §3.5 absence: parked / off the station until this tick (unpaid). Absent otherwise. */
+  absentUntilTick?: Tick
 }
 
 /** §11 */
@@ -232,6 +249,8 @@ export type ParcelState =
   | 'handed_off'
   | 'clearing'
   | 'cleared'
+  /** Build 3 (D-11): removed off the shelf by an event (`parcels lose`); terminal. */
+  | 'lost'
 
 /**
  * One hop of a parcel's history, for the lost-life card path (§10). `what`:
@@ -321,6 +340,10 @@ export interface Parcel {
   sorted?: { by: number; name: string; pct: number }
   /** M6: the last player touch while held (the sorter's player grace). */
   touchedTick?: Tick
+  /** Build 3: injected by an event effect; absent = spawned (or magic when `magic` is set). */
+  source?: 'event'
+  /** Build 3: set at an overseas hand-off, so the clearance progress no longer derives it. */
+  handOffTick?: Tick
 }
 
 export type LaneNodeKind =
@@ -510,6 +533,8 @@ export interface Employee {
   /** Face index 0..FACE_LOOKS-1 (face_00..face_11). */
   look: number
   star: boolean
+  /** B3 §3.5 absence: parked / off the station until this tick (unpaid). Absent otherwise. */
+  absentUntilTick?: Tick
 }
 
 export interface Applicant {
@@ -640,8 +665,13 @@ export interface QuestsState {
   offer: Quest | null
   /** The active quest (quests.offer.maxActive = 1). */
   active: Quest | null
-  /** Earliest regular offer (start: firstOfferDay days). */
+  /**
+   * Earliest regular offer (start: firstOfferDay days).
+   * @deprecated build 3 — removed in M11 wave 2
+   */
   nextOfferTick: Tick
+  /** B3 §3.2: earliest tick a job card may be offered (start 0; set on every quest end). */
+  jobReadyTick: Tick
   /** Earliest (re-)offer of the ultimate quest (start 0). */
   ultimateNextTick: Tick
   /** state.day at the last offer (spec-build2 §8). */
@@ -721,6 +751,10 @@ export interface RunStats {
    * conservation term of parcels that left the map at a hub.
    */
   cleared: number
+  /** Every life:lost (malware and events) — the reactive cards' livesLostAtLeast. */
+  livesLost: number
+  /** Parcels removed by an event (parcels lose) — a conservation term. */
+  lost: number
 }
 
 // Defined here (named in §6.4) --------------------------------------------------
@@ -769,6 +803,8 @@ export interface MinuteRow {
 
 /** Everything the lost-life card shows (§10); also the life:lost `report`. */
 export interface LostLifeReport {
+  /** Build 3: absent on parcel reports written before the field (read as 'parcel'). */
+  kind?: 'parcel'
   tick: Tick
   parcelId: number
   label: string
@@ -803,6 +839,152 @@ export interface LostLifeReport {
   inspectorRate: number | null
   /** M6: the sorter's `looks clean` call on it, if any. */
   sorterCall: { name: string; pct: number } | null
+}
+
+/** B3 §3.5: a life an event option took. */
+export interface EventLostLifeReport {
+  kind: 'event'
+  tick: Tick
+  eventId: string
+  /** The card's title. */
+  title: string
+  /** The chosen option's label (filled). */
+  option: string
+  livesLeft: number
+}
+
+/** True while `x` is away (B3 §3.5 absence). */
+export function isAbsent(x: { absentUntilTick?: Tick }, tick: Tick): boolean {
+  return x.absentUntilTick !== undefined && x.absentUntilTick > tick
+}
+
+// Events (build 3, B3 §3, §6) ------------------------------------------------------
+
+export interface CardPick {
+  role: CardPickRole
+  /** Employee id, or Vehicle id for role 'vehicle'. */
+  id: number
+  /** Name at pick time ("Audrey", "Bike 2"). */
+  name: string
+}
+
+export interface OpenCard {
+  /** A deck id, or `job:<templateId>` for a job card. */
+  eventId: string
+  kind: EventKind
+  category: EventCategoryId
+  /** Job cards: the offered quest (quests.offer.id); null otherwise. */
+  questId: string | null
+  /** The resolved target district (links inherit the head's). */
+  target: DistrictId | null
+  /** The `one` pick (links inherit the head's). */
+  pick: CardPick | null
+  openedTick: Tick
+  /** Links: the parent's chosen option label (the "You chose: …" line). */
+  parentChoice: string | null
+  /** The chain head's id (the card's own id for a head); null for jobs. */
+  chainHeadId: string | null
+  /** 1 = a head (or a single); a link is its booking card's depth + 1. */
+  depth: number
+  /** Opened by a random draw (its close restarts the draw timer). */
+  drawn: boolean
+  /** Drawn cards: the next draw interval, drawn at open (applied at close). */
+  gapTicks: number | null
+}
+
+/** The refs a condition / text fill needs from a card (critique 11: here, not in deck.ts). */
+export type CardRefs = Pick<OpenCard, 'target' | 'pick'>
+
+export interface ScheduledLink {
+  /** A plain next: the link id (may be a router); null for a conditional next. */
+  eventId: string | null
+  /** A conditional next: resolved when due; null for a plain next. */
+  branches: NextBranchDef[] | null
+  dueTick: Tick
+  target: DistrictId | null
+  pick: CardPick | null
+  parentChoice: string
+  chainHeadId: string
+  depth: number
+  bookedTick: Tick
+}
+
+export interface EventRecord {
+  eventId: string
+  kind: EventKind
+  category: EventCategoryId
+  openedTick: Tick
+  closedTick: Tick
+  /** The option index, or null when withdrawn. */
+  option: number | null
+  label: string | null
+  /** The chosen option was the card's default. */
+  default: boolean
+  outcome: 'decided' | 'withdrawn'
+  chainHeadId: string | null
+  depth: number
+}
+
+export interface EventStats {
+  offered: number
+  decided: number
+  withdrawn: number
+  /** Draws that yielded no card (D-1). */
+  blanks: number
+  byCategory: Record<string, number>
+  livesLost: number
+  livesGained: number
+  vehiclesLost: number
+  workersLost: number
+  chainsStarted: number
+  chainsFinished: number
+  modifiersPeak: number
+}
+
+export interface EventsState {
+  /** mulberry32 word of the CADENCE stream (Sim.eventRng): the job roll, the gap. Never state.rng. */
+  rng: number
+  /** The CONTENT stream (Sim.eventPicksRng): decision picks, random targets, `one` picks, effect draws (D-2). */
+  picks: { rng: number }
+  open: OpenCard | null
+  /** Cards opened while another was open (debugOfferEvent); promoted before any link or draw (D-15). */
+  queue: OpenCard[]
+  /** Booking order; due order = (dueTick, array index). */
+  scheduled: ScheduledLink[]
+  /** Next random draw; at or above DECK_OFF_TICK (1e12) = the deck makes no automatic card (tests). */
+  nextDrawTick: Tick
+  /** fleet = 0 ∧ balance < bike since: the rescue's due tick; null while the condition is false. */
+  rescueTick: Tick | null
+  lastCategory: EventCategoryId | null
+  /** Deck id → times offered (data order of first offer). */
+  seen: Record<string, number>
+  /** Deck id → tick its cooldown ends. */
+  cooldownUntil: Record<string, Tick>
+  flags: Record<string, true>
+  /** Newest last, at most schedule.historyMax. */
+  history: EventRecord[]
+  /** state.day the wrong-toss baseline was taken (D-30). */
+  wrongTossDay: number
+  /** stats.wrongToss at that day's start (D-30). */
+  wrongTossBase: number
+  stats: EventStats
+}
+
+export interface Modifier {
+  /** 'm<n>' from nextId.modifier. */
+  id: string
+  key: ModifierKey
+  /** 1 for an add-type row. */
+  mult: number
+  /** 0 for a mult-type row. */
+  add: number
+  scope: string | null
+  /** null = permanent. */
+  untilTick: Tick | null
+  eventId: string
+  /** The setting card's title (EffectsCard, ticker). */
+  label: string
+  appliedTick: Tick
 }
 
 // Pure state accessors (no runtime imports, so every sim module can use them) -----
@@ -858,6 +1040,7 @@ export function malwareShare(
   state: SimState,
   data: GameData,
   overseas = false,
+  extra = 0,
 ): number {
   const m = data.parcels.malware
   let share = m.baseShare + m.perLevel * (state.level.level - 1)
@@ -870,6 +1053,8 @@ export function malwareShare(
     const firstDay = Math.floor(from / TICKS_PER_DAY) + 1
     share += m.postVictoryPerDay * Math.max(0, state.day - firstDay + 1)
   }
+  // Build 3 (D-6): the malwareShare modifier fold, before the overseas multiply.
+  share = Math.min(m.cap, Math.max(0, share + extra))
   share = Math.min(m.cap, share)
   return overseas ? Math.min(m.cap, share * m.overseasMult) : share
 }

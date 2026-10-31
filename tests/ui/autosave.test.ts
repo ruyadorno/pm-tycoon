@@ -242,9 +242,9 @@ describe('spec §2: autosave every 10 s of real time and on hide', () => {
       ].toSorted(),
     )
     // M6 bumped the state shape (design-m6 D18), M7 again (design-m7 §2.5),
-    // M8 again (design-m8-m9 §2.4: lane.feedIndex, stats.cleared); the key
-    // stays pm.save.v2.
-    expect(SAVE_VERSION).toBe(5)
+    // M8 again (design-m8-m9 §2.4: lane.feedIndex, stats.cleared), build 3
+    // M11 again (state.events, state.modifiers …); the key stays pm.save.v2.
+    expect(SAVE_VERSION).toBe(6)
     expect(p.version).toBe(SAVE_VERSION)
     expect(p.state.version).toBe(SAVE_VERSION)
     expect(p.build).toBe('test-build')

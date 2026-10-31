@@ -19,6 +19,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { loadGameData } from '../sim/load.node.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
+import { assertNoCard, settleCards } from './cards.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { TICKS_PER_S } from '../../src/sim/types.ts'
 import type { BuildingDef } from '../../src/data/types.ts'
@@ -60,7 +61,9 @@ while (sim.state.tick < runTicks) {
   policy.step()
   sim.tick()
 }
+settleCards(sim, policy)
 policy.dispose?.()
+assertNoCard(sim, 'late-waiting')
 
 const st = sim.state
 const live = data.buildings.filter(

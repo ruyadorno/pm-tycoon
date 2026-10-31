@@ -1,0 +1,2200 @@
+{
+  "version": 1,
+  "dataHash": "0af23d08",
+  "config": null,
+  "policy": "competent",
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "minutes": 35,
+  "targets": {
+    "firstDeliveryS": 60,
+    "firstMalwareCaughtMaxS": 300,
+    "level2Min": [
+      8,
+      15
+    ],
+    "truckAfterLevel2MaxMin": 4,
+    "maxLivesLost": 0,
+    "maxShelfStallS": 0,
+    "holdBayEventsPer10MinMin": 6,
+    "level3Min": [
+      15,
+      20
+    ],
+    "level4Min": [
+      20,
+      25
+    ],
+    "level5Min": [
+      25,
+      30
+    ],
+    "firstOverseasClearedAfterLevel3MaxMin": 3,
+    "questsOfferedBy30MinMin": 4,
+    "questsCompletedBy30MinMin": 2,
+    "payrollShareOfGrossMax": 0.25,
+    "goldenReleaseOfferedMaxMin": 32,
+    "victoryMaxMin": 45
+  },
+  "runs": [
+    {
+      "metrics": {
+        "seed": 1,
+        "minutes": 35,
+        "firstDeliveryS": 54.3,
+        "firstMalwareCaughtS": 150.5,
+        "level2Min": 11.19,
+        "truckAfterLevel2Min": 1.7,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 8.94,
+        "holdBayEventsPer10Min": 25.43,
+        "scriptedCaughtS": 150.5,
+        "wrongTosses": 43,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 17.1,
+        "level4Min": 22.33,
+        "level5Min": 28.39,
+        "firstOverseasClearedAfterLevel3Min": 1.82,
+        "overseasCleared": 22,
+        "overseasLivesLost": 0,
+        "dock2Min": 20.53,
+        "dock3Min": 34.42,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.206,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 7,
+        "questsOffered30": 7,
+        "questsCompleted30": 4,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 28.39,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "on_time_day": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 2,
+            "declined": 0
+          },
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "night_shift": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "clean_sweep": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 54.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 150.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 11.19,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 1.7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 8.94,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 17.1,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 1.82,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 22.33,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 28.39,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 2,
+        "minutes": 35,
+        "firstDeliveryS": 55.6,
+        "firstMalwareCaughtS": 185.4,
+        "level2Min": 11.98,
+        "truckAfterLevel2Min": 3.81,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 8.35,
+        "holdBayEventsPer10Min": 23.43,
+        "scriptedCaughtS": 185.4,
+        "wrongTosses": 40,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 19.59,
+        "level4Min": 23.44,
+        "level5Min": 28.22,
+        "firstOverseasClearedAfterLevel3Min": 2.28,
+        "overseasCleared": 26,
+        "overseasLivesLost": 0,
+        "dock2Min": 21.25,
+        "dock3Min": 32.79,
+        "armTosses": 3,
+        "payrollShareOfGross": 0.204,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 8,
+        "questsOffered30": 7,
+        "questsCompleted30": 3,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 28.22,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 3,
+            "completed": 1,
+            "failed": 2,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 55.6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 185.4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 11.98,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 3.81,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 8.35,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 19.59,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2.28,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 23.44,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 28.22,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 3,
+        "minutes": 35,
+        "firstDeliveryS": 52,
+        "firstMalwareCaughtS": 201.3,
+        "level2Min": 12.05,
+        "truckAfterLevel2Min": 2.3,
+        "livesLost": 1,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 9.13,
+        "holdBayEventsPer10Min": 23.43,
+        "scriptedCaughtS": 201.3,
+        "wrongTosses": 39,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 18,
+        "level4Min": 22.38,
+        "level5Min": 26.56,
+        "firstOverseasClearedAfterLevel3Min": 1.93,
+        "overseasCleared": 26,
+        "overseasLivesLost": 0,
+        "dock2Min": 21.24,
+        "dock3Min": 31.89,
+        "armTosses": 13,
+        "payrollShareOfGross": 0.207,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 9,
+        "questsOffered30": 6,
+        "questsCompleted30": 3,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 26.56,
+        "victoryMin": null,
+        "magicSpawned": 0,
+        "magicOnTime": 0,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "night_shift": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "customs_run": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 52,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 201.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 12.05,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 2.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 1,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 9.13,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 18,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 1.93,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 22.38,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 26.56,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 4,
+        "minutes": 35,
+        "firstDeliveryS": 48.8,
+        "firstMalwareCaughtS": 163.6,
+        "level2Min": 10.63,
+        "truckAfterLevel2Min": 0.38,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 2.82,
+        "holdBayEventsPer10Min": 28.57,
+        "scriptedCaughtS": 163.6,
+        "wrongTosses": 39,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 16.01,
+        "level4Min": 19.63,
+        "level5Min": 24.93,
+        "firstOverseasClearedAfterLevel3Min": 2.11,
+        "overseasCleared": 25,
+        "overseasLivesLost": 0,
+        "dock2Min": 17.93,
+        "dock3Min": 29.75,
+        "armTosses": 32,
+        "payrollShareOfGross": 0.198,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 8,
+        "questsOffered30": 8,
+        "questsCompleted30": 6,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 24.93,
+        "victoryMin": null,
+        "magicSpawned": 2,
+        "magicOnTime": 2,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 3,
+            "completed": 2,
+            "failed": 1,
+            "declined": 0
+          },
+          "on_time_day": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 2,
+            "completed": 2,
+            "failed": 0,
+            "declined": 0
+          },
+          "night_shift": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 48.8,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 163.6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 10.63,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 0.38,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 2.82,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 8,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 16.01,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2.11,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 19.63,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 24.93,
+          "pass": false,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 5,
+        "minutes": 35,
+        "firstDeliveryS": 60.8,
+        "firstMalwareCaughtS": 176.5,
+        "level2Min": 12.36,
+        "truckAfterLevel2Min": 2.2,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 10.52,
+        "holdBayEventsPer10Min": 18,
+        "scriptedCaughtS": 176.5,
+        "wrongTosses": 31,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 19.52,
+        "level4Min": 24.89,
+        "level5Min": 31.5,
+        "firstOverseasClearedAfterLevel3Min": 3.48,
+        "overseasCleared": 9,
+        "overseasLivesLost": 0,
+        "dock2Min": 22.64,
+        "dock3Min": null,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.23,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 6,
+        "questsOffered30": 6,
+        "questsCompleted30": 3,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 31.5,
+        "victoryMin": null,
+        "magicSpawned": 2,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 2,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 2,
+            "completed": 1,
+            "failed": 1,
+            "declined": 0
+          },
+          "night_shift": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 0,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 60.8,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 176.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 12.36,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 2.2,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 10.52,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 19.52,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 3.48,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 24.89,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 31.5,
+          "pass": false,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 6,
+        "minutes": 35,
+        "firstDeliveryS": 36,
+        "firstMalwareCaughtS": 181.5,
+        "level2Min": 11.48,
+        "truckAfterLevel2Min": 0.2,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 4.36,
+        "holdBayEventsPer10Min": 23.14,
+        "scriptedCaughtS": 181.5,
+        "wrongTosses": 39,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 17.01,
+        "level4Min": 21.12,
+        "level5Min": 27.72,
+        "firstOverseasClearedAfterLevel3Min": 1.74,
+        "overseasCleared": 26,
+        "overseasLivesLost": 0,
+        "dock2Min": 19.55,
+        "dock3Min": 34.66,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.226,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 8,
+        "questsOffered30": 7,
+        "questsCompleted30": 5,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 27.72,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 3,
+            "completed": 2,
+            "failed": 1,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 36,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 181.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 11.48,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 0.2,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 4.36,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 17.01,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 1.74,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 21.12,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 27.72,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 7,
+        "minutes": 35,
+        "firstDeliveryS": 31.5,
+        "firstMalwareCaughtS": 180.1,
+        "level2Min": 11.89,
+        "truckAfterLevel2Min": 0.41,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 6.73,
+        "holdBayEventsPer10Min": 23.71,
+        "scriptedCaughtS": 180.1,
+        "wrongTosses": 44,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 17.96,
+        "level4Min": 22.72,
+        "level5Min": 27.88,
+        "firstOverseasClearedAfterLevel3Min": 2.26,
+        "overseasCleared": 17,
+        "overseasLivesLost": 0,
+        "dock2Min": 20.98,
+        "dock3Min": 34.8,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.223,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 7,
+        "questsOffered30": 7,
+        "questsCompleted30": 3,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 27.88,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "on_time_day": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 2,
+            "declined": 0
+          },
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 0,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 31.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 180.1,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 11.89,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 0.41,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 6.73,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 17.96,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2.26,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 22.72,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 27.88,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": true
+    },
+    {
+      "metrics": {
+        "seed": 8,
+        "minutes": 35,
+        "firstDeliveryS": 37.8,
+        "firstMalwareCaughtS": 205.7,
+        "level2Min": 12.22,
+        "truckAfterLevel2Min": 2.73,
+        "livesLost": 2,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 6.55,
+        "holdBayEventsPer10Min": 26,
+        "scriptedCaughtS": 205.7,
+        "wrongTosses": 45,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 18.49,
+        "level4Min": 22.71,
+        "level5Min": 27.68,
+        "firstOverseasClearedAfterLevel3Min": 2.57,
+        "overseasCleared": 25,
+        "overseasLivesLost": 1,
+        "dock2Min": 19.92,
+        "dock3Min": 31.82,
+        "armTosses": 15,
+        "payrollShareOfGross": 0.202,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 7,
+        "questsOffered30": 7,
+        "questsCompleted30": 5,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 27.68,
+        "victoryMin": null,
+        "magicSpawned": 0,
+        "magicOnTime": 0,
+        "questsByTemplate": {
+          "on_time_day": {
+            "offered": 2,
+            "completed": 1,
+            "failed": 1,
+            "declined": 0
+          },
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "night_shift": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "customs_run": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 37.8,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 205.7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 12.22,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 2.73,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 2,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 6.55,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 18.49,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2.57,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 22.71,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 27.68,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 9,
+        "minutes": 35,
+        "firstDeliveryS": 36.3,
+        "firstMalwareCaughtS": 165.5,
+        "level2Min": 11.54,
+        "truckAfterLevel2Min": 1.37,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 4.33,
+        "holdBayEventsPer10Min": 24.29,
+        "scriptedCaughtS": 165.5,
+        "wrongTosses": 39,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 18.18,
+        "level4Min": 21.72,
+        "level5Min": 26.99,
+        "firstOverseasClearedAfterLevel3Min": 2.88,
+        "overseasCleared": 24,
+        "overseasLivesLost": 0,
+        "dock2Min": 20.43,
+        "dock3Min": 32.93,
+        "armTosses": 4,
+        "payrollShareOfGross": 0.188,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 8,
+        "questsOffered30": 6,
+        "questsCompleted30": 2,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 26.99,
+        "victoryMin": null,
+        "magicSpawned": 0,
+        "magicOnTime": 0,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 2,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "customs_run": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 36.3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 165.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 11.54,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 1.37,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 4.33,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 2,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 18.18,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2.88,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 21.72,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 26.99,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 10,
+        "minutes": 35,
+        "firstDeliveryS": 34.5,
+        "firstMalwareCaughtS": 153.1,
+        "level2Min": 10.27,
+        "truckAfterLevel2Min": 0.61,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 6.82,
+        "holdBayEventsPer10Min": 29.71,
+        "scriptedCaughtS": 153.1,
+        "wrongTosses": 49,
+        "malwareShareAtEnd": 0.13,
+        "level3Min": 15.36,
+        "level4Min": 19.79,
+        "level5Min": 25.22,
+        "firstOverseasClearedAfterLevel3Min": 2,
+        "overseasCleared": 30,
+        "overseasLivesLost": 0,
+        "dock2Min": 17.54,
+        "dock3Min": 30.49,
+        "armTosses": 19,
+        "payrollShareOfGross": 0.189,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 8,
+        "questsOffered30": 7,
+        "questsCompleted30": 5,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 25.22,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "on_time_day": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "clean_sweep": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "inspector_general": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        }
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 34.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 153.1,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "8-15 min",
+          "value": 10.27,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 0.61,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 6.82,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "15-20 min",
+          "value": 15.36,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "20-25 min",
+          "value": 19.79,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "25-30 min",
+          "value": 25.22,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    }
+  ],
+  "medians": {
+    "firstDeliveryS": 43.3,
+    "firstMalwareCaughtS": 178.3,
+    "level2Min": 11.72,
+    "truckAfterLevel2Min": 1.54,
+    "livesLost": 0,
+    "shelfStallS": 0,
+    "holdBayEventsPer10MinL1": 6.78,
+    "holdBayEventsPer10Min": 24,
+    "scriptedCaughtS": 178.3,
+    "wrongTosses": 39.5,
+    "malwareShareAtEnd": 0.13,
+    "level3Min": 17.98,
+    "level4Min": 22.35,
+    "level5Min": 27.7,
+    "firstOverseasClearedAfterLevel3Min": 2.18,
+    "overseasCleared": 25,
+    "overseasLivesLost": 0,
+    "dock2Min": 20.48,
+    "dock3Min": 32.86,
+    "armTosses": 3.5,
+    "payrollShareOfGross": 0.21,
+    "sorterDecisions": 0,
+    "sorterWrongToss": 0,
+    "sorterMissed": 0,
+    "hires": 8,
+    "questsOffered30": 7,
+    "questsCompleted30": 3.5,
+    "questActive7to13": 1,
+    "goldenReleaseOfferedMin": 27.7,
+    "victoryMin": null,
+    "magicSpawned": 1,
+    "magicOnTime": 1
+  },
+  "checks": [
+    {
+      "key": "firstDeliveryS",
+      "metric": "firstDeliveryS",
+      "target": "< 60 s",
+      "value": 43.3,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "firstMalwareCaughtMaxS",
+      "metric": "firstMalwareCaughtS",
+      "target": "≤ 300 s",
+      "value": 178.3,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "level2Min",
+      "metric": "level2Min",
+      "target": "8-15 min",
+      "value": 11.72,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "truckAfterLevel2MaxMin",
+      "metric": "truckAfterLevel2Min",
+      "target": "≤ 4 min",
+      "value": 1.54,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "maxLivesLost",
+      "metric": "livesLost",
+      "target": "≤ 0",
+      "value": 0,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "maxShelfStallS",
+      "metric": "shelfStallS",
+      "target": "≤ 0 s",
+      "value": 0,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "holdBayEventsPer10MinMin",
+      "metric": "holdBayEventsPer10MinL1",
+      "target": "≥ 6 /10 min at L1",
+      "value": 6.78,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "questsOfferedBy30MinMin",
+      "metric": "questsOffered30",
+      "target": "≥ 4 by 30 min",
+      "value": 7,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "questsCompletedBy30MinMin",
+      "metric": "questsCompleted30",
+      "target": "≥ 2 by 30 min",
+      "value": 3.5,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "level3Min",
+      "metric": "level3Min",
+      "target": "15-20 min",
+      "value": 17.98,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "firstOverseasClearedAfterLevel3MaxMin",
+      "metric": "firstOverseasClearedAfterLevel3Min",
+      "target": "≤ 3 min after L3",
+      "value": 2.18,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "level4Min",
+      "metric": "level4Min",
+      "target": "20-25 min",
+      "value": 22.35,
+      "pass": true,
+      "note": null
+    },
+    {
+      "key": "level5Min",
+      "metric": "level5Min",
+      "target": "25-30 min",
+      "value": 27.7,
+      "pass": true,
+      "note": null
+    }
+  ],
+  "features": {
+    "lane": true,
+    "lives": true,
+    "levels": true,
+    "payroll": true,
+    "people": true,
+    "quests": true,
+    "levels3plus": true,
+    "levels45": true
+  },
+  "informational": [
+    {
+      "key": "holdBayEventsPer10Min",
+      "target": "whole run",
+      "median": 24,
+      "note": "informational"
+    },
+    {
+      "key": "scriptedCaughtS",
+      "target": "flag time of the scripted malware",
+      "median": 178.3,
+      "note": "informational"
+    },
+    {
+      "key": "wrongTosses",
+      "target": "clean parcels tossed (Toss-everything)",
+      "median": 39.5,
+      "note": "informational"
+    },
+    {
+      "key": "malwareShareAt30Min",
+      "target": "share at 35 min",
+      "median": 0.13,
+      "note": "informational"
+    },
+    {
+      "key": "payrollShareOfGross",
+      "target": "≤ 0.25 (payroll paid ÷ gross income at 35 min)",
+      "median": 0.21,
+      "note": "informational"
+    },
+    {
+      "key": "sorterDecisions",
+      "target": "Hold Bay sorter calls",
+      "median": 0,
+      "note": "informational"
+    },
+    {
+      "key": "sorterWrongToss",
+      "target": "clean parcels the sorter tossed",
+      "median": 0,
+      "note": "informational"
+    },
+    {
+      "key": "sorterMissed",
+      "target": "malware the sorter left as looks clean",
+      "median": 0,
+      "note": "informational"
+    },
+    {
+      "key": "hires",
+      "target": "hires (not re-hires)",
+      "median": 8,
+      "note": "informational"
+    },
+    {
+      "key": "overseasCleared",
+      "target": "overseas clearances (parcel:cleared, malware included)",
+      "median": 25,
+      "note": "informational"
+    },
+    {
+      "key": "overseasLivesLost",
+      "target": "lives lost at a clearance (the ship has sailed)",
+      "median": 0,
+      "note": "informational"
+    },
+    {
+      "key": "dock2Min",
+      "target": "minute loading dock 2 is bought",
+      "median": 20.48,
+      "note": "informational"
+    },
+    {
+      "key": "dock3Min",
+      "target": "minute loading dock 3 is bought",
+      "median": 32.86,
+      "note": "informational"
+    },
+    {
+      "key": "armTosses",
+      "target": "Hold Bay parcels the Sorter Arm tossed (L4 plan)",
+      "median": 3.5,
+      "note": "informational"
+    },
+    {
+      "key": "goldenReleaseOfferedMaxMin",
+      "target": "≤ 32 min (seeds 1-10 × 35 min, --minutes 35)",
+      "median": 27.7,
+      "note": "informational"
+    },
+    {
+      "key": "victoryMaxMin",
+      "target": "≤ 45 min (seeds 1-3 × 45 min, the long test)",
+      "median": null,
+      "note": "informational"
+    },
+    {
+      "key": "questActive7to13",
+      "target": "a quest active between minutes 7 and 13 on ≥ 8/10 seeds (plan-build2 §8.4)",
+      "median": 1,
+      "note": "informational",
+      "text": "10/10 seeds"
+    },
+    {
+      "key": "magicOnTime",
+      "target": "golden parcels delivered on time / spawned (all seeds)",
+      "median": 1,
+      "note": "informational",
+      "text": "8/9"
+    },
+    {
+      "key": "quest:magic_parcel",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 9 · completed 8 · failed 1 · declined 0"
+    },
+    {
+      "key": "quest:on_time_day",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 8 · completed 3 · failed 5 · declined 0"
+    },
+    {
+      "key": "quest:rush_district",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 16 · completed 12 · failed 4 · declined 0"
+    },
+    {
+      "key": "quest:night_shift",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 5 · completed 5 · failed 0 · declined 0"
+    },
+    {
+      "key": "quest:clean_sweep",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 2 · completed 1 · failed 1 · declined 0"
+    },
+    {
+      "key": "quest:golden_release",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 17 · completed 0 · failed 8 · declined 0"
+    },
+    {
+      "key": "quest:cheer_up",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 8 · completed 1 · failed 7 · declined 0"
+    },
+    {
+      "key": "quest:big_haul",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 7 · completed 5 · failed 2 · declined 0"
+    },
+    {
+      "key": "quest:customs_run",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 3 · completed 3 · failed 0 · declined 0"
+    },
+    {
+      "key": "quest:inspector_general",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 1 · completed 1 · failed 0 · declined 0"
+    }
+  ],
+  "pass": true
+}

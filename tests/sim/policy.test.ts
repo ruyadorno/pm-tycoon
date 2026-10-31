@@ -544,6 +544,7 @@ describe('competent policy (spec §7) [gate]', () => {
       quests: true,
       levels3plus: true,
       levels45: true,
+      events: false,
     })
     expect(g.checks.map((c) => [c.key, c.note])).toEqual([
       ['firstDeliveryS', null],

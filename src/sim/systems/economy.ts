@@ -13,7 +13,7 @@ import { lostLifeReport, slotResultEntry } from '../detection.ts'
 import { SIM_FEATURES } from '../features.ts'
 import { districtDef } from '../map.ts'
 import type { Sim } from '../sim.ts'
-import type { Parcel, Strain, Vehicle } from '../types.ts'
+import type { EventLostLifeReport, Parcel, Strain, Vehicle } from '../types.ts'
 import { laneNode, liveSlotIds, TICKS_PER_S } from '../types.ts'
 import { ageS, isOnTime, paidValue } from '../value.ts'
 import { debugParcel } from './holdbay.ts'
@@ -98,6 +98,7 @@ export function loseLife(sim: Sim, p: Parcel, viaClearance: boolean): void {
   const wasOver = eco.gameOver
   eco.lives = Math.max(0, eco.lives - 1)
   eco.daysSinceIncident = 0
+  s.stats.livesLost += 1
   addWanted(s, p.label)
   const report = lostLifeReport(sim, p, viaClearance)
   s.lastLostLife = report
@@ -117,10 +118,49 @@ export function loseLife(sim: Sim, p: Parcel, viaClearance: boolean): void {
     inspectorRate: card.inspectorRate,
     sorterCall: structuredClone(card.sorterCall),
     report: card,
+    cause: 'malware',
   })
   if (eco.lives === 0 && !wasOver) {
     eco.gameOver = true
-    sim.emit('game:over', {})
+    sim.emit('game:over', { cause: 'malware' })
+  }
+}
+
+/** B3 §3.5: an event option took a life — no parcel, no wanted label; the ordinary game-over path. */
+export function loseLifeEvent(
+  sim: Sim,
+  eventId: string,
+  title: string,
+  option: string,
+): void {
+  if (!SIM_FEATURES.lives) return
+  const s = sim.state
+  const eco = s.economy
+  const wasOver = eco.gameOver
+  eco.lives = Math.max(0, eco.lives - 1)
+  eco.daysSinceIncident = 0
+  s.stats.livesLost += 1
+  s.events.stats.livesLost += 1
+  const report: EventLostLifeReport = {
+    kind: 'event',
+    tick: s.tick,
+    eventId,
+    title,
+    option,
+    livesLeft: eco.lives,
+  }
+  s.lastLostLife = report
+  sim.emit('life:lost', {
+    cause: 'event',
+    eventId,
+    title,
+    option,
+    lives: eco.lives,
+    report: structuredClone(report),
+  })
+  if (eco.lives === 0 && !wasOver) {
+    eco.gameOver = true
+    sim.emit('game:over', { cause: 'event' })
   }
 }
 

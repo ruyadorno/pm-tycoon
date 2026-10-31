@@ -35,7 +35,7 @@ import { auditState, replay, Sim, stateHash } from '../../src/sim/sim.ts'
 import { clearingParcels } from '../../src/sim/systems/hubs.ts'
 import { effectiveP, sorterNumbers } from '../../src/sim/systems/people.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
-import { collect, dataFixture } from '../sim/helpers.ts'
+import { collect, collectLost, dataFixture } from '../sim/helpers.ts'
 import {
   ATTRACT_FLEET,
   ATTRACT_LIVE,
@@ -183,7 +183,7 @@ describe('malware-cleared: a cleared malware parcel costs a life on delivery (§
 
   it('under ?policy=1 life:lost lands at fixture.lifeLostInS, "cleared by you"', () => {
     const { sim, fx } = load('malware-cleared')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     const t0 = sim.state.tick
     withPolicy(sim, 120, () => lost.length > 0)
     expect(lost.length).toBe(1)
@@ -299,7 +299,7 @@ describe('l2-lane: L2 with four live slots and the Shaky shaker (warehouse-view 
   it('under ?policy=1 no level:up and no life lost in the next 30 s', () => {
     const { sim } = load('l2-lane')
     const ups = collect(sim, 'level:up')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     withPolicy(sim, 30)
     expect(ups).toEqual([])
     expect(lost).toEqual([])
@@ -532,7 +532,7 @@ describe('overseas-malware: a handed-off malware parcel costs a life at clearanc
 
   it('under ?policy=1 life:lost {viaClearance} lands at fixture.lifeLostInS with handedOff + customsCleared in its path; the ship has sailed', () => {
     const { sim, fx } = load('overseas-malware')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     const cleared = collect(sim, 'parcel:cleared')
     const lives = sim.state.economy.lives
     const t0 = sim.state.tick
@@ -654,7 +654,7 @@ describe('l4-room: the tier-4 room at a real L4 (B2 §4.4, plan-build2 §8.6 tas
   it('under ?policy=1 no level:up and no life lost in the next 30 s', () => {
     const { sim } = load('l4-room')
     const ups = collect(sim, 'level:up')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     withPolicy(sim, 30)
     expect(ups).toEqual([])
     expect(lost).toEqual([])
@@ -898,7 +898,7 @@ describe('attract.json: the Title attract city (B2 §5; M8: the L3 city, M9: L3+
   it('under the competent policy the demo keeps delivering for 2 minutes: no stall, no life lost', () => {
     const sim = loadAttract()
     const delivered = collect(sim, 'parcel:delivered')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     const stalls = collect(sim, 'lane:stalled')
     withPolicy(sim, 120)
     expect(delivered.length).toBeGreaterThan(0)

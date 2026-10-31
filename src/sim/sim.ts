@@ -16,8 +16,10 @@ import type {
   SimTap,
 } from './events.ts'
 import { pathfinder, type Pathfinder } from './astar.ts'
+import { modAdd } from './modifiers.ts'
 import { Rng, seedWord } from './rng.ts'
 import { roadGraph, type RoadGraph } from './roads.ts'
+import { startEventsState } from './systems/deck.ts'
 import { isSoldInbound } from './systems/lane.ts'
 import {
   effectiveP,
@@ -43,6 +45,7 @@ import type {
 } from './types.ts'
 import {
   daysToTicks,
+  isAbsent,
   laneNode,
   STATE_VERSION,
   TICKS_PER_DAY,
@@ -86,6 +89,8 @@ export interface Policy {
   readonly name: string
   step(): void
   dispose?(): void
+  /** Metrics-only tallies (the event policy's EV); never read by the sim. */
+  metrics?(): Record<string, number>
 }
 /** 'delegating' (M6, spec-build2 §7.2): hires a sorter at L2 and Clears what it tags clean. */
 export type PolicyKind = 'competent' | 'delegating'
@@ -101,6 +106,10 @@ export class Sim {
   readonly peopleRng: Rng
   /** M7: the quest stream (state.quests.rng; offers and magic routes, design-m7 Q21). */
   readonly questRng: Rng
+  /** Build 3: the event CADENCE stream (state.events.rng; the job roll, the gap — D-2). */
+  readonly eventRng: Rng
+  /** Build 3: the event CONTENT stream (state.events.picks.rng; picks, targets, effect draws — D-2). */
+  readonly eventPicksRng: Rng
   readonly commandLog: CommandLogEntry[] = []
   /** Bumped by every tick, successful dispatch and load (view caches key on it). */
   revision = 0
@@ -111,6 +120,8 @@ export class Sim {
   #emitDepth = 0
   #ticking = false
   #taps: SimTap[] = []
+  /** Attached policies (Sim.attachPolicy): never serialised; the hold reads it (B3 §6, D-9). */
+  #policies = 0
 
   constructor(data: GameData, seed: number) {
     this.data = data
@@ -120,6 +131,29 @@ export class Sim {
     this.rng = new Rng(() => this.state)
     this.peopleRng = new Rng(() => this.state.applicants)
     this.questRng = new Rng(() => this.state.quests)
+    this.eventRng = new Rng(() => this.state.events)
+    this.eventPicksRng = new Rng(() => this.state.events.picks)
+  }
+
+  /**
+   * A policy answers open cards before every tick (B3 §6, D-9): while one is
+   * attached the hold never stops tick(). Never serialised; the hold reads
+   * it. The CompetentPolicy constructor calls this and `dispose()` calls the
+   * returned detach, which is idempotent.
+   */
+  attachPolicy(): () => void {
+    this.#policies += 1
+    let attached = true
+    return () => {
+      if (!attached) return
+      attached = false
+      this.#policies -= 1
+    }
+  }
+
+  /** True while at least one policy is attached (attachPolicy). */
+  get policyAttached(): boolean {
+    return this.#policies > 0
   }
 
   /** Resume a snapshot (validated: version, data hash, ids, locations). */
@@ -154,8 +188,13 @@ export class Sim {
     return res
   }
 
-  /** One 100 ms step in the fixed order of tick.ts. */
+  /**
+   * One 100 ms step in the fixed order of tick.ts. B3 §6 the hold: while a
+   * card is open and no policy is attached, tick() returns at once (no
+   * step, no revision bump) until the card is decided.
+   */
   tick(): void {
+    if (this.state.events.open !== null && this.#policies === 0) return // B3 §6 the hold
     if (this.#ticking) throw new Error('Sim.tick() re-entered')
     this.#ticking = true
     try {
@@ -337,11 +376,14 @@ export function createStartState(data: GameData, seed: number): SimState {
       offer: null,
       active: null,
       nextOfferTick: daysToTicks(data.quests.offer.firstOfferDay),
+      jobReadyTick: 0,
       ultimateNextTick: 0,
       lastOfferDay: null,
       history: [],
       vouchers: [],
     },
+    events: startEventsState(data, seed),
+    modifiers: [],
     parcels: {},
     lane: buildStartLane(data, L1),
     stats: {
@@ -362,6 +404,8 @@ export function createStartState(data: GameData, seed: number): SimState {
       minutes: [],
       victoryTick: null,
       cleared: 0,
+      livesLost: 0,
+      lost: 0,
     },
     lastLostLife: null,
     nextId: {
@@ -371,6 +415,7 @@ export function createStartState(data: GameData, seed: number): SimState {
       checker: 1,
       applicant: 1,
       quest: 1,
+      modifier: 1,
     },
   }
 
@@ -496,7 +541,7 @@ function buildStartLane(data: GameData, L1: LevelDef): Lane {
 
 // Validation and invariants ---------------------------------------------------------
 
-const TERMINAL = ['delivered', 'tossed', 'cleared']
+const TERMINAL = ['delivered', 'tossed', 'cleared', 'lost']
 const OFF_MAP = ['handed_off', 'clearing']
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -542,7 +587,8 @@ function jsonProblems(v: unknown, path: string, add: (m: string) => void) {
  * exactly one place (a building's waiting list, a vehicle's cargo, a lane
  * node's queue or station; none while handed off / clearing or terminal);
  * and the conservation identity spawned = live + delivered + tossed +
- * cleared (plan.md §12.5; M8 adds the overseas clearances, stats.cleared).
+ * cleared + lost (plan.md §12.5; M8 adds the overseas clearances,
+ * stats.cleared; build 3 the parcels an event took, stats.lost).
  */
 export function auditState(state: SimState, data: GameData): string[] {
   const out: string[] = []
@@ -724,9 +770,10 @@ export function auditState(state: SimState, data: GameData): string[] {
   const delivered = state.stats.deliveries
   const tossed = lane.quarantine.count
   const cleared = state.stats.cleared
-  if (state.spawn.spawnedCount !== live + delivered + tossed + cleared) {
+  const lost = state.stats.lost
+  if (state.spawn.spawnedCount !== live + delivered + tossed + cleared + lost) {
     add(
-      `conservation: spawned ${state.spawn.spawnedCount} ≠ live ${live} + delivered ${delivered} + tossed ${tossed} + cleared ${cleared}`,
+      `conservation: spawned ${state.spawn.spawnedCount} ≠ live ${live} + delivered ${delivered} + tossed ${tossed} + cleared ${cleared} + lost ${lost}`,
     )
   }
   const c = conservation(state)
@@ -795,36 +842,46 @@ function auditPeople(
     if (!rows.includes(f.index)) {
       add(`lane.${n.id}: desk index ${f.index} is not a desks.rows index`)
     }
-    if (n.stations.length !== f.inspectorIds.length) {
+    // Build 3 (D-10): stations exist for the on-duty crew only (syncDesk's
+    // filter); an absent inspector stays in inspectorIds, active.
+    const onDuty = f.inspectorIds.filter((id) => {
+      const e = byId(id)
+      return e === null || !isAbsent(e, state.tick)
+    })
+    if (n.stations.length !== onDuty.length) {
       add(
-        `lane.${n.id}: ${n.stations.length} stations ≠ ${f.inspectorIds.length} inspectors`,
+        `lane.${n.id}: ${n.stations.length} stations ≠ ${onDuty.length} inspectors on duty`,
       )
     }
-    const crew = f.inspectorIds.map(byId)
-    f.inspectorIds.forEach((id, i) => {
-      const e = crew[i] ?? null
+    for (const id of f.inspectorIds) {
       seated[String(id)] = (seated[String(id)] ?? 0) + 1
+      const e = byId(id)
       if (!e || e.role !== 'inspector' || !e.active) {
         add(`lane.${n.id}.inspectorIds: ${id} is not an active inspector`)
-        return
       }
-      const st = n.stations[i]
+    }
+    const extra = modAdd({ state, data }, 'inspectorP')
+    const crew = onDuty.map(byId)
+    onDuty.forEach((id, j) => {
+      const e = crew[j] ?? null
+      if (!e || e.role !== 'inspector' || !e.active) return
+      const st = n.stations[j]
       if (!st || st.employeeId !== id) {
-        add(`lane.${n.id}.stations[${i}]: not inspector ${id}'s station`)
+        add(`lane.${n.id}.stations[${j}]: not inspector ${id}'s station`)
         return
       }
-      const colleagues = crew.flatMap((c, j) =>
-        j !== i && c !== null && c.active ? [c.pips] : [],
+      const colleagues = crew.flatMap((c, k) =>
+        k !== j && c !== null && c.active ? [c.pips] : [],
       )
       const own = inspectorNumbers(data, e.pips)
-      const want = effectiveP(data, e.pips, colleagues)
+      const want = effectiveP(data, e.pips, colleagues, extra)
       if (
         differs(st.p, want) ||
         differs(st.decoyFlag, own.decoyFlag) ||
         differs(st.processTicks, own.processTicks)
       ) {
         add(
-          `lane.${n.id}.stations[${i}]: numbers differ from inspector ${id}'s`,
+          `lane.${n.id}.stations[${j}]: numbers differ from inspector ${id}'s`,
         )
       }
     })
@@ -909,7 +966,9 @@ export interface Conservation {
   tossed: number
   /** M8: overseas clearances (stats.cleared, malware included). */
   cleared: number
-  /** spawned = waiting + vehicles + lane + held + shelf + offMap + delivered + tossed + cleared */
+  /** Build 3: parcels an event took off the shelf (stats.lost, D-11). */
+  lost: number
+  /** spawned = waiting + vehicles + lane + held + shelf + offMap + delivered + tossed + cleared + lost */
   ok: boolean
 }
 
@@ -936,6 +995,7 @@ export function conservation(state: SimState): Conservation {
   const delivered = state.stats.deliveries
   const tossed = lane.quarantine.count
   const cleared = state.stats.cleared
+  const lost = state.stats.lost
   const spawned = state.spawn.spawnedCount
   const sum =
     waiting +
@@ -946,7 +1006,8 @@ export function conservation(state: SimState): Conservation {
     offMap +
     delivered +
     tossed +
-    cleared
+    cleared +
+    lost
   return {
     spawned,
     waiting,
@@ -958,12 +1019,13 @@ export function conservation(state: SimState): Conservation {
     delivered,
     tossed,
     cleared,
+    lost,
     ok: sum === spawned,
   }
 }
 
 export function formatConservation(c: Conservation): string {
-  return `spawned ${c.spawned} ${c.ok ? '=' : '≠'} waiting ${c.waiting} + vehicles ${c.vehicles} + lane ${c.lane} + held ${c.held} + shelf ${c.shelf} + off-map ${c.offMap} + delivered ${c.delivered} + tossed ${c.tossed} + cleared ${c.cleared}`
+  return `spawned ${c.spawned} ${c.ok ? '=' : '≠'} waiting ${c.waiting} + vehicles ${c.vehicles} + lane ${c.lane} + held ${c.held} + shelf ${c.shelf} + off-map ${c.offMap} + delivered ${c.delivered} + tossed ${c.tossed} + cleared ${c.cleared} + lost ${c.lost}`
 }
 
 /** Why a snapshot cannot be loaded (empty = loadable). */
@@ -1029,14 +1091,19 @@ export function stateHash(state: SimState): string {
 /**
  * Re-run a game: new Sim(data, seed), re-dispatch every logged command at its
  * tick, tick() up to `untilTick`. Same seed + data + log ⇒ same state hash.
+ * Build 3: `prepare` adjusts the fresh sim before the first command (tests:
+ * a deck-off sim, D-8 — tests/sim/helpers.ts replayOf); a held card with no
+ * logged decision ends the replay early (B3 §6).
  */
 export function replay(
   data: GameData,
   seed: number,
   log: readonly CommandLogEntry[],
   untilTick: Tick,
+  prepare?: (sim: Sim) => void,
 ): Sim {
   const sim = new Sim(data, seed)
+  prepare?.(sim)
   let i = 0
   for (;;) {
     while (
@@ -1047,6 +1114,9 @@ export function replay(
       i += 1
     }
     if (sim.state.tick >= untilTick) return sim
+    const before = sim.state.tick
     sim.tick()
+    // A held card with no logged decision ends the replay (B3 §6).
+    if (sim.state.tick === before) return sim
   }
 }

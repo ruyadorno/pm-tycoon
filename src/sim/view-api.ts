@@ -5,7 +5,14 @@
 // exact). The pure §6.3 readouts live in detection.ts and are re-exported
 // here with their M0 signatures.
 
-import type { BuildingDef, GameData, MapData } from '../data/types.ts'
+import type {
+  BuildingDef,
+  EventCategoryId,
+  EventKind,
+  GameData,
+  MapData,
+  ModifierKey,
+} from '../data/types.ts'
 import type { CommandResult } from './commands.ts'
 import {
   announcedStrains,
@@ -13,8 +20,9 @@ import {
   laneRatePerMin,
   machineChecker,
 } from './detection.ts'
-import type { SimEmitter, StallReason } from './events.ts'
+import type { StallReason } from './events.ts'
 import type { Sim } from './sim.ts'
+import type { EffectLine } from './systems/effects.ts'
 import type {
   Affinity,
   Applicant,
@@ -22,6 +30,7 @@ import type {
   BuildingId,
   DistrictId,
   Employee,
+  EventRecord,
   HireTarget,
   LaneNode,
   LoadingDock,
@@ -402,6 +411,57 @@ export interface QuestActions {
   abandon(): CommandResult
 }
 
+// Build 3 events (spec-build3 §6; M11 contract §3 stream E) ------------------------
+
+/** One visible option of the open card. */
+export interface EventOptionView {
+  index: number
+  label: string
+  lines: readonly EffectLine[]
+  cost: number
+  default: boolean
+  danger: boolean
+  affordable: boolean
+  /** eventWords.cantAfford when the option is not affordable, else null. */
+  reason: string | null
+}
+
+/** The open card as the EventCard draws it. */
+export interface OpenCardView {
+  eventId: string
+  kind: EventKind
+  category: EventCategoryId
+  word: string
+  picture: string
+  title: string
+  body: string
+  day: number
+  parentChoice: string | null
+  questId: string | null
+  options: readonly EventOptionView[]
+}
+
+/** A live modifier as the EffectsCard lists it. */
+export interface ModifierView {
+  id: string
+  key: ModifierKey
+  line: string
+  untilTick: Tick | null
+  ticksLeft: number | null
+  eventId: string
+  label: string
+}
+
+/** The deck as the HUD reads it (ViewSim.events()). */
+export interface EventsView {
+  open: OpenCardView | null
+  queue: number
+  scheduledCount: number
+  nextDueTicks: number | null
+  history: readonly EventRecord[]
+  modifiers: readonly ModifierView[]
+}
+
 /**
  * Debug-build helpers for shots / tests (each dispatches a debug command):
  * forceFlagNext — the next checker roll flags its parcel on `strain`;
@@ -445,7 +505,12 @@ export interface ViewSim {
   readonly quarantine: { count: number; malware: number; clean: number }
   readonly docks: readonly LoadingDock[]
   readonly daysSinceIncident: number
-  readonly events: SimEmitter
+  /**
+   * Build 3 (B3 §6): the open card, the queue, links, history and live
+   * modifiers. M11 wave 0: always empty; stream E fills it (cached per
+   * revision).
+   */
+  events(): EventsView
   regionState(id: string): 'locked' | 'live'
   buildingAt(tx: number, ty: number): BuildingInfo | null
   waitingAt(buildingId: BuildingId): readonly Parcel[]
@@ -779,7 +844,7 @@ export function createViewSim(
     const sim = get()
     return announcedStrains(sim.state, sim.data).map((strain) => ({
       strain,
-      d: laneCatchRate(sim.state.lane, strain),
+      d: laneCatchRate(sim.state.lane, strain, [], sim),
       counter:
         sim.data.parcels.malware.strains.find((s) => s.id === strain)
           ?.counter ?? '',
@@ -826,7 +891,7 @@ export function createViewSim(
 
   const lane: LaneView = {
     nodes: () => st().lane.nodes,
-    rate: () => laneRatePerMin(st().lane, get().data),
+    rate: () => laneRatePerMin(st().lane, get().data, get()),
     detection,
     get stalled() {
       return stalled()
@@ -936,8 +1001,15 @@ export function createViewSim(
     get daysSinceIncident() {
       return st().economy.daysSinceIncident
     },
-    get events() {
-      return get().events
+    events(): EventsView {
+      return {
+        open: null,
+        queue: 0,
+        scheduledCount: 0,
+        nextDueTicks: null,
+        history: [],
+        modifiers: [],
+      }
     },
 
     regionState(id) {
@@ -1051,9 +1123,12 @@ export function createViewSim(
               ),
               withCounterPct: Math.round(
                 100 *
-                  laneCatchRate(sim.state.lane, weakest.strain, [
-                    machineChecker(def, `counter:${def.id}`, sim.state.tick),
-                  ]),
+                  laneCatchRate(
+                    sim.state.lane,
+                    weakest.strain,
+                    [machineChecker(def, `counter:${def.id}`, sim.state.tick)],
+                    sim,
+                  ),
               ),
             }
           : null

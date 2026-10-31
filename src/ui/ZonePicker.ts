@@ -194,6 +194,15 @@ export function failText(
       return 'Finish the current job first'
     case 'quest-expired':
       return 'That job is no longer on the board'
+    // Build 3: the event card commands (B3 §6).
+    case 'no-event':
+      return 'That card is gone'
+    case 'bad-option':
+      return 'Pick one of the options'
+    case 'option-hidden':
+      return 'Not available right now'
+    case 'cant-afford':
+      return "Can't afford"
     default:
       return 'Not possible right now'
   }

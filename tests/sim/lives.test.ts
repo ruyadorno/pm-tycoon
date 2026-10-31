@@ -19,6 +19,7 @@ import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   buy,
   collect,
+  collectLost,
   dataFixture,
   feeder,
   heldParcel,
@@ -43,7 +44,7 @@ function deliverMalware(sim: ReturnType<typeof quietSim>) {
   sim.state.tick = 100
   const bike = buy(sim, 'bike')
   const p = injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe', { malware: true })
-  const lost = collect(sim, 'life:lost')
+  const lost = collectLost(sim)
   const delivered = collect(sim, 'parcel:delivered')
   expect(runUntil(sim, () => lost.length > 0, 3000)).toBeGreaterThan(0)
   return { bike, p, lost, delivered }
@@ -66,7 +67,7 @@ function missed(sim: Sim, n: number, strain: Strain): Parcel[] {
 }
 /** Deliver one shelf parcel now and return its life:lost payload. */
 function card(sim: Sim, p: Parcel) {
-  const lost = collect(sim, 'life:lost')
+  const lost = collectLost(sim)
   takeFrom(laneNode(sim.state.lane, 'shelf')!, p.id)
   deliverParcel(sim, null, p)
   return lost[0]!
@@ -149,7 +150,7 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     const sim = noCheckers(quietSim(1))
     placeMachine(sim, 'metal_detector', 'slot2')
     const vs = createViewSim(sim, { debug: true })
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     expect(vs.debug?.forceMalwareDelivery()).toEqual({ ok: true })
     const l = lost[0]!
     expect(l.counterMachineId).toBe('metal_detector')
@@ -239,7 +240,7 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     expect(sim.dispatch({ kind: 'clear', parcelId: p.id })).toEqual({
       ok: true,
     })
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     runUntil(sim, () => lost.length > 0, 3000)
     const l = lost[0]!
     expect(l.clearedByPlayerAt).toBe(clearTick)
@@ -257,12 +258,12 @@ describe('a malware delivery costs a life (spec §10, §7.3)', () => {
     const sim = quietSim(1)
     const vs = createViewSim(sim, { debug: true })
     const over = collect(sim, 'game:over')
-    const lost = collect(sim, 'life:lost')
+    const lost = collectLost(sim)
     for (let i = 0; i < data.economy.lives.start; i++) {
       vs.debug?.forceMalwareDelivery()
     }
     expect(lost.map((l) => l.report.livesLeft)).toEqual([2, 1, 0])
-    expect(over).toEqual([{}])
+    expect(over).toEqual([{ cause: 'malware' }])
     expect(vs.gameOver).toBe(true)
     vs.debug?.forceMalwareDelivery()
     expect(vs.lives).toBe(0)

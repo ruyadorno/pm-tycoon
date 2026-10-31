@@ -600,7 +600,10 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         },
         // §9.6: fx_dust construction → wh_ext_t<tier> + the LEVEL stamp.
         'level:up': (p) => this.onLevelUp(p.level),
-        'life:lost': (p) => this.onLifeLost(p),
+        'life:lost': (p) => {
+          if (p.cause === 'event') return // M12: the event variant
+          this.onLifeLost(p)
+        },
         // M7 §6.8: the magic markers follow the active quest. Read on the
         // next frame — the facade's quests() cache keys on sim.revision,
         // which moves only after the emitting tick / command.
@@ -2038,7 +2041,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   /** Rebuild the scorch from sim state (wake, sim swap): the last loss only. */
   private syncScorch(): void {
     const last = getSim(this)?.state.lastLostLife ?? null
-    if (last && !this.scorched.has(last.destBuildingId))
+    // An event's life (build 3) has no building to scorch.
+    if (
+      last &&
+      last.kind !== 'event' &&
+      !this.scorched.has(last.destBuildingId)
+    )
       this.scorched.set(last.destBuildingId, last.tick + TICKS_PER_DAY)
     this.refreshScorch()
     for (const [id] of this.scorched) this.buildings.get(id)?.setScorch(true)

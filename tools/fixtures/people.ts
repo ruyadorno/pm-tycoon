@@ -37,6 +37,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { loadGameData } from '../sim/load.node.ts'
 import { bestApplicant, createPolicy } from '../../src/sim/policy.ts'
+import { assertNoCard, settleCards } from './cards.ts'
 import type { PolicyKind } from '../../src/sim/sim.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { salaryOf } from '../../src/sim/systems/people.ts'
@@ -64,6 +65,7 @@ type Name = 'people-l3' | 'sorter-duty'
 const NAMES: readonly Name[] = ['people-l3', 'sorter-duty']
 
 function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
+  assertNoCard(sim, name)
   const snap = {
     ...sim.snapshot(),
     fixture: {
@@ -107,11 +109,13 @@ function runPolicy(
     policy.step()
     sim.tick()
   }
+  settleCards(sim, policy)
   return {
     sim,
     step: () => {
       policy.step()
       sim.tick()
+      settleCards(sim, policy)
     },
   }
 }

@@ -3,7 +3,7 @@
 // cross-references and conservation identity (sim.ts). A save with the
 // running data hash can still be damaged (a flipped digit that stays valid
 // JSON, a hand-edited payload, a build that changed the state shape without
-// bumping `version` — types.ts STATE_VERSION, 5 since M8, the only value
+// bumping `version` — types.ts STATE_VERSION, 6 since M11, the only value
 // accepted); every field the tick and the command handlers read must
 // then have its type, its enum value or a data id, or tick() throws on the
 // first frame after Continue. Problems here make the Title discard the
@@ -12,6 +12,7 @@
 // are ignored, the ADDITION fields of types.ts are optional (older saves
 // lack them), trace `what` is free text.
 
+import { MODIFIER_KEYS } from '../data/schema.ts'
 import type { GameData } from '../data/types.ts'
 import { roadGraph } from './roads.ts'
 import { FACE_LOOKS, ROLES } from './systems/people.ts'
@@ -148,12 +149,15 @@ const PARCEL_STATES = [
   'handed_off',
   'clearing',
   'cleared',
+  'lost',
 ]
 const NODE_KINDS = ['dock', 'conveyor', 'slot', 'holdBay', 'bin', 'shelf']
 const SIZES = ['S', 'M', 'L', 'XL']
 const HEADINGS = ['NE', 'SE', 'SW', 'NW']
 const STALL_REASONS = ['holdBayFull', 'shelfFull', 'bufferFull']
 const STOP_KINDS = ['deliver', 'collect', 'handoff']
+const EVENT_KINDS = ['decision', 'news', 'job']
+const PICK_ROLES = ['inspector', 'sorter', 'driver', 'vehicle']
 
 /**
  * Sanity bounds, far past anything a run reaches (a 90-minute game: tick
@@ -350,6 +354,107 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     reason: nullable(oneOf(['timeout', 'abandoned', 'malware', 'unavailable'])),
   })
 
+  // Build 3 (B3 §3, §6): the event deck and the modifiers. Version 6 is
+  // fresh, so every key is required.
+  const cardPick = obj({ role: oneOf(PICK_ROLES), id, name: str })
+  const openCard = obj({
+    eventId: str,
+    kind: oneOf(EVENT_KINDS),
+    category: str,
+    questId: nullable(str),
+    target: nullable(district),
+    pick: nullable(cardPick),
+    openedTick: tick,
+    parentChoice: nullable(str),
+    chainHeadId: nullable(str),
+    depth: int(1, 99),
+    drawn: bool,
+    gapTicks: nullable(count),
+  })
+  // A branch's `if` is checked again by the data schema; a save only needs an object.
+  const link = obj({
+    eventId: nullable(str),
+    branches: nullable(arr(obj({ id: str, 'if?': obj({}) }))),
+    dueTick: tick,
+    target: nullable(district),
+    pick: nullable(cardPick),
+    parentChoice: str,
+    chainHeadId: str,
+    depth: int(1, 99),
+    bookedTick: tick,
+  })
+  const events = obj({
+    rng: int(0, 0xffffffff),
+    picks: obj({ rng: int(0, 0xffffffff) }),
+    open: nullable(openCard),
+    queue: arr(openCard),
+    scheduled: arr(link),
+    nextDrawTick: tick,
+    rescueTick: nullable(tick),
+    lastCategory: nullable(str),
+    seen: rec(count),
+    cooldownUntil: rec(tick),
+    flags: rec(oneOf([true])),
+    history: arr(
+      obj({
+        eventId: str,
+        kind: oneOf(EVENT_KINDS),
+        category: str,
+        openedTick: tick,
+        closedTick: tick,
+        option: nullable(count),
+        label: nullable(str),
+        default: bool,
+        outcome: oneOf(['decided', 'withdrawn']),
+        chainHeadId: nullable(str),
+        depth: int(1, 99),
+      }),
+    ),
+    wrongTossDay: count,
+    wrongTossBase: count,
+    stats: obj({
+      offered: count,
+      decided: count,
+      withdrawn: count,
+      blanks: count,
+      byCategory: rec(count),
+      livesLost: count,
+      livesGained: count,
+      vehiclesLost: count,
+      workersLost: count,
+      chainsStarted: count,
+      chainsFinished: count,
+      modifiersPeak: count,
+    }),
+  })
+  const modifier = obj({
+    id: str,
+    key: oneOf(MODIFIER_KEYS),
+    mult: num(0, 10),
+    add: num(-1e6, 1e6),
+    scope: nullable(str),
+    untilTick: nullable(tick),
+    eventId: str,
+    label: str,
+    appliedTick: tick,
+  })
+  const parcelReport = obj({
+    tick,
+    parcelId: id,
+    label: str,
+    path: arr(obj({ tick })),
+  })
+  const eventReport = obj({
+    kind: oneOf(['event']),
+    tick,
+    eventId: str,
+    title: str,
+    option: str,
+    livesLeft: count,
+  })
+  const lostLife: Check = (v, path, a) =>
+    (isObj(v) && v.kind === 'event' ? eventReport : parcelReport)(v, path, a)
+
   const shape = obj({
     // Build 2 only (plan.md R9): a version-1 state never loads.
     version: oneOf([STATE_VERSION]),
@@ -433,6 +538,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
         collectedThisLeg: bool,
         purchasePrice: price,
         boughtTick: tick,
+        'absentUntilTick?': tick,
       }),
     ),
     employees: arr(
@@ -450,6 +556,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
         affinity,
         look,
         star: bool,
+        'absentUntilTick?': tick,
       }),
     ),
     applicants: obj({
@@ -464,11 +571,14 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       offer: nullable(quest),
       active: nullable(quest),
       nextOfferTick: tick,
+      jobReadyTick: tick,
       ultimateNextTick: tick,
       lastOfferDay: nullable(count),
       history: arr(questRecord),
       vouchers: arr(checkerId),
     }),
+    events,
+    modifiers: arr(modifier),
     parcels: rec(
       obj({
         id,
@@ -510,6 +620,8 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
         'bay?': int(0, 1000),
         'sorted?': obj({ by: id, name: str, pct: int(0, 100) }),
         'touchedTick?': tick,
+        'source?': oneOf(['event']),
+        'handOffTick?': tick,
       }),
     ),
     lane: obj({
@@ -584,10 +696,10 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       minutes: arr(obj({ min: count, tick })),
       victoryTick: nullable(tick),
       cleared: count,
+      livesLost: count,
+      lost: count,
     }),
-    lastLostLife: nullable(
-      obj({ tick, parcelId: id, label: str, path: arr(obj({ tick })) }),
-    ),
+    lastLostLife: nullable(lostLife),
     nextId: obj({
       parcel: id,
       vehicle: id,
@@ -595,6 +707,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       checker: id,
       applicant: id,
       quest: id,
+      modifier: id,
     }),
   })
   if (!shape(state, 'state', add) || out.length > 0) return out

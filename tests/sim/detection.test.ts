@@ -88,9 +88,15 @@ function runParcels(
 describe('§6.3 series compounding', () => {
   it('inspector alone vs metal = 0.85; inspector + Metal detector = 0.97 (the HUD reads 97 %)', () => {
     const sim = quietSim(1)
-    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(0.85, 10)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], null)).toBeCloseTo(
+      0.85,
+      10,
+    )
     openingA(sim)
-    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(0.97, 10)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], null)).toBeCloseTo(
+      0.97,
+      10,
+    )
     expect(createViewSim(sim).laneStats().detectionPct).toBe(97)
   })
 
@@ -99,9 +105,15 @@ describe('§6.3 series compounding', () => {
     placeMachine(sim, 'metal_detector', 'slot1')
     placeMachine(sim, 'shaky_shaker', 'slot2')
     placeMachine(sim, 'battery_checker', 'slot3')
-    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(0.856, 3)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], null)).toBeCloseTo(
+      0.856,
+      3,
+    )
     placeMachine(sim, 'xray', 'slot4')
-    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(0.957, 3)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], null)).toBeCloseTo(
+      0.957,
+      3,
+    )
   })
 
   it('a 3-inspector desk is still 0.85: stations buy throughput, never detection', () => {
@@ -110,7 +122,10 @@ describe('§6.3 series compounding', () => {
     hireInspector(sim)
     hireInspector(sim)
     expect(laneNode(sim.state.lane, 'slot1')?.stations).toHaveLength(3)
-    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(deskP, 10)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], null)).toBeCloseTo(
+      deskP,
+      10,
+    )
   })
 
   it('desk stations share one roll: 400 metal malware through a 3-inspector desk → one draw each, ~85 % flagged (not 1 − 0.15³)', () => {
@@ -398,7 +413,10 @@ describe('M6 per-inspector detection and charisma (spec-build2 §2.3, Q-B2-5)', 
     expect(c.stations).toBe(3)
     expect(c.pMatch).toBe(0.8767)
     expect(c.pOther).toBe(0.8767)
-    expect(laneCatchRate(sim.state.lane, 'metal')).toBeCloseTo(0.8767, 10)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], null)).toBeCloseTo(
+      0.8767,
+      10,
+    )
     expect(createViewSim(sim).laneStats().detectionPct).toBe(88)
     const people = createViewSim(sim).people()
     expect(people.map((x) => x.numbers.pEff)).toEqual([0.89, 0.89, 0.85])
@@ -458,7 +476,7 @@ describe('M6 per-inspector detection and charisma (spec-build2 §2.3, Q-B2-5)', 
       { eye: 3, pace: 3, charisma: 0 },
       { eye: 3, pace: 3, charisma: 0 },
     )
-    expect(laneRatePerMin(sim.state.lane, sim.data)).toBeCloseTo(45, 10)
+    expect(laneRatePerMin(sim.state.lane, sim.data, null)).toBeCloseTo(45, 10)
     const b = quietSim(1)
     b.state.economy.balance = 1000
     expect(
@@ -469,6 +487,6 @@ describe('M6 per-inspector detection and charisma (spec-build2 §2.3, Q-B2-5)', 
     expect(
       laneNode(b.state.lane, 'slot1')!.stations.map((st) => st.processTicks),
     ).toEqual([30, 50])
-    expect(laneRatePerMin(b.state.lane, b.data)).toBeCloseTo(32, 10)
+    expect(laneRatePerMin(b.state.lane, b.data, null)).toBeCloseTo(32, 10)
   })
 })

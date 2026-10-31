@@ -21,6 +21,7 @@
 
 import type { GameData, VehicleTypeDef } from '../data/types.ts'
 import { machineChecker } from './detection.ts'
+import { priceOf } from './modifiers.ts'
 import type { Sim } from './sim.ts'
 import type {
   Applicant,
@@ -38,6 +39,12 @@ import type {
   Zone,
 } from './types.ts'
 import { laneNode } from './types.ts'
+import {
+  debugOfferEvent,
+  debugOfferJob,
+  decideEvent,
+  resolveJobCommand,
+} from './systems/deck.ts'
 import { applyRush } from './systems/dispatch.ts'
 import { buyDock } from './systems/docks.ts'
 import { debugMalwareDelivery } from './systems/economy.ts'
@@ -60,14 +67,9 @@ import {
   restartSorterClock,
   ROLES,
 } from './systems/people.ts'
-import {
-  abandonQuest,
-  acceptQuest,
-  debugOfferQuest,
-  declineQuest,
-} from './systems/quests.ts'
+import { abandonQuest, acceptQuest, declineQuest } from './systems/quests.ts'
 import { playerGraceTicks, SORTER_ARM_ID } from './systems/sorter.ts'
-import { parkingTile, sellVehicle } from './systems/vehicles.ts'
+import { createVehicle, sellVehicle } from './systems/vehicles.ts'
 
 export type Command =
   /** M6: applicantId = the picked driver applicant, null = "Hire later" (no driver, `inactive`). */
@@ -113,6 +115,10 @@ export type Command =
   | { kind: 'debugOfferQuest'; templateId: string }
   /** Debug builds (ViewSim.debug.forceOverseasMalware): hand a malware parcel off at a live hub now. */
   | { kind: 'debugOverseasMalware'; hub: string }
+  /** Build 3 (B3 §6): answer the open card with option `option` (its index). */
+  | { kind: 'decideEvent'; eventId: string; option: number }
+  /** Debug builds (ViewSimDebug.offerEvent, ?event=): open this deck card now (queued behind an open one). */
+  | { kind: 'debugOfferEvent'; eventId: string }
 
 export type CommandKind = Command['kind']
 export type CommandOf<K extends CommandKind> = Extract<Command, { kind: K }>
@@ -141,6 +147,10 @@ export const FAIL_REASONS = [
   'desk-locked',
   'quest-active',
   'quest-expired',
+  'no-event',
+  'bad-option',
+  'option-hidden',
+  'cant-afford',
   'invalid',
 ] as const
 export type FailReason = (typeof FAIL_REASONS)[number]
@@ -196,6 +206,8 @@ const FIELDS: { [K in CommandKind]: Record<string, FieldType> } = {
   debugForceLevel: { level: 'int' },
   debugOfferQuest: { templateId: 'string' },
   debugOverseasMalware: { hub: 'string' },
+  decideEvent: { eventId: 'string', option: 'int' },
+  debugOfferEvent: { eventId: 'string' },
 }
 
 /** Exactly one of {nodeId: string}, {station: 'hold'}, {vehicleId: safe int}. */
@@ -253,17 +265,19 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
       if (!a) return fail('no-applicant')
     }
     const fee = a ? hireFeeOf(sim.data, a, def.id) : 0
-    if (sim.state.economy.balance < def.price + fee) {
+    // Build 3 (B3 §3.6): the vehiclePrice modifier's price, stored as paid.
+    const price = priceOf(sim, 'vehicle', def.price)
+    if (sim.state.economy.balance < price + fee) {
       return fail('insufficient-funds')
     }
     // Spec-build2 §2.5: the picked driver drives it; "Hire later" parks it
     // `inactive` (No driver) until one is hired from the Garage row.
-    const v = createVehicle(sim, def, a !== null)
-    sim.debit(def.price, 'purchase')
+    const v = createVehicle(sim, def, a !== null, price)
+    sim.debit(price, 'purchase')
     if (def.id === 'truck' && sim.state.stats.truckTick === null) {
       sim.state.stats.truckTick = sim.state.tick
     }
-    sim.emit('vehicle:bought', { id: v.id })
+    sim.emit('vehicle:bought', { id: v.id, free: false })
     if (a) {
       const e = hireApplicant(sim, a, { vehicleId: v.id }, v)
       return { ok: true, vehicleId: v.id, employeeId: e.id }
@@ -327,7 +341,10 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     // M7: a quest voucher pays for it (price 0, the first matching one).
     const vouchers = sim.state.quests.vouchers
     const voucher = vouchers.indexOf(def.id)
-    if (voucher < 0 && sim.state.economy.balance < def.price) {
+    // Build 3 (B3 §3.6): the machinePrice modifier's price, stored as paid
+    // (the Sorter Arm above keeps its list price, D-21).
+    const price = priceOf(sim, 'machine', def.price)
+    if (voucher < 0 && sim.state.economy.balance < price) {
       return fail('insufficient-funds')
     }
     const checker: Checker = machineChecker(
@@ -338,9 +355,11 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     if (voucher >= 0) {
       vouchers.splice(voucher, 1)
       checker.price = 0 // a gift: removing it refunds nothing
+    } else {
+      checker.price = price
     }
     placeFixture(sim, node, { kind: 'machine', checker })
-    if (voucher < 0) sim.debit(def.price, 'purchase')
+    if (voucher < 0) sim.debit(price, 'purchase')
     sim.emit('lane:fixturePlaced', {
       nodeId: node.id,
       fixture: structuredClone(node.fixture as Fixture),
@@ -536,12 +555,19 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
     return OK
   },
 
+  // Build 3 (B3 §3.1, D-18): a quest a job card holds is that card's decision.
   acceptQuest(sim, cmd) {
-    return acceptQuest(sim, cmd.questId)
+    return (
+      resolveJobCommand(sim, cmd.questId, 'accept') ??
+      acceptQuest(sim, cmd.questId)
+    )
   },
 
   declineQuest(sim, cmd) {
-    return declineQuest(sim, cmd.questId)
+    return (
+      resolveJobCommand(sim, cmd.questId, 'decline') ??
+      declineQuest(sim, cmd.questId)
+    )
   },
 
   abandonQuest(sim) {
@@ -576,11 +602,19 @@ export const COMMAND_HANDLERS: { [K in CommandKind]: Handler<K> } = {
   },
 
   debugOfferQuest(sim, cmd) {
-    return debugOfferQuest(sim, cmd.templateId)
+    return debugOfferJob(sim, cmd.templateId)
   },
 
   debugOverseasMalware(sim, cmd) {
     return debugOverseasMalware(sim, cmd.hub)
+  },
+
+  decideEvent(sim, cmd) {
+    return decideEvent(sim, cmd.eventId, cmd.option)
+  },
+
+  debugOfferEvent(sim, cmd) {
+    return debugOfferEvent(sim, cmd.eventId)
   },
 }
 
@@ -641,53 +675,4 @@ export function deskChecker(
     price: row?.price ?? 0,
     boughtTick: state.tick,
   }
-}
-
-/**
- * §4.1 Buy: pops in on the lot, home zone 'any' — `idle_lot` when a driver
- * is about to be seated (people.ts hireApplicant), else `inactive` with no
- * driver ("Hire later", spec-build2 §2.5).
- */
-function createVehicle(
-  sim: Sim,
-  def: VehicleTypeDef,
-  withDriver: boolean,
-): Vehicle {
-  const s = sim.state
-  const usedNames = s.vehicles.map((v) => v.name)
-  let n = 1
-  while (usedNames.includes(`${def.name} ${n}`)) n += 1
-  const id = s.nextId.vehicle
-  s.nextId.vehicle += 1
-  const tile = parkingTile(sim, id)
-  const pos = { tx: tile.x, ty: tile.y }
-  const v: Vehicle = {
-    id,
-    type: def.id,
-    name: `${def.name} ${n}`,
-    driverId: null,
-    nextDriverId: null,
-    state: withDriver ? 'idle_lot' : 'inactive',
-    zone: 'any',
-    pos,
-    prev: { ...pos },
-    heading: 'SE',
-    wheel: 0,
-    path: [],
-    pathIndex: 0,
-    edgeT: 0,
-    stops: [],
-    stopIndex: 0,
-    cargo: [],
-    unitsUsed: 0,
-    reserved: [],
-    dockId: null,
-    waitUntilTick: null,
-    rushBuildingId: null,
-    collectedThisLeg: false,
-    purchasePrice: def.price,
-    boughtTick: s.tick,
-  }
-  s.vehicles.push(v)
-  return v
 }

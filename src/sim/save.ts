@@ -3,7 +3,7 @@
 // or storage: src/boot/autosave.ts supplies savedAt / build / onboarding,
 // picks the key (SAVE_KEY, or SAVE_KEY + ':cfg:<name>' under ?config=) and
 // does the localStorage I/O. No migrations (R9): a payload loads only when
-// version === SAVE_VERSION (types.ts STATE_VERSION, 5 since M8; the key stays
+// version === SAVE_VERSION (types.ts STATE_VERSION, 6 since M11; the key stays
 // `pm.save.v2` — it names the build-2 save) and its dataHash
 // matches the running data tables (isCompatible); otherwise the Title
 // discards it — a build-1 save (`pm.save.v1`, version 1) included.

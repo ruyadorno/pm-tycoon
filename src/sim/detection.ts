@@ -25,7 +25,9 @@
 // and (M6) the inspector who missed it and the 5-eye "what if".
 
 import type { CheckerDef, GameData, StrainId } from '../data/types.ts'
+import { effChecker, modAdd, type ModCtx } from './modifiers.ts'
 import type { Sim } from './sim.ts'
+import { effectiveP } from './systems/people.ts'
 import type {
   Checker,
   Lane,
@@ -37,7 +39,13 @@ import type {
   Strain,
   TraceEntry,
 } from './types.ts'
-import { laneNode, liveSlotIds, TICKS_PER_S, ticksFromS } from './types.ts'
+import {
+  isAbsent,
+  laneNode,
+  liveSlotIds,
+  TICKS_PER_S,
+  ticksFromS,
+} from './types.ts'
 
 // §6.3 rates -------------------------------------------------------------------------
 
@@ -69,11 +77,15 @@ export function compound(ps: readonly number[]): number {
 export function laneCatchRate(
   lane: Lane,
   strain: Strain,
-  extra: readonly Checker[] = [],
+  extra: readonly Checker[],
+  ctx: ModCtx | null,
 ): number {
+  // Build 3 (B3 §3.6, D-5): with a ctx every machine checker — the lane's
+  // and the `extra` what-ifs — rolls with the machineP modifier (effChecker).
+  const eff = (c: Checker): Checker => (ctx === null ? c : effChecker(ctx, c))
   return compound([
-    ...activeCheckers(lane).map(({ c }) => checkerP(c, strain)),
-    ...extra.map((c) => checkerP(c, strain)),
+    ...activeCheckers(lane).map(({ c }) => checkerP(eff(c), strain)),
+    ...extra.map((c) => checkerP(eff(c), strain)),
   ])
 }
 
@@ -99,7 +111,11 @@ export function announcedStrains(state: SimState, data: GameData): Strain[] {
  * Σ stations 1 / processS (each inspector at its own pace, spec-build2 §2.3),
  * capped by the loading docks (dockUnloadPerS each).
  */
-export function laneRatePerMin(lane: Lane, data: GameData): number {
+export function laneRatePerMin(
+  lane: Lane,
+  data: GameData,
+  _ctx: ModCtx | null,
+): number {
   const dockCap = lane.docks.length * data.vehicles.dockUnloadPerS * 60
   let rate = dockCap
   for (const { node, c } of activeCheckers(lane)) {
@@ -388,16 +404,16 @@ export function lostLifeReport(
     counterRate =
       strain === null || counter === null
         ? null
-        : compound([...ps, checkerP(counter, strain)])
+        : compound([...ps, checkerP(effChecker(sim, counter), strain)])
   } else {
-    laneRate = strain === null ? 0 : laneCatchRate(lane, strain)
+    laneRate = strain === null ? 0 : laneCatchRate(lane, strain, [], sim)
     counterOwned =
       counterMachineId !== null &&
       activeCheckers(lane).some(({ c }) => c.defId === counterMachineId)
     counterRate =
       strain === null || counter === null
         ? null
-        : laneCatchRate(lane, strain, [counter])
+        : laneCatchRate(lane, strain, [counter], sim)
   }
   // M6 (spec-build2 §2.3): the inspector whose desk roll missed it, and the
   // faced rate with a 5-eye inspector in that seat instead (design D14).
@@ -419,7 +435,7 @@ export function lostLifeReport(
       : null
   let inspectorRate: number | null = null
   if (faced !== null && strain !== null && missed && missedBy) {
-    const p5 = fiveEyeP(s, data, missedBy.employeeId, missedBy.nodeId)
+    const p5 = fiveEyeP(sim, missedBy.employeeId, missedBy.nodeId)
     const e = s.employees.find((x) => x.id === missedBy.employeeId)
     const eye = e?.pips.eye
     const better = eye !== undefined ? eye < 5 : missedBy.p < p5
@@ -462,17 +478,13 @@ export function lostLifeReport(
 }
 
 /**
- * A 5-eye inspector's effective p in `employeeId`'s seat now: p[eye 5] + the
- * charisma bonus of the other active inspectors at that desk (the desk that
- * seats them, else the one at `nodeId`), ≤ pCap, 4 dp (people.ts effectiveP).
+ * A 5-eye inspector's effective p in `employeeId`'s seat now (people.ts
+ * effectiveP with eye 5): the charisma bonus of the other active, on-duty
+ * inspectors at that desk (the desk that seats them, else the one at
+ * `nodeId` — syncDesk's colleague filter) and the inspectorP modifier fold.
  */
-function fiveEyeP(
-  s: SimState,
-  data: GameData,
-  employeeId: number,
-  nodeId: string,
-): number {
-  const r = data.employees.roles.inspector
+function fiveEyeP(sim: Sim, employeeId: number, nodeId: string): number {
+  const s = sim.state
   const desk =
     s.lane.nodes.find(
       (n) =>
@@ -480,15 +492,16 @@ function fiveEyeP(
         (n.fixture.inspectorIds.includes(employeeId) ||
           n.fixture.walkedOutIds.includes(employeeId)),
     ) ?? laneNode(s.lane, nodeId)
-  let p = r.p[4] ?? 0
-  if (desk?.fixture?.kind === 'desk') {
-    for (const id of desk.fixture.inspectorIds) {
-      if (id === employeeId) continue
-      const c = s.employees.find((x) => x.id === id)
-      if (c?.active) p += r.charismaBonus[c.pips.charisma ?? 0] ?? 0
-    }
-  }
-  return Math.round(Math.min(r.pCap, p) * 1e4) / 1e4
+  const colleagues =
+    desk?.fixture?.kind === 'desk'
+      ? desk.fixture.inspectorIds.flatMap((id) => {
+          if (id === employeeId) return []
+          const c = s.employees.find((x) => x.id === id)
+          return c?.active && !isAbsent(c, s.tick) ? [c.pips] : []
+        })
+      : []
+  // Only the eye of the seat's own pips counts (p[eye 5]).
+  return effectiveP(sim.data, { eye: 5 }, colleagues, modAdd(sim, 'inspectorP'))
 }
 
 /**

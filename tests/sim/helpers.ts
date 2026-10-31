@@ -6,13 +6,19 @@ import { applyConfig, buildGameData } from '../../src/data/index.ts'
 import type { GameData } from '../../src/data/types.ts'
 import type { CommandResult } from '../../src/sim/commands.ts'
 import { onSimEvent } from '../../src/sim/events.ts'
-import type { SimEventName, SimEventPayloads } from '../../src/sim/events.ts'
-import { Sim } from '../../src/sim/sim.ts'
+import type {
+  LifeLostPayload,
+  SimEventName,
+  SimEventPayloads,
+} from '../../src/sim/events.ts'
+import { replay, Sim } from '../../src/sim/sim.ts'
+import { cardOptions, DECK_OFF_TICK } from '../../src/sim/systems/deck.ts'
 import type {
   Affinity,
   Applicant,
   BuildingId,
   DistrictId,
+  LostLifeReport,
   Parcel,
   Pips,
   Quest,
@@ -21,7 +27,12 @@ import type {
   Vehicle,
   VehicleType,
 } from '../../src/sim/types.ts'
-import { liveSlotIds, laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
+import {
+  liveSlotIds,
+  laneNode,
+  TICKS_PER_S,
+  ticksFromS,
+} from '../../src/sim/types.ts'
 import { holdBays } from '../../src/sim/systems/lane.ts'
 import { freshName, hireFeeOf } from '../../src/sim/systems/people.ts'
 import { loadRawData } from '../../tools/sim/load.node.ts'
@@ -41,9 +52,88 @@ export function dataFixture(overrides?: unknown): GameData {
   return buildGameData(applyConfig(loadRawData(), overrides, 'test overrides'))
 }
 
-/** A new game on the shipped (or patched) data. */
+/**
+ * A new game on the shipped (or patched) data, with the event deck off
+ * (build 3 D-8: no automatic card, so nothing holds a policy-less test sim);
+ * `deckOn` opts back in.
+ */
 export function makeSim(seed = 1, overrides?: unknown): Sim {
-  return new Sim(dataFixture(overrides), seed)
+  const sim = new Sim(dataFixture(overrides), seed)
+  sim.state.events.nextDrawTick = DECK_OFF_TICK
+  return sim
+}
+
+// Build 3 event deck helpers (M11; B3 §3, §6) ----------------------------------------
+
+/**
+ * replay() of `sim`'s seed + data + log up to `untilTick` (default now), with
+ * the deck off when `sim` runs without it (makeSim / noOffers: nextDrawTick
+ * at DECK_OFF_TICK — nothing moves it while the deck is off). Call deckOn /
+ * noOffers at tick 0 only: the deck mode is read from the sim's current
+ * nextDrawTick and applied to the replay from tick 0.
+ */
+export function replayOf(sim: Sim, untilTick = sim.state.tick): Sim {
+  const off = sim.state.events.nextDrawTick >= DECK_OFF_TICK
+  return replay(sim.data, sim.state.seed, sim.commandLog, untilTick, (s) => {
+    if (off) s.state.events.nextDrawTick = DECK_OFF_TICK
+  })
+}
+
+/** The deck back on: the first draw at schedule.firstEventS. */
+export function deckOn(sim: Sim): Sim {
+  sim.state.events.nextDrawTick = ticksFromS(
+    sim.data.events.schedule.firstEventS,
+  )
+  return sim
+}
+
+/** Answer the open card with option `option` (throws when refused). */
+export function decideOpen(sim: Sim, option: number): CommandResult {
+  const open = sim.state.events.open
+  if (!open) throw new Error('decideOpen: no open card')
+  const res = sim.dispatch({
+    kind: 'decideEvent',
+    eventId: open.eventId,
+    option,
+  })
+  if (!res.ok && res.applied !== true)
+    throw new Error(`decideOpen ${open.eventId}#${option}: ${res.reason}`)
+  return res
+}
+
+/**
+ * Decide any open card (and a promoted queue entry after it): `default` =
+ * the default option (else the first answerable), `first` = the first
+ * visible, affordable option. Returns how many cards were answered.
+ */
+export function answerCards(sim: Sim, pick: 'default' | 'first'): number {
+  let n = 0
+  for (let guard = 0; guard < 10; guard++) {
+    const open = sim.state.events.open
+    if (!open) return n
+    const opts = cardOptions(sim, open).filter((o) => o.visible && o.affordable)
+    const o =
+      (pick === 'default' ? opts.find((x) => x.default) : undefined) ?? opts[0]
+    if (!o) throw new Error(`answerCards: ${open.eventId} has no answer`)
+    decideOpen(sim, o.index)
+    n += 1
+  }
+  return n
+}
+
+/** state.lastLostLife when it is a parcel's (malware) report, else null (none, or an event's — build 3). */
+export function parcelLoss(sim: Sim): LostLifeReport | null {
+  const l = sim.state.lastLostLife
+  return l === null || l.kind === 'event' ? null : l
+}
+
+/** Every malware `life:lost` payload from now on (an event's life — build 3 — has no parcel). */
+export function collectLost(sim: Sim): LifeLostPayload[] {
+  const out: LifeLostPayload[] = []
+  onSimEvent(sim.events, 'life:lost', (p) => {
+    if (p.cause !== 'event') out.push(structuredClone(p))
+  })
+  return out
 }
 
 export function runTicks(sim: Sim, ticks: number): void {
@@ -442,9 +532,13 @@ export function feeder(
 
 // M7 quest helpers (design-m7 §7) ----------------------------------------------------
 
-/** Push the regular offer scheduler out of reach (tests that offer by hand). */
+/**
+ * Push the regular offer scheduler out of reach (tests that offer by hand);
+ * build 3: the deck too (job cards are its draws).
+ */
 export function noOffers(sim: Sim): Sim {
   sim.state.quests.nextOfferTick = 1e12
+  sim.state.events.nextDrawTick = DECK_OFF_TICK
   return sim
 }
 

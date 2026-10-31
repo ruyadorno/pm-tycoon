@@ -1014,8 +1014,11 @@ test.describe('M2 shots', () => {
       `shots: life:lost after ${w.waitedMs} ms ${JSON.stringify(w.payload?.report ?? null)}`,
     )
     expect(w.ok, 'the cleared malware is delivered').toBe(true)
-    expect(w.payload!.parcelId).toBe(fixture.parcelId)
-    expect(w.payload!.clearedByPlayerAt).not.toBeNull()
+    const lost = w.payload
+    // Build 3: the parcel variant (an event's life has no parcel).
+    if (lost?.cause === 'event') throw new Error('an event took the life')
+    expect(lost!.parcelId).toBe(fixture.parcelId)
+    expect(lost!.clearedByPlayerAt).not.toBeNull()
     expect(
       await settleUntil(page, pm, async () => (await hudCards(page)).lost),
       'the lost-life card opens (600 ms after the loss)',
@@ -3059,12 +3062,15 @@ test.describe('M8 shots', () => {
       (cap) => window.__pm!.waitEvent('life:lost', cap),
       capMs,
     )
+    const lost = w.payload
+    // Build 3: the parcel variant (an event's life has no parcel).
+    if (lost?.cause === 'event') throw new Error('an event took the life')
     console.log(
-      `shots: lost-life-overseas life:lost after ${w.waitedMs} ms ${JSON.stringify(w.payload?.report.path.slice(-3) ?? null)}`,
+      `shots: lost-life-overseas life:lost after ${w.waitedMs} ms ${JSON.stringify(lost?.report.path.slice(-3) ?? null)}`,
     )
     expect(w.ok, 'the handed-off malware clears').toBe(true)
-    expect(w.payload!.parcelId).toBe(fixture.parcelId)
-    expect(w.payload!.report.viaClearance).toBe(true)
+    expect(lost!.parcelId).toBe(fixture.parcelId)
+    expect(lost!.report.viaClearance).toBe(true)
     expect(w.waitedMs).toBe(
       Math.ceil((fixture.lifeLostInS as number) * 10) * 100,
     )

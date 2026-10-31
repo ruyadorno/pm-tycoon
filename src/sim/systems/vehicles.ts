@@ -20,6 +20,7 @@ import { sellRefund } from './economy.ts'
 import { returnToConveyor, returnToShelf } from './lane.ts'
 import { driverNumbers, driverOf } from './people.ts'
 import { mapIndex, sameTile, unitsOf, vehicleTypeDef } from '../map.ts'
+import { modMult } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type { Heading, TileXY, Vehicle } from '../types.ts'
 import { dockNumber, TICKS_PER_S } from '../types.ts'
@@ -52,13 +53,71 @@ export function driverMults(
   return driverNumbers(sim.data, e.pips, e.affinity, v.type)
 }
 
-/** Edge progress per tick (1/MILLI tile); a speed-5 driver in a van: 276. */
+/**
+ * Edge progress per tick (1/MILLI tile); a speed-5 driver in a van: 276.
+ * Build 3 (B3 §3.6): × the speed modifier fold for this vehicle's type.
+ */
 export function speedPerTick(sim: Sim, v: Vehicle): number {
   const mult = driverMults(sim, v).speedMult
+  const mod = modMult(sim, 'speed', v.type)
   return Math.max(
     1,
-    Math.round((typeOf(sim, v).speedTilesPerS * mult * MILLI) / TICKS_PER_S),
+    Math.round(
+      (typeOf(sim, v).speedTilesPerS * mult * mod * MILLI) / TICKS_PER_S,
+    ),
   )
+}
+
+/**
+ * §4.1 Buy: pops in on the lot, home zone 'any' — `idle_lot` when a driver
+ * is about to be seated (people.ts hireApplicant), else `inactive` with no
+ * driver ("Hire later", spec-build2 §2.5). `price` = what was paid (build 3:
+ * the vehiclePrice modifier's price, 0 for an event's gift) — the sell
+ * refund follows it.
+ */
+export function createVehicle(
+  sim: Sim,
+  def: VehicleTypeDef,
+  withDriver: boolean,
+  price: number,
+): Vehicle {
+  const s = sim.state
+  const usedNames = s.vehicles.map((v) => v.name)
+  let n = 1
+  while (usedNames.includes(`${def.name} ${n}`)) n += 1
+  const id = s.nextId.vehicle
+  s.nextId.vehicle += 1
+  const tile = parkingTile(sim, id)
+  const pos = { tx: tile.x, ty: tile.y }
+  const v: Vehicle = {
+    id,
+    type: def.id,
+    name: `${def.name} ${n}`,
+    driverId: null,
+    nextDriverId: null,
+    state: withDriver ? 'idle_lot' : 'inactive',
+    zone: 'any',
+    pos,
+    prev: { ...pos },
+    heading: 'SE',
+    wheel: 0,
+    path: [],
+    pathIndex: 0,
+    edgeT: 0,
+    stops: [],
+    stopIndex: 0,
+    cargo: [],
+    unitsUsed: 0,
+    reserved: [],
+    dockId: null,
+    waitUntilTick: null,
+    rushBuildingId: null,
+    collectedThisLeg: false,
+    purchasePrice: price,
+    boughtTick: s.tick,
+  }
+  s.vehicles.push(v)
+  return v
 }
 
 /** Units of the parcels in `ids` (missing ids count 0). */

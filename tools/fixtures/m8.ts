@@ -48,6 +48,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { loadGameData } from '../sim/load.node.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
+import { assertNoCard, settleCards } from './cards.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import type { Command } from '../../src/sim/commands.ts'
 import { clearingParcels } from '../../src/sim/systems/hubs.ts'
@@ -79,6 +80,7 @@ type Name = 'level-up-3' | 'l3-docks' | 'overseas-malware'
 const NAMES: readonly Name[] = ['level-up-3', 'l3-docks', 'overseas-malware']
 
 function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
+  assertNoCard(sim, name)
   const snap = {
     ...sim.snapshot(),
     fixture: {
@@ -123,11 +125,13 @@ function runPolicy(stop: (sim: Sim) => boolean): {
     policy.step()
     sim.tick()
   }
+  settleCards(sim, policy)
   return {
     sim,
     step: () => {
       policy.step()
       sim.tick()
+      settleCards(sim, policy)
     },
   }
 }

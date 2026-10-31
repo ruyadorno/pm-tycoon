@@ -31,6 +31,8 @@ import type {
   StarApplicantDef,
   StatId,
 } from '../../data/types.ts'
+import type { FireReason } from '../events.ts'
+import { modAdd } from '../modifiers.ts'
 import { Rng } from '../rng.ts'
 import type { Sim } from '../sim.ts'
 import type {
@@ -45,7 +47,7 @@ import type {
   Vehicle,
   VehicleType,
 } from '../types.ts'
-import { TICKS_PER_DAY, ticksFromS } from '../types.ts'
+import { isAbsent, TICKS_PER_DAY, ticksFromS } from '../types.ts'
 import { goIdle, goInactive } from './dispatch.ts'
 import { hasDriver } from './vehicles.ts'
 
@@ -141,17 +143,22 @@ export function driverNumbers(
 
 /**
  * An inspector's p at a desk: own p + charismaBonus of every OTHER active
- * inspector at the same desk (`colleagues`), ≤ pCap, rounded to 4 dp.
+ * inspector at the same desk (`colleagues`) + `extra` (build 3: the
+ * inspectorP modifier fold), at least events.json modifiers.deskPFloor
+ * (D-24), at most pCap, rounded to 4 dp.
  */
 export function effectiveP(
   data: GameData,
   pips: Pips,
   colleagues: readonly Pips[],
+  extra = 0,
 ): number {
   const r = data.employees.roles.inspector
   let p = at(r.p, pip(pips, 'eye') - 1)
   for (const c of colleagues) p += at(r.charismaBonus, pip(c, 'charisma'))
-  return round4(Math.min(r.pCap, p))
+  return round4(
+    Math.min(r.pCap, Math.max(data.events.modifiers.deskPFloor, p + extra)),
+  )
 }
 
 /** $/day (spec-build2 §2.2); a driver's for vehicle class `type` (default bike). */
@@ -459,11 +466,7 @@ function where(e: Employee): {
 }
 
 /** Remove an employee row and emit `worker:fired` (no seat logic). */
-function dropEmployee(
-  sim: Sim,
-  e: Employee,
-  reason: 'fired' | 'replaced' | 'deskRemoved',
-): void {
+export function dropEmployee(sim: Sim, e: Employee, reason: FireReason): void {
   sim.state.employees = sim.state.employees.filter((x) => x.id !== e.id)
   sim.emit('worker:fired', {
     employeeId: e.id,
@@ -495,16 +498,21 @@ function onLot(v: Vehicle): boolean {
  * trip) — then `worker:hired`, the pool topped up, `applicants:refreshed`.
  * Event order: worker:fired (replaced) → money:changed → worker:hired →
  * applicants:refreshed.
+ * Build 3 (M11 critique 10): `opts.fee` overrides the fee (an event's gift
+ * driver: 0, never an overdraft) and `opts.topUp: false` leaves the pool
+ * alone (no top-up draw, no `applicants:refreshed`) for an applicant built
+ * outside the pools.
  */
 export function hireApplicant(
   sim: Sim,
   a: Applicant,
   target: HireTarget,
   vehicle?: Vehicle,
+  opts: { fee?: number; topUp?: boolean } = {},
 ): Employee {
   const s = sim.state
   const data = sim.data
-  const fee = hireFeeOf(data, a, vehicle?.type)
+  const fee = opts.fee ?? hireFeeOf(data, a, vehicle?.type)
   s.applicants[a.role] = s.applicants[a.role].filter((x) => x.id !== a.id)
   const e: Employee = {
     id: s.nextId.employee,
@@ -533,8 +541,10 @@ export function hireApplicant(
     star: e.star,
     rehire: false,
   })
-  topUp(s, data, sim.peopleRng, a.role)
-  sim.emit('applicants:refreshed', { role: a.role, reason: 'hire' })
+  if (opts.topUp !== false) {
+    topUp(s, data, sim.peopleRng, a.role)
+    sim.emit('applicants:refreshed', { role: a.role, reason: 'hire' })
+  }
   return e
 }
 
@@ -627,11 +637,7 @@ export function dropPendingDriver(sim: Sim, v: Vehicle): void {
  * takes over at once, else the vehicle has no driver (on the lot it parks
  * `inactive`; mid-trip it finishes the trip, then parks). No refund.
  */
-export function fireEmployee(
-  sim: Sim,
-  e: Employee,
-  reason: 'fired' | 'replaced' | 'deskRemoved',
-): void {
+export function fireEmployee(sim: Sim, e: Employee, reason: FireReason): void {
   const s = sim.state
   if (e.role === 'inspector') {
     const node = deskNodeOf(s, e.id)
@@ -694,24 +700,34 @@ export function fireEmployee(
  * and the desk checker's readout: stations = n, pMatch = pOther = mean p,
  * decoyFlag = mean, processTicks = round(mean) (display; B2 §2.3 "readout p
  * = mean"). With nobody seated the readout keeps the start-pip numbers.
+ * Build 3 (B3 §3.5, D-10): stations exist only for the ON-DUTY crew — an
+ * absent inspector stays in inspectorIds (active) but has no station (its
+ * parcel goes back like a leaver's) and is nobody's colleague; every p adds
+ * the inspectorP modifier fold (effectiveP `extra`). auditPeople shares the
+ * filter.
  */
 export function syncDesk(sim: SimLike, node: LaneNode): void {
   const f = node.fixture
   if (f?.kind !== 'desk') return
   const s = sim.state
   const data = sim.data
+  const extra = modAdd(sim, 'inspectorP')
+  const onDuty = f.inspectorIds.filter((id) => {
+    const e = employeeById(s, id)
+    return e === null || !isAbsent(e, s.tick)
+  })
   const kept: Station[] = []
   const back: number[] = []
   const byId: Record<string, Station> = {}
   for (const st of node.stations) {
-    if (st.employeeId !== undefined && f.inspectorIds.includes(st.employeeId)) {
+    if (st.employeeId !== undefined && onDuty.includes(st.employeeId)) {
       byId[String(st.employeeId)] ??= st
       if (byId[String(st.employeeId)] === st) continue
     }
     if (st.parcelId !== null) back.push(st.parcelId)
   }
-  const crew = f.inspectorIds.map((id) => employeeById(s, id))
-  f.inspectorIds.forEach((id, i) => {
+  const crew = onDuty.map((id) => employeeById(s, id))
+  onDuty.forEach((id, i) => {
     const st = byId[String(id)] ?? { parcelId: null, doneTick: null }
     const me = crew[i]
     const pips = me?.pips ?? data.employees.start.inspector.pips
@@ -720,7 +736,7 @@ export function syncDesk(sim: SimLike, node: LaneNode): void {
     )
     const own = inspectorNumbers(data, pips)
     st.employeeId = id
-    st.p = effectiveP(data, pips, colleagues)
+    st.p = effectiveP(data, pips, colleagues, extra)
     st.decoyFlag = own.decoyFlag
     st.processTicks = own.processTicks
     kept.push(st)
@@ -742,6 +758,13 @@ export function syncDesk(sim: SimLike, node: LaneNode): void {
   c.pOther = p
   c.decoyFlag = round4(mean(kept.map((st) => st.decoyFlag ?? 0)))
   c.processTicks = Math.round(mean(kept.map((st) => st.processTicks ?? 0)))
+}
+
+/** Re-sync every desk (after an inspectorP modifier or an absence changes). */
+export function resyncDesks(sim: SimLike): void {
+  for (const n of sim.state.lane.nodes) {
+    if (n.fixture?.kind === 'desk') syncDesk(sim, n)
+  }
 }
 
 // The Hold Bay sorter and the wanted list -------------------------------------------------

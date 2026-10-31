@@ -23,6 +23,7 @@
 // it). acceptQuest never appears in the policy's log for a regular quest.
 
 import { describe, expect, it } from 'vitest'
+import { SIM_FEATURES } from '../../src/sim/features.ts'
 import { createPolicy, questPolicyStep } from '../../src/sim/policy.ts'
 import { JOB_ACCEPT } from '../../src/sim/systems/deck.ts'
 import { isRushed } from '../../src/sim/systems/dispatch.ts'
@@ -45,6 +46,7 @@ import {
   quietSim,
   runTicks,
   startQuest,
+  withDecisions,
 } from './helpers.ts'
 
 const data = dataFixture()
@@ -54,7 +56,10 @@ const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 let gateRuns: RunResult[] | null = null
 /** The 10-seed × 30-min competent-policy runs (computed once for this file). */
 function runs(): RunResult[] {
-  gateRuns ??= SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy))
+  // Pass 1 (B3 §2.3): the decision draw off until M14's pass 2 (M12).
+  gateRuns ??= withDecisions(false, () =>
+    SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy)),
+  )
   return gateRuns
 }
 
@@ -317,7 +322,7 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
     expect(n).toBeGreaterThanOrEqual(0)
   }, 120_000)
 
-  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows; M9: + the L4-L5 rows; build 3: the event rows informational until M12) passes by median on these runs; no seed breaks an invariant', () => {
+  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows; M9: + the L4-L5 rows; build 3: pass-1 runs, so the event rows stay informational until M14) passes by median on these runs; no seed breaks an invariant', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -326,6 +331,8 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
         policy: 'competent',
         minutes: 30,
         targets,
+        // The runs are pass 1 (decisions off): so is the gate's feature set.
+        features: { ...SIM_FEATURES, events: false },
         eventPolicy: data.events.policy,
       },
     )

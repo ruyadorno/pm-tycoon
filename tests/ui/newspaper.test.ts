@@ -3,8 +3,10 @@
 // the headline wrapped at 236 px in at most 4 lines, one paper at a time with
 // a short queue, the resting place 8 px above the bottom bar, and the
 // palette-snapped "photo" made for frames larger than the 48×48 box (no GPU
-// scaling of world art, AGENTS.md). Pure helpers only; Phaser is stubbed
-// because the module imports the Button kit.
+// scaling of world art, AGENTS.md). Build 3 M12: the event paper (its
+// category picture, the grey3 box behind it, every event headline in the
+// box). Pure helpers only; Phaser is stubbed because the module imports the
+// Button kit.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -156,6 +158,77 @@ describe('design-m7 §6.7: quest-complete and ★ papers', () => {
       }
     }
     expect(kinds).toEqual(new Set(['quest', 'star']))
+  })
+})
+
+describe('build 3 M12 (B3 §3.4): the event paper', () => {
+  it("event → the card's category picture when the atlas has it, else ic_event", () => {
+    expect(np.newsPicture('event', data, { picture: 'ev_pic_staff' })).toBe(
+      'ev_pic_staff',
+    )
+    expect(np.newsPicture('event', data, { picture: 'no_such_frame' })).toBe(
+      'ic_event',
+    )
+    expect(np.newsPicture('event', data)).toBe('ic_event')
+    for (const c of Object.values(data.events.categories))
+      expect(np.newsPicture('event', data, { picture: c.picture })).toBe(
+        c.picture,
+      )
+  })
+
+  it('the picture box is grey3 behind an ev_pic_* (the darker inset), grey4 behind the rest', () => {
+    expect(np.photoBgFill('ev_pic_weather')).toBe(PALETTE.grey3)
+    expect(np.photoBgFill('ic_event')).toBe(PALETTE.grey4)
+    expect(np.photoBgFill('victory_art')).toBe(PALETTE.grey4)
+    expect(np.photoBgFill(null)).toBe(PALETTE.grey4)
+  })
+
+  it('every event headline (`Title — you chose: Option`, `Title — the story ends`) fits the 236-px box in m5x7', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { eventChoiceLine } = await import('../../src/ui/effectText.ts')
+    const xml = readFileSync(
+      new URL('../../src/assets/m5x7.xml', import.meta.url),
+      'utf8',
+    )
+    const adv = new Map<number, number>()
+    for (const m of xml.matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+      adv.set(Number(m[1]), Number(m[2]))
+    const width = (t: string): number =>
+      [...t].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
+    const longest = (xs: readonly string[]): string =>
+      xs.reduce((a, b) => (width(b) > width(a) ? b : a), '')
+    const district = longest(
+      data.districts.filter((d) => d.kind === 'district').map((d) => d.flavour),
+    )
+    const person = longest(data.puns.peopleNames)
+    const fill = (t: string): string =>
+      t
+        .replaceAll('{district}', district)
+        .replaceAll('{inspector}', person)
+        .replaceAll('{driver}', person)
+        .replaceAll('{sorter}', person)
+        .replaceAll('{vehicle}', 'Truck 12')
+    const heads: string[] = []
+    for (const c of data.events.deck) {
+      if (c.router) continue
+      const title = fill(c.title)
+      heads.push(data.puns.tickerEvent.chainDone.replaceAll('{title}', title))
+      for (const o of c.options ?? [])
+        heads.push(eventChoiceLine(data, title, fill(o.label)))
+    }
+    expect(heads.length).toBeGreaterThan(0)
+    const bad = heads.filter((h) => {
+      const lines = np.wrapHeadline(
+        h,
+        np.HEADLINE_W,
+        np.HEADLINE_MAX_LINES,
+        width,
+      )
+      return (
+        lines.join(' ') !== h || lines.some((l) => width(l) > np.HEADLINE_W)
+      )
+    })
+    expect(bad).toEqual([])
   })
 })
 

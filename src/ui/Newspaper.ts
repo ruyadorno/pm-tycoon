@@ -34,8 +34,11 @@ import { buildingSprite, frameOrNull } from '../render/frames.ts'
 import { Button, TAP_PX } from './Button.ts'
 import type { Layout } from './layout.ts'
 import { addPanel } from './Panel.ts'
-import { addText, ellipsize, textTop } from './text.ts'
+import { addText, textTop, wrapHeadline } from './text.ts'
 import { PALETTE, THEME } from './theme.ts'
+
+/** Moved to text.ts (Phaser-free, shared with effectText; D-M12-8); re-exported for QuestCard and the tests. */
+export { wrapHeadline } from './text.ts'
 
 export const PAPER_W = 300
 export const PAPER_H = 180
@@ -67,7 +70,8 @@ const ALPHA_CUT = 128
 /**
  * M6 `hired`: a ★ applicant joined (spec-build2 §2.5, stars only). M7
  * (design-m7 §6.7): `quest` a quest completed, `star` a quest reward put a
- * ★ applicant in the pool (headlines: questText.newsHeadline).
+ * ★ applicant in the pool (headlines: questText.newsHeadline). Build 3 M12
+ * (B3 §3.4): `event` a newsworthy card decision (its category picture).
  */
 export type NewsKind =
   | 'level'
@@ -77,6 +81,7 @@ export type NewsKind =
   | 'hired'
   | 'quest'
   | 'star'
+  | 'event'
 
 export interface NewsItem {
   kind: NewsKind
@@ -139,8 +144,9 @@ export function starHireHeadline(name: string, role: Role): string {
  * level brings (levels.json warehouseTier → `wh_ext_tN`), the malware parcel,
  * the region's hero building, the worker's idle frame (M6 `hired`: the
  * sorter's own variant for a sorter), M7 `quest`: `ref.picture` when the
- * atlas has it, else `ic_quest`; M7 `star`: `ic_star` (16-px frames are
- * drawn unscaled in the box). Null when the atlas has no such frame (the box
+ * atlas has it, else `ic_quest`; M7 `star`: `ic_star`; build 3 `event`:
+ * `ref.picture` (the card's `ev_pic_<category>`) when the atlas has it, else
+ * `ic_event` (16-px frames are drawn unscaled in the box). Null when the atlas has no such frame (the box
  * then stays empty).
  */
 export function newsPicture(
@@ -186,7 +192,21 @@ export function newsPicture(
       )
     case 'star':
       return frameOrNull('ic_star')
+    case 'event':
+      return (
+        (ref.picture ? frameOrNull(ref.picture) : null) ??
+        frameOrNull('ic_event')
+      )
   }
+}
+
+/**
+ * The picture box's fill (build 3 M12, art-todo): grey3 behind an event's
+ * category picture (`ev_pic_*`: the EventCard's darker inset, so a cream
+ * picture still reads), grey4 behind everything else.
+ */
+export function photoBgFill(picture: string | null): number {
+  return picture?.startsWith('ev_pic_') ? PALETTE.grey3 : PALETTE.grey4
 }
 
 /** Fit (w, h) inside a `box`-px square keeping the aspect (never upscales). */
@@ -201,46 +221,6 @@ export function fitBox(
     w: Math.max(1, Math.round(w * s)),
     h: Math.max(1, Math.round(h * s)),
   }
-}
-
-/**
- * Word-wrap `text` at `maxW` px into at most `maxLines` lines; words longer
- * than a line stay whole, and text past the last line ends that line with
- * `…`. `measure` is the BitmapText width of a string.
- */
-export function wrapHeadline(
-  text: string,
-  maxW: number,
-  maxLines: number,
-  measure: (s: string) => number,
-): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  const lines: string[] = []
-  let line = ''
-  let i = 0
-  for (; i < words.length; i++) {
-    const w = words[i] as string
-    const next = line ? `${line} ${w}` : w
-    if (!line || measure(next) <= maxW) {
-      line = next
-      continue
-    }
-    lines.push(line)
-    line = w
-    if (lines.length === maxLines) break
-  }
-  if (lines.length < maxLines) {
-    if (line) lines.push(line)
-    return lines
-  }
-  // Out of lines with words left: the last line runs on and is cut with `…`.
-  const rest = [line, ...words.slice(i + 1)].join(' ')
-  lines[maxLines - 1] = ellipsize(
-    `${lines[maxLines - 1] as string} ${rest}`,
-    maxW,
-    measure,
-  )
-  return lines
 }
 
 /**
@@ -704,6 +684,7 @@ export class Newspaper {
     this.headline.setText(lines.join('\n'))
     this.headline.setPosition(hx, BODY_Y - 2)
     this.fillGreek(item.headline, BODY_Y - 2 + lines.length * 14)
+    this.photoBg.setFillStyle(photoBgFill(item.picture))
     this.photo?.destroy()
     this.photo = null
     const pic = item.picture ? this.pictureTexture(item.picture) : null

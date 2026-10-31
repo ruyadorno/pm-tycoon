@@ -13,7 +13,7 @@
 import type { GameData } from '../data/types.ts'
 import type { BuildingId, DistrictId, QuestReward } from '../sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../sim/types.ts'
-import type { OpenCardView, QuestsView, QuestView } from '../sim/view-api.ts'
+import type { QuestsView, QuestView } from '../sim/view-api.ts'
 import { rewardSummary } from '../sim/view-api.ts'
 import { formatClock, formatMoney } from './text.ts'
 
@@ -31,32 +31,6 @@ export const CROSS = '✕'
 export const JOB_WAITING_TEXT = 'waiting for you'
 
 export type QuestTone = 'light' | 'warn' | 'danger'
-
-/**
- * Build 3 interim (M11, D-18 + review deck-1): the M11 HUD has no EventCard,
- * so an open deck card that is not a job card (the rescue's loaner, a
- * `?event=` / debug.offerEvent card — the sim holds on it, B3 §6) is answered
- * by the HUD with its default option when shown and affordable, else the
- * first affordable one, through ViewSim.event.decide (a logged command, so
- * the replay stays exact), and told on the ticker as `<title>: <lines>`.
- * Null for no card, a job card (the QuestCard answers those) or a card with
- * no answerable option. M12's EventCard replaces it.
- */
-export function interimCardAnswer(
-  open: OpenCardView | null,
-): { eventId: string; index: number; line: string } | null {
-  if (open === null || open.kind === 'job') return null
-  const ok = open.options.filter((o) => o.affordable)
-  const pick = ok.find((o) => o.default) ?? ok[0]
-  if (pick === undefined) return null
-  const what = pick.lines.map((l) => l.text).filter((t) => t !== '')
-  const said = what.length > 0 ? what.join(', ') : pick.label
-  return {
-    eventId: open.eventId,
-    index: pick.index,
-    line: `${open.title}: ${said}`,
-  }
-}
 
 const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`

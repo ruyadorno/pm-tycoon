@@ -568,13 +568,17 @@ export class HireSheet {
     return m.fee + this.buyPrice()
   }
 
-  private buyPrice(): number {
+  /**
+   * The vehicle's price in the buy flow (0 otherwise): B3 §3.6 — what
+   * buyVehicle will charge now (ViewSim.priceOf, a vehiclePrice modifier
+   * included), so the cards, `Hire later` and the cost check agree with it.
+   */
+  buyPrice(): number {
     const t = this.opts.target
     if (!('buyType' in t)) return 0
-    return (
-      this.opts.vs.data.vehicles.types.find((x) => x.id === t.buyType)?.price ??
-      0
-    )
+    const vs = this.opts.vs
+    const def = vs.data.vehicles.types.find((x) => x.id === t.buyType)
+    return def ? vs.priceOf('vehicle', def.price) : 0
   }
 
   /** False once the target is gone (sold vehicle, removed desk) or at game over. */

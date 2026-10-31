@@ -33,7 +33,11 @@ import {
 } from '../../src/sim/systems/payroll.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import type { CardOption } from '../../src/sim/systems/deck.ts'
-import { cardOptions, DECK_OFF_TICK } from '../../src/sim/systems/deck.ts'
+import {
+  cardOptions,
+  DECK_OFF_TICK,
+  optionLines,
+} from '../../src/sim/systems/deck.ts'
 import type { OpenCard } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY } from '../../src/sim/types.ts'
 import {
@@ -1047,6 +1051,124 @@ describe('the policy’s choice (ties → the default, then the lowest index; th
       label: 'Skip',
       default: true,
     })
+  })
+})
+
+describe('M12 review: per-vehicle prices, driverless vehicles, the poach tie', () => {
+  const drivers = (sim: Sim) =>
+    sim.state.employees.filter((e) => e.role === 'driver')
+
+  it('deck-1: a costPerVehicle option is priced at each × the fleet — greyed while short (never clamped to a free upgrade), its line names the count, decide debits it once', () => {
+    const sim = makeSim(1)
+    buy(sim, 'bike')
+    buy(sim, 'bike')
+    buy(sim, 'bike')
+    sim.state.economy.balance = 100
+    const c = open(sim, 'ev_staff_radio')
+    const [buyIt, no] = cardOptions(sim, c)
+    expect(buyIt).toMatchObject({
+      label: 'Buy them',
+      cost: 120,
+      perVehicle: { each: 40 },
+      affordable: false,
+    })
+    expect(no).toMatchObject({ cost: 0, affordable: true, default: true })
+    expect(optionLines(sim, c, buyIt!)[0]).toEqual({
+      text: '−$120 ($40 × 3 vehicles)',
+      tone: 'cost',
+    })
+    // The policy never counts an unaffordable price as a cheap upgrade.
+    expect(pickOf(sim, c)).toBe('No')
+    const energy = drivers(sim).map((e) => e.pips.energy)
+    expect(
+      sim.dispatch({ kind: 'decideEvent', eventId: c.eventId, option: 0 }),
+    ).toEqual({ ok: false, reason: 'cant-afford' })
+    expect(sim.state.economy.balance).toBe(100)
+    expect(drivers(sim).map((e) => e.pips.energy)).toEqual(energy)
+    sim.state.economy.balance = 130
+    expect(scores(sim, c)['Buy them']).toBe(-120 + 3 * W.pips.energy!)
+    expect(
+      sim.dispatch({ kind: 'decideEvent', eventId: c.eventId, option: 0 }).ok,
+    ).toBe(true)
+    expect(sim.state.economy.balance).toBe(10)
+    expect(drivers(sim).map((e) => e.pips.energy)).toEqual(
+      energy.map((x) => Math.min(5, (x ?? 0) + 1)),
+    )
+  })
+
+  it('deck-2: a driver a card took (the poach) and a driverless gift (the buy-out van) each get the best driver applicant on the next policy step', () => {
+    const sim = makeSim(1)
+    buy(sim, 'bike')
+    buy(sim, 'bike')
+    sim.state.economy.balance = 1000
+    const poach = open(sim, 'ev_cust_rival_poach')
+    const quitter = poach.pick!.id
+    const bike = sim.state.vehicles.find((v) => v.driverId === quitter)!
+    expect(
+      sim.dispatch({ kind: 'decideEvent', eventId: poach.eventId, option: 1 })
+        .ok,
+    ).toBe(true)
+    expect(bike.driverId).toBeNull()
+    expect(bike.state).toBe('inactive')
+    const trouble = open(sim, 'ev_cust_rival_trouble')
+    expect(
+      sim.dispatch({ kind: 'decideEvent', eventId: trouble.eventId, option: 0 })
+        .ok,
+    ).toBe(true)
+    const van = sim.state.vehicles.find((v) => v.type === 'van')!
+    expect(van.driverId).toBeNull()
+    sim.state.economy.balance = 1000
+    const policy = createPolicy(sim, 'competent')
+    policy.step()
+    policy.dispose?.()
+    expect(bike.driverId).not.toBeNull()
+    expect(bike.driverId).not.toBe(quitter)
+    expect(van.driverId).not.toBeNull()
+    expect(bike.state).not.toBe('inactive')
+    expect(van.state).not.toBe('inactive')
+    const hires = sim.commandLog
+      .map((e) => e.cmd)
+      .filter((cmd) => cmd.kind === 'hire' && cmd.role === 'driver')
+    expect(hires.map((cmd) => (cmd as { target: unknown }).target)).toEqual([
+      { vehicleId: bike.id },
+      { vehicleId: van.id },
+    ])
+  })
+
+  it('deck-2: short of the fee + buffer, or with no applicant, the vehicle waits (never a refused hire)', () => {
+    const sim = makeSim(1)
+    buy(sim, 'bike')
+    buy(sim, 'bike')
+    sim.state.economy.balance = 1000
+    const poach = open(sim, 'ev_cust_rival_poach')
+    sim.dispatch({ kind: 'decideEvent', eventId: poach.eventId, option: 1 })
+    const idle = sim.state.vehicles.find((v) => v.driverId === null)!
+    sim.state.economy.balance = 0
+    const policy = createPolicy(sim, 'competent')
+    policy.step()
+    expect(idle.driverId).toBeNull()
+    sim.state.applicants.driver = []
+    sim.state.economy.balance = 1000
+    policy.step()
+    expect(idle.driverId).toBeNull()
+    policy.dispose?.()
+    expect(
+      sim.commandLog.some(
+        (e) => e.cmd.kind === 'hire' && e.cmd.role === 'driver',
+      ),
+    ).toBe(false)
+  })
+
+  it('deck-3: the poach is no tie — the bonus is the cheaper answer, so the policy keeps the driver', () => {
+    const sim = makeSim(1)
+    buy(sim, 'bike')
+    sim.state.economy.balance = 500
+    const c = open(sim, 'ev_cust_rival_poach')
+    expect(scores(sim, c)).toEqual({
+      'Match it (a bonus)': -180 + W.chain,
+      'Let them go': -W.staffQuit + W.chain,
+    })
+    expect(pickOf(sim, c)).toBe('Match it (a bonus)')
   })
 })
 

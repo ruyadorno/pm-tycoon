@@ -115,34 +115,35 @@ describe('the draw timer (B3 §3.2)', () => {
     })
   })
 
-  it('band gaps by level: whole seconds inside intervalS[level] (exact bounds), the mean near the middle across seeds; a level past the last key uses it', () => {
-    for (let level = 1; level <= 5; level++) {
-      const [lo, hi] = drawBand(data, level)
-      expect([lo, hi]).toEqual(sch.intervalS[String(level)])
-      const gaps: number[] = []
-      for (const seed of [1, 2, 3, 4]) {
-        const sim = playing(seed, NO_JOBS)
-        sim.state.level.level = level
-        sim.state.economy.victory = true // no Golden Release window at L5
-        for (let i = 0; i < 60; i++) {
-          sim.state.events.nextDrawTick = sim.state.tick + 1
-          sim.tick()
-          gaps.push(sim.state.events.nextDrawTick - sim.state.tick)
+  it('band gaps by level: whole seconds inside intervalS[level] (exact bounds), the mean near the middle across seeds; a level past the last key uses it', () =>
+    withEvents(false, () => {
+      for (let level = 1; level <= 5; level++) {
+        const [lo, hi] = drawBand(data, level)
+        expect([lo, hi]).toEqual(sch.intervalS[String(level)])
+        const gaps: number[] = []
+        for (const seed of [1, 2, 3, 4]) {
+          const sim = playing(seed, NO_JOBS)
+          sim.state.level.level = level
+          sim.state.economy.victory = true // no Golden Release window at L5
+          for (let i = 0; i < 60; i++) {
+            sim.state.events.nextDrawTick = sim.state.tick + 1
+            sim.tick()
+            gaps.push(sim.state.events.nextDrawTick - sim.state.tick)
+          }
+          expect(sim.state.events.stats.blanks).toBe(60)
         }
-        expect(sim.state.events.stats.blanks).toBe(60)
+        for (const g of gaps) {
+          expect(g % 10).toBe(0)
+          expect(g).toBeGreaterThanOrEqual(ticksFromS(lo))
+          expect(g).toBeLessThanOrEqual(ticksFromS(hi))
+        }
+        const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length
+        const mid = ticksFromS((lo + hi) / 2)
+        expect(Math.abs(mean - mid)).toBeLessThan(0.08 * mid)
+        expect(new Set(gaps).size).toBeGreaterThan((hi - lo) / 2)
       }
-      for (const g of gaps) {
-        expect(g % 10).toBe(0)
-        expect(g).toBeGreaterThanOrEqual(ticksFromS(lo))
-        expect(g).toBeLessThanOrEqual(ticksFromS(hi))
-      }
-      const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length
-      const mid = ticksFromS((lo + hi) / 2)
-      expect(Math.abs(mean - mid)).toBeLessThan(0.08 * mid)
-      expect(new Set(gaps).size).toBeGreaterThan((hi - lo) / 2)
-    }
-    expect(drawBand(data, 9)).toEqual(sch.intervalS['5'])
-  })
+      expect(drawBand(data, 9)).toEqual(sch.intervalS['5'])
+    }))
 
   it('a drawn card restarts the timer when it closes (closeTick + its gap); links, the rescue and debug cards leave nextDrawTick alone', () => {
     // A drawn job card, closed 100 ticks after it opened (a policy keeps the sim ticking).
@@ -190,50 +191,52 @@ describe('the draw timer (B3 §3.2)', () => {
 })
 
 describe('quiet rules and the queue (B3 §3.2; critique 15, 30)', () => {
-  it('the first firstEventS: a draw due earlier waits until 200 s', () => {
-    const sim = deckOn(quietSim(1, NO_JOBS))
-    sim.state.events.nextDrawTick = 100
-    runTicks(sim, FIRST - 1)
-    expect(sim.state.events.stats.blanks).toBe(0)
-    runTicks(sim, 1)
-    expect(sim.state.events.stats.blanks).toBe(1)
-  })
+  it('the first firstEventS: a draw due earlier waits until 200 s', () =>
+    withEvents(false, () => {
+      const sim = deckOn(quietSim(1, NO_JOBS))
+      sim.state.events.nextDrawTick = 100
+      runTicks(sim, FIRST - 1)
+      expect(sim.state.events.stats.blanks).toBe(0)
+      runTicks(sim, 1)
+      expect(sim.state.events.stats.blanks).toBe(1)
+    }))
 
-  it('a payday tick: nothing opens while the day step is about to pay payroll; what was due opens the next tick (review policy-1)', () => {
-    const P = payrollTicks(data)
-    const sim = playing(1, NO_JOBS)
-    const payday = Math.ceil((sim.state.tick + 1) / P) * P
-    runTicks(sim, payday - 1 - sim.state.tick)
-    sim.state.events.nextDrawTick = payday
-    runTicks(sim, 1)
-    expect(sim.state.tick).toBe(payday)
-    expect(sim.state.economy.lastPayroll?.tick).toBe(payday)
-    expect(sim.state.events.stats.blanks).toBe(0)
-    runTicks(sim, 1)
-    expect(sim.state.events.stats.blanks).toBe(1)
-    // A link due on a payday waits the same tick.
-    const linked = playing(2, NO_JOBS)
-    const pd = Math.ceil((linked.state.tick + 1) / P) * P
-    runTicks(linked, pd - 1 - linked.state.tick)
-    linked.state.events.scheduled.push({
-      eventId: 'ev_crime_gang_bust',
-      branches: null,
-      dueTick: pd,
-      target: null,
-      pick: null,
-      parentChoice: 'Call the police',
-      chainHeadId: 'ev_crime_gang',
-      depth: 4,
-      bookedTick: pd - 10,
-    })
-    runTicks(linked, 1)
-    expect(linked.state.events.open).toBeNull()
-    runTicks(linked, 1)
-    expect(linked.state.events.open).toMatchObject({
-      eventId: 'ev_crime_gang_bust',
-      openedTick: pd + 1,
-    })
-  })
+  it('a payday tick: nothing opens while the day step is about to pay payroll; what was due opens the next tick (review policy-1)', () =>
+    withEvents(false, () => {
+      const P = payrollTicks(data)
+      const sim = playing(1, NO_JOBS)
+      const payday = Math.ceil((sim.state.tick + 1) / P) * P
+      runTicks(sim, payday - 1 - sim.state.tick)
+      sim.state.events.nextDrawTick = payday
+      runTicks(sim, 1)
+      expect(sim.state.tick).toBe(payday)
+      expect(sim.state.economy.lastPayroll?.tick).toBe(payday)
+      expect(sim.state.events.stats.blanks).toBe(0)
+      runTicks(sim, 1)
+      expect(sim.state.events.stats.blanks).toBe(1)
+      // A link due on a payday waits the same tick.
+      const linked = playing(2, NO_JOBS)
+      const pd = Math.ceil((linked.state.tick + 1) / P) * P
+      runTicks(linked, pd - 1 - linked.state.tick)
+      linked.state.events.scheduled.push({
+        eventId: 'ev_crime_gang_bust',
+        branches: null,
+        dueTick: pd,
+        target: null,
+        pick: null,
+        parentChoice: 'Call the police',
+        chainHeadId: 'ev_crime_gang',
+        depth: 4,
+        bookedTick: pd - 10,
+      })
+      runTicks(linked, 1)
+      expect(linked.state.events.open).toBeNull()
+      runTicks(linked, 1)
+      expect(linked.state.events.open).toMatchObject({
+        eventId: 'ev_crime_gang_bust',
+        openedTick: pd + 1,
+      })
+    }))
 
   it('game over: no link, rescue or draw (the timer keeps its tick)', () => {
     const sim = playing(1, NO_JOBS)
@@ -246,61 +249,64 @@ describe('quiet rules and the queue (B3 §3.2; critique 15, 30)', () => {
     expect(sim.state.events.rescueTick).toBeNull()
   })
 
-  it('afterLevelUpS (15 s) after a level-up', () => {
-    const sim = playing(1, NO_JOBS)
-    const t = sim.state.tick
-    sim.state.level.level = 2
-    sim.state.stats.levelTick['2'] = t
-    sim.state.events.nextDrawTick = t + 1
-    runTicks(sim, CALM - 1)
-    expect(sim.state.events.stats.blanks).toBe(0)
-    runTicks(sim, 1)
-    expect(sim.state.events.stats.blanks).toBe(1)
-    expect(sim.state.tick).toBe(t + CALM)
-  })
+  it('afterLevelUpS (15 s) after a level-up', () =>
+    withEvents(false, () => {
+      const sim = playing(1, NO_JOBS)
+      const t = sim.state.tick
+      sim.state.level.level = 2
+      sim.state.stats.levelTick['2'] = t
+      sim.state.events.nextDrawTick = t + 1
+      runTicks(sim, CALM - 1)
+      expect(sim.state.events.stats.blanks).toBe(0)
+      runTicks(sim, 1)
+      expect(sim.state.events.stats.blanks).toBe(1)
+      expect(sim.state.tick).toBe(t + CALM)
+    }))
 
-  it('the Golden Release: quiet afterLevelUpS after it is offered, or after the last regular quest ended while it waited (D-14, critique 30)', () => {
-    const sim = playing(1, NO_JOBS)
-    sim.state.level.level = 5 // no levelTick row: only the Golden Release window
-    sim.state.events.nextDrawTick = sim.state.tick + 2
-    runTicks(sim, 1)
-    const offered = sim.state.quests.offer!
-    expect(offered.ultimate).toBe(true)
-    runTicks(sim, CALM - 1)
-    expect(sim.state.events.stats.blanks).toBe(0)
-    runTicks(sim, 1)
-    expect(sim.state.events.stats.blanks).toBe(1)
-    expect(sim.state.tick).toBe(offered.offeredTick + CALM)
+  it('the Golden Release: quiet afterLevelUpS after it is offered, or after the last regular quest ended while it waited (D-14, critique 30)', () =>
+    withEvents(false, () => {
+      const sim = playing(1, NO_JOBS)
+      sim.state.level.level = 5 // no levelTick row: only the Golden Release window
+      sim.state.events.nextDrawTick = sim.state.tick + 2
+      runTicks(sim, 1)
+      const offered = sim.state.quests.offer!
+      expect(offered.ultimate).toBe(true)
+      runTicks(sim, CALM - 1)
+      expect(sim.state.events.stats.blanks).toBe(0)
+      runTicks(sim, 1)
+      expect(sim.state.events.stats.blanks).toBe(1)
+      expect(sim.state.tick).toBe(offered.offeredTick + CALM)
 
-    // Offered while a regular quest runs: the window opens when that quest ends.
-    const b = playing(2, NO_JOBS)
-    startQuest(b, 'on_time_day')
-    b.state.level.level = 5
-    runTicks(b, 1)
-    expect(b.state.quests.offer?.ultimate).toBe(true)
-    runTicks(b, CALM + 10)
-    expect(b.dispatch({ kind: 'abandonQuest' })).toEqual({ ok: true })
-    const end = b.state.tick
-    const blanks = b.state.events.stats.blanks
-    b.state.events.nextDrawTick = end + 1
-    runTicks(b, CALM - 1)
-    expect(b.state.events.stats.blanks).toBe(blanks)
-    runTicks(b, 1)
-    expect(b.state.events.stats.blanks).toBe(blanks + 1)
-  })
+      // Offered while a regular quest runs: the window opens when that quest ends.
+      const b = playing(2, NO_JOBS)
+      startQuest(b, 'on_time_day')
+      b.state.level.level = 5
+      runTicks(b, 1)
+      expect(b.state.quests.offer?.ultimate).toBe(true)
+      runTicks(b, CALM + 10)
+      expect(b.dispatch({ kind: 'abandonQuest' })).toEqual({ ok: true })
+      const end = b.state.tick
+      const blanks = b.state.events.stats.blanks
+      b.state.events.nextDrawTick = end + 1
+      runTicks(b, CALM - 1)
+      expect(b.state.events.stats.blanks).toBe(blanks)
+      runTicks(b, 1)
+      expect(b.state.events.stats.blanks).toBe(blanks + 1)
+    }))
 
-  it('an open card: no draw while it is up (even with the sim ticking), the draw comes the tick after it closes', () => {
-    const sim = playing(1, NO_JOBS)
-    sim.dispatch({ kind: 'debugOfferEvent', eventId: 'ev_wx_rain' })
-    const detach = sim.attachPolicy()
-    sim.state.events.nextDrawTick = sim.state.tick + 1
-    runTicks(sim, 50)
-    expect(sim.state.events.stats.blanks).toBe(0)
-    detach()
-    decideOpen(sim, 0)
-    runTicks(sim, 1)
-    expect(sim.state.events.stats.blanks).toBe(1)
-  })
+  it('an open card: no draw while it is up (even with the sim ticking), the draw comes the tick after it closes', () =>
+    withEvents(false, () => {
+      const sim = playing(1, NO_JOBS)
+      sim.dispatch({ kind: 'debugOfferEvent', eventId: 'ev_wx_rain' })
+      const detach = sim.attachPolicy()
+      sim.state.events.nextDrawTick = sim.state.tick + 1
+      runTicks(sim, 50)
+      expect(sim.state.events.stats.blanks).toBe(0)
+      detach()
+      decideOpen(sim, 0)
+      runTicks(sim, 1)
+      expect(sim.state.events.stats.blanks).toBe(1)
+    }))
 
   it('the queue: a debug card behind an open one queues (event:queued; maxQueued 1 — a second is refused) and opens first when the slot frees, before a due link or draw', () => {
     const sim = playing(1, NO_JOBS)
@@ -338,20 +344,21 @@ describe('quiet rules and the queue (B3 §3.2; critique 15, 30)', () => {
 })
 
 describe('blank draws and the streams (D-1, D-2)', () => {
-  it('decisions off: a due draw with no job yields no card — a blank, counted, the next draw one gap later', () => {
-    const sim = deckOn(quietSim(1, NO_JOBS))
-    const offered = collect(sim, 'event:offered')
-    runTicks(sim, FIRST)
-    expect(sim.state.events.open).toBeNull()
-    expect(sim.state.events.stats.blanks).toBe(1)
-    const gap = sim.state.events.nextDrawTick - FIRST
-    expect(gap).toBeGreaterThanOrEqual(600)
-    expect(gap).toBeLessThanOrEqual(1000)
-    runTicks(sim, gap)
-    expect(sim.state.events.stats.blanks).toBe(2)
-    expect(offered).toEqual([])
-    expect(sim.state.events.stats.offered).toBe(0)
-  })
+  it('decisions off: a due draw with no job yields no card — a blank, counted, the next draw one gap later', () =>
+    withEvents(false, () => {
+      const sim = deckOn(quietSim(1, NO_JOBS))
+      const offered = collect(sim, 'event:offered')
+      runTicks(sim, FIRST)
+      expect(sim.state.events.open).toBeNull()
+      expect(sim.state.events.stats.blanks).toBe(1)
+      const gap = sim.state.events.nextDrawTick - FIRST
+      expect(gap).toBeGreaterThanOrEqual(600)
+      expect(gap).toBeLessThanOrEqual(1000)
+      runTicks(sim, gap)
+      expect(sim.state.events.stats.blanks).toBe(2)
+      expect(offered).toEqual([])
+      expect(sim.state.events.stats.offered).toBe(0)
+    }))
 
   it('decisions on with no candidate is a blank too; with candidates the draw is a decision card (event:offered, its ticker line)', () => {
     withEvents(true, () => {
@@ -436,24 +443,25 @@ describe('jobs as cards (B3 §3.1–§3.2, §6)', () => {
     expect(jobsOpen(sim)).toBe(false)
   })
 
-  it('jobShare: about 65 % of the due draws are jobs while one is eligible (400 draws)', () => {
-    const sim = playing(5)
-    let jobs = 0
-    const n = 400
-    for (let i = 0; i < n; i++) {
-      sim.state.events.nextDrawTick = sim.state.tick + 1
-      sim.tick()
-      const open = sim.state.events.open
-      if (open !== null) {
-        expect(open.kind).toBe('job')
-        jobs += 1
-        sim.dispatch({ kind: 'declineQuest', questId: open.questId! })
-        sim.state.quests.jobReadyTick = 0
+  it('jobShare: about 65 % of the due draws are jobs while one is eligible (400 draws)', () =>
+    withEvents(false, () => {
+      const sim = playing(5)
+      let jobs = 0
+      const n = 400
+      for (let i = 0; i < n; i++) {
+        sim.state.events.nextDrawTick = sim.state.tick + 1
+        sim.tick()
+        const open = sim.state.events.open
+        if (open !== null) {
+          expect(open.kind).toBe('job')
+          jobs += 1
+          sim.dispatch({ kind: 'declineQuest', questId: open.questId! })
+          sim.state.quests.jobReadyTick = 0
+        }
       }
-    }
-    expect(jobs / n).toBeGreaterThan(sch.jobShare - 0.08)
-    expect(jobs / n).toBeLessThan(sch.jobShare + 0.08)
-  })
+      expect(jobs / n).toBeGreaterThan(sch.jobShare - 0.08)
+      expect(jobs / n).toBeLessThan(sch.jobShare + 0.08)
+    }))
 
   it('a job card: Accept and Decline (the default) as its options and lines; Accept starts the quest as acceptQuest does (deadline, satisfaction start)', () => {
     const sim = playing(1)

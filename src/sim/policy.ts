@@ -28,6 +28,9 @@
 //     worker is re-hired in pay order (inspectors, sorters, drivers) at
 //     fee + purchaseBuffer, before any new purchase (dormant unless two
 //     paydays in a row ran short);
+//   CREW (policy extension — M12 review deck-2): a vehicle a card left with
+//     no driver (a quit, a driverless gift) gets the best driver applicant
+//     at fee + purchaseBuffer, right after REHIRE;
 //   Toss every flag on the tick it is held: the step before the next tick
 //     tosses every parcel in the Hold Bay, so a Hold Bay stall never builds
 //     (M9: the Sorter Arm takes this over once bought, see below);
@@ -242,6 +245,7 @@ class CompetentPolicy implements Policy {
     eventPolicyStep(sim, this.#tally)
     if (sim.state.economy.gameOver) return
     if (SIM_FEATURES.payroll) this.#rehire()
+    this.#crewVehicles()
     if (this.#delegating) {
       delegatingHireSorter(
         sim,
@@ -336,6 +340,34 @@ class CompetentPolicy implements Policy {
     for (const e of order) {
       if (!this.#affords(rehireFee(sim, e))) return
       sim.dispatch({ kind: 'rehire', employeeId: e.id })
+    }
+  }
+
+  /**
+   * CREW (M12 review deck-2, R28; policy extension): a vehicle with no
+   * driver — a card's quit (the rival poach's `Let them go`) or a
+   * driverless gift (the rival buy-out, the auction van; B3 §3.4 parks it
+   * `No driver` until the player hires) — gets the best driver applicant
+   * for its type (bestApplicant) as soon as balance ≥ the hire fee +
+   * purchaseBuffer, oldest vehicle first, before any new purchase. A
+   * walked-out driver keeps the wheel (REHIRE's), a pending Replace is
+   * never touched, and with an empty pool the vehicle waits. Shared by both
+   * kinds; a no-op on every deck-off run (only cards make such vehicles).
+   */
+  #crewVehicles(): void {
+    const sim = this.#sim
+    const empty = sim.state.vehicles
+      .filter((v) => v.driverId === null && v.nextDriverId === null)
+      .toSorted((a, b) => a.boughtTick - b.boughtTick || a.id - b.id)
+    for (const v of empty) {
+      const a = bestApplicant(sim, 'driver', v.type)
+      if (!a || !this.#affords(hireFeeOf(sim.data, a, v.type))) return
+      sim.dispatch({
+        kind: 'hire',
+        role: 'driver',
+        applicantId: a.id,
+        target: { vehicleId: v.id },
+      })
     }
   }
 

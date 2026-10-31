@@ -594,6 +594,15 @@ describe('performance and save size (plan.md §6.11: tick() p99 < 1 ms)', () => 
     const sim = new Sim(data, 7)
     const m = new Monitor(sim, { every: 10 })
     const policy = policyPlayer(sim)
+    // The deck is on (M12): a card may give the policy a vehicle (the rival's
+    // van) or take one (the gang), so the fleet is 11 ± those.
+    let gifts = 0
+    let lost = 0
+    sim.addTap((name, p) => {
+      if (name === 'vehicle:bought' && (p as { free?: boolean }).free === true)
+        gifts += 1
+      if (name === 'vehicle:lost') lost += 1
+    })
     const price = (t: VehicleType): number =>
       data.vehicles.types.find((x) => x.id === t)!.price
     const units = (t: VehicleType): number =>
@@ -640,7 +649,7 @@ describe('performance and save size (plan.md §6.11: tick() p99 < 1 ms)', () => 
       }
     }
     expect(m.problems).toEqual([])
-    expect(sim.state.vehicles).toHaveLength(11)
+    expect(sim.state.vehicles).toHaveLength(11 + gifts - lost)
     times.sort((a, b) => a - b)
     expect(times[Math.floor(0.99 * times.length)]!).toBeLessThan(1)
     // Live parcels ≤ building caps + lane nodes and stations + fleet units.

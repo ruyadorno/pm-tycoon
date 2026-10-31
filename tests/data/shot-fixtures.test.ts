@@ -534,13 +534,15 @@ describe('overseas-malware: a handed-off malware parcel costs a life at clearanc
     const { sim, fx } = load('overseas-malware')
     const lost = collectLost(sim)
     const cleared = collect(sim, 'parcel:cleared')
-    const lives = sim.state.economy.lives
+    // Lives lost, not lives: a job reward can add one meanwhile (build 3
+    // M12: seed 7's magic_parcel pays +1 life 18.8 s after the load).
+    const livesLost = sim.state.stats.livesLost
     const t0 = sim.state.tick
     const id = fx.fixture.parcelId as number
     const lead = (fx.fixture.lifeLostInS as number) - 0.1
     withPolicy(sim, lead)
     expect(lost.filter((l) => l.parcelId === id)).toEqual([])
-    expect(sim.state.economy.lives).toBe(lives)
+    expect(sim.state.stats.livesLost).toBe(livesLost)
     withPolicy(sim, 10, () => lost.some((l) => l.parcelId === id))
     const l = lost.find((x) => x.parcelId === id)!
     expect(l).toBeTruthy()
@@ -549,7 +551,7 @@ describe('overseas-malware: a handed-off malware parcel costs a life at clearanc
     expect(whats).toContain('handedOff')
     expect(whats.at(-1)).toBe('customsCleared')
     expect((sim.state.tick - t0) / TICKS_PER_S).toBe(fx.fixture.lifeLostInS)
-    expect(sim.state.economy.lives).toBe(lives - 1)
+    expect(sim.state.stats.livesLost).toBe(livesLost + 1)
     const c = cleared.find((x) => x.id === id)!
     expect(c).toMatchObject({ paid: 0, malware: true, hub: 'docks' })
   })

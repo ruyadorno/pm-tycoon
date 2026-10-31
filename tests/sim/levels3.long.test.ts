@@ -17,13 +17,18 @@
 // REPLACE on that tick. L4 can now arrive before dock 2 (seeds 7 and 8):
 // NEW STRAIN FIRST (levelPlan.ts) then buys the X-ray ahead of dock 2,
 // which may fall past the 25 minutes.
+//
+// Build 3, M12: SIM_FEATURES.events is on, but these are the pass-1 pacing
+// runs (B3 §2.3, §3.9: the level rows gated "pass 1 with events off, pass 2
+// on") — the decision draw stays off here until M14's pass 2 re-gates them
+// with the deck (the M12 deck-on drift is in docs/status.md).
 
 import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
 import { runSeed } from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
 import { median } from '../../tools/sim/report.ts'
-import { dataFixture } from './helpers.ts'
+import { dataFixture, withDecisions } from './helpers.ts'
 
 const data = dataFixture()
 const targets = data.economy.pacingTargets
@@ -33,7 +38,9 @@ const MINUTES = 25
 let cached: RunResult[] | null = null
 /** The 10-seed × 25-min competent runs (computed once for this file). */
 function runs(): RunResult[] {
-  cached ??= SEEDS.map((seed) => runSeed(data, seed, MINUTES, createPolicy))
+  cached ??= withDecisions(false, () =>
+    SEEDS.map((seed) => runSeed(data, seed, MINUTES, createPolicy)),
+  )
   return cached
 }
 

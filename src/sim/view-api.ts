@@ -146,6 +146,8 @@ export interface VehicleSnapshot {
   /** ADDITION (M1): capacity units aboard / of the type (§4.1). */
   unitsUsed: number
   capacityUnits: number
+  /** B3 §3.6: the price paid (0 for a gift). */
+  purchasePrice: number
 }
 
 /** buildingAt() result: the static row + the dynamic part. */
@@ -469,8 +471,20 @@ export interface OpenCardView {
   body: string
   /** The HUD's `Day N` the card opened on (completed days + 1). */
   day: number
+  /**
+   * The tick the card opened (OpenCard.openedTick). With eventId it tells two
+   * cards apart: back-to-back job cards share `job:<templateId>` (M12
+   * critique 18).
+   */
+  openedTick: Tick
   /** A link: `You chose: {option}` (eventWords.youChose) of its parent; else null. */
   parentChoice: string | null
+  /**
+   * A link (depth ≥ 2): its chain head's filled title — what the sim's
+   * `chainDone` ticker names (`Protection — the story ends`); null for a head,
+   * a single and a job card (M12 critique 6).
+   */
+  chainTitle: string | null
   questId: string | null
   /** The visible options only (an `if` that fails hides one), in data order. */
   options: readonly EventOptionView[]
@@ -544,6 +558,13 @@ export interface ViewSim {
   readonly nextThreshold: number | null
   readonly lives: number
   readonly gameOver: boolean
+  /**
+   * Build 3 (B3 §6): Sim.held — a card is open, no policy is attached and the
+   * game is not over, so tick() does nothing (the browser stepper skips the
+   * frame: M11 review deck-2). The HUD reads it for the speed button / ticker
+   * while a card waits behind a sheet or a paper (M12 critique 4).
+   */
+  readonly held: boolean
   readonly tick: Tick
   /** Completed in-game days (HUD "Day N" = day + 1). */
   readonly day: number
@@ -673,6 +694,7 @@ function snapshotVehicles(sim: Sim): VehicleSnapshot[] {
       capacityUnits:
         sim.data.vehicles.types.find((t) => t.id === v.type)?.capacityUnits ??
         0,
+      purchasePrice: v.purchasePrice,
     }
   })
 }
@@ -783,6 +805,19 @@ function nextOfferIn(sim: Sim): number | null {
   return Math.max(0, Math.max(qs.jobReadyTick, ev.nextDrawTick) - s.tick)
 }
 
+/**
+ * A link's chain-head title as decideEvent's `chainDone` ticker fills it
+ * (the head's title with the link's refs, else the card's own); null for a
+ * head, a single or a job card.
+ */
+function chainTitleOf(data: GameData, card: OpenCard): string | null {
+  if (card.kind === 'job' || card.depth < 2) return null
+  const head = eventDef(data, card.chainHeadId ?? card.eventId)
+  return head === null
+    ? cardTitle(data, card)
+    : fillCardText(data, head.title, card)
+}
+
 /** The open card as the EventCard reads it (B3 §3.4, §6). */
 function openCardView(sim: Sim, card: OpenCard): OpenCardView {
   const data = sim.data
@@ -806,10 +841,12 @@ function openCardView(sim: Sim, card: OpenCard): OpenCardView {
         ? questFlavour(data, job)
         : fillCardText(data, def?.body ?? '', card),
     day: Math.floor(Math.max(0, card.openedTick) / TICKS_PER_DAY) + 1,
+    openedTick: card.openedTick,
     parentChoice:
       card.parentChoice === null
         ? null
         : words.youChose.replaceAll('{option}', card.parentChoice),
+    chainTitle: chainTitleOf(data, card),
     questId: card.questId,
     options: cardOptions(sim, card)
       .filter((o) => o.visible)
@@ -1135,6 +1172,9 @@ export function createViewSim(
     },
     get gameOver() {
       return st().economy.gameOver
+    },
+    get held() {
+      return get().held
     },
     get tick() {
       return st().tick

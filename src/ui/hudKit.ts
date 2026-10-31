@@ -10,6 +10,7 @@ import type { FrameName } from '../render/frames.ts'
 import type { MoneyReason } from '../sim/events.ts'
 import type { Role, Size, VehicleType } from '../sim/types.ts'
 import type { Trend, VehicleSnapshot } from '../sim/view-api.ts'
+import { eventChoiceLine } from './effectText.ts'
 import type { Rect } from './layout.ts'
 import { CHECK, ellipsize, formatMoney } from './text.ts'
 import { THEME } from './theme.ts'
@@ -678,6 +679,196 @@ export function cargoCounts(
   const n: Record<Size, number> = { S: 0, M: 0, L: 0, XL: 0 }
   for (const c of cargo) n[c.size]++
   return SIZES.filter((s) => n[s] > 0).map((size) => ({ size, n: n[size] }))
+}
+
+// ---- build 3 M12: the event card on the HUD (B3 §3.4) ---------------------------
+
+/**
+ * What decides whether a pending event card (the sim's open card, not yet on
+ * screen) opens now. There is no HUD hold while a card only waits (D-M12-5:
+ * paperSuppressed reads `holds`, so a held pending card and a waiting paper
+ * would deadlock) — the sim holds itself and the event chip pulses.
+ */
+export interface EventOpenGate {
+  /** A scripted policy drives the stepper: it decides the card on its step. */
+  policy: boolean
+  /** The EventCard already shows a card. */
+  showing: boolean
+  gameOver: boolean
+  /** Entries on the shared modal stack (sheets, popovers, cards, dialogs). */
+  modals: number
+  /** A HUD hold other than 'event' (lost life, game over, hidden, rotate, summary, victory). */
+  otherHolds: boolean
+  /** A lost-life / game-over / victory lead-in timer runs. */
+  timers: boolean
+  /**
+   * A newspaper is on screen — only a visible one: queued papers wait behind
+   * the card (D-M12-4), so lost life → EventCard → papers.
+   */
+  paperVisible: boolean
+  /** The level-up moment (the 2.4-s stamp hold or the bar's refill sweep; R34). */
+  levelMoment: boolean
+  /** The Golden Release's gold card would open now: it goes first (R34, critique 3). */
+  questFirst: boolean
+}
+
+/** True when nothing in `g` stops the pending card from opening. */
+export function eventCardOpens(g: EventOpenGate): boolean {
+  return (
+    !g.policy &&
+    !g.showing &&
+    !g.gameOver &&
+    g.modals === 0 &&
+    !g.otherHolds &&
+    !g.timers &&
+    !g.paperVisible &&
+    !g.levelMoment &&
+    !g.questFirst
+  )
+}
+
+/** One HUD-cell pulse leg (down, then back up): 2 × 120 ms (Reigns' meter dots). */
+export const EVENT_PULSE_MS = 120
+/** The pulse's lowest alpha (at the middle of the 240 ms). */
+export const EVENT_PULSE_MIN_ALPHA = 0.3
+/**
+ * B3 §3.4 presentation thresholds (UI constants, not balance — D-M12-9): the
+ * bell rings on a gain of at least $100, and a decision that moved at least
+ * $100 gets a newspaper item.
+ */
+export const EVENT_BELL_MIN_MONEY = 100
+export const EVENT_NEWS_MIN_MONEY = 100
+
+/** The HUD cells and counts a decision can move, read just before and after it. */
+export interface CellSnapshot {
+  money: number
+  lives: number
+  /** meanSatisfaction(), unrounded (critique 14: +2 on one district moves no rounded mean). */
+  mood: number
+  /** lifetimeEarned (the level bar). */
+  earned: number
+  vehicles: number
+  workers: number
+  /** Chain links waiting (events().scheduledCount): a link that schedules its next one raises it. */
+  scheduled: number
+}
+
+/** after − before, field by field (mood unrounded). */
+export type CellDiff = CellSnapshot
+
+export function cellDiff(before: CellSnapshot, after: CellSnapshot): CellDiff {
+  return {
+    money: after.money - before.money,
+    lives: after.lives - before.lives,
+    mood: after.mood - before.mood,
+    earned: after.earned - before.earned,
+    vehicles: after.vehicles - before.vehicles,
+    workers: after.workers - before.workers,
+    scheduled: after.scheduled - before.scheduled,
+  }
+}
+
+export type PulseCell = 'money' | 'lives' | 'mood' | 'level'
+
+/** Below this a mood difference is float noise, not an effect. */
+const MOOD_EPS = 1e-9
+
+/** The top-bar cells a decision moved (money, lives, mood, the level bar), in bar order. */
+export function pulsedCells(d: CellDiff): PulseCell[] {
+  const out: PulseCell[] = []
+  if (d.money !== 0) out.push('money')
+  if (d.lives !== 0) out.push('lives')
+  if (Math.abs(d.mood) > MOOD_EPS) out.push('mood')
+  if (d.earned !== 0) out.push('level')
+  return out
+}
+
+/**
+ * The decision's sound (B3 §3.4; `tap` is the button's own ui:tap): `wah`
+ * when it cost a life, a vehicle or a worker; else `bell` on a gain of at
+ * least $100 or a life; else none.
+ */
+export function decisionSfx(d: CellDiff): 'wah' | 'bell' | null {
+  if (d.lives < 0 || d.vehicles < 0 || d.workers < 0) return 'wah'
+  if (d.money >= EVENT_BELL_MIN_MONEY || d.lives > 0) return 'bell'
+  return null
+}
+
+/**
+ * The decided card was a chain's last link: a link (depth ≥ 2) whose option
+ * scheduled no next link (the sim's `chainDone` rule: chainsFinished).
+ */
+export function eventChainEnded(depth: number, d: CellDiff): boolean {
+  return depth >= 2 && d.scheduled <= 0
+}
+
+/** B3 §3.4: a chain's last link, or a decision that moved ≥ $100, a life, a vehicle or a worker. */
+export function eventNewsworthy(d: CellDiff, chainEnd: boolean): boolean {
+  return (
+    chainEnd ||
+    Math.abs(d.money) >= EVENT_NEWS_MIN_MONEY ||
+    d.lives !== 0 ||
+    d.vehicles !== 0 ||
+    d.workers !== 0
+  )
+}
+
+/** The decided card as the paper's headline reads it. */
+export interface EventNewsCard {
+  /** The card's own (filled) title. */
+  title: string
+  /** The chosen option's label. */
+  option: string
+  kind: 'decision' | 'news' | 'job'
+  /** A link's chain-head title (OpenCardView.chainTitle; critique 6), else null. */
+  chainTitle: string | null
+  /** The chosen option's first effects line (a news card's headline tail), if any. */
+  firstLine?: string | null
+}
+
+/**
+ * The event paper's one-line headline: a chain's end names the chain as the
+ * sim's ticker does (`Protection — the story ends`, the head's title —
+ * critique 6); a news card (one OK) its title and what it did (`The loaner —
+ * +1 bike`, never `you chose: OK` — critique 7); any other decision the
+ * choice (`The recall — you chose: Take the strike`).
+ */
+export function eventNewsHeadline(
+  data: Pick<GameData, 'puns'>,
+  card: EventNewsCard,
+  chainEnd: boolean,
+): string {
+  if (chainEnd)
+    return data.puns.tickerEvent.chainDone.replaceAll(
+      '{title}',
+      card.chainTitle ?? card.title,
+    )
+  if (card.kind === 'news') {
+    const line = card.firstLine?.trim() ?? ''
+    return line === '' ? card.title : `${card.title} — ${line}`
+  }
+  return eventChoiceLine(data, card.title, card.option)
+}
+
+/**
+ * The `incident` ticker line of a life an event option took (the Ticker's
+ * incidentLine wording): `The recall cost a life — 2 lives left`.
+ */
+export function eventIncidentLine(title: string, livesLeft: number): string {
+  const n = Math.max(0, Math.floor(Number.isFinite(livesLeft) ? livesLeft : 0))
+  const left =
+    n === 0 ? 'no lives left' : `${n} ${n === 1 ? 'life' : 'lives'} left`
+  return `${title} cost a life — ${left}`
+}
+
+/**
+ * The pulse alpha at `v` ∈ [0, 1] of its 240 ms: 1 → EVENT_PULSE_MIN_ALPHA at
+ * the middle → 1 (linear legs).
+ */
+export function eventPulseAlpha(v: number): number {
+  const t = Math.min(1, Math.max(0, Number.isFinite(v) ? v : 1))
+  const dip = 1 - EVENT_PULSE_MIN_ALPHA
+  return t < 0.5 ? 1 - 2 * dip * t : EVENT_PULSE_MIN_ALPHA + 2 * dip * (t - 0.5)
 }
 
 // ---- tap zones -----------------------------------------------------------------

@@ -53,6 +53,12 @@
 // `ui_tag` pill) instead of its price and stays enabled at any balance —
 // buyMachine spends the voucher, not money. Locked rows ignore vouchers (the
 // sim refuses them too). A `quest:completed` (a voucher reward) rebuilds.
+//
+// Build 3 M12 (B3 §3.6): machine rows read ViewSim.priceOf('machine', ·) (a
+// machinePrice modifier); below the list price the row shows a gold `SALE`
+// pill left of the price (a voucher still wins: `FREE`, no SALE). The
+// Sorter Arm keeps its list price (D-21); desks are not machines.
+// `modifier:applied` / `modifier:expired` rebuild.
 import type Phaser from 'phaser'
 import {
   bindSim,
@@ -158,6 +164,14 @@ export const VOUCHER_TAG_Y = 4
 export const VOUCHER_TAG_H = 15
 /** Gap between the voucher tag's right edge and the row button's. */
 export const VOUCHER_TAG_RIGHT = 6
+/**
+ * Build 3 M12 (B3 §3.6): the tag of a price under the list price (a
+ * machinePrice / vehiclePrice modifier) — the BuySheet row and the Garage
+ * buy card; a `ui_tag` pill like the voucher's, left of the price.
+ */
+export const SALE_TEXT = 'SALE'
+/** Gap between the SALE pill's right edge and the price. */
+export const SALE_GAP = 4
 
 /** `$150`, or `free` for a zero price (the desk, employees.json deskPrice). */
 export function priceText(price: number): string {
@@ -351,6 +365,10 @@ export interface BuyRow {
   index?: number
   /** M7: a quest voucher pays for this machine (price 0, `FREE`). */
   voucher?: boolean
+  /** Build 3 (B3 §3.6): machines.json price (machine rows). */
+  listPrice?: number
+  /** Build 3: the price is under the list price (the `SALE` pill; never with a voucher). */
+  sale?: true
 }
 
 /** A placed desk (for its `Move desk here` row). */
@@ -376,32 +394,39 @@ export function deskRowId(index: number): string {
  * it (unplaced) or `Move desk here` (placed; numbered once two are placed);
  * then the locked checkers and desks by unlock level (stable). M7: an
  * unlocked checker held as a quest voucher (`vouchers`, machines.json ids)
- * costs 0 and reads `FREE` (design-m7 §6.8).
+ * costs 0 and reads `FREE` (design-m7 §6.8). Build 3 (B3 §3.6): `priceOf`
+ * is ViewSim.priceOf('machine', ·) — a machine row shows, compares and is
+ * charged the modified price and carries `sale` below the list price; a
+ * voucher beats a sale; desk rows keep their price (desks are not machines).
  */
 export function buyRows(
   data: GameData,
   level: number,
   placed: readonly DeskInfo[],
   vouchers: readonly string[] = [],
+  priceOf: (list: number) => number = (x) => x,
 ): BuyRow[] {
   const machines: BuyRow[] = data.machines.checkers.map((def) => {
     const locked = def.unlockLevel > level
     const speed = perMinText(def.processS)
     const voucher = !locked && vouchers.includes(def.id)
+    const price = voucher ? 0 : priceOf(def.price)
     const row: BuyRow = {
       kind: 'machine',
       id: def.id,
       name: def.name,
-      price: voucher ? 0 : def.price,
-      priceText: voucher ? VOUCHER_TEXT : priceText(def.price),
+      price,
+      priceText: voucher ? VOUCHER_TEXT : priceText(price),
       lines: [
         catchLine(def),
         locked ? `${speed} · ${unlockText(data, def.unlockLevel)}` : speed,
       ],
       unlockLevel: def.unlockLevel,
       locked,
+      listPrice: def.price,
     }
     if (voucher) row.voucher = true
+    else if (price < def.price) row.sale = true
     return row
   })
   const desks: BuyRow[] = []
@@ -962,6 +987,9 @@ export class BuySheet extends WarehouseSheet {
       'desk:placed': dirty,
       // M7: a voucher reward lands in quests.vouchers (design-m7 §6.8).
       'quest:completed': dirty,
+      // Build 3 M12 (B3 §3.6): a machinePrice card re-prices the rows.
+      'modifier:applied': dirty,
+      'modifier:expired': dirty,
     })
   }
 
@@ -995,7 +1023,9 @@ export class BuySheet extends WarehouseSheet {
         meanP: f.checker.pMatch,
       })
     }
-    return buyRows(this.vs.data, this.vs.level, placed, this.vouchers())
+    return buyRows(this.vs.data, this.vs.level, placed, this.vouchers(), (l) =>
+      this.vs.priceOf('machine', l),
+    )
   }
 
   /** M7: machines.json ids held as quest vouchers (oldest first). */
@@ -1064,7 +1094,23 @@ export class BuySheet extends WarehouseSheet {
         )
         btn.add(tag)
         parts.push(tag)
-      } else price.setX(btn.btnWidth - 8 - Math.round(price.width))
+      } else {
+        price.setX(btn.btnWidth - 8 - Math.round(price.width))
+        if (m.sale === true && !m.locked) {
+          // B3 §3.6: a gold SALE pill left of the (sale) price (not on a
+          // locked row, like the Garage's locked cards).
+          const text = addText(sc, 0, 0, SALE_TEXT)
+          const w = Math.round(text.width) + 2 * VOUCHER_PAD_X
+          const x = price.x - SALE_GAP - w
+          const tag = addPanel(sc, x, VOUCHER_TAG_Y, w, VOUCHER_TAG_H, 'ui_tag')
+          text.setPosition(
+            x + VOUCHER_PAD_X,
+            textTop(VOUCHER_TAG_Y, VOUCHER_TAG_H),
+          )
+          btn.add([tag, text])
+          parts.push(tag, text)
+        }
+      }
       const l2 = addText(sc, ROW_TEXT_X, ROW_LINE_Y[1], m.lines[0], {
         tint: MUTED,
       })

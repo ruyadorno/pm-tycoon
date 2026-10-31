@@ -14,6 +14,8 @@
 // the 48-px picture, each option's generated effects line in ≤ 2 lines of
 // the card's 276-px inner width — measured with the m5x7 advance widths and
 // the Newspaper's wrapHeadline algorithm, re-implemented here Phaser-free.
+// The real fit through the EventCard's layout: tests/data/events-fit.test.ts
+// (M12) — run both with vlr test -- tests/data/events.
 // The static EV max (B3 §3.8, critique 20: life gains left out) holds for
 // every option. Gated on the full deck (M13, ≥ 100 cards): every bounds key
 // is used by some card, and ≥ 30 cards are L1-eligible.
@@ -560,6 +562,37 @@ describe('checkEvents: the harsh-consequence rule (B3 §3.5, critique 21-22)', (
       `events.deck[${i}].options[1].cost: a paid option needs an unpaid sibling with no \`if\` (a card never greys out every option)`,
     )
   })
+
+  it('review deck-1: costPerVehicle is a price — never with cost, never on the default, and it needs an unpaid sibling', () => {
+    const radio = at('ev_staff_radio')
+    const livery = at('ev_fleet_livery')
+    const service = at('ev_fleet_service')
+    expect(problems(() => {})).toEqual([])
+    const p = problems((r) => {
+      cardOf(r, 'ev_staff_radio').options[0].cost = 10
+      const l = cardOf(r, 'ev_fleet_livery')
+      l.options[1].costPerVehicle = { each: 5 }
+      const sv = cardOf(r, 'ev_fleet_service')
+      sv.options[1].costPerVehicle = { each: 5, type: 'van' }
+    })
+    expect(p).toContainEqual(
+      `events.deck[${radio}].options[0].costPerVehicle: an option takes \`cost\` or \`costPerVehicle\`, not both`,
+    )
+    expect(p).toContainEqual(
+      `events.deck[${livery}].options[1].costPerVehicle: the default never takes a per-vehicle price (a fleet-sized price no cond can cover)`,
+    )
+    expect(p).toContainEqual(
+      `events.deck[${livery}].options[0].costPerVehicle: a paid option needs an unpaid sibling with no \`if\` (a card never greys out every option)`,
+    )
+    expect(p).toContainEqual(
+      `events.deck[${service}].options[1].costPerVehicle: a paid option needs an unpaid sibling with no \`if\` (a card never greys out every option)`,
+    )
+    expect(
+      problems((r) => {
+        cardOf(r, 'ev_staff_radio').options[0].costPerVehicle = { each: 0 }
+      }).length,
+    ).toBeGreaterThan(0)
+  })
 })
 
 describe('checkEvents: targets, picks and scopes', () => {
@@ -994,6 +1027,7 @@ function optionOf(o: EventOptionDef, index: number): CardOption {
     label: fillLong(o.label),
     effects: o.effects,
     cost: o.cost ?? 0,
+    ...(o.costPerVehicle ? { perVehicle: { ...o.costPerVehicle } } : {}),
     default: o.default === true,
     danger: o.danger === true,
     visible: true,
@@ -1110,6 +1144,34 @@ describe('events.json policy design rules (B3 §3.8)', () => {
           over.push(`${c.id} "${o.label}": ${score}`)
       }
     expect(over).toEqual([])
+  })
+
+  it('review deck-3: no harsh option ties a harsh-free sibling state-free (a tie goes to the default, so a paid way out at the harsh price loses the worker every time)', () => {
+    const ties = (d: GameData): string[] => {
+      const out: string[] = []
+      for (const c of d.events.deck) {
+        const opts = c.options ?? []
+        const sc = opts.map((o) => staticScore(d, c, o))
+        opts.forEach((o, i) => {
+          if (!o.effects.some((e) => isHarshEffect(e))) return
+          opts.forEach((x, j) => {
+            if (j === i || x.effects.some((e) => isHarshEffect(e))) return
+            if (Math.abs(sc[i]! - sc[j]!) < 0.005)
+              out.push(`${c.id} "${o.label}" = "${x.label}" (${sc[i]})`)
+          })
+        })
+      }
+      return out
+    }
+    expect(ties(data)).toEqual([])
+    // The M12 poach: a $200 bonus against staffQuit 200 was an exact tie.
+    const raw = fresh()
+    const poach = cardOf(raw, 'ev_cust_rival_poach')
+    poach.options[0].cost = data.events.policy.weights.staffQuit
+    poach.cond.balanceAtLeast = data.events.policy.weights.staffQuit
+    expect(ties(buildGameData(raw))).toEqual([
+      `ev_cust_rival_poach "Let them go" = "Match it (a bonus)" (${-data.events.policy.weights.staffQuit + data.events.policy.weights.chain})`,
+    ])
   })
 })
 

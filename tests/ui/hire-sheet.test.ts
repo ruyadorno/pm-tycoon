@@ -8,6 +8,9 @@
 // buttons following the balance, Esc / a vanished target cancelling, and a
 // sleeping scene closing it silently. Phaser is stubbed with chainable no-op
 // game objects (the sheet builds real kit Buttons, which extend Container).
+// Build 3 M12 (B3 §3.6): in the buy flow the vehicle's price is
+// ViewSim.priceOf — a vehiclePrice card's sale price is what the cards and
+// `Hire later` need and what the buy charges.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -65,6 +68,7 @@ const { CONTENT_PAD } = await import('../../src/ui/Button.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { addStarApplicant, salaryOf } =
   await import('../../src/sim/systems/people.ts')
+const { applyModifier } = await import('../../src/sim/systems/modifierOps.ts')
 const { dataFixture, fund, quietSim, standardApplicant, buy } =
   await import('../sim/helpers.ts')
 
@@ -448,6 +452,34 @@ describe('HireSheet against a live sim (design-m6 §6.1, §6.3)', () => {
     // The hired applicant left the pool; a regular replaced them.
     expect(vs.applicants('driver').map((a) => a.id)).not.toContain(pick.id)
     expect(vs.applicants('driver')).toHaveLength(3)
+  })
+
+  it('B3 §3.6: buyPrice follows ViewSim.priceOf — a vehiclePrice ×0.5 card halves what Hire later needs and charges; 0 outside the buy flow', () => {
+    const sim = quietSim(1)
+    const vs = createViewSim(sim)
+    const { sheet } = openSheet(vs, { buyType: 'bike' }, 'driver', true)
+    expect(sheet.buyPrice()).toBe(200)
+    applyModifier(sim, {
+      key: 'vehiclePrice',
+      mult: 0.5,
+      add: 0,
+      scope: null,
+      untilTick: null,
+      eventId: 'ev_test_sale',
+      label: 'Test sale',
+    })
+    expect(sheet.buyPrice()).toBe(vs.priceOf('vehicle', 200))
+    expect(sheet.buyPrice()).toBe(100)
+    // A balance between the sale and the list price still buys.
+    sim.state.economy.balance = 150
+    const res = sheet.hireLater()
+    expect(res).toMatchObject({ ok: true })
+    expect(vs.money).toBe(50)
+    expect(vs.vehicles[0]?.purchasePrice).toBe(100)
+    // Outside the buy flow there is no vehicle price.
+    const other = openSheet(vs, { vehicleId: vs.vehicles[0]!.id })
+    expect(other.sheet.buyPrice()).toBe(0)
+    other.sheet.close()
   })
 
   it('Hire later buys the vehicle without a driver: it parks inactive, `No driver`', () => {

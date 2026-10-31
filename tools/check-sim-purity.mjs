@@ -9,6 +9,7 @@ const PHASER_FREE = [
   'src/ui/layout.ts',
   'src/ui/questText.ts',
   'src/ui/hubText.ts',
+  'src/ui/effectText.ts',
   'src/render/warehouse/RoomLayout.ts',
   'src/render/decayPhase.ts',
   'src/render/cityFx.ts',

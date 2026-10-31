@@ -35,7 +35,11 @@
 // no policy, so answerCard() decides the open card's default (a logged
 // decideEvent — the replay still matches) and advance(ms, true) /
 // waitEvent(name, cap, true) answer every card they meet on the way, for
-// policy-less runs that must cross a draw (fixtures, long waits).
+// policy-less runs that must cross a draw (fixtures, long waits). M12: the
+// HUD shows the open card as its EventCard; an answer from here closes it on
+// the next frame (event:decided → its refreshEvents) and releases its
+// 'event' hold. The debug offer is `sim.debug.offerEvent(id)` (Boot's
+// ?event=<id> calls it).
 import Phaser from 'phaser'
 import type { AudioDebugApi, AudioDirector } from '../audio/director.ts'
 import type { Stepper } from '../boot/stepper.ts'

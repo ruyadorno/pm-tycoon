@@ -630,6 +630,13 @@ export interface EventOptionDef {
   effects: EventEffect[]
   /** The money effect itself: debits it, greys the option while balance < cost (B3 §3.3). */
   cost?: number
+  /**
+   * A voluntary per-vehicle purchase (M12 review deck-1): `each` × the
+   * owned vehicles (of `type` when set) is the option's price, debited and
+   * greyed exactly like `cost` (never with `cost`, never on the default). A
+   * `moneyPerVehicle` effect stays a consequence, clamped to the balance.
+   */
+  costPerVehicle?: { each: number; type?: VehicleTypeId }
   default?: true
   danger?: true
   if?: EventCond

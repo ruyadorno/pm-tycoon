@@ -23,7 +23,11 @@ import {
   lifeFrames,
 } from '../../src/ui/LivesRow.ts'
 import { BAR_FILL, barFrame } from '../../src/ui/Panel.ts'
-import { QUEST_CHIP_BAR_W, QUEST_CHIP_W } from '../../src/ui/layout.ts'
+import {
+  QUEST_CHIP_BAR_W,
+  QUEST_CHIP_COMPACT_W,
+  QUEST_CHIP_W,
+} from '../../src/ui/layout.ts'
 import {
   QUEST_CHIP_BAR_MIN_W,
   QUEST_CHIP_BAR_X,
@@ -31,6 +35,7 @@ import {
   QUEST_CHIP_LABEL_GAP,
   QUEST_OFFER_TEXT,
   QUEST_PULSE_ALPHA,
+  questChipFillColour,
   questChipFit,
   questChipModel,
   questChipTint,
@@ -275,6 +280,41 @@ describe('the chip label fits beside the bar (design-m7 §6.4, m5x7)', () => {
     expect(f.barW).toBe(QUEST_CHIP_BAR_MIN_W)
     expect(f.label.endsWith('…')).toBe(true)
     expect(gap(f)).toBeGreaterThanOrEqual(QUEST_CHIP_LABEL_GAP)
+  })
+
+  it('B3 §3.4: the compact chip (82 px, beside the event chip) drops the label, keeps the 60-px bar', () => {
+    expect(QUEST_CHIP_COMPACT_W).toBe(82)
+    expect(questChipFit('1d 12h', QUEST_CHIP_COMPACT_W, width)).toEqual({
+      label: '',
+      barW: 60,
+    })
+    for (const s of ['0✕ 100%', '1:59', '123✕ 100% on time', ''])
+      expect(questChipFit(s, QUEST_CHIP_COMPACT_W, width), s).toEqual({
+        label: '',
+        barW: QUEST_CHIP_BAR_W,
+      })
+    // The icon + the full bar fit the compact chip.
+    expect(QUEST_CHIP_BAR_X + QUEST_CHIP_BAR_W).toBeLessThanOrEqual(
+      QUEST_CHIP_COMPACT_W,
+    )
+    // The full chip still keeps its label.
+    expect(questChipFit('1d 12h', QUEST_CHIP_W, width).label).toBe('1d 12h')
+  })
+
+  it('D-M12-10: the compact chip moves the warning into the bar fill; the full chip stays gold', () => {
+    expect(questChipFillColour({ tone: 'danger' }, QUEST_CHIP_COMPACT_W)).toBe(
+      'red',
+    )
+    expect(questChipFillColour({ tone: 'warn' }, QUEST_CHIP_COMPACT_W)).toBe(
+      'amber',
+    )
+    expect(questChipFillColour({ tone: 'light' }, QUEST_CHIP_COMPACT_W)).toBe(
+      'gold',
+    )
+    for (const tone of ['danger', 'warn', 'light'] as const)
+      expect(questChipFillColour({ tone }, QUEST_CHIP_W), tone).toBe('gold')
+    for (const c of ['red', 'amber', 'gold'] as const)
+      expect(FRAME_ATLAS[BAR_FILL[c]], c).toBe('world')
   })
 })
 

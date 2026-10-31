@@ -53,14 +53,20 @@
 //   M7 (plan-build2 §8.4 tasks 4-6; design-m7 §3.4, §6.4, §6.10) — quests:
 //      build 3 (M11, B3 §3.2): jobs come as event cards from the deck's
 //      draws — the first draw at 3:20 (firstEventS 200 s), a job with
-//      probability jobShare, else a blank (decisions off) and the next draw
-//      60–100 s on; under ?policy=1 the policy accepts the first job card on
+//      probability jobShare, else a decision card (M12: decisions on) and the
+//      next draw 60–100 s on; under ?policy=1 the policy accepts the first job card on
 //      the step it opens (the decideEvent is logged) — __pm.quests().active,
 //      no card left open, the QuestChip in row B, the replay still matches;
 //      the Title's New game with ?level=2&quest=rush_district is a fresh L2
 //      game whose log starts debugForceLevel, debugOfferQuest (the L2 goal:
 //      10 deliveries — a job card the policy-less sim holds on), the attract
-//      sim untouched.
+//      sim untouched. M12: a debug-offered news card (the loaner) holds the
+//      sim and the stepper and shows in the HUD's EventCard under the
+//      'event' hold until its OK is tapped (no interim auto-answer). M12
+//      review (hud-1/2/3): a card that arrives behind a Warehouse BuySheet
+//      holds the sim with ❚❚ lit; a real tap on the pulsing event chip
+//      closes the sheet and raises the card; a pm:goto highlight under the
+//      card opens no BuySheet over it and Enter still answers the card.
 //      e2e/quests.spec.ts has the card / chip / magic / victory flows.
 //   M8 (plan-build2 §8.5 tasks 3, 6; design-m8-m9 §6.1, §6.3) — L3 docks:
 //      a fresh ?level=3 game in the room: dock 3's door gives its unlock
@@ -1504,8 +1510,9 @@ test.describe('M7 quests smoke', () => {
     expect(qs.active).toBeNull()
     expect(qs.history).toEqual([])
     expect(qs.nextOfferInTicks).toBeGreaterThan(0)
-    // A draw is a job with probability jobShare (else a blank and the next
-    // draw 60–100 s on): poll in 10-s steps until the policy took one.
+    // A draw is a job with probability jobShare (else a decision card the
+    // policy answers, and the next draw 60–100 s on): poll in 10-s steps
+    // until the policy took one.
     await pm.advance(1_000)
     for (let i = 0; i < 30; i++) {
       qs = await page.evaluate(() => window.__pm!.quests())
@@ -1517,7 +1524,11 @@ test.describe('M7 quests smoke', () => {
     const st = await page.evaluate(() => {
       const api = window.__pm!
       const log = api.core.commandLog
-      const decide = log.find((e) => e.cmd.kind === 'decideEvent')
+      // M12: decision cards draw too (the first draw at 3:20 may be one), so
+      // the job's own decideEvent is the first one naming a job card.
+      const decide = log.find(
+        (e) => e.cmd.kind === 'decideEvent' && e.cmd.eventId.startsWith('job:'),
+      )
       const hud = api.game.scene.getScene('HUD') as unknown as {
         questChip: { current: { visible: boolean; barText: string } }
       }
@@ -1547,7 +1558,7 @@ test.describe('M7 quests smoke', () => {
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
-  test('no policy: a non-job card (the loaner, debug.offerEvent) holds the sim and the stepper, then the interim HUD answers it with its default (review deck-1/deck-2)', async ({
+  test('no policy: a non-job card (the loaner, debug.offerEvent) holds the sim and the stepper; the EventCard shows it and its OK answers it (M12, B3 §3.4)', async ({
     page,
     pm,
     consoleErrors,
@@ -1563,6 +1574,7 @@ test.describe('M7 quests smoke', () => {
         open: api.events().open?.eventId ?? null,
         held: api.core.held,
         vehicles: api.sim.vehicles.length,
+        tick: api.sim.tick,
       }
     })
     expect(before).toMatchObject({
@@ -1572,6 +1584,40 @@ test.describe('M7 quests smoke', () => {
     })
     // Held, the stepper runs nothing (no no-op ticks): advance() reports 0.
     expect(await page.evaluate(() => window.__pm!.advance(1_000))).toBe(0)
+    // The HUD shows the card (a news card: one OK) under the 'event' hold;
+    // nothing answers it for the player any more (the M11 interim answer is
+    // retired).
+    const card = () =>
+      page.evaluate(() => {
+        const api = window.__pm!
+        const hud = api.game.scene.getScene('HUD') as unknown as {
+          eventCard: { isOpen: boolean; eventId: string | null }
+          holds: Set<string>
+        }
+        return {
+          open: hud.eventCard.isOpen,
+          eventId: hud.eventCard.eventId,
+          holds: [...hud.holds],
+          simOpen: api.events().open?.eventId ?? null,
+          tick: api.sim.tick,
+        }
+      })
+    expect(
+      await settleUntil(page, pm, async () => (await card()).open, 120),
+      'the EventCard opens',
+    ).toBe(true)
+    // The 300-ms slide (a news card ignores scrim taps until it is in).
+    await pm.settle(24)
+    const shown = await card()
+    console.log(`smoke: the loaner card ${JSON.stringify(shown)}`)
+    expect(shown).toMatchObject({
+      open: true,
+      eventId: 'ev_luck_loaner',
+      simOpen: 'ev_luck_loaner',
+      tick: before.tick,
+    })
+    expect(shown.holds).toContain('event')
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
     await pm.settle(5)
     const after = await page.evaluate(() => {
       const api = window.__pm!
@@ -1585,7 +1631,7 @@ test.describe('M7 quests smoke', () => {
         tick: api.sim.tick,
       }
     })
-    expect(after.open, 'the interim HUD answered the loaner').toBeNull()
+    expect(after.open, 'the OK answered the loaner').toBeNull()
     expect(after.held).toBe(false)
     expect(after.vehicles).toBe(before.vehicles + 1)
     expect(after.decide).toEqual({
@@ -1593,10 +1639,116 @@ test.describe('M7 quests smoke', () => {
       eventId: 'ev_luck_loaner',
       option: 0,
     })
+    expect((await card()).open, 'the card closed').toBe(false)
+    expect((await card()).holds).not.toContain('event')
     await pm.settle(30)
     expect(await page.evaluate(() => window.__pm!.sim.tick)).toBeGreaterThan(
       after.tick,
     )
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('a card pending behind a Warehouse sheet: ❚❚ lights, a tap on the pulsing chip closes the sheet and opens the card; a pm:goto highlight under the card opens no BuySheet over it (M12 review hud-1/2/3)', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open('/?seed=7&debug=1&skipTitle=1&audio=0')
+    await pm.freeze()
+    await pm.settle(5)
+    await switchView(page, pm, 'warehouse')
+    const slot = await page.evaluate(() => {
+      const api = window.__pm!
+      const wh = api.game.scene.getScene('Warehouse') as unknown as {
+        buy: { open(id: string): void; isOpen(): boolean }
+      }
+      for (const n of api.sim.lane.nodes()) {
+        if (n.kind !== 'slot' || n.locked || n.fixture) continue
+        wh.buy.open(n.id)
+        if (wh.buy.isOpen()) return n.id
+      }
+      return null
+    })
+    expect(slot, 'a BuySheet on an empty slot').not.toBeNull()
+    await pm.settle(20)
+    const state = () =>
+      page.evaluate(() => {
+        const api = window.__pm!
+        const hud = api.game.scene.getScene('HUD') as unknown as {
+          eventPending: boolean
+          eventCard: { isOpen: boolean; eventId: string | null }
+          effectsCard: { isOpen: boolean }
+          eventChip: { current: { visible: boolean; pulse: boolean } }
+          holds: Set<string>
+          segment: number
+          modalDepth(): number
+        }
+        const wh = api.game.scene.getScene('Warehouse') as unknown as {
+          buy: { isOpen(): boolean }
+        }
+        return {
+          held: api.core.held,
+          pending: hud.eventPending,
+          card: hud.eventCard.isOpen,
+          eventId: hud.eventCard.eventId,
+          effects: hud.effectsCard.isOpen,
+          chip: hud.eventChip.current,
+          holds: [...hud.holds],
+          segment: hud.segment,
+          modals: hud.modalDepth(),
+          buy: wh.buy.isOpen(),
+        }
+      })
+    // A card arrives while the sheet is up (the sim runs under a sheet): it
+    // waits behind it, the sim holds itself and the chip pulses.
+    const r = await page.evaluate(() =>
+      window.__pm!.sim.debug!.offerEvent('ev_wx_rain'),
+    )
+    expect(r.ok).toBe(true)
+    await pm.settle(10)
+    const before = await state()
+    console.log(`smoke: card behind the BuySheet ${JSON.stringify(before)}`)
+    expect(before).toMatchObject({
+      held: true,
+      pending: true,
+      card: false,
+      buy: true,
+      modals: 1,
+      chip: { visible: true, pulse: true },
+    })
+    // hud-3: held, the speed segment lights ❚❚, not the running 1×.
+    expect(before.segment).toBe(0)
+    // hud-1: the chip tap closes the room's sheet and raises the card.
+    await tapTarget(page, pm, 'HUD', 'eventChip')
+    await pm.settle(24) // the 300-ms slide
+    const raised = await state()
+    console.log(`smoke: after the chip tap ${JSON.stringify(raised)}`)
+    expect(raised).toMatchObject({
+      card: true,
+      eventId: 'ev_wx_rain',
+      effects: false,
+      buy: false,
+      modals: 1,
+    })
+    expect(raised.holds).toContain('event')
+    // hud-2: a highlight goto while the card is up (the shield popover's
+    // machine row, the lost-life card's Open warehouse) pulses the slot but
+    // opens no BuySheet over the card; Enter still answers the card.
+    await page.evaluate(() =>
+      window.__pm!.game.events.emit('pm:goto', {
+        view: 'warehouse',
+        highlight: 'metal_detector',
+      }),
+    )
+    await pm.settle(30) // > SHEET_DELAY_MS
+    const under = await state()
+    expect(under).toMatchObject({ card: true, buy: false, modals: 1 })
+    await page.keyboard.press('Enter')
+    await pm.settle(5)
+    const after = await state()
+    expect(after).toMatchObject({ held: false, card: false, buy: false })
+    expect(after.holds).not.toContain('event')
     expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
@@ -1745,7 +1897,10 @@ test.describe('M8 docks smoke', () => {
     ).toBeNull()
 
     // level-up-3.json without the policy: sim-only to L3 with $800 (build 3:
-    // answering any card a draw opens on the way — a held sim stays put).
+    // answering any card a draw opens on the way — a held sim stays put —
+    // and, M12, Tossing every held parcel like a player: with the deck on the
+    // regenerated run's lane stalls on a full Hold Bay at ≈ 146 s otherwise
+    // and never earns the $800; with the Tosses it gets there at ≈ 184 s).
     const fx = readFileSync(LEVEL_UP_3_FIXTURE, 'utf8')
     expect(
       (JSON.parse(fx) as { dataHash: string }).dataHash,
@@ -1755,7 +1910,9 @@ test.describe('M8 docks smoke', () => {
       const api = window.__pm!
       api.load(json)
       let ms = 0
-      while (!(api.sim.level >= 3 && api.sim.money >= 800) && ms < 180_000) {
+      while (!(api.sim.level >= 3 && api.sim.money >= 800) && ms < 300_000) {
+        const held = api.sim.holdBay.items.map((it) => it.parcelId)
+        for (const id of held) api.sim.holdBay.toss(id)
         api.advance(100, true)
         ms += 100
       }

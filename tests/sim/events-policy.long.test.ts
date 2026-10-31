@@ -1,15 +1,19 @@
-// spec-build3 §3.8-§3.9; plan-build3 §8.2 task 8; M11 contract §3 stream D
-// task 8: the event policy on the seed deck with SIM_FEATURES.events on,
-// seeds 1-10 × 30 min through the CLI's runSeed (the gate's own runs) —
-// no card stays open past the step after the tick that offered it
-// (eventsOpenMaxTicks ≤ 1 on every seed), the policy decides every card it
-// is offered (every event:offered has its event:decided, none withdrawn
-// but a job card the Golden Release displaced), every job card is
-// accepted, and the run keeps its invariants. The EV band and the
-// non-default share are printed (informational until M12 flips the flag
-// and the full deck lands); so are the cards per category and the event
-// rows. Tagged [long]: excluded from `vlr check:quick` (tools/check.mjs),
-// run by the full `vlr check`.
+// spec-build3 §3.8-§3.9; plan-build3 §8.2 task 8, §8.3 task 5; M11 contract
+// §3 stream D task 8: the event policy on the shipped deck with
+// SIM_FEATURES.events on, seeds 1-10 × 30 min through the CLI's runSeed
+// (the gate's own runs) — no card stays open past the step after the tick
+// that offered it (eventsOpenMaxTicks ≤ 1 on every seed), the policy
+// decides every card it is offered (every event:offered has its
+// event:decided, none withdrawn but a job card the Golden Release
+// displaced), every job card is accepted, and the run keeps its invariants.
+// M12 (the flag on, the ~60-card deck): the event rows are gated here as in
+// `vlr sim:gate` — ≥ eventsOfferedBy30MinMin cards by 30 min, ≥
+// eventsL1PlateauMin decision cards on the L1 plateau, the policy's EV per
+// card inside events.json policy.evBand and its non-default share ≥
+// nonDefaultShareMin (medians); the cards per category, the chains and the
+// lives / vehicles / workers events took are printed. Tagged [long]:
+// excluded from `vlr check:quick` (tools/check.mjs), run by the full
+// `vlr check`.
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
@@ -38,7 +42,7 @@ function runs(): RunResult[] {
   return cached
 }
 
-describe('[long] the event policy on the seed deck, seeds 1-10 × 30 min (events on)', () => {
+describe('[long] the event policy on the shipped deck, seeds 1-10 × 30 min (events on)', () => {
   it('no card stays open past one tick; every offered card is decided (a job card only ever withdrawn by the sim); every job card accepted; the invariants hold', () => {
     for (const r of runs()) {
       const m = r.result.metrics
@@ -70,7 +74,7 @@ describe('[long] the event policy on the seed deck, seeds 1-10 × 30 min (events
     }
   }, 180_000)
 
-  it('informational: the policy EV per card and the non-default share against events.json policy, the cards by category and the event rows — printed, never fails', () => {
+  it('the event rows (B3 §3.9, gated since M12): cards by 30 min, the L1 plateau, the EV band and the non-default share by median; the categories, chains and harsh outcomes printed', () => {
     const m = runs().map((r) => r.result.metrics)
     const band = data.events.policy
     const ev = median(m.map((x) => x.policyEvPerCard))
@@ -97,6 +101,17 @@ describe('[long] the event policy on the seed deck, seeds 1-10 × 30 min (events
         (x) => x.policyEvPerCard === null || Number.isFinite(x.policyEvPerCard),
       ),
     ).toBe(true)
+    const t = data.economy.pacingTargets
+    expect(median(m.map((x) => x.eventsOffered30))!).toBeGreaterThanOrEqual(
+      t.eventsOfferedBy30MinMin,
+    )
+    expect(median(m.map((x) => x.eventsL1Decisions))!).toBeGreaterThanOrEqual(
+      t.eventsL1PlateauMin,
+    )
+    expect(ev, 'policyEvPerCard').not.toBeNull()
+    expect(ev!).toBeGreaterThanOrEqual(band.evBand[0])
+    expect(ev!).toBeLessThanOrEqual(band.evBand[1])
+    expect(nd!).toBeGreaterThanOrEqual(band.nonDefaultShareMin)
   }, 180_000)
 
   it('the policy never ends its own run: no event game over on any seed', () => {

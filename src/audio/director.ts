@@ -806,7 +806,10 @@ export class AudioDirector {
         this.#setLoop('stallAlarm', false)
         break
       case 'quest:offered':
-        this.sfx.play('bell')
+        // Build 3 M12 (D-M12-14): the bell is the Golden Release's; a job
+        // offer is an EventCard, whose `eventPing` the HUD plays when it shows
+        // (so a policy run or a card queued behind a modal stays silent).
+        if (p.ultimate === true) this.sfx.play('bell')
         break
       case 'quest:completed':
         this.sfx.play('questDone')
@@ -1230,7 +1233,8 @@ export function createAudioDirector(o: AudioDirectorOptions): AudioDirector {
  *   Title        pointerdown → audio.unlock() synchronously (no await before it), then the scene switch
  *   HUD          mute button → audio.toggleMuted(); listen 'audio:muted' {muted}; toast on 'audio:nowPlaying'
  *                {title, seconds}; Paused-card tap → audio.resumeAfterPause(); district panel open with
- *                satisfaction < 30 → audio.setGrumble(true/false)
+ *                satisfaction < 30 → audio.setGrumble(true/false); build 3 M12: the EventCard's sounds are
+ *                `ui:sfx` {eventPing} as a card shows and {wah} / {bell} after a decision (hudKit.decisionSfx)
  *   scenes       emit only 'ui:tap', 'ui:sheetOpen', 'ui:sheetClose', 'ui:sfx' {name} on game.events
  *   New game     after 'game:over' → audio.startMusic()
  *   debug        window.__pm.audio = audio.debugApi()

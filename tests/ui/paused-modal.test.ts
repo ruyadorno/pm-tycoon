@@ -6,6 +6,9 @@
 // opened above it owns the keys; sleep/shutdown never leak a stack entry.
 // Phaser is stubbed with chainable no-op game objects (the card builds a
 // real Button, which extends Container).
+// Build 3 M12 (B3 §3.4): with onEffects the card carries a second entry,
+// `Effects · N` (hidden at 0), under the summary button or the text panel;
+// its tap is a gesture and opens the EffectsCard (onEffects).
 import { describe, expect, it, vi } from 'vitest'
 
 type Bag = Record<string | symbol, unknown>
@@ -36,9 +39,29 @@ function chain<T extends object>(target: T): T {
 vi.mock('phaser', () => {
   class GameObject {
     readonly stub = true
+    readonly dataMap = new Map<string, unknown>()
     constructor() {
       return chain(this)
     }
+    // The Button calls these on itself (Container); record what the tests read.
+    setVisible(v: boolean): this {
+      ;(this as unknown as { visible: boolean }).visible = v
+      return this
+    }
+    setPosition(x: number, y: number): this {
+      const o = this as unknown as { x: number; y: number }
+      o.x = x
+      o.y = y
+      return this
+    }
+    setData(k: string, v: unknown): this {
+      this.dataMap.set(k, v)
+      return this
+    }
+    getData(k: string): unknown {
+      return this.dataMap.get(k)
+    }
+    destroy(): void {}
   }
   class Rectangle {
     readonly stub = true
@@ -55,7 +78,8 @@ vi.mock('phaser', () => {
   }
 })
 
-const { PausedCard } = await import('../../src/ui/PausedCard.ts')
+const { EFFECTS_ENTRY_TEXT, PausedCard, effectsEntryText } =
+  await import('../../src/ui/PausedCard.ts')
 const { claimKey, modalCount, popModal, pushModal, topModal } =
   await import('../../src/ui/Sheet.ts')
 const { computeLayout } = await import('../../src/ui/layout.ts')
@@ -84,8 +108,17 @@ function emitter() {
 
 const obj = (): object => chain({})
 
+interface Existing {
+  id?: string
+  visible?: boolean
+  onClick?: (() => void) | null
+  getData?: (k: string) => unknown
+}
+
 function fakeScene() {
+  const existing: Existing[] = []
   return {
+    existing,
     scale: { width: 360, height: 604, zoom: 1 },
     add: {
       rectangle: obj,
@@ -94,7 +127,10 @@ function fakeScene() {
       bitmapText: obj,
       image: obj,
       container: obj,
-      existing: (o: unknown) => o,
+      existing: (o: Existing) => {
+        existing.push(o)
+        return o
+      },
     },
     input: { keyboard: emitter() },
     events: emitter(),
@@ -105,13 +141,16 @@ function fakeScene() {
 
 const L = computeLayout(360, 604, 0, 0, 1)
 
-function setup(over: { onSummary?: () => void } = {}) {
+function setup(
+  over: { onSummary?: () => void; onEffects?: () => void } = {},
+  layout = L,
+) {
   const scene = fakeScene()
   const onResume = vi.fn()
   const onGesture = vi.fn()
   // HudScene.resumeFromCard hides the card.
   let card: InstanceType<typeof PausedCard> | null = null
-  const c = new PausedCard(scene as never, L, {
+  const c = new PausedCard(scene as never, layout, {
     onGesture,
     onResume: () => {
       onResume()
@@ -232,5 +271,86 @@ describe('report §6.5: the Paused card is on the modal stack', () => {
     card.hide()
     scene.input.keyboard.emit('keydown', key('Escape'))
     expect(onResume).not.toHaveBeenCalled()
+  })
+})
+
+const effectsButton = (scene: ReturnType<typeof fakeScene>) =>
+  scene.existing.find((o) => o.id === 'paused:effects')
+
+describe('B3 §3.4: the pause menu Effects · N entry', () => {
+  it('without onEffects there is no entry (and setEffectsCount is harmless)', () => {
+    const { scene, card } = setup({ onSummary: () => {} })
+    card.setEffectsCount(3)
+    expect(effectsButton(scene)).toBeUndefined()
+    expect(card.effectsCount).toBe(0)
+    expect(card.effectsRect()).toBeNull()
+  })
+
+  it('hidden until a count is set; 0 hides it, 2 shows `Effects · 2`', () => {
+    const onEffects = vi.fn()
+    const { scene, card } = setup({ onEffects })
+    const b = effectsButton(scene)
+    expect(b).toBeDefined()
+    expect(b?.visible).toBe(false)
+    expect(b?.getData?.('label')).toBe(EFFECTS_ENTRY_TEXT)
+    expect(card.effectsRect()).toBeNull()
+    card.setEffectsCount(0)
+    expect(b?.visible).toBe(false)
+    card.setEffectsCount(2)
+    expect(b?.visible).toBe(true)
+    expect(b?.getData?.('label')).toBe('Effects · 2')
+    expect(effectsEntryText(2)).toBe('Effects · 2')
+    expect(card.effectsCount).toBe(2)
+    expect(card.effectsRect()).not.toBeNull()
+    card.setEffectsCount(0)
+    expect(b?.visible).toBe(false)
+    expect(card.effectsCount).toBe(0)
+    expect(card.effectsRect()).toBeNull()
+    card.setEffectsCount(Number.NaN)
+    expect(b?.visible).toBe(false)
+  })
+
+  it('a tap is a gesture first, then onEffects; it never resumes', () => {
+    const order: string[] = []
+    const onEffects = vi.fn(() => order.push('effects'))
+    const scene = fakeScene()
+    const onResume = vi.fn()
+    const card = new PausedCard(scene as never, L, {
+      onGesture: () => order.push('gesture'),
+      onResume,
+      onEffects,
+    })
+    card.show()
+    card.setEffectsCount(1)
+    effectsButton(scene)?.onClick?.()
+    expect(onEffects).toHaveBeenCalledOnce()
+    expect(order).toEqual(['gesture', 'effects'])
+    expect(onResume).not.toHaveBeenCalled()
+    card.hide()
+  })
+
+  it('it sits under the summary entry (8 px), or under the text panel without one', () => {
+    // 360×604: the panel at y 280, the summary entry at 280 + 44 + 16 = 340.
+    const both = setup({ onSummary: () => {}, onEffects: () => {} })
+    both.card.setEffectsCount(1)
+    const s = both.card.entryRect()!
+    const e = both.card.effectsRect()!
+    expect(s.y).toBe(340)
+    expect(e.y).toBe(s.y + s.h + 8)
+    expect(e.x).toBe(s.x)
+    expect(e.w).toBe(s.w)
+    expect(e.h).toBe(44)
+    const alone = setup({ onEffects: () => {} })
+    alone.card.setEffectsCount(1)
+    expect(alone.card.effectsRect()!.y).toBe(340)
+  })
+
+  it('it never drops past the safe area (clamped to H − safeBottom − 44)', () => {
+    const tight = computeLayout(360, 480, 0, 150, 1)
+    const { card } = setup({ onSummary: () => {}, onEffects: () => {} }, tight)
+    card.setEffectsCount(4)
+    const e = card.effectsRect()!
+    expect(e.y).toBe(480 - 150 - 44)
+    expect(e.y + e.h).toBeLessThanOrEqual(tight.H - tight.safeBottom)
   })
 })

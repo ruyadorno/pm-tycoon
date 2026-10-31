@@ -26,6 +26,14 @@
 // M9 integration (NEW STRAIN FIRST, src/sim/policies/levelPlan.ts): at L4
 // the X-ray goes ahead of the L3 van and 2nd truck, so seed 7's van comes
 // at ≈ 29 min and its 2nd truck at ≈ 32 min — the scan runs to 34 min.
+// Build 3 M12 (the decision deck on, pass 1 pacing): seed 7 reaches L5 at
+// ≈ 29.9 min and buys its van at ≈ 34.7 min and its 2nd truck at ≈ 39.3 min,
+// and a minute is taken only if a 2-min policy watch of it loses no life
+// (attractWatchProblems; 40 and 41 do) — the city is minute 42 and the scan
+// runs to 45 min (M14's pacing pass 2 re-checks it). M12 review fixes (the
+// per-vehicle prices, the policy's CREW step, the $180 poach): seed 7
+// reaches L5 at ≈ 32.7 min, buys its van at ≈ 35.5 and its 2nd truck at
+// ≈ 39.8 min — the city is minute 40.
 //
 // The JSON is JSON.stringify(sim.snapshot()) + "\n": the run is deterministic
 // (seeded PRNG, no clock), so the same tables give the same bytes.
@@ -43,7 +51,7 @@ import { loadGameData } from '../sim/load.node.ts'
 export const ATTRACT_SEED = 7
 /** The scan's first and last whole sim minute (design R15). */
 export const ATTRACT_MIN_MINUTES = 24
-export const ATTRACT_MAX_MINUTES = 34
+export const ATTRACT_MAX_MINUTES = 45
 /** M8 expectations: at least this level (L4/L5 are fine at M9). */
 export const ATTRACT_MIN_LEVEL = 3
 export const ATTRACT_MIN_VEHICLES = 6
@@ -100,6 +108,43 @@ export function attractProblems(sim: Sim): string[] {
   if (st.lane.stalled)
     out.push(`the lane is stalled (${String(st.lane.stallReason)})`)
   if (st.economy.gameOver) out.push('the game is over')
+  // Build 3 M12: the demo's first minutes under the policy must be clean —
+  // tests/data/shot-fixtures.test.ts watches ATTRACT_WATCH_S: deliveries, no
+  // life lost, no stall (seed 7's 40-min city had an unchecked strain on its
+  // way to a pier). Only run when the city itself passes.
+  if (out.length === 0) out.push(...attractWatchProblems(sim))
+  return out
+}
+
+/** The shot-fixtures test's watch of the loaded demo under the policy (s). */
+export const ATTRACT_WATCH_S = 120
+
+/** A copy of `sim` under the competent policy for ATTRACT_WATCH_S. */
+function attractWatchProblems(sim: Sim): string[] {
+  const copy = Sim.load(sim.data, JSON.parse(JSON.stringify(sim.snapshot())), {
+    ignoreDataHash: true,
+  })
+  let delivered = 0
+  let stalls = 0
+  copy.events.on('parcel:delivered', () => {
+    delivered += 1
+  })
+  copy.events.on('lane:stalled', () => {
+    stalls += 1
+  })
+  const lost0 = copy.state.stats.livesLost
+  const policy = createPolicy(copy, 'competent')
+  for (let i = 0; i < ATTRACT_WATCH_S * TICKS_PER_S; i++) {
+    policy.step()
+    copy.tick()
+  }
+  policy.dispose?.()
+  const out: string[] = []
+  if (delivered === 0) out.push(`no delivery in the ${ATTRACT_WATCH_S}-s watch`)
+  const lost = copy.state.stats.livesLost - lost0
+  if (lost > 0) out.push(`${lost} lives lost in the ${ATTRACT_WATCH_S}-s watch`)
+  if (stalls > 0) out.push(`${stalls} stalls in the ${ATTRACT_WATCH_S}-s watch`)
+  if (copy.state.economy.gameOver) out.push('game over in the watch')
   return out
 }
 

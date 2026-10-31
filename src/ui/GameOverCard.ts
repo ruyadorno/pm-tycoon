@@ -20,10 +20,17 @@
 // an off-screen origin so nothing in the HUD covers it, and it swallows every
 // tap. The stats are pure (tests/ui/game-over-card.test.ts); Phaser is a
 // type-only import.
+//
+// Build 3 M12 (B3 §3.4): when an event option took the last life
+// (state.lastLostLife kind 'event', so a reloaded game-over save shows it
+// too) the headline names the card and the choice — `The recall — you
+// chose: Take the strike` (effectText eventChoiceLine) — with the same
+// stats and the same New game / Run summary buttons.
 import type Phaser from 'phaser'
 import { removeCamera } from './cameraBits.ts'
 import type { GameData } from '../data/types.ts'
 import { Button } from './Button.ts'
+import { eventChoiceLine } from './effectText.ts'
 import { levelLabel } from './hudKit.ts'
 import type { Layout } from './layout.ts'
 import { addPanel } from './Panel.ts'
@@ -94,6 +101,12 @@ export interface GameOverInput {
   level: number
   /** stats.minutes (one row per in-game day). */
   rows: readonly { earned: number }[]
+  /**
+   * Build 3 M12 (B3 §3.5): the last life went to an event option
+   * (state.lastLostLife kind 'event'): the headline names the card and the
+   * choice (`The recall — you chose: Take the strike`).
+   */
+  event?: { title: string; option: string } | null
 }
 
 export interface GameOverModel {
@@ -107,7 +120,9 @@ export function gameOverModel(
 ): GameOverModel {
   const clean = Math.max(0, input.deliveries - input.malwareMissed)
   return {
-    headline: gameOverHeadline(input.malwareMissed),
+    headline: input.event
+      ? eventChoiceLine(data, input.event.title, input.event.option)
+      : gameOverHeadline(input.malwareMissed),
     stats: [
       ['Days survived', formatInt(input.day)],
       ['Lifetime earned', formatMoney(input.lifetimeEarned)],

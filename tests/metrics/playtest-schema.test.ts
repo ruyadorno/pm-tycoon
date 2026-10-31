@@ -41,7 +41,13 @@ import { createPolicy } from '../../src/sim/policy.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { salaryOf } from '../../src/sim/systems/people.ts'
 import { TICKS_PER_S } from '../../src/sim/types.ts'
-import { dataFixture, deckOn, makeSim, parcelLoss } from '../sim/helpers.ts'
+import {
+  dataFixture,
+  deckOn,
+  makeSim,
+  parcelLoss,
+  withDecisions,
+} from '../sim/helpers.ts'
 
 const data = dataFixture()
 const EXAMPLE = 'tests/playtest/seed-7.json'
@@ -323,7 +329,9 @@ function policyRun(): { r: Rig; pt: Playtest; tally: Tally } {
   return { r, pt: r.rec.snapshot(), tally }
 }
 
-const run = policyRun()
+// Build 3, M12: the decision draw is on, but this build-2 profile (fun bar 2)
+// stays a pass-1 run (B3 §2.3: jobs only) until the playtest-3 metrics (M15).
+const run = withDecisions(false, policyRun)
 
 describe('plan-build2 §8.7 task 1: every playtest.json v2 field, with its type', () => {
   it('a 35-minute seed-7 policy profile matches the schema exactly', () => {

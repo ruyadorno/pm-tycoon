@@ -45,6 +45,7 @@ function noopDeck(data: GameData): GameData {
     for (const o of def.options ?? []) {
       o.effects = []
       delete o.cost
+      delete o.costPerVehicle
       delete o.if
     }
   }

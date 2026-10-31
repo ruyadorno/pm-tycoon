@@ -76,6 +76,12 @@
 // the strip lights for `neon_strip_f0` (a short `_f1` flicker now and then).
 // The Sorter Arm (`sorter_arm_f0/_f1/_f2`, packed into both atlases) stands
 // in the station at L4+ and swings on every `parcel:tossed {source: 'arm'}`.
+//
+// Build 3 M12 (B3 §3.5): a shelf parcel an event took (`parcels {lose}`,
+// `parcel:lost` → onLost) puffs in its cell instead of flying to the dock
+// door (the same tick's gc deletes it, so syncShelf could not tell it from
+// a loaded one). The badge's `/N` already reads vs.shelf.cap, which a `cap`
+// card raises; minis past shelfCapacity() stay undrawn (D-23, D-M12-13).
 import Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type { LaneNode, Parcel, Size, Strain } from '../../sim/types.ts'
@@ -136,6 +142,7 @@ import {
   moveLegs,
   MOVE_MIN_MS,
   PARCEL_PX_PER_S,
+  reducedMotion,
   SLIDE_AT_MS,
   type MoveOpts,
 } from './Fx.ts'
@@ -242,6 +249,9 @@ const UNLOAD_MS = 200
 const TOSS_MS = 250
 const LOAD_MS = 300
 const SHELF_POP_MS = 200
+/** Build 3 M12: a lost shelf parcel's puff, fx_puff_f0..f3 at 60 ms. */
+const PUFF_STEP_MS = 60
+const PUFF_FRAMES = 4
 const LID_MS = 300
 /** Sorter Arm toss: reach, toss, rest — one frame each (§3.4 pace). */
 const ARM_FRAME_MS = 120
@@ -636,6 +646,10 @@ export class LaneRenderer {
   private sprites = new Map<number, PSprite>()
   private wants = new Map<number, Want>()
   private cleared = new Set<number>()
+  /** Build 3 M12: shelf parcels an event took (`parcel:lost`), puffed on the next syncShelf. */
+  private lost = new Set<number>()
+  /** Running shelf puffs (syncAll drops them). */
+  private puffs = new Set<{ img: Img; timer: Phaser.Time.TimerEvent }>()
   private prevShelf: number[] = []
   private flights = 0
   private poolWarned = false
@@ -1617,11 +1631,20 @@ export class LaneRenderer {
       const now = new Set(ids)
       this.prevShelf.forEach((id, i) => {
         if (now.has(id)) return
+        // Build 3 M12: a parcel an event took (`parcels lose`) is gone from
+        // the state by now (the same tick's gc) — it puffs in its cell, it
+        // never flies to the dock door as if loaded.
+        if (this.lost.delete(id)) {
+          this.puff(i % cells)
+          return
+        }
         const p = this.vs.parcel(id)
         if (p && p.state !== 'loaded' && p.state !== 'in_transit_out') return
         this.loadFlight(p?.size ?? 'S', i % cells, this.loadDoor(p))
       })
     }
+    // Every loss reported before this frame has left the shelf by now.
+    this.lost.clear()
     const before = this.instant ? null : new Set(this.prevShelf)
     this.prevShelf = ids.slice()
     for (let i = cells; i < this.minis.length; i++)
@@ -1681,6 +1704,35 @@ export class LaneRenderer {
       Math.round(sb.x + (sb.w - this.badgeText.width) / 2),
       textTop(sb.y, sb.h),
     )
+  }
+
+  /**
+   * Build 3 M12: a lost shelf parcel's puff — `fx_puff_f0..f3` over its
+   * cell's mini on the badges layer, a frame every PUFF_STEP_MS on the scene
+   * clock, then gone. Skipped under prefers-reduced-motion.
+   */
+  private puff(cell: number): void {
+    if (reducedMotion() || !frameOrNull('fx_puff_f0')) return
+    const c = this.lay.shelfCell(cell)
+    const img = this.img(this.L.badges, c.x - 3, c.y - 3, 'fx_puff_f0')
+    let step = 0
+    const rec = {
+      img,
+      timer: this.scene.time.addEvent({
+        delay: PUFF_STEP_MS,
+        repeat: PUFF_FRAMES - 1,
+        callback: () => {
+          step += 1
+          if (step < PUFF_FRAMES) {
+            img.setFrame(`fx_puff_f${step}`)
+            return
+          }
+          img.destroy()
+          this.puffs.delete(rec)
+        },
+      }),
+    }
+    this.puffs.add(rec)
   }
 
   /** §1.8 pop: alpha 0 → 1 and 4 px drop into the cell over 200 ms. */
@@ -2232,6 +2284,11 @@ export class LaneRenderer {
     this.cleared.add(id)
   }
 
+  /** Build 3 M12 (`parcel:lost`): the shelf mini puffs instead of flying to the door. */
+  onLost(id: number): void {
+    this.lost.add(id)
+  }
+
   // ================================================================ sync + frame
 
   /** Rebuild every dynamic part from sim state, without tweens (create / WAKE). */
@@ -2245,6 +2302,12 @@ export class LaneRenderer {
     for (const img of this.miniChecks.values()) img.destroy()
     this.miniChecks.clear()
     this.cleared.clear()
+    this.lost.clear()
+    for (const p of this.puffs) {
+      p.timer.remove(false)
+      p.img.destroy()
+    }
+    this.puffs.clear()
     const holdId =
       this.vs.lane.nodes().find((n) => n.kind === 'holdBay')?.id ?? 'hold'
     for (const id of this.vs.shelf.ids) {

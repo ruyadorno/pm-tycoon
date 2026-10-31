@@ -58,7 +58,9 @@
 // lives ±life (never −∞), `all` × the spawning districts unlocked at the
 // card's minLevel, one person, a vehicle loss at the type's list price, the
 // chain weight only for a next, 0 for `end`, moneyPct 0 and one vehicle for
-// moneyPerVehicle. The evMax rule leaves life gains out (critique 20: lives
+// moneyPerVehicle and a costPerVehicle price (review deck-1: in scoreOption
+// that price is the option's cost — every owned vehicle, greyed while
+// unaffordable, never clamped). The evMax rule leaves life gains out (critique 20: lives
 // are rewards, not cash; deckEvMean keeps them).
 //
 // Pure sim code (tools/check-sim-purity.mjs): reads sim.state, acts only
@@ -526,7 +528,8 @@ export function staticScore(
         : data.vehicles.types.find((x) => x.id === type)
     return t?.price ?? 0
   }
-  let score = -(opt.cost ?? 0) * w.money
+  // A per-vehicle price (review deck-1) counts one vehicle, as moneyPerVehicle does.
+  let score = -((opt.cost ?? 0) + (opt.costPerVehicle?.each ?? 0)) * w.money
   for (const e of opt.effects) {
     switch (e.kind) {
       case 'money':

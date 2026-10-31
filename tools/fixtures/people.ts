@@ -46,6 +46,15 @@ import type { LaneNode, Parcel } from '../../src/sim/types.ts'
 import { laneNode, TICKS_PER_S } from '../../src/sim/types.ts'
 
 const SEED = 7
+/**
+ * people-l3: the seeds tried in order (build 3, M12: with the decision deck
+ * on, seed 7 crosses L4 inside the settle, so the first seed from 7 that
+ * leaves a live L3 game is used; `fixture.seed` records it).
+ */
+const PEOPLE_SEEDS: readonly number[] = Array.from(
+  { length: 24 },
+  (_, i) => SEED + i,
+)
 /** people-l3: the slot desk 2 takes (the COUNTERS Metal detector at L2, the policy's Battery checker at L3). */
 const DESK2_SLOT = 'slot3'
 /** people-l3: the fixture's level (desk 2 unlocks there, employees.json desks.rows); forced only if the run is below it. */
@@ -71,7 +80,7 @@ function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
     fixture: {
       name,
       regenerate: `${REGENERATE} ${name}`,
-      seed: SEED,
+      seed: sim.state.seed,
       tick: sim.state.tick,
       ...fixture,
     },
@@ -101,8 +110,9 @@ function must(sim: Sim, cmd: Command): void {
 function runPolicy(
   kind: PolicyKind,
   stop: (sim: Sim) => boolean,
+  seed = SEED,
 ): { sim: Sim; step: () => void } {
-  const sim = new Sim(data, SEED)
+  const sim = new Sim(data, seed)
   const policy = createPolicy(sim, kind)
   const cap = CAP_S * TICKS_PER_S
   while (!stop(sim) && sim.state.tick < cap) {
@@ -130,6 +140,24 @@ const deskOf = (node: LaneNode | null) =>
   node?.fixture?.kind === 'desk' ? node.fixture : null
 
 function peopleL3(): void {
+  const misses: string[] = []
+  // A real L3 first (M8); `debugForceLevel` only when no seed reaches one.
+  for (const allowForce of [false, true]) {
+    for (const seed of PEOPLE_SEEDS) {
+      try {
+        peopleL3Seed(seed, allowForce)
+        return
+      } catch (e) {
+        misses.push(`seed ${seed}: ${(e as Error).message}`)
+        console.log(`people-l3: ${misses.at(-1)}`)
+      }
+    }
+  }
+  throw new Error(`people-l3: no seed works (${misses.join('; ')})`)
+}
+
+/** Write people-l3 from `seed` (throws why that seed does not give one). */
+function peopleL3Seed(seed: number, allowForce: boolean): void {
   const desk2 = data.employees.desks.rows.find((r) => r.index === 2)
   if (!desk2) throw new Error('people-l3: no desks.rows index 2')
   if (desk2.unlockLevel > FORCED_LEVEL)
@@ -147,12 +175,15 @@ function peopleL3(): void {
       s.state.level.level >= 2 &&
       owns(s, shaker.id) &&
       s.state.economy.balance >= need,
+    seed,
   )
   if (sim.state.level.level < 2 || !owns(sim, shaker.id))
     throw new Error(`people-l3: no L2 lane with the shaker by ${CAP_S} s`)
 
   // M8: the cap is 3 — seed 7 is usually at a real L3 by now.
   const forced = sim.state.level.level < FORCED_LEVEL
+  if (forced && !allowForce)
+    throw new Error(`level ${sim.state.level.level} at the stop (no force)`)
   if (forced) must(sim, { kind: 'debugForceLevel', level: FORCED_LEVEL })
   if (sim.state.level.level !== FORCED_LEVEL)
     throw new Error(

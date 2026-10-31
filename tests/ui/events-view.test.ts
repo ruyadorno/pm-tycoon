@@ -19,6 +19,7 @@ import { TICKS_PER_DAY } from '../../src/sim/types.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import type { ModifierKey } from '../../src/data/types.ts'
 import {
+  dataFixture,
   deckOn,
   makeSim,
   offerQuest,
@@ -124,12 +125,17 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
   })
 
   it('an option whose `if` fails is not shown (options keep their data index)', () => {
-    const sim = makeSim(1, {
-      events: { deck: [{ options: [{ if: { livesAtLeast: 9 } }] }] },
-    })
+    // A config patch merges arrays by index: hide the course's first option.
+    const at = dataFixture().events.deck.findIndex(
+      (d) => d.id === 'ev_staff_training',
+    )
+    const deck = Array.from({ length: at + 1 }, (_, i) =>
+      i === at ? { options: [{ if: { livesAtLeast: 9 } }] } : {},
+    )
+    const sim = makeSim(1, { events: { deck } })
     sim.state.economy.balance = 1000
     const vs = createViewSim(sim, { debug: true })
-    expect(sim.data.events.deck[0]!.id).toBe('ev_staff_training')
+    expect(sim.data.events.deck[at]!.id).toBe('ev_staff_training')
     vs.debug!.offerEvent('ev_staff_training')
     expect(vs.events().open!.options.map((o) => o.index)).toEqual([1, 2])
   })

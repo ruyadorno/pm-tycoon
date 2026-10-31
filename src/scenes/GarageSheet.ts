@@ -44,6 +44,13 @@
 // states are also re-read at 4 Hz while open (payday countdown, cargo).
 // `toggleGarage(from)` is the one entry point (HUD button, G key, the
 // district panel's `Garage ▸`).
+//
+// Build 3 M12 (B3 §3.6): the buy cards show ViewSim.priceOf('vehicle', ·)
+// (a vehiclePrice modifier) with a gold `SALE` pill in the card's bottom
+// band (the lock line's, free on unlocked cards) while it is below the list
+// price; `Sell $N` refunds half of the price paid
+// (VehicleSnapshot.purchasePrice: 0 for a gift); a vehicle an event took
+// (`vehicle:lost`) leaves the list like a sold one.
 import Phaser from 'phaser'
 import { EV_GARAGE_OPENING } from '../boot/nav.ts'
 import { bindSim, getViewSim, REG } from '../boot/simBinding.ts'
@@ -84,6 +91,7 @@ import {
 } from '../ui/text.ts'
 import { EV_TOAST } from '../ui/Toast.ts'
 import { PALETTE, THEME } from '../ui/theme.ts'
+import { SALE_TEXT } from '../ui/warehouse/BuySheet.ts'
 import {
   EV_UI_SFX,
   EV_UI_TAP,
@@ -106,6 +114,14 @@ export const BOTTOM_H = 120
 export const CARD_H = 88
 export const CARD_GAP = 8
 export const CARD_MAX_W = 120
+/**
+ * B3 §3.6: the buy card's `SALE` pill (card-local): the name column's x, the
+ * 66–81 band (the lock line's band, free on unlocked cards), 4-px padding.
+ */
+export const SALE_X = 58
+export const SALE_Y = 66
+export const SALE_H = 15
+export const SALE_PAD_X = 4
 const MARGIN = 12
 /** The buy card's sprite box (card-local); the name column starts at 58. */
 const SPRITE_BOX = { x: 6, y: 4, w: 48, h: 32 }
@@ -178,10 +194,16 @@ function typeDef(data: GameData, type: VehicleType): VehicleTypeDef | null {
   return data.vehicles.types.find((t) => t.id === type) ?? null
 }
 
-/** Sell refund: vehicles.json price × economy.sellRefund (spec §4.1). */
-export function sellRefund(data: GameData, type: VehicleType): number {
-  const def = typeDef(data, type)
-  return def ? Math.round(def.price * data.economy.sellRefund) : 0
+/**
+ * Sell refund: the price paid × economy.sellRefund (spec §4.1; B3 §3.6: the
+ * paid price is stored, so a sale-bought vehicle refunds half of the sale
+ * price and a gift refunds nothing) — economy.ts sellRefund's own formula.
+ */
+export function sellRefund(
+  data: GameData,
+  v: Pick<VehicleSnapshot, 'purchasePrice'>,
+): number {
+  return Math.round(Math.max(0, v.purchasePrice) * data.economy.sellRefund)
 }
 
 /**
@@ -452,13 +474,13 @@ export function rowAction(
  * lastVehicleUnsellable (tip `Keep at least one vehicle`).
  */
 export function sellAction(
-  v: Pick<VehicleSnapshot, 'type'>,
+  v: Pick<VehicleSnapshot, 'type' | 'purchasePrice'>,
   data: GameData,
   fleetSize: number,
 ): { label: string; enabled: boolean; tip: string | null } {
   const last = data.vehicles.lastVehicleUnsellable && fleetSize <= 1
   return {
-    label: `Sell ${formatMoney(sellRefund(data, v.type))}`,
+    label: `Sell ${formatMoney(sellRefund(data, v))}`,
     enabled: !last,
     tip: last ? 'Keep at least one vehicle' : null,
   }
@@ -478,7 +500,7 @@ export interface MenuItem {
  * (Hire later, a fire) → Hire driver / Sell.
  */
 export function menuItems(
-  v: Pick<VehicleSnapshot, 'type'>,
+  v: Pick<VehicleSnapshot, 'type' | 'purchasePrice'>,
   data: GameData,
   fleetSize: number,
   primary: RowAction | null = null,
@@ -552,8 +574,13 @@ export function speedPips(
 export interface BuyCardModel {
   type: VehicleType
   name: string
+  /** What it costs now (B3 §3.6: the list price × the vehiclePrice fold). */
   price: number
   priceText: string
+  /** vehicles.json price. */
+  listPrice: number
+  /** B3 §3.6: the price is under the list price (the `SALE` tag). */
+  sale: boolean
   capacity: string
   capacityCompact: string
   salaryText: string
@@ -566,22 +593,30 @@ export interface BuyCardModel {
   enabled: boolean
 }
 
-/** One buy card per vehicles.json type (city-view §7.3). */
+/**
+ * One buy card per vehicles.json type (city-view §7.3). Build 3 (B3 §3.6):
+ * `priceOf` is ViewSim.priceOf('vehicle', ·) — the card shows, compares and
+ * charges the modified price, and flags a `sale` below the list price.
+ */
 export function buyCards(
   data: GameData,
   money: number,
   level: number,
+  priceOf: (list: number) => number = (x) => x,
 ): BuyCardModel[] {
   const types = data.vehicles.types
   const maxPips = new Set(types.map((t) => t.speedTilesPerS)).size
   return types.map((t) => {
     const locked = t.unlockLevel > level
-    const affordable = money >= t.price
+    const price = priceOf(t.price)
+    const affordable = money >= price
     return {
       type: t.id,
       name: t.name,
-      price: t.price,
-      priceText: formatMoney(t.price),
+      price,
+      priceText: formatMoney(price),
+      listPrice: t.price,
+      sale: price < t.price,
       capacity: capacityText(t),
       capacityCompact: capacityText(t, true),
       salaryText: `${formatMoney(t.driverSalaryPerDay)}/day`,
@@ -804,6 +839,9 @@ interface CardView {
   salary: Phaser.GameObjects.BitmapText
   pips: Phaser.GameObjects.NineSlice[]
   lock: Phaser.GameObjects.BitmapText
+  /** B3 §3.6: the `SALE` pill (ui_tag) and its text, shown on a sale. */
+  sale: Phaser.GameObjects.NineSlice
+  saleText: Phaser.GameObjects.BitmapText
   model: BuyCardModel
 }
 
@@ -872,6 +910,11 @@ export class GarageSheet extends Phaser.Scene {
       {
         'vehicle:bought': mark,
         'vehicle:sold': mark,
+        // Build 3 M12 (B3 §3.6): a vehiclePrice card re-prices the buy
+        // cards; an event can take a vehicle (its row goes, like a sale).
+        'modifier:applied': mark,
+        'modifier:expired': mark,
+        'vehicle:lost': mark,
         'vehicle:inactive': mark,
         'vehicle:parked': mark,
         'vehicle:departed': mark,
@@ -1040,7 +1083,9 @@ export class GarageSheet extends Phaser.Scene {
     const s = this.sheet
     if (!s) return
     const data = this.vs.data
-    const models = buyCards(data, this.vs.money, this.vs.level)
+    const models = buyCards(data, this.vs.money, this.vs.level, (l) =>
+      this.vs.priceOf('vehicle', l),
+    )
     const n = models.length
     const cw = cardWidth(this.W, n)
     const total = n * cw + (n - 1) * CARD_GAP
@@ -1080,7 +1125,31 @@ export class GarageSheet extends Phaser.Scene {
         )
       }
       const lock = addText(this, 6, textTop(68, 14), m.lockText)
-      btn.add([sprite, name, price, capacity, salary, ...pips, lock])
+      // B3 §3.6: the SALE pill in the 66–81 band (free on unlocked cards).
+      const saleText = addText(this, 0, 0, SALE_TEXT)
+      const sale = addPanel(
+        this,
+        SALE_X,
+        SALE_Y,
+        Math.round(saleText.width) + 2 * SALE_PAD_X,
+        SALE_H,
+        'ui_tag',
+      )
+      saleText.setPosition(SALE_X + SALE_PAD_X, textTop(SALE_Y, SALE_H))
+      const onSale = m.sale && !m.locked
+      sale.setVisible(onSale)
+      saleText.setVisible(onSale)
+      btn.add([
+        sprite,
+        name,
+        price,
+        capacity,
+        salary,
+        ...pips,
+        lock,
+        sale,
+        saleText,
+      ])
       s.add(btn)
       this.cards.push({
         type: m.type,
@@ -1092,6 +1161,8 @@ export class GarageSheet extends Phaser.Scene {
         salary,
         pips,
         lock,
+        sale,
+        saleText,
         model: m,
       })
     })
@@ -1140,12 +1211,18 @@ export class GarageSheet extends Phaser.Scene {
   }
 
   private updateCards(): void {
-    const models = buyCards(this.vs.data, this.vs.money, this.vs.level)
+    const models = buyCards(this.vs.data, this.vs.money, this.vs.level, (l) =>
+      this.vs.priceOf('vehicle', l),
+    )
     for (const c of this.cards) {
       const m = models.find((x) => x.type === c.type)
       if (!m) continue
       c.model = m
       c.btn.setEnabled(m.enabled)
+      setTextIf(c.price, m.priceText)
+      const onSale = m.sale && !m.locked
+      c.sale.setVisible(onSale)
+      c.saleText.setVisible(onSale)
       const grey = m.locked
       const ink = grey ? PALETTE.grey2 : THEME.textDark
       c.name.setTint(ink)
@@ -1587,7 +1664,11 @@ export class GarageSheet extends Phaser.Scene {
     this.openHire({
       target: { buyType: type },
       title: buyTitle(def.name),
-      note: buyNote(def),
+      // B3 §3.6: the note quotes what the buy will charge (a sale included).
+      note: buyNote({
+        name: def.name,
+        price: this.vs.priceOf('vehicle', def.price),
+      }),
       allowLater: true,
       onDone: (res) => this.bought(res),
     })
@@ -1671,7 +1752,7 @@ export class GarageSheet extends Phaser.Scene {
   }
 
   private sell(v: VehicleSnapshot): void {
-    const refund = sellRefund(this.vs.data, v.type)
+    const refund = sellRefund(this.vs.data, v)
     this.dialog?.destroy()
     this.dialog = new Dialog(this, {
       title: 'Sell vehicle',

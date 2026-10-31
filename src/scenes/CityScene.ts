@@ -91,6 +91,12 @@
 // clearStampPoint). level:up 4 / 5 swaps the exterior to wh_ext_t4 / _t5
 // (three bays: three lamps and three docked poses, dock 3 lit by number).
 //
+// Build 3 M12 (B3 §3.5–§3.6): a vehicle an event took (`vehicle:lost`)
+// leaves under an fx_puff (the sold vehicle's fx_pop is a sale); the OOPS
+// stamp names the fee the sim actually takes (the wrongTossFee modifier
+// folded in, clamped to the balance — HoldBayCard wrongTossFeeNow); an
+// event life (`life:lost {cause: 'event'}`) has no building to flash.
+//
 // Sim contract: reads the ViewSim facade only, never mutates state; commands
 // go through the facade (rush). Sim events are bound with bindSim
 // (attached on create/WAKE, detached on SLEEP/SHUTDOWN, syncAll on wake).
@@ -232,6 +238,7 @@ import {
   type ViewRect,
 } from '../ui/Popups.ts'
 import { FONT_SIZE, FONT_SIZE_BIG, paletteColour, THEME } from '../ui/theme.ts'
+import { oopsStampText, wrongTossFeeNow } from '../ui/warehouse/HoldBayCard.ts'
 
 // Game-event names this scene speaks (plan.md §5; the M1 cross-scene contract).
 export const EV_SELECT = 'pm:select'
@@ -279,6 +286,8 @@ const LOT_CORNER_COLOUR = 0xff00ff
 const LOT_CORNER_ARM = 4
 /** fx strips (4 frames each). */
 const FX_POP_MS = 250
+/** Build 3 M12: a vehicle an event took leaves under fx_puff_f0..f3. */
+const FX_LOST_MS = 400
 const FX_PING_MS = 300
 /** city-view §3.3: fx_boom is 6 frames over 480 ms. */
 const FX_BOOM_MS = 480
@@ -589,6 +598,8 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
           this.departVessel(p.hub)
         },
         'vehicle:sold': (p) => this.onSold(p.id),
+        // Build 3 M12 (B3 §3.5): an event took it — the sprite goes.
+        'vehicle:lost': (p) => this.onLost(p.id),
         'day:ended': () => {
           this.refreshSign()
           this.refreshScorch()
@@ -601,7 +612,7 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         // §9.6: fx_dust construction → wh_ext_t<tier> + the LEVEL stamp.
         'level:up': (p) => this.onLevelUp(p.level),
         'life:lost': (p) => {
-          if (p.cause === 'event') return // M12: the event variant
+          if (p.cause === 'event') return // event lives have no building to flash
           this.onLifeLost(p)
         },
         // M7 §6.8: the magic markers follow the active quest. Read on the
@@ -1986,10 +1997,20 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
         'warehouse',
         roof.x,
         roof.y,
-        `OOPS −$${this.gd.economy.wrongTossFee}`,
+        oopsStampText(this.wrongTossFee()),
         STAMP_GREY,
       )
     }
+  }
+
+  /**
+   * Build 3 M12 (B3 §3.6): the fee this wrong Toss costs — the sim's own
+   * formula on its state now (parcel:tossed fires before the debit); the
+   * data's fee when no sim is bound.
+   */
+  private wrongTossFee(): number {
+    const sim = getSim(this)
+    return sim ? wrongTossFeeNow(sim) : this.gd.economy.wrongTossFee
   }
 
   /** Camera shake (city-view §3.2-§3.3), skipped under prefers-reduced-motion. */
@@ -2085,6 +2106,16 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
     const view = this.vehicles.get(id)
     if (!view) return
     this.playFx(view.x, view.y, 'fx_pop', FX_POP_MS, true, view.img.depth)
+    view.destroy()
+    this.vehicles.delete(id)
+    if (this.followId === id) this.unfollow(true)
+  }
+
+  /** Build 3 M12 (`vehicle:lost`): the view leaves under a puff; follow ends. */
+  private onLost(id: number): void {
+    const view = this.vehicles.get(id)
+    if (!view) return
+    this.playFx(view.x, view.y, 'fx_puff', FX_LOST_MS, false, view.img.depth)
     view.destroy()
     this.vehicles.delete(id)
     if (this.followId === id) this.unfollow(true)

@@ -55,13 +55,23 @@ import { Sim } from '../../src/sim/sim.ts'
 import { TICKS_PER_S } from '../../src/sim/types.ts'
 
 const SEED = 7
+/**
+ * victory: the seeds tried in order (M12 review fixes: with the per-vehicle
+ * prices and the policy's CREW step seed 7's Golden Release times out three
+ * times and never ships by CAP_S, so the first seed from 7 that wins is
+ * used; `fixture.seed` records it — the other m9 fixtures stay on seed 7).
+ */
+const VICTORY_SEEDS: readonly number[] = Array.from(
+  { length: 12 },
+  (_, i) => SEED + i,
+)
 /** level-up-4 / level-up-5: snapshot at most this long before the level-up tick. */
 const LEVEL_LEAD_S = 3
 /** l4-room: the policy runs this long past the real L4. */
 const L4_SETTLE_S = 60
 /** victory: snapshot this long before the game:victory tick. */
 const VICTORY_LEAD_S = 3
-/** Give up past this (sim seconds) — seed 7 wins at ≈ 46 min. */
+/** Give up past this (sim seconds) — the victory seed (8 since the M12 review fixes) wins at ≈ 48 min. */
 const CAP_S = 3600
 /** Measuring a fixture's "…InS" under a fresh policy gives up after this. */
 const MEASURE_CAP_S = 600
@@ -79,14 +89,19 @@ const NAMES: readonly Name[] = [
   'victory',
 ]
 
-function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
+function write(
+  name: Name,
+  sim: Sim,
+  fixture: Record<string, unknown>,
+  seed = SEED,
+): void {
   assertNoCard(sim, name)
   const snap = {
     ...sim.snapshot(),
     fixture: {
       name,
       regenerate: `${REGENERATE} ${name}`,
-      seed: SEED,
+      seed,
       tick: sim.state.tick,
       ...fixture,
     },
@@ -104,9 +119,9 @@ function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
   )
 }
 
-/** Seed 7 under the competent policy until `stop` holds (checked before each step) or the cap. */
-function runPolicy(stop: (sim: Sim) => boolean): Sim {
-  const sim = new Sim(data, SEED)
+/** `seed` (7) under the competent policy until `stop` holds (checked before each step) or the cap. */
+function runPolicy(stop: (sim: Sim) => boolean, seed = SEED): Sim {
+  const sim = new Sim(data, seed)
   const policy = createPolicy(sim, 'competent')
   const cap = CAP_S * TICKS_PER_S
   while (!stop(sim) && sim.state.tick < cap) {
@@ -266,34 +281,50 @@ function l5Tycoon(): void {
 }
 
 function victory(): void {
-  const probe = runPolicy((s) => s.state.economy.victory)
+  const misses: string[] = []
+  for (const seed of VICTORY_SEEDS) {
+    const why = victorySeed(seed)
+    if (why === null) return
+    misses.push(`seed ${seed}: ${why}`)
+    console.log(`victory: ${misses.at(-1)}`)
+  }
+  throw new Error(`victory: no seed works (${misses.join('; ')})`)
+}
+
+/** Write victory from `seed`, or say why that seed has no usable win. */
+function victorySeed(seed: number): string | null {
+  const probe = runPolicy((s) => s.state.economy.victory, seed)
   const vTick = probe.state.stats.victoryTick
   if (vTick === null || !probe.state.economy.victory)
-    throw new Error(`victory: no game:victory by ${CAP_S} s`)
+    return `no game:victory by ${CAP_S} s`
   const snapTick = vTick - VICTORY_LEAD_S * TICKS_PER_S
-  const sim = runPolicy((s) => s.state.tick >= snapTick)
+  const sim = runPolicy((s) => s.state.tick >= snapTick, seed)
   const st = sim.state
   const q = st.quests.active
   if (!q || !q.ultimate || q.progress.kind !== 'ultimate')
-    throw new Error('victory: the Golden Release is not active')
+    return 'the Golden Release is not active at the snapshot'
   if (st.economy.victory || st.economy.gameOver)
-    throw new Error('victory: already won or over at the snapshot')
+    return 'already won or over at the snapshot'
   const inS = measure(sim, (s) => s.state.economy.victory)
   if (inS !== VICTORY_LEAD_S)
-    throw new Error(
-      `victory: a fresh policy wins after ${String(inS)} s, want ${VICTORY_LEAD_S}`,
-    )
-  write('victory', sim, {
-    level: st.level.level,
-    questId: q.id,
-    goal: q.goal,
-    delivered: q.progress.delivered,
-    onTime: q.progress.onTime,
-    malware: q.progress.malware,
-    victoryInS: inS,
-    victoryDay: probe.state.day,
-    policy: true,
-  })
+    return `a fresh policy wins after ${String(inS)} s, want ${VICTORY_LEAD_S}`
+  write(
+    'victory',
+    sim,
+    {
+      level: st.level.level,
+      questId: q.id,
+      goal: q.goal,
+      delivered: q.progress.delivered,
+      onTime: q.progress.onTime,
+      malware: q.progress.malware,
+      victoryInS: inS,
+      victoryDay: probe.state.day,
+      policy: true,
+    },
+    seed,
+  )
+  return null
 }
 
 const want = process.argv.slice(2)

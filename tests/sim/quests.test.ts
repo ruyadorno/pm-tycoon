@@ -49,6 +49,7 @@ import {
   runUntil,
   startQuest,
   unlockDistrict,
+  withDecisions,
 } from './helpers.ts'
 
 const data = dataFixture()
@@ -302,85 +303,90 @@ describe('job cards (B3 §3.1–§3.2): the deck draws jobs; Accept / Decline; t
     )
   })
 
-  it('Decline: the card closes (decided, the default option), the decline cooldown (declineCooldownDays) — a draw inside it is a blank — then the next job', () => {
-    const sim = deckOn(
-      quietSim(3, {
-        quests: {
-          templates: RUSH_ONLY.quests.templates,
-          offer: { declineCooldownDays: 2 },
-        },
-        ...ALWAYS_JOBS,
-      }),
-    )
-    injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    runTicks(sim, FIRST)
-    const q = sim.state.quests.offer!
-    const declined = collect(sim, 'quest:declined')
-    expect(sim.dispatch({ kind: 'declineQuest', questId: q.id })).toEqual({
-      ok: true,
-    })
-    expect(declined).toEqual([
-      { questId: q.id, templateId: 'rush_district', reason: 'declined' },
-    ])
-    expect(sim.state.quests.history.at(-1)).toMatchObject({
-      outcome: 'declined',
-      tick: FIRST,
-    })
-    expect(sim.state.events.open).toBeNull()
-    expect(sim.state.events.history.at(-1)).toMatchObject({
-      outcome: 'decided',
-      option: 1,
-      label: 'Decline',
-      default: true,
-    })
-    expect(sim.state.quests.jobReadyTick).toBe(FIRST + 2 * DAY)
-    const blanks = sim.state.events.stats.blanks
-    const offered = collect(sim, 'quest:offered')
-    runTicks(sim, 2 * DAY - 1)
-    expect(offered).toEqual([])
-    // The draw one gap (≤ 100 s) after the Decline fell inside the cooldown.
-    expect(sim.state.events.stats.blanks).toBeGreaterThan(blanks)
-    expect(
-      runUntil(sim, () => sim.state.quests.offer !== null, 2 * DAY),
-    ).toBeGreaterThan(0)
-    expect(sim.state.quests.offer!.offeredTick).toBeGreaterThanOrEqual(
-      FIRST + 2 * DAY,
-    )
-  })
+  it('Decline: the card closes (decided, the default option), the decline cooldown (declineCooldownDays) — a draw inside it is a blank — then the next job', () =>
+    withDecisions(false, () => {
+      const sim = deckOn(
+        quietSim(3, {
+          quests: {
+            templates: RUSH_ONLY.quests.templates,
+            offer: { declineCooldownDays: 2 },
+          },
+          ...ALWAYS_JOBS,
+        }),
+      )
+      injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
+      runTicks(sim, FIRST)
+      const q = sim.state.quests.offer!
+      const declined = collect(sim, 'quest:declined')
+      expect(sim.dispatch({ kind: 'declineQuest', questId: q.id })).toEqual({
+        ok: true,
+      })
+      expect(declined).toEqual([
+        { questId: q.id, templateId: 'rush_district', reason: 'declined' },
+      ])
+      expect(sim.state.quests.history.at(-1)).toMatchObject({
+        outcome: 'declined',
+        tick: FIRST,
+      })
+      expect(sim.state.events.open).toBeNull()
+      expect(sim.state.events.history.at(-1)).toMatchObject({
+        outcome: 'decided',
+        option: 1,
+        label: 'Decline',
+        default: true,
+      })
+      expect(sim.state.quests.jobReadyTick).toBe(FIRST + 2 * DAY)
+      const blanks = sim.state.events.stats.blanks
+      const offered = collect(sim, 'quest:offered')
+      runTicks(sim, 2 * DAY - 1)
+      expect(offered).toEqual([])
+      // The draw one gap (≤ 100 s) after the Decline fell inside the cooldown.
+      expect(sim.state.events.stats.blanks).toBeGreaterThan(blanks)
+      expect(
+        runUntil(sim, () => sim.state.quests.offer !== null, 2 * DAY),
+      ).toBeGreaterThan(0)
+      expect(sim.state.quests.offer!.offeredTick).toBeGreaterThanOrEqual(
+        FIRST + 2 * DAY,
+      )
+    }))
 
-  it('maxActive 1: no job card while a quest is active (its draws are blanks); a timeout fails it (grey ticker line, no penalty), then the job cooldown', () => {
-    const sim = deckOn(quietSim(5, RUSH_JOBS))
-    injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    runTicks(sim, FIRST)
-    const q = acceptOffer(sim)
-    const money = sim.state.economy.balance
-    const failed = collect(sim, 'quest:failed')
-    const news = collect(sim, 'ticker:news')
-    const offered = collect(sim, 'quest:offered')
-    const blanks = sim.state.events.stats.blanks
-    runTicks(sim, 3 * DAY)
-    expect(sim.state.tick).toBe(q.deadlineTick)
-    expect(sim.state.quests.active?.id).toBe(q.id)
-    expect(sim.state.quests.offer).toBeNull()
-    expect(offered).toEqual([])
-    expect(sim.state.events.stats.blanks).toBeGreaterThan(blanks)
-    runTicks(sim, 1)
-    expect(sim.state.quests.active).toBeNull()
-    expect(failed).toEqual([
-      { questId: q.id, templateId: 'rush_district', reason: 'timeout' },
-    ])
-    expect(news.filter((n) => n.kind === 'questFailed')).toEqual([
-      { text: 'Quest expired: Rush hour', kind: 'questFailed' },
-    ])
-    expect(sim.state.quests.history.at(-1)).toMatchObject({
-      outcome: 'failed',
-      reason: 'timeout',
-    })
-    expect(sim.state.quests.jobReadyTick).toBe(q.deadlineTick! + 1 + JOB_CD)
-    // No penalty (Q-B2-7): only payroll moved the balance.
-    const payroll = sim.state.employees.reduce((s, e) => s + e.salaryPerDay, 0)
-    expect(sim.state.economy.balance).toBe(money - 3 * payroll)
-  })
+  it('maxActive 1: no job card while a quest is active (its draws are blanks); a timeout fails it (grey ticker line, no penalty), then the job cooldown', () =>
+    withDecisions(false, () => {
+      const sim = deckOn(quietSim(5, RUSH_JOBS))
+      injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
+      runTicks(sim, FIRST)
+      const q = acceptOffer(sim)
+      const money = sim.state.economy.balance
+      const failed = collect(sim, 'quest:failed')
+      const news = collect(sim, 'ticker:news')
+      const offered = collect(sim, 'quest:offered')
+      const blanks = sim.state.events.stats.blanks
+      runTicks(sim, 3 * DAY)
+      expect(sim.state.tick).toBe(q.deadlineTick)
+      expect(sim.state.quests.active?.id).toBe(q.id)
+      expect(sim.state.quests.offer).toBeNull()
+      expect(offered).toEqual([])
+      expect(sim.state.events.stats.blanks).toBeGreaterThan(blanks)
+      runTicks(sim, 1)
+      expect(sim.state.quests.active).toBeNull()
+      expect(failed).toEqual([
+        { questId: q.id, templateId: 'rush_district', reason: 'timeout' },
+      ])
+      expect(news.filter((n) => n.kind === 'questFailed')).toEqual([
+        { text: 'Quest expired: Rush hour', kind: 'questFailed' },
+      ])
+      expect(sim.state.quests.history.at(-1)).toMatchObject({
+        outcome: 'failed',
+        reason: 'timeout',
+      })
+      expect(sim.state.quests.jobReadyTick).toBe(q.deadlineTick! + 1 + JOB_CD)
+      // No penalty (Q-B2-7): only payroll moved the balance.
+      const payroll = sim.state.employees.reduce(
+        (s, e) => s + e.salaryPerDay,
+        0,
+      )
+      expect(sim.state.economy.balance).toBe(money - 3 * payroll)
+    }))
 
   it('no back-to-back repeat: the newest history template is left out while another is eligible (seeds 1–10)', () => {
     for (let seed = 1; seed <= 10; seed++) {
@@ -399,33 +405,34 @@ describe('job cards (B3 §3.1–§3.2): the deck draws jobs; Accept / Decline; t
     }
   })
 
-  it('an empty pool: the due draw is a blank (no job roll, no quest-stream draw — one cadence draw, the gap); the next draw with an eligible template offers with one quest-stream draw', () => {
-    // Like clockwork locked to L2: nothing at L1 is eligible in a quiet city.
-    const sim = deckOn(
-      quietSim(6, {
-        quests: { templates: [{}, {}, {}, {}, { unlockLevel: 2 }] },
-        ...ALWAYS_JOBS,
-      }),
-    )
-    const word = sim.state.quests.rng
-    const cadence = sim.state.events.rng
-    runTicks(sim, FIRST)
-    expect(sim.state.quests.offer).toBeNull()
-    expect(sim.state.events.open).toBeNull()
-    expect(sim.state.events.stats.blanks).toBe(1)
-    expect(sim.state.quests.rng).toBe(word)
-    expect(sim.state.events.rng).toBe(afterDraws(cadence, 1))
-    expect(eligibleTemplates(sim)).toEqual([])
-    injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    const next = sim.state.events.nextDrawTick
-    expect(
-      runUntil(sim, () => sim.state.quests.offer !== null, 2 * DAY),
-    ).toBeGreaterThan(0)
-    expect(sim.state.tick).toBe(next)
-    expect(sim.state.quests.offer?.templateId).toBe('rush_district')
-    expect(sim.state.quests.rng).toBe(afterDraws(word, 1))
-    expect(sim.state.events.rng).toBe(afterDraws(cadence, 3))
-  })
+  it('an empty pool: the due draw is a blank (no job roll, no quest-stream draw — one cadence draw, the gap); the next draw with an eligible template offers with one quest-stream draw', () =>
+    withDecisions(false, () => {
+      // Like clockwork locked to L2: nothing at L1 is eligible in a quiet city.
+      const sim = deckOn(
+        quietSim(6, {
+          quests: { templates: [{}, {}, {}, {}, { unlockLevel: 2 }] },
+          ...ALWAYS_JOBS,
+        }),
+      )
+      const word = sim.state.quests.rng
+      const cadence = sim.state.events.rng
+      runTicks(sim, FIRST)
+      expect(sim.state.quests.offer).toBeNull()
+      expect(sim.state.events.open).toBeNull()
+      expect(sim.state.events.stats.blanks).toBe(1)
+      expect(sim.state.quests.rng).toBe(word)
+      expect(sim.state.events.rng).toBe(afterDraws(cadence, 1))
+      expect(eligibleTemplates(sim)).toEqual([])
+      injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
+      const next = sim.state.events.nextDrawTick
+      expect(
+        runUntil(sim, () => sim.state.quests.offer !== null, 2 * DAY),
+      ).toBeGreaterThan(0)
+      expect(sim.state.tick).toBe(next)
+      expect(sim.state.quests.offer?.templateId).toBe('rush_district')
+      expect(sim.state.quests.rng).toBe(afterDraws(word, 1))
+      expect(sim.state.events.rng).toBe(afterDraws(cadence, 3))
+    }))
 })
 
 describe('the quest stream: job templates and a magic Accept never advance state.rng (design-m7 §3.6; B3 D-2)', () => {

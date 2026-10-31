@@ -151,3 +151,43 @@ export function ellipsize(
   while (s.length > 0 && measure(s + '…') > maxW) s = s.slice(0, -1)
   return s.trimEnd() + '…'
 }
+
+/**
+ * Word-wrap `text` at `maxW` px into at most `maxLines` lines; words longer
+ * than a line stay whole, and text past the last line ends that line with
+ * `…`. `measure` is the BitmapText width of a string.
+ */
+export function wrapHeadline(
+  text: string,
+  maxW: number,
+  maxLines: number,
+  measure: (s: string) => number,
+): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let line = ''
+  let i = 0
+  for (; i < words.length; i++) {
+    const w = words[i] as string
+    const next = line ? `${line} ${w}` : w
+    if (!line || measure(next) <= maxW) {
+      line = next
+      continue
+    }
+    lines.push(line)
+    line = w
+    if (lines.length === maxLines) break
+  }
+  if (lines.length < maxLines) {
+    if (line) lines.push(line)
+    return lines
+  }
+  // Out of lines with words left: the last line runs on and is cut with `…`.
+  const rest = [line, ...words.slice(i + 1)].join(' ')
+  lines[maxLines - 1] = ellipsize(
+    `${lines[maxLines - 1] as string} ${rest}`,
+    maxW,
+    measure,
+  )
+  return lines
+}

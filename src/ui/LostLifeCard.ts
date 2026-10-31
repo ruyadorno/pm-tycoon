@@ -38,13 +38,19 @@
 // origin (the Dialog pattern), so it covers every HUD camera; its dim
 // backdrop swallows taps. Esc / Enter = Continue. The model functions are
 // pure (tests/ui/lost-life-card.test.ts); Phaser is a type-only import.
+//
+// Build 3 M12 (B3 §3.4, D-M12-16): a life an event option took opens the
+// short event variant instead (`open(eventLostLifeModel(p, data))`): the
+// card's title in red, `You chose: Take the strike`, `Lives: 2`, the lives
+// row and one full-width `OK` (`lostLife:ok`, Continue; Esc / Enter too).
+// There is no route and no warehouse button: no parcel was involved.
 import type Phaser from 'phaser'
 import { removeCamera } from './cameraBits.ts'
 import type { GameData, StrainId } from '../data/types.ts'
 import type { FrameName } from '../render/frames.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { counterChoice } from '../sim/detection.ts'
-import type { LifeLostPayload } from '../sim/events.ts'
+import type { LifeLostEventPayload, LifeLostPayload } from '../sim/events.ts'
 import type { LaneNode, Size, TraceEntry } from '../sim/types.ts'
 import { TICKS_PER_S } from '../sim/types.ts'
 import { Button } from './Button.ts'
@@ -54,13 +60,17 @@ import { startInspectorP } from './Onboarding.ts'
 import { addPanel } from './Panel.ts'
 import { claimKey, offscreenOrigin, popModal, pushModal } from './Sheet.ts'
 import { addText, lineCount, LINE_H, textTop } from './text.ts'
-import { THEME } from './theme.ts'
+import { PALETTE, THEME } from './theme.ts'
 import { sailedText } from './hubText.ts'
 
 /** city-view §3.3 step 5: the card opens this long after `life:lost`. */
 export const LOST_LIFE_DELAY_MS = 600
 export const LOST_LIFE_TITLE = 'MALWARE DELIVERED'
 export const CARD_MAX_H = 440
+/** Build 3 M12 (B3 §3.4): the event variant's one button. */
+export const LOST_LIFE_OK = 'OK'
+/** Build 3 M12: the event variant is at most this wide (the EventCard's width). */
+export const LOST_LIFE_EVENT_MAX_W = 300
 const PAD = 12
 const BTN_H = 44
 const BTN_GAP = 8
@@ -533,6 +543,8 @@ const STRAIN_ICON: Record<StrainId, FrameName> = {
 }
 
 export interface LostLifeModel {
+  /** Build 3 M12: the malware card (absent in build-2 call sites). */
+  kind?: 'malware'
   label: string
   strain: StrainId | null
   parcelFrame: FrameName
@@ -567,6 +579,64 @@ export function lostLifeModel(
     highlight:
       counterPick(p) === 'inspector' ? null : (p.counterMachineId ?? null),
   }
+}
+
+/**
+ * Build 3 M12 (B3 §3.5, D-M12-16): the event variant — the card's title, the
+ * `You chose: …` line, the lives left and one OK (no route, no warehouse).
+ */
+export interface LostLifeEventModel {
+  kind: 'event'
+  title: string
+  choice: string
+  livesText: string
+  lives: number
+}
+
+export type LostLifeCardModel = LostLifeModel | LostLifeEventModel
+
+/** The event variant's model, from the `life:lost {cause:'event'}` payload. */
+export function eventLostLifeModel(
+  p: LifeLostEventPayload,
+  data: GameData,
+): LostLifeEventModel {
+  return {
+    kind: 'event',
+    title: p.title,
+    choice: data.puns.eventWords.youChose.replaceAll('{option}', p.option),
+    livesText: `Lives: ${p.report.livesLeft}`,
+    lives: p.report.livesLeft,
+  }
+}
+
+/** Build 3 M12: the event variant's width on a `W`-px canvas: min(300, max(200, W − 24)). */
+export function lostLifeEventWidth(W: number): number {
+  return Math.min(LOST_LIFE_EVENT_MAX_W, Math.max(200, Math.round(W) - 24))
+}
+
+/**
+ * Build 3 M12: the event variant's height for `titleLines` title lines and
+ * `choiceLines` choice lines (buildEvent's own arithmetic): the title, the
+ * choice + 8, `Lives: N` (18), the lives row + 10, the OK button and PAD;
+ * never under 120.
+ */
+export function lostLifeEventHeight(
+  titleLines: number,
+  choiceLines: number,
+): number {
+  const y =
+    PAD -
+    4 +
+    (Math.max(1, titleLines) - 1) * LINE_H +
+    18 +
+    Math.max(1, choiceLines) * LINE_H +
+    8 +
+    18 +
+    16 +
+    10 +
+    BTN_H +
+    PAD
+  return Math.max(y, 120)
 }
 
 /**
@@ -639,7 +709,7 @@ export class LostLifeCard {
   readonly scene: Phaser.Scene
   private L: Layout
   private opts: LostLifeCardOptions
-  private model: LostLifeModel | null = null
+  private model: LostLifeCardModel | null = null
   private root: Phaser.GameObjects.Container | null = null
   private cam: Phaser.Cameras.Scene2D.Camera | null = null
   private lives: LivesRow | null = null
@@ -657,7 +727,7 @@ export class LostLifeCard {
   }
 
   /** The open card's model (e2e / debug). */
-  get current(): LostLifeModel | null {
+  get current(): LostLifeCardModel | null {
     return this.model
   }
 
@@ -666,7 +736,7 @@ export class LostLifeCard {
     return this.model ? { ...this.panelRect } : null
   }
 
-  open(model: LostLifeModel): void {
+  open(model: LostLifeCardModel): void {
     this.teardown()
     this.model = model
     this.build()
@@ -698,7 +768,8 @@ export class LostLifeCard {
     const m = this.model
     if (!m) return
     this.close()
-    if (which === 'warehouse') this.opts.onOpenWarehouse(m.highlight)
+    if (which === 'warehouse')
+      this.opts.onOpenWarehouse(m.kind === 'event' ? null : m.highlight)
     else this.opts.onContinue()
   }
 
@@ -718,9 +789,111 @@ export class LostLifeCard {
     this.cam = null
   }
 
+  /**
+   * Build 3 M12 (B3 §3.4, D-M12-16): the event variant — the card's title
+   * (danger red), `You chose: {option}`, `Lives: N`, the lives row and one
+   * full-width `OK` (Continue). Same camera and backdrop as the malware
+   * card; at most 300 wide, fitted to its content and centred.
+   */
+  private buildEvent(m: LostLifeEventModel): void {
+    const scene = this.scene
+    const { W, H } = this.L
+    const o = offscreenOrigin()
+    const w = lostLifeEventWidth(W)
+    const inner = w - 2 * PAD
+
+    const backdrop = scene.add
+      .rectangle(0, 0, W, H, THEME.shadow, BACKDROP_ALPHA)
+      .setOrigin(0, 0)
+      .setInteractive()
+    const panel = addPanel(scene, 0, 0, w, 64, 'ui_panel').setInteractive()
+    const place: { obj: { x: number; y: number }; x: number; y: number }[] = []
+    const put = <T extends { x: number; y: number }>(
+      obj: T,
+      x: number,
+      y: number,
+    ): T => {
+      place.push({ obj, x, y })
+      return obj
+    }
+
+    let y = PAD - 4
+    const title = addText(scene, 0, 0, m.title, {
+      tint: THEME.danger,
+      maxWidth: inner,
+      align: 'center',
+    })
+    put(title, Math.round((w - title.width) / 2), y)
+    y += (lineCount(title) - 1) * LINE_H + 18
+    const choice = addText(scene, 0, 0, m.choice, {
+      tint: THEME.textDark,
+      maxWidth: inner,
+      align: 'center',
+    })
+    put(choice, Math.round((w - choice.width) / 2), y)
+    y += lineCount(choice) * LINE_H + 8
+    const livesText = addText(scene, 0, 0, m.livesText, { tint: PALETTE.grey1 })
+    put(livesText, Math.round((w - livesText.width) / 2), y)
+    y += 18
+
+    const lives = new LivesRow(scene, 0, 0)
+    lives.set(m.lives)
+    put(lives.root, Math.round((w - livesRowWidth()) / 2), y)
+    this.lives = lives
+    y += 16 + 10
+
+    const ok = new Button(scene, {
+      x: 0,
+      y: 0,
+      w: inner,
+      h: BTN_H,
+      label: LOST_LIFE_OK,
+      face: 'primary',
+      minHit: this.L.minHit,
+      id: 'lostLife:ok',
+      onClick: () => this.choose('continue'),
+    })
+    put(ok, PAD, y)
+    this.buttons = [ok]
+    y += BTN_H + PAD
+
+    const h = Math.max(y, 120)
+    const px = Math.round((W - w) / 2)
+    const py = Math.max(0, Math.round((H - h) / 2))
+    panel.setPosition(px, py).setSize(w, h)
+    if (panel.input?.hitArea)
+      (panel.input.hitArea as Phaser.Geom.Rectangle).setTo(0, 0, w, h)
+    for (const p of place) {
+      const obj = p.obj as unknown as Phaser.GameObjects.Components.Transform
+      obj.setPosition(px + p.x, py + p.y)
+    }
+    this.panelRect = { x: px, y: py, w, h }
+
+    const root = scene.add.container(o.x, o.y, [
+      backdrop,
+      panel,
+      title,
+      choice,
+      livesText,
+      lives.root,
+      ok,
+    ])
+    root.setDepth(100000)
+    for (const c of scene.cameras.cameras) c.ignore(root)
+    const cam = scene.cameras.add(0, 0, W, H)
+    cam.setScroll(o.x, o.y)
+    for (const obj of scene.children.list) if (obj !== root) cam.ignore(obj)
+    this.root = root
+    this.cam = cam
+  }
+
   private build(): void {
     const m = this.model
     if (!m) return
+    if (m.kind === 'event') {
+      this.buildEvent(m)
+      return
+    }
     const scene = this.scene
     const { W, H } = this.L
     const o = offscreenOrigin()

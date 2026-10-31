@@ -9,10 +9,12 @@
 // Decline / Esc / Enter, Accept left to the caller, deny, refresh, the
 // Abandon confirm and the complete state. Phaser is stubbed with chainable
 // no-op game objects (the card builds real kit Buttons).
-// Build 3 interim (M11, D-18): a job offer is Accept · Decline (Decline at
-// the right edge, x + 214 as before), no Later and no expiry (`waiting for
-// you`); Esc / outside only hide it; the abandon text names
-// events.schedule.jobCooldownDays.
+// Build 3 M12 (B3 §3.4, §6 "one path for jobs"): a job offer is an EventCard,
+// so the M11 interim job mode (Accept · Decline at the right edge, Esc only
+// hiding the card) is gone: the offer mode is Accept · Later (only the
+// Golden Release reaches it), no mode shows Decline, and Esc / outside are
+// Later again. A job offer's time row (`waiting for you`, D-18) still answers
+// a direct call; the abandon text names events.schedule.jobCooldownDays.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -203,10 +205,11 @@ describe('design-m7 §6.3: the card rect, 8 px above the bottom bar', () => {
       { name: 'accept', x: 6, w: 120 },
       { name: 'later', x: 134, w: 72 },
     ])
-    // A job offer (D-18): no Later — Decline keeps its x + 214 tap.
+    // M12: the interim job row (Decline moved to the right edge) is gone —
+    // two buttons just follow each other.
     expect(qc.questCardButtonRects(300, ['accept', 'decline'])).toEqual([
       { name: 'accept', x: 6, w: 120 },
-      { name: 'decline', x: 214, w: 72 },
+      { name: 'decline', x: 134, w: 72 },
     ])
     expect(qc.questCardButtonRects(300, ['abandon', 'close'])).toEqual([
       { name: 'abandon', x: 6, w: 96 },
@@ -262,7 +265,7 @@ describe('M5 atlas rule: the card binds world frames only', () => {
 // ---- model ------------------------------------------------------------------------------
 
 describe('design-m7 §6.3: the model per mode', () => {
-  it('a job offer (build 3, D-18): JOB BOARD, Accept / Decline (no Later), no bar, the time, no expiry', () => {
+  it('M12: the offer mode is Accept / Later for any quest (a job offer is an EventCard since M12; its model still reads JOB BOARD and `waiting for you`), never Decline', () => {
     const q = at(offer('rush_district'), 'downtown')
     const m = qc.questCardModel(data, q, 'offer', OFFER_TICK + 150, names, null)
     expect(m).toEqual({
@@ -274,10 +277,13 @@ describe('design-m7 §6.3: the model per mode', () => {
       reward: 'Reward: $120',
       time: 'Time: 3 days · waiting for you',
       bar: null,
-      buttons: ['accept', 'decline'],
+      buttons: ['accept', 'later'],
       blocked: null,
       waiting: false,
     })
+    for (const mode of ['offer', 'active', 'complete'] as const)
+      for (const ultimate of [false, true])
+        expect(qc.questCardButtons({ ultimate }, mode)).not.toContain('decline')
   })
 
   it('the Golden Release offer: gold, its own masthead, Accept / Later only (no Decline), no expiry', () => {
@@ -583,19 +589,19 @@ function onlyCalled(
 }
 
 describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
-  it('opens a job offer on top of the modal stack: Accept / Decline, no Later (D-18); a tap outside only hides it (onLater only)', () => {
+  it('opens an offer on top of the modal stack: Accept / Later (M12: no interim job mode); a tap outside is Later (onLater only)', () => {
     const { card, cb } = makeCard()
-    const q = offer('rush_district')
+    const q = offer('golden_release')
     const before = modalCount()
     card.open(q, 'offer', OFFER_TICK, 4)
     expect(card.isOpen).toBe(true)
     expect(card.questId).toBe(q.id)
     expect(card.mode).toBe('offer')
-    expect(card.model?.buttons).toEqual(['accept', 'decline'])
+    expect(card.model?.buttons).toEqual(['accept', 'later'])
     expect(modalCount()).toBe(before + 1)
     expect(topModal()).toBe(card)
-    // No Later button on a job: the tap does nothing.
-    card.tap('later')
+    // No Decline on any offer: the tap does nothing.
+    card.tap('decline')
     expect(card.isOpen).toBe(true)
     ;(card as unknown as { outside(): void }).outside()
     expect(card.isOpen).toBe(false)
@@ -612,9 +618,9 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     onlyCalled(cb, 'onLater')
   })
 
-  it('Esc only hides a job offer (onLater; the sim stays held on its card); Enter is Accept and leaves the card open for the caller', () => {
+  it('Esc is Later on an offer (onLater); Enter is Accept and leaves the card open for the caller', () => {
     const { card, cb, scene } = makeCard()
-    const q = offer('rush_district')
+    const q = offer('golden_release')
     card.open(q, 'offer', OFFER_TICK, 4)
     scene.input.keyboard.emit('keydown', key('Enter'))
     expect(cb.onAccept).toHaveBeenCalledWith(q.id)
@@ -628,19 +634,15 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     expect(cb.onAccept).toHaveBeenCalledTimes(1)
   })
 
-  it('Decline closes and reports the id; the Golden Release has no Decline', () => {
+  it('M12: no offer shows Decline any more (a job is declined on its EventCard): the tap does nothing', () => {
     const { card, cb } = makeCard()
-    const q = offer('rush_district')
-    card.open(q, 'offer', OFFER_TICK, 4)
-    card.tap('decline')
-    expect(card.isOpen).toBe(false)
-    expect(cb.onDecline).toHaveBeenCalledWith(q.id)
-    const u = offer('golden_release')
-    card.open(u, 'offer', OFFER_TICK, 4)
-    card.tap('decline')
-    expect(card.isOpen).toBe(true)
-    expect(cb.onDecline).toHaveBeenCalledTimes(1)
-    card.close()
+    for (const id of ['rush_district', 'golden_release']) {
+      card.open(offer(id), 'offer', OFFER_TICK, 4)
+      card.tap('decline')
+      expect(card.isOpen).toBe(true)
+      card.close()
+    }
+    expect(cb.onDecline).not.toHaveBeenCalled()
   })
 
   it('Accept through the sim: the caller closes on success, or denies a refusal (shake, deny SFX, tooltip over Accept)', () => {

@@ -52,6 +52,7 @@ import type {
   VehicleType,
 } from '../../src/sim/types.ts'
 import {
+  isAbsent,
   laneNode,
   liveSlotIds,
   TICKS_PER_DAY,
@@ -320,7 +321,13 @@ export class Monitor {
       if (v.state === 'idle_lot' && v.nextDriverId !== null) {
         this.fail(`${v.name} idle_lot with a Replace still pending`)
       }
-      if (v.state === 'inactive' && driver && driver.active) {
+      // An event's absence (B3 §3.5, D-10) parks a vehicle with its driver.
+      if (
+        v.state === 'inactive' &&
+        driver &&
+        driver.active &&
+        !isAbsent(v, s.tick)
+      ) {
         this.fail(`${v.name} inactive with an active driver`)
       }
       if (
@@ -371,9 +378,15 @@ export class Monitor {
           this.fail(`${n.id}: desk lists unknown inspector ${id}`)
         }
       }
-      if (f.inspectorIds.length !== f.checker.stations) {
+      // Stations are the on-duty inspectors: an absent one keeps the seat
+      // (B3 §3.5, D-10; people.ts syncDesk).
+      const onDuty = f.inspectorIds.filter((id) => {
+        const e = s.employees.find((x) => x.id === id)
+        return e === undefined || !isAbsent(e, s.tick)
+      })
+      if (onDuty.length !== f.checker.stations) {
         this.fail(
-          `${n.id}: ${f.inspectorIds.length} inspectors ≠ ${f.checker.stations} stations`,
+          `${n.id}: ${onDuty.length} inspectors on duty ≠ ${f.checker.stations} stations`,
         )
       }
     }

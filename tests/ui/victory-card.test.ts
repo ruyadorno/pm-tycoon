@@ -4,7 +4,11 @@
 // missed, lives, level reached — the card's height at 360×604, and the card
 // on a stub scene: on top of the modal stack with its own camera, Enter / Esc
 // = Continue, closing removes the camera. Phaser is stubbed with chainable
-// no-op game objects (the card builds real kit Buttons).
+// no-op game objects (the card builds real kit Buttons). Build 3 M12 (B3 §5,
+// D-M12-12): the 208×104 `victory_art` drawn 1:1 under TYCOON (the card
+// grows 112 px and still fits 360×604) and the confetti burst — one scene
+// timer on `open(m, {burst: true})`, none on a relayout, stopped before the
+// container goes.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -61,6 +65,9 @@ const { wrapHeadline } = await import('../../src/ui/Newspaper.ts')
 const { computeLayout } = await import('../../src/ui/layout.ts')
 const { modalCount, topModal } = await import('../../src/ui/Sheet.ts')
 const { dataFixture } = await import('../sim/helpers.ts')
+const { inAtlas } = await import('../../src/render/frames.generated.ts')
+const { CONFETTI_LIFT, CONFETTI_PIECES } =
+  await import('../../src/ui/confetti.ts')
 
 const data = dataFixture()
 
@@ -107,7 +114,7 @@ describe('spec-build2 §3.4: TYCOON and the run stats', () => {
   })
 })
 
-describe('design-m7 §6.6: the card fits 360×604 (≈ 340 px tall)', () => {
+describe('design-m7 §6.6 / B3 §5: the card fits 360×604 with the victory art (454 px)', () => {
   const xml = readFileSync(
     new URL('../../src/assets/m5x7.xml', import.meta.url),
     'utf8',
@@ -125,11 +132,33 @@ describe('design-m7 §6.6: the card fits 360×604 (≈ 340 px tall)', () => {
     expect(lines.length).toBeLessThanOrEqual(2)
     for (const [label, value] of m.stats)
       expect(width(label) + 8 + width(value)).toBeLessThanOrEqual(inner)
-    const h = vc.victoryCardHeight(lines.length, m.stats.length)
-    expect(h).toBeGreaterThan(300)
-    expect(h).toBeLessThanOrEqual(360)
-    const L = computeLayout(360, 604, 0, 0, 1)
-    expect(h).toBeLessThanOrEqual(L.H - L.safeTop - L.safeBottom)
+    // Without the art (no frame): the build-2 card, ≈ 340 px.
+    const bare = vc.victoryCardHeight(lines.length, m.stats.length, false)
+    expect(bare).toBeGreaterThan(300)
+    expect(bare).toBeLessThanOrEqual(360)
+    // B3 §5: the art adds 104 + 8 and the card still fits 360×604.
+    const h = vc.victoryCardHeight(lines.length, m.stats.length, true)
+    expect(h).toBe(bare + vc.VICTORY_ART_H + vc.VICTORY_ART_GAP)
+    expect(vc.victoryCardHeight(2, 6)).toBe(454)
+    expect(h).toBeGreaterThan(400)
+    for (const [W, H] of [
+      [360, 604],
+      [393, 659],
+      [430, 932],
+    ] as const) {
+      const L = computeLayout(W, H, 0, 0, 1)
+      expect(h, `${W}×${H}`).toBeLessThanOrEqual(L.H - L.safeTop - L.safeBottom)
+    }
+    // The 208-px art fits the card's inner width at 360 (288).
+    expect(inner).toBe(288)
+    expect(vc.VICTORY_ART_W).toBeLessThanOrEqual(inner)
+    expect([vc.VICTORY_ART_W, vc.VICTORY_ART_H]).toEqual([208, 104])
+  })
+
+  it('victory_art and the confetti frames are packed in the world atlas', () => {
+    expect(inAtlas('victory_art', 'world')).toBe(true)
+    for (let f = 0; f < 8; f++)
+      expect(inAtlas(`fx_confetti_f${f}`, 'world'), `f${f}`).toBe(true)
   })
 })
 
@@ -162,16 +191,23 @@ const obj = (): object => chain({})
 function fakeScene() {
   const added: unknown[] = []
   const removed: unknown[] = []
+  const images: { x: number; y: number; frame: string }[] = []
+  const timerRemove = vi.fn()
+  const addEvent = vi.fn(() => ({ remove: timerRemove }))
   const scene = {
     scale: { width: 360, height: 604, zoom: 1 },
     add: {
       rectangle: obj,
       nineslice: obj,
       bitmapText: obj,
-      image: obj,
+      image: (x: number, y: number, _atlas: string, frame: string) => {
+        images.push({ x, y, frame })
+        return chain({})
+      },
       container: obj,
       existing: (o: unknown) => o,
     },
+    time: { addEvent },
     cameras: {
       cameras: [] as unknown[],
       add: () => {
@@ -186,7 +222,7 @@ function fakeScene() {
     events: emitter(),
     game: { events: emitter() },
   }
-  return { scene, added, removed }
+  return { scene, added, removed, images, addEvent, timerRemove }
 }
 
 const key = (k: string) => ({ key: k, repeat: false }) as KeyboardEvent
@@ -229,5 +265,58 @@ describe('design-m7 §6.6: the card (modal, its own camera, Enter = Continue)', 
     scene.input.keyboard.emit('keydown', key('Enter'))
     expect(onContinue).toHaveBeenCalledTimes(2)
     card.destroy()
+  })
+})
+
+describe('B3 §5 / D-M12-12: the victory art and the confetti burst on the card', () => {
+  const L = computeLayout(360, 604, 0, 0, 1)
+  const opts = { onContinue: vi.fn(), onNewGame: vi.fn() }
+
+  it('draws victory_art 1:1, centred, right under TYCOON; no burst without the option', () => {
+    const { scene, images, addEvent } = fakeScene()
+    const card = new vc.VictoryCard(scene as never, L, data, opts)
+    card.open(vc.victoryModel(INPUT, data))
+    const art = images.filter((i) => i.frame === 'victory_art')
+    expect(art).toHaveLength(1)
+    expect(art[0]!.x).toBe(Math.round((360 - vc.VICTORY_ART_W) / 2))
+    // The stub's headline wraps to 2 lines: the card is 454 px, centred in
+    // the safe area, and the art starts PAD + TITLE_H + 10 below its top.
+    const ch = vc.victoryCardHeight(2, 6)
+    const cy = L.safeTop + Math.round((L.H - L.safeTop - L.safeBottom - ch) / 2)
+    expect(art[0]!.y).toBe(cy + 16 + 28 + 10)
+    expect(addEvent).not.toHaveBeenCalled()
+    expect(card.bursting).toBe(false)
+    card.close()
+  })
+
+  it('open(m, {burst: true}) starts one burst over the top edge; a relayout neither replays nor keeps it; close stops it', () => {
+    const { scene, images, addEvent, timerRemove } = fakeScene()
+    const card = new vc.VictoryCard(scene as never, L, data, opts)
+    card.open(vc.victoryModel(INPUT, data), { burst: true })
+    expect(addEvent).toHaveBeenCalledTimes(1)
+    expect(card.bursting).toBe(true)
+    const ch = vc.victoryCardHeight(2, 6)
+    const cy = L.safeTop + Math.round((L.H - L.safeTop - L.safeBottom - ch) / 2)
+    const pieces = images.filter((i) => i.frame === 'fx_confetti_f0')
+    expect(pieces.map((p) => p.x)).toEqual(
+      CONFETTI_PIECES.map((p) => 180 + p.dx),
+    )
+    expect(pieces.every((p) => p.y === cy - CONFETTI_LIFT)).toBe(true)
+    // A relayout rebuilds with no burst: the running one stops first.
+    card.relayout(computeLayout(393, 659, 0, 0, 1))
+    expect(addEvent).toHaveBeenCalledTimes(1)
+    expect(timerRemove).toHaveBeenCalledTimes(1)
+    expect(card.bursting).toBe(false)
+    card.close()
+    expect(timerRemove).toHaveBeenCalledTimes(1)
+
+    // Closing while it runs stops it (before the root is destroyed).
+    const b = fakeScene()
+    const c2 = new vc.VictoryCard(b.scene as never, L, data, opts)
+    c2.open(vc.victoryModel(INPUT, data), { burst: true })
+    expect(b.addEvent).toHaveBeenCalledTimes(1)
+    c2.close()
+    expect(b.timerRemove).toHaveBeenCalledTimes(1)
+    expect(c2.bursting).toBe(false)
   })
 })

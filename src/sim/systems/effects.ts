@@ -287,7 +287,10 @@ function scopeDistricts(
 }
 
 /** Owned vehicles of `type` (all with none). */
-function vehicleCount(s: SimState, type: VehicleTypeId | undefined): number {
+export function vehicleCount(
+  s: SimState,
+  type: VehicleTypeId | undefined,
+): number {
   if (type === undefined) return s.vehicles.length
   return s.vehicles.filter((v) => v.type === type).length
 }
@@ -848,6 +851,27 @@ export function effectSummary(
   return out
 }
 
+/**
+ * `delta` per owned vehicle (of `type`): `−$120 ($40 × 3 vehicles)`, or
+ * `$0 (no vans)` — a moneyPerVehicle effect's line and a costPerVehicle
+ * price's (deck.ts optionLines, review deck-1).
+ */
+export function perVehicleLine(
+  view: ModCtx,
+  delta: number,
+  type?: VehicleTypeId,
+): EffectLine {
+  const n = vehicleCount(view.state, type)
+  const noun =
+    type === undefined ? plural(n, 'vehicle') : vehicleWord(view, type, n)
+  if (n === 0) return line(`$0 (no ${noun})`, null)
+  const total = delta * n
+  return line(
+    `${money(total)} ($${Math.abs(delta)} × ${n} ${noun})`,
+    total === 0 ? null : total > 0,
+  )
+}
+
 function linesOf(
   view: ModCtx,
   e: EventEffect,
@@ -858,21 +882,8 @@ function linesOf(
   switch (e.kind) {
     case 'money':
       return [line(money(e.delta), e.delta === 0 ? null : e.delta > 0)]
-    case 'moneyPerVehicle': {
-      const n = vehicleCount(s, e.type)
-      const noun =
-        e.type === undefined
-          ? plural(n, 'vehicle')
-          : vehicleWord(view, e.type, n)
-      if (n === 0) return [line(`$0 (no ${noun})`, null)]
-      const total = e.delta * n
-      return [
-        line(
-          `${money(total)} ($${Math.abs(e.delta)} × ${n} ${noun})`,
-          total === 0 ? null : total > 0,
-        ),
-      ]
-    }
+    case 'moneyPerVehicle':
+      return [perVehicleLine(view, e.delta, e.type)]
     case 'moneyPct': {
       const amount = pctAmount(s.economy.balance, e.pct)
       return [

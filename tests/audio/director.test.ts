@@ -405,7 +405,7 @@ describe('AudioDirector: loop throttles (audio.md §7)', () => {
 })
 
 describe('AudioDirector: quests and victory (build 2 M7, design-m7 §6.9)', () => {
-  it('quest:offered rings the bell, quest:completed plays questDone', async () => {
+  it('quest:offered rings the bell for the Golden Release only (a job offer is an EventCard: the HUD plays eventPing — D-M12-14); quest:completed plays questDone', async () => {
     const { d, sim } = await unlocked()
     sim.emit('quest:offered', {
       questId: 'q1',
@@ -413,9 +413,25 @@ describe('AudioDirector: quests and victory (build 2 M7, design-m7 §6.9)', () =
       target: 'downtown',
       ultimate: false,
     })
+    expect(played(d, 'bell')).toBe(0)
+    sim.emit('quest:offered', {
+      questId: 'q2',
+      templateId: 'golden_release',
+      target: null,
+      ultimate: true,
+    })
     expect(played(d, 'bell')).toBe(1)
     sim.emit('quest:completed', { questId: 'q1', templateId: 'rush_district' })
     expect(played(d, 'questDone')).toBe(1)
+  })
+
+  it('build 3 M12: the HUD-emitted card sounds (ui:sfx eventPing / wah / bell) play through the director', async () => {
+    const { d, game } = await unlocked()
+    for (const name of ['eventPing', 'wah', 'bell'])
+      game.emit('ui:sfx', { name })
+    expect(played(d, 'eventPing')).toBe(1)
+    expect(played(d, 'wah')).toBe(1)
+    expect(played(d, 'bell')).toBe(1)
   })
 
   it('game:victory plays the victory tag (a log line while the stinger set still loads)', async () => {

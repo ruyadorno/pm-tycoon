@@ -68,11 +68,9 @@
 // tap opens the QuestCard (offer: Accept / Later / Decline; active:
 // Abandon / Close) on the modal stack without holding the sim. A new offer
 // opens the card by itself when nothing else is up in the city
-// (questCardAutoOpens; otherwise the chip pulses and it retries). Build 3
-// interim (M11, D-18): a job offer is an event card the sim holds on — its
-// QuestCard has Accept / Decline only (routed by the sim to decideEvent),
-// opens in either view, and Esc only hides it (the chip reopens it); the
-// EventCard takes over in M12.
+// (questCardAutoOpens; otherwise the chip pulses and it retries). Since
+// build 3 M12 only the Golden Release's offer opens a QuestCard: a job offer
+// is an EventCard (below).
 // quest:completed plays the gold `QUEST COMPLETE +$300` stamp rising from the
 // toast lane at the money cell, turns an open card to its complete state and
 // queues a quest / ★ paper; life:gained blinks the newly lit bomb slot (4–5
@@ -125,6 +123,28 @@
 // playing` resumes at the last running speed; `New game` asks first during
 // a live run.
 //
+// Build 3 M12 (B3 §3.3-§3.5, §6; plan-build3 §8.3): the sim's open deck card
+// (a decision, a news card or a job card) shows as the EventCard — a bottom
+// card on this camera, on the modal stack — the moment nothing else is up
+// (hudKit.eventCardOpens: no policy, no modal, no other hold, no lead-in
+// timer, no visible paper, not the level-up moment, the gold card first —
+// R34), and holds the sim ('event': the stepper stops, the music plays on,
+// the ticker freezes) until an option is chosen through ViewSim.event.decide.
+// While it waits the sim holds itself (Sim.held) and the event chip in row B
+// pulses (no HUD hold then: D-M12-5); a tap on the chip raises the card when
+// it can open — the Warehouse's sheets close for it (pm:closeSheets, review
+// hud-1) — else opens the EffectsCard (every live modifier; also the pause
+// menu's `Effects · N`); held, the speed segment lights ❚❚ (review hud-3). A decision pulses the top-bar cells it moved
+// (a before/after diff), plays `wah` / `bell` (decisionSfx; `eventPing` when
+// a card shows), and a chain's end or a decision that moved ≥ $100, a life,
+// a vehicle or a worker runs a one-line paper. A life an option took gets
+// the lost-life card's event variant (or the game-over variant: `The recall
+// — you chose: Take the strike`). The Golden Release's QUEST COMPLETE stamp
+// and the VictoryCard play the confetti (B3 §5) and the victory paper shows
+// victory_art. Job offers (the quest chip, the district panel's quest row,
+// ?quest=) raise the job EventCard; the M11 interim job QuestCard and the
+// interim auto-answer of other cards are gone.
+//
 // Sim events come through bindSim (attached while awake — always — and moved
 // on a Sim swap, with syncAll on WAKE / swap). The autosave timer runs from
 // update(); HIDDEN and pagehide save immediately. Keyboard: Space, 1, 2, 4
@@ -143,7 +163,12 @@ import {
   savedRun,
   writeSettings,
 } from '../boot/autosave.ts'
-import { EV_GOTO, EV_VIEW, type WorldView } from '../boot/nav.ts'
+import {
+  EV_CLOSE_SHEETS,
+  EV_GOTO,
+  EV_VIEW,
+  type WorldView,
+} from '../boot/nav.ts'
 import {
   bindSim,
   getData,
@@ -175,6 +200,7 @@ import {
   roomPlacement,
 } from '../render/warehouse/RoomLayout.ts'
 import type {
+  LifeLostEventPayload,
   LifeLostPayload,
   SimEventPayloads,
   TickerKind,
@@ -182,17 +208,38 @@ import type {
 import type { OnboardingSave } from '../sim/save.ts'
 import type { Sim } from '../sim/sim.ts'
 import type { QuestReward, Role, VehicleType } from '../sim/types.ts'
-import type { QuestView, ViewSim } from '../sim/view-api.ts'
+import type { OpenCardView, QuestView, ViewSim } from '../sim/view-api.ts'
 import { Button } from '../ui/Button.ts'
+import {
+  CONFETTI_HALF_SPAN,
+  confettiBurst,
+  type ConfettiBurst,
+} from '../ui/confetti.ts'
 import { Dialog } from '../ui/Dialog.ts'
 import { DistrictPanel } from '../ui/DistrictPanel.ts'
+import { EffectsCard, effectsCardModel } from '../ui/EffectsCard.ts'
+import { EventCard } from '../ui/EventCard.ts'
+import { EventChip, eventChipModel } from '../ui/EventChip.ts'
 import { FollowStrip } from '../ui/FollowStrip.ts'
 import { dockBoughtToast } from '../ui/hubText.ts'
 import {
   addTapZone,
+  cellDiff,
   chipEntries,
+  decisionSfx,
   delegateDefusedLine,
   detectionColour,
+  EVENT_PULSE_MS,
+  eventCardOpens,
+  eventChainEnded,
+  eventIncidentLine,
+  eventNewsHeadline,
+  eventNewsworthy,
+  eventPulseAlpha,
+  type CellSnapshot,
+  type EventOpenGate,
+  type PulseCell,
+  type QuestAutoOpen,
   firedToast,
   firedToastsFor,
   floatsGold,
@@ -213,6 +260,7 @@ import {
   nowPlayingText,
   paydayToast,
   payrollShortLine,
+  pulsedCells,
   questCardAutoOpens,
   regionOpenLine,
   victoryCardPending,
@@ -236,6 +284,7 @@ import { GameOverCard, gameOverModel } from '../ui/GameOverCard.ts'
 import {
   computeLayout,
   overlaps,
+  rowB,
   type Layout,
   type Rect,
 } from '../ui/layout.ts'
@@ -250,6 +299,7 @@ import {
   type NewsKind,
 } from '../ui/Newspaper.ts'
 import {
+  eventLostLifeModel,
   LOST_LIFE_DELAY_MS,
   LostLifeCard,
   lostLifeModel,
@@ -272,8 +322,9 @@ import { addBar, addPanel, BAR_H, setBarFill } from '../ui/Panel.ts'
 import { QuestCard, type QuestCardMode } from '../ui/QuestCard.ts'
 import { QuestChip, questChipModel } from '../ui/QuestChip.ts'
 import {
-  interimCardAnswer,
+  buildingNamer,
   newsHeadline,
+  objectiveText,
   questBlockedBy,
   questWaitingOn,
   stampText,
@@ -310,7 +361,7 @@ import {
 } from '../ui/Ticker.ts'
 import { Toast, toastDuration } from '../ui/Toast.ts'
 import { VictoryCard, victoryModel } from '../ui/VictoryCard.ts'
-import { failText } from '../ui/ZonePicker.ts'
+import { EV_UI_SFX, failText } from '../ui/ZonePicker.ts'
 import { GARAGE_SHEET_ID, toggleGarage } from './GarageSheet.ts'
 
 // Game events (plan.md §5; the M1 cross-scene contract).
@@ -354,6 +405,11 @@ interface PendingPaper {
   district?: string
   /** M6 `hired`: the role, for its picture. */
   role?: Role
+  /**
+   * Build 3 M12: the picture frame (`event`: the card's ev_pic_<category>;
+   * the Golden Release's `quest` paper: victory_art).
+   */
+  picture?: string
 }
 
 export const MONEY_TWEEN_MS = 300
@@ -415,6 +471,8 @@ type Hold =
   | 'summary'
   /** M7: the VictoryCard (B2 §3.4 "modal, pauses"). */
   | 'victory'
+  /** Build 3 M12: the EventCard shows (B3 §3.4 holds.event). */
+  | 'event'
 
 // M7 (design-m7 §6.5).
 /** game:victory → the VictoryCard after the completion stamp has risen. */
@@ -422,7 +480,6 @@ export const VICTORY_DELAY_MS = STAMP_RISE_MS
 /** The stamp's pill: text inset and height. */
 const QUEST_STAMP_PAD = 4
 const QUEST_STAMP_H = 18
-
 function reducedMotion(): boolean {
   try {
     return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -575,7 +632,8 @@ export class HudScene extends Phaser.Scene {
   // M2
   /** Why the sim is held (stepper.paused = holds.size > 0). */
   private holds = new Set<Hold>()
-  private lostQueue: LifeLostPayload[] = []
+  /** Lost lives waiting for their card: a malware delivery or (M12) an event option. */
+  private lostQueue: (LifeLostPayload | LifeLostEventPayload)[] = []
   private lostTimer: Phaser.Time.TimerEvent | null = null
   private overTimer: Phaser.Time.TimerEvent | null = null
   private flash!: Phaser.GameObjects.Rectangle
@@ -667,6 +725,23 @@ export class HudScene extends Phaser.Scene {
   /** The next syncQuests is create()'s (a standing offer opens its card). */
   private questBootSync = true
 
+  // Build 3 M12 (B3 §3.4)
+  private eventCard!: EventCard
+  private eventChip!: EventChip
+  private effectsCard!: EffectsCard
+  /** Re-read events() next frame (after the event's revision bump). */
+  private eventDirty = false
+  /** The sim's open card waits for the stack to free (the chip pulses). */
+  private eventPending = false
+  /** The card on screen as it opened (its options' labels for the paper). */
+  private eventView: OpenCardView | null = null
+  /** The event chip shows: row B is laid out for it (layout.rowB). */
+  private eventChipShown = false
+  /** The EffectsCard came from the pause menu: closing it reopens the menu. */
+  private effectsFromPause = false
+  /** The Golden Release stamp's confetti (B3 §5). */
+  private questConfetti: ConfettiBurst | null = null
+
   constructor() {
     super('HUD')
   }
@@ -747,6 +822,12 @@ export class HudScene extends Phaser.Scene {
     this.victoryTimer = null
     this.summaryFromVictory = false
     this.questBootSync = true
+    this.eventDirty = false
+    this.eventPending = false
+    this.eventView = null
+    this.eventChipShown = false
+    this.effectsFromPause = false
+    this.questConfetti = null
   }
 
   create(): void {
@@ -794,6 +875,7 @@ export class HudScene extends Phaser.Scene {
       },
       onResume: () => this.resumeFromCard(),
       onSummary: () => this.openSummary('run'),
+      onEffects: () => this.openEffects('pause'),
     })
     this.rotate = new RotateCard(this, this.L.W, this.L.H)
     this.district = new DistrictPanel(this, this.L, this.vs, {
@@ -842,6 +924,13 @@ export class HudScene extends Phaser.Scene {
       // its card says so, and the active card (the chip's) names it.
       blockedBy: (q) => questBlockedBy(this.vs.quests(), q),
       waitingOn: (q) => questWaitingOn(this.vs.quests(), q),
+    })
+    // Build 3 M12: created after the QuestCard (same depth band, 6000).
+    this.eventCard = new EventCard(this, this.L, this.gd, {
+      onOption: (id, i) => this.onEventOption(id, i),
+    })
+    this.effectsCard = new EffectsCard(this, this.L, {
+      onClose: () => this.closeEffects(),
     })
     this.victoryCard = new VictoryCard(this, this.L, this.gd, {
       onContinue: () => this.continueAfterVictory(),
@@ -894,8 +983,10 @@ export class HudScene extends Phaser.Scene {
       this.moodDirty = false
       if (this.moodPop) this.openMood()
     }
-    // Speed segment + PAUSED from the stepper (also follows __pm.speed).
-    const seg = speedSegment(st.paused, st.speed)
+    // Speed segment + PAUSED from the stepper (also follows __pm.speed); a
+    // card waiting behind a sheet or a paper holds the sim (Sim.held): ❚❚
+    // lights, never the running speed (M12 critique 4, review hud-3).
+    const seg = speedSegment(st.paused || vs.held, st.speed)
     if (seg !== this.segment) {
       this.segment = seg
       this.speedBtns.forEach((b, i) => b.setSelected(i === seg))
@@ -903,7 +994,9 @@ export class HudScene extends Phaser.Scene {
     const fast = st.speed === 4 ? '4×' : '2×'
     if (this.speedBtns[2]?.getData('label') !== fast)
       this.speedBtns[2]?.setLabel(fast)
-    this.ticker.setPaused(st.paused || st.speed === 0)
+    // A card waiting behind a sheet or a paper holds the sim itself (Sim.held,
+    // M12 critique 4): the ticker freezes with it.
+    this.ticker.setPaused(st.paused || st.speed === 0 || vs.held)
     this.ticker.setDay(vs.day + 1)
     this.ticker.setProgress(vs.dayProgress)
     this.ticker.update(time, delta)
@@ -918,10 +1011,14 @@ export class HudScene extends Phaser.Scene {
       if (this.district?.isOpen()) this.district.refresh()
     }
     if (this.questAutoOpen) this.tryAutoOpenQuest()
-    this.answerInterimCard()
+    // Build 3 M12: the sim's open card on screen once the stack frees (after
+    // the gold card's own try above, before the paper's turn below).
+    if (this.eventDirty) this.refreshEvents()
+    if (this.eventPending) this.tryOpenEventCard()
     if (time >= this.pollAt) {
       this.pollAt = time + POLL_MS
       this.refreshQuest(false)
+      this.refreshEvents()
       this.refreshShield()
       this.refreshWarehouseBtn()
       this.refreshChipActive()
@@ -1025,6 +1122,7 @@ export class HudScene extends Phaser.Scene {
       this.shieldIcon,
       this.shieldText,
       this.questChip.root,
+      this.eventChip.root,
     ]
   }
 
@@ -1049,7 +1147,8 @@ export class HudScene extends Phaser.Scene {
       !this.lostCard.isOpen() &&
       !this.overCard.isOpen() &&
       !this.summary.isOpen() &&
-      !this.victoryCard.isOpen
+      !this.victoryCard.isOpen &&
+      !this.eventCard.isOpen
     this.flagArrow.setVisible(show)
     if (!show) return
     const r = this.L.warehouse.rect
@@ -1072,11 +1171,11 @@ export class HudScene extends Phaser.Scene {
     return this.gd.buildings.find((b) => b.id === id)?.name ?? id
   }
 
-  /** life:lost (city-view §3.3, HUD side). */
-  private onLifeLost(p: LifeLostPayload): void {
-    // A loss while the game-over screen is up is dropped (§9.4).
-    if (this.overCard.isOpen()) return
-    const left = p.report?.livesLeft ?? this.vs.lives
+  /**
+   * The effects of any lost life (§3.3): the rightmost lit bomb fuses, the
+   * screen flashes red, the top bar shakes 2 px (not under reduced motion).
+   */
+  private lifeLostFx(left: number): void {
     this.lives.loseLife(left)
     this.flashUntil = this.time.now + FLASH_MS
     this.flash.setSize(this.L.W, this.L.H).setAlpha(FLASH_ALPHA)
@@ -1086,6 +1185,14 @@ export class HudScene extends Phaser.Scene {
         until: this.time.now + TOP_SHAKE_MS,
         base: this.topParts().map((o) => o.x),
       }
+  }
+
+  /** life:lost (city-view §3.3, HUD side). */
+  private onLifeLost(p: LifeLostPayload): void {
+    // A loss while the game-over screen is up is dropped (§9.4).
+    if (this.overCard.isOpen()) return
+    const left = p.report?.livesLeft ?? this.vs.lives
+    this.lifeLostFx(left)
     const headline = incidentLine(this.buildingName(p.destBuildingId), left)
     this.queueLine(headline, 'incident')
     // Persist the loss right after this tick (a reload must not replay the
@@ -1104,6 +1211,25 @@ export class HudScene extends Phaser.Scene {
     this.scheduleLostCard()
   }
 
+  /**
+   * Build 3 M12 (B3 §3.5): `life:lost {cause: 'event'}` — an option took a
+   * life (inside decide, before event:decided). The same flash and shake,
+   * the `The recall cost a life — 2 lives left` incident line and, unless it
+   * was the last life (game:over follows), the lost-life card's event
+   * variant after the usual lead-in. No incident paper: the decision's own
+   * paper tells it (D-M12-16).
+   */
+  private onEventLifeLost(p: LifeLostEventPayload): void {
+    if (this.overCard.isOpen()) return
+    const left = p.report.livesLeft
+    this.lifeLostFx(left)
+    this.queueLine(eventIncidentLine(p.title, left), 'incident')
+    if (this.saveSoon !== 'final') this.saveSoon = 'save'
+    if (left <= 0 || this.vs.gameOver) return // game:over takes over
+    this.lostQueue.push(p)
+    this.scheduleLostCard()
+  }
+
   private scheduleLostCard(): void {
     if (this.lostTimer || this.lostCard.isOpen()) return
     this.lostTimer = this.time.delayedCall(LOST_LIFE_DELAY_MS, () => {
@@ -1115,7 +1241,8 @@ export class HudScene extends Phaser.Scene {
   /**
    * Close the panels a modal card must not sit under; sleep the Garage. The
    * QuestCard goes too (an offer stays in its slot), unless it is the card
-   * being opened (`keepQuest`).
+   * being opened (`keepQuest`), and so does the EffectsCard (M12; it never
+   * reopens the pause menu from here).
    */
   private prepareModal(keepQuest = false): void {
     if (this.garageOpen()) this.scene.sleep('Garage')
@@ -1124,6 +1251,8 @@ export class HudScene extends Phaser.Scene {
     if (this.district?.isOpen()) this.district.close()
     this.hideTooltip()
     if (!keepQuest) this.closeQuestCard()
+    this.effectsFromPause = false
+    if (this.effectsCard.isOpen) this.effectsCard.close()
   }
 
   private openNextLostCard(): void {
@@ -1134,16 +1263,21 @@ export class HudScene extends Phaser.Scene {
     const p = this.lostQueue.shift()
     if (!p) return
     this.prepareModal()
-    const sim = getSim(this)
-    this.lostCard.open(
-      lostLifeModel(p, {
-        data: this.gd,
-        vehicleName: (id) =>
-          sim.state.vehicles.find((v) => v.id === id)?.name ?? null,
-        nodes: this.vs.lane.nodes(),
-        lives: p.report?.livesLeft ?? this.vs.lives,
-      }),
-    )
+    if (p.cause === 'event') {
+      // B3 §3.5: title, `You chose: …`, `Lives: N`, OK.
+      this.lostCard.open(eventLostLifeModel(p, this.gd))
+    } else {
+      const sim = getSim(this)
+      this.lostCard.open(
+        lostLifeModel(p, {
+          data: this.gd,
+          vehicleName: (id) =>
+            sim.state.vehicles.find((v) => v.id === id)?.name ?? null,
+          nodes: this.vs.lane.nodes(),
+          lives: p.report?.livesLeft ?? this.vs.lives,
+        }),
+      )
+    }
     this.hold('lostLife')
   }
 
@@ -1165,6 +1299,11 @@ export class HudScene extends Phaser.Scene {
   /** game:over (city-view §9.4): hold now, the screen after the effects. */
   private onGameOver(): void {
     this.hold('gameOver')
+    // Build 3 M12: a last life an option took ends the run inside decide
+    // (life:lost → game:over → event:decided): the card goes after the hold
+    // is set, so the sim never runs a frame in between (critique 2).
+    this.closeEventCard()
+    this.eventPending = false
     this.lostQueue = []
     this.incidentPapers = []
     this.pendingPapers = []
@@ -1193,6 +1332,9 @@ export class HudScene extends Phaser.Scene {
     this.prepareModal()
     this.flagHint = false
     const s = getSim(this).state
+    // Build 3 M12 (B3 §3.4): the last life went to a card — the headline
+    // names it (a reload of that game-over save shows it too).
+    const last = s.lastLostLife
     this.overCard.open(
       gameOverModel(
         {
@@ -1203,6 +1345,10 @@ export class HudScene extends Phaser.Scene {
           defused: s.lane.quarantine.malware,
           level: s.level.level,
           rows: s.stats.minutes,
+          event:
+            last?.kind === 'event'
+              ? { title: last.title, option: last.option }
+              : null,
         },
         this.gd,
       ),
@@ -1293,6 +1439,7 @@ export class HudScene extends Phaser.Scene {
       return
     this.prepareModal()
     this.pauseMenu = true
+    this.paused.setEffectsCount(this.vs.events().modifiers.length)
     this.paused.show()
     // The first-pause hint has done its job once the menu is up.
     if (
@@ -1510,14 +1657,14 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
-   * A new offer opens its card once nothing else is up (questCardAutoOpens);
-   * it stops trying when the offer is gone, accepted or already on screen.
+   * The Golden Release's offer (the only offer a QuestCard shows since M12)
+   * opens its card once nothing else is up (questCardAutoOpens); it stops
+   * trying when the offer is gone, accepted or already on screen.
    */
   private tryAutoOpenQuest(): void {
     const want = this.questAutoOpen
     if (!want) return
-    const qs = this.vs.quests()
-    const q = qs.offer
+    const q = this.vs.quests().offer
     if (!q || q.id !== want.id || this.vs.gameOver) {
       this.questAutoOpen = null
       return
@@ -1526,42 +1673,44 @@ export class HudScene extends Phaser.Scene {
       if (this.questCard.questId === q.id) this.questAutoOpen = null
       return
     }
-    // Build 3 interim (M11, D-18): a job offer is a card the sim holds on
-    // (B3 §6), so its QuestCard opens in either view and through the tour —
-    // otherwise the game would sit frozen with nothing on screen. It still
-    // waits for a modal, a paper or a HUD hold to clear.
-    const holdsSim = this.vs.events().open?.questId === q.id
-    const ok = questCardAutoOpens({
-      modals: modalCount(),
-      onboardingStep: this.onboarding.activeStep,
-      view: holdsSim ? 'city' : this.view,
-      held: this.holds.size > 0 || this.paused.isOpen(),
-      paperVisible: this.paperBusy(),
-      blocked: q.ultimate && qs.active !== null,
-      force: want.force || holdsSim,
-      policy: this.stepper.policy !== null,
-    })
-    if (!ok) return
+    if (!questCardAutoOpens(this.questOpenGate(q, want.force))) return
     this.questAutoOpen = null
     this.openQuestCard(q)
   }
 
+  /** The QuestCard auto-open inputs right now for the offer `q`. */
+  private questOpenGate(q: QuestView, force: boolean): QuestAutoOpen {
+    return {
+      modals: modalCount(),
+      onboardingStep: this.onboarding.activeStep,
+      view: this.view,
+      held: this.holds.size > 0 || this.paused.isOpen(),
+      paperVisible: this.paperBusy(),
+      blocked: q.ultimate && this.vs.quests().active !== null,
+      force,
+      policy: this.stepper.policy !== null,
+    }
+  }
+
   /**
-   * Build 3 interim (M11, review deck-1): an open deck card that is not a
-   * job card (the rescue's loaner, a debug card) holds the sim (B3 §6) and
-   * nothing draws it until M12's EventCard — so the HUD answers it with its
-   * default option (interimCardAnswer, a logged decideEvent) once no HUD
-   * hold is up, and tickers what it did. Never under a policy (it answers
-   * cards itself) or at game over.
+   * R34 / M12 critique 3: the gold card goes before a pending event card —
+   * but only when it could open right now (in the city, not blocked by an
+   * active job, past the tour unless forced, no paper). A blocked Golden
+   * Release offer must never keep the card waiting: the sim holds on the
+   * card, so the job would never end and the game would freeze. The modal
+   * and hold inputs are the event gate's own (and an open EventCard is not
+   * the gold card's business here).
    */
-  private answerInterimCard(): void {
-    const vs = this.vs
-    if (this.stepper.policy !== null || vs.gameOver || this.holds.size > 0)
-      return
-    const a = interimCardAnswer(vs.events().open)
-    if (a === null) return
-    if (vs.event.decide(a.eventId, a.index).ok)
-      this.ticker.push(a.line, 'event')
+  private goldCardFirst(): boolean {
+    const want = this.questAutoOpen
+    if (!want || this.vs.gameOver) return false
+    const q = this.vs.quests().offer
+    if (!q || q.id !== want.id) return false
+    return questCardAutoOpens({
+      ...this.questOpenGate(q, want.force),
+      modals: 0,
+      held: false,
+    })
   }
 
   /**
@@ -1580,11 +1729,18 @@ export class HudScene extends Phaser.Scene {
     )
   }
 
-  /** The chip: the active quest's card (Abandon), else the offer's. */
+  /**
+   * The chip: the active quest's card (Abandon), else the offer's — a job
+   * offer's card is the EventCard (raised when it can open).
+   */
   private onQuestChipTap(): void {
     const qs = this.vs.quests()
     const q = qs.active ?? qs.offer
     if (!q) return
+    if (this.isJobOffer(q)) {
+      this.raiseJobCard()
+      return
+    }
     if (this.questCard.isOpen && this.questCard.questId === q.id) {
       this.closeQuestCard()
       return
@@ -1592,7 +1748,7 @@ export class HudScene extends Phaser.Scene {
     this.openQuestCard(q)
   }
 
-  /** The district panel's quest row: that quest's card. */
+  /** The district panel's quest row: that quest's card (a job offer: the EventCard). */
   private openQuestCardFor(id: string): void {
     const qs = this.vs.quests()
     const q =
@@ -1600,7 +1756,16 @@ export class HudScene extends Phaser.Scene {
     if (q) this.openQuestCard(q)
   }
 
+  /** B3 §6 one path for jobs: a regular offer lives on its job card. */
+  private isJobOffer(q: QuestView): boolean {
+    return q.status === 'offered' && !q.ultimate
+  }
+
   private openQuestCard(q: QuestView): void {
+    if (this.isJobOffer(q)) {
+      this.raiseJobCard()
+      return
+    }
     if (this.vs.gameOver || this.holds.size > 0) return
     this.prepareModal(true)
     if (this.questAutoOpen?.id === q.id) this.questAutoOpen = null
@@ -1657,7 +1822,13 @@ export class HudScene extends Phaser.Scene {
     this.showQuestStamp(p.reward)
     if (!q) return
     const h = newsHeadline(this.gd, q, p.reward)
-    this.queuePaper({ kind: h.kind, headline: h.text, level: this.vs.level })
+    this.queuePaper({
+      kind: h.kind,
+      headline: h.text,
+      level: this.vs.level,
+      // B3 §5: the Golden Release's paper shows the victory art.
+      ...(p.reward.victory ? { picture: 'victory_art' } : {}),
+    })
   }
 
   /**
@@ -1672,19 +1843,29 @@ export class HudScene extends Phaser.Scene {
     if (!text) return
     const t = addText(this, QUEST_STAMP_PAD, 0, text)
     t.setY(textTop(0, QUEST_STAMP_H))
-    const bg = addPanel(
-      this,
-      0,
-      0,
-      Math.round(t.width) + 2 * QUEST_STAMP_PAD,
-      QUEST_STAMP_H,
-      'ui_tag',
-    )
+    const stampW = Math.round(t.width) + 2 * QUEST_STAMP_PAD
+    const bg = addPanel(this, 0, 0, stampW, QUEST_STAMP_H, 'ui_tag')
     const root = this.add
       .container(this.L.money.rect.x, this.L.toast.y, [bg, t])
       .setDepth(D.questStamp)
     this.questStamp = { root, ms: 0 }
     this.updateQuestStamp(0)
+    // B3 §5: the Golden Release's stamp reuses the VictoryCard's burst,
+    // centred on the stamp but kept on screen (the pieces span ±112 px:
+    // critique 15).
+    if (r.victory && !reducedMotion()) {
+      this.questConfetti?.stop()
+      const L = this.L
+      const cx = Math.round(
+        Math.min(
+          L.W - CONFETTI_HALF_SPAN,
+          Math.max(CONFETTI_HALF_SPAN, L.money.rect.x + stampW / 2),
+        ),
+      )
+      this.questConfetti = confettiBurst(this, cx, L.toast.y, (img) =>
+        img.setDepth(D.questStamp + 1),
+      )
+    }
   }
 
   private updateQuestStamp(delta: number): void {
@@ -1725,12 +1906,14 @@ export class HudScene extends Phaser.Scene {
       reducedMotion() ? 0 : VICTORY_DELAY_MS,
       () => {
         this.victoryTimer = null
-        this.openVictory()
+        // B3 §5 / D-M12-12: the confetti plays on this open (the event's, or
+        // a reload's reopen) — never on Back from the summary or a relayout.
+        this.openVictory(true)
       },
     )
   }
 
-  private openVictory(): void {
+  private openVictory(burst = false): void {
     if (this.victoryCard.isOpen) return
     if (this.vs.gameOver) {
       this.release('victory')
@@ -1752,6 +1935,7 @@ export class HudScene extends Phaser.Scene {
         },
         this.gd,
       ),
+      { burst: burst && !reducedMotion() },
     )
     this.hold('victory')
   }
@@ -1774,9 +1958,10 @@ export class HudScene extends Phaser.Scene {
    * stale victory screen or stamp gone (the victory shows on its event
    * only — or at create from a save written on the victory tick, before
    * Continue: a reload then reopens the VictoryCard, victoryCardPending). At
-   * create a standing offer opens its card (a reload, Boot's `?quest=`
-   * offer, made before the HUD listened); after a swap (__pm.load, a
-   * fixture) the chip just pulses, so a swap leaves the modal stack empty.
+   * create the Golden Release's standing offer opens its card (a reload,
+   * Boot's `?quest=golden_release`, made before the HUD listened); after a
+   * swap (__pm.load, a fixture) the chip just pulses, so a swap leaves the
+   * modal stack empty. (A job offer is the sim's open card: syncEvents.)
    */
   private syncQuests(): void {
     const boot = this.questBootSync
@@ -1785,14 +1970,20 @@ export class HudScene extends Phaser.Scene {
     this.closeQuestCard()
     this.questStamp?.root.destroy()
     this.questStamp = null
+    this.questConfetti?.stop()
+    this.questConfetti = null
     this.victoryTimer?.remove(false)
     this.victoryTimer = null
     if (this.victoryCard.isOpen) this.victoryCard.close()
     this.summaryFromVictory = false
     this.release('victory')
     const qs = this.vs.quests()
+    // Only the Golden Release's standing offer opens a QuestCard (M12); a
+    // job offer's card is the sim's open card, which syncEvents shows.
     this.questAutoOpen =
-      boot && qs.offer && !qs.active ? { id: qs.offer.id, force: true } : null
+      boot && qs.offer?.ultimate && !qs.active
+        ? { id: qs.offer.id, force: true }
+        : null
     this.refreshQuest()
     if (
       boot &&
@@ -1806,6 +1997,318 @@ export class HudScene extends Phaser.Scene {
       )
     )
       this.onVictory()
+  }
+
+  // ---------------------------------------------------------------- M12: event cards
+
+  /**
+   * Re-read events() (next frame after an event, and at 2 Hz): a shown card
+   * the sim no longer has open closes (an answer from outside the HUD —
+   * __pm.answerCard, a policy — or a withdrawal; matched on eventId and
+   * openedTick, since back-to-back job cards share `job:<templateId>`:
+   * critique 18), a card the sim holds on but the HUD does not show yet is
+   * pending, the chip follows (live modifiers, the pending pulse) and an open
+   * EffectsCard re-reads its rows when they changed.
+   */
+  private refreshEvents(): void {
+    this.eventDirty = false
+    const ev = this.vs.events()
+    const open = ev.open
+    if (
+      this.eventCard.isOpen &&
+      (!open ||
+        open.eventId !== this.eventCard.eventId ||
+        open.openedTick !== this.eventCard.openedTick)
+    )
+      this.closeEventCard()
+    // Never an 'event' hold without the card on screen (the card closes
+    // only through the HUD, but a hold left behind would freeze the game).
+    if (!this.eventCard.isOpen && this.holds.has('event')) this.closeEventCard()
+    // Never at game over (decide refuses then; critique 8) nor under a
+    // policy (it decides the card on its step).
+    this.eventPending =
+      open !== null &&
+      !this.eventCard.isOpen &&
+      this.stepper.policy === null &&
+      !this.vs.gameOver
+    const m = eventChipModel(ev, this.eventPending, this.vs.gameOver)
+    const cur = this.eventChip.current
+    if (
+      cur.visible !== m.visible ||
+      cur.count !== m.count ||
+      cur.pulse !== m.pulse
+    )
+      this.eventChip.set(m)
+    if (m.visible !== this.eventChipShown) {
+      this.eventChipShown = m.visible
+      if (!this.topShake) this.layoutTopBar()
+    }
+    if (this.effectsCard.isOpen) {
+      const rows = JSON.stringify(effectsCardModel(ev.modifiers))
+      if (rows !== JSON.stringify(this.effectsCard.model))
+        this.effectsCard.refresh(ev.modifiers)
+    }
+  }
+
+  /** The inputs of hudKit.eventCardOpens right now. */
+  private eventGate(): EventOpenGate {
+    return {
+      policy: this.stepper.policy !== null,
+      showing: this.eventCard.isOpen,
+      gameOver: this.vs.gameOver,
+      modals: modalCount(),
+      otherHolds: [...this.holds].some((h) => h !== 'event'),
+      timers:
+        this.lostTimer !== null ||
+        this.overTimer !== null ||
+        this.victoryTimer !== null,
+      paperVisible: this.paper.isVisible(),
+      levelMoment: this.paperHoldMs > 0 || this.levelAnim !== null,
+      questFirst: this.goldCardFirst(),
+    }
+  }
+
+  /** A pending card opens once nothing else is up (B3 §3.4 "when the stack frees"). */
+  private tryOpenEventCard(): void {
+    if (!this.eventPending) return
+    if (!eventCardOpens(this.eventGate())) return
+    const open = this.vs.events().open
+    if (!open) {
+      this.eventPending = false
+      return
+    }
+    this.openEventCard(open)
+  }
+
+  /**
+   * Show `v` and hold the sim ('event': the stepper stops, the music plays
+   * on, the ticker freezes), with the card's `eventPing`.
+   */
+  private openEventCard(v: OpenCardView): void {
+    // A no-op once the gate passed (no modal is up): the tooltip, mostly.
+    this.prepareModal()
+    this.eventPending = false
+    this.eventView = v
+    this.eventCard.open(v, {
+      objective: v.kind === 'job' ? this.jobObjective(v) : null,
+    })
+    this.hold('event')
+    this.game.events.emit(EV_UI_SFX, { name: 'eventPing' })
+    // The chip stops pulsing.
+    this.refreshEvents()
+  }
+
+  /**
+   * The event chip, the quest chip or the district row asked for the
+   * pending card: it opens when nothing but a closable panel (the Garage, a
+   * popover, the district panel, the QuestCard, the EffectsCard, a sheet of
+   * the Warehouse — pm:closeSheets, review hud-1) stands in the way — the
+   * gate is read first, so a refusal closes nothing (critique 20). True when
+   * the card shows now, or next frame once the Garage (it closes
+   * asynchronously, on its queued sleep) has left the modal stack; false
+   * when anything else still blocks it, so the caller falls back.
+   */
+  private raiseEventCard(): boolean {
+    if (!this.eventPending) return false
+    if (!eventCardOpens({ ...this.eventGate(), modals: 0 })) return false
+    const garage = this.garageOpen()
+    this.prepareModal()
+    this.game.events.emit(EV_CLOSE_SHEETS)
+    this.tryOpenEventCard()
+    return this.eventCard.isOpen || garage
+  }
+
+  /**
+   * A job offer's chip / row: its EventCard; when that cannot open now (a
+   * paper, the level-up moment, a lead-in timer, the gold card first) the
+   * tap denies instead of doing nothing (review hud-1).
+   */
+  private raiseJobCard(): void {
+    if (this.raiseEventCard() || this.eventCard.isOpen) return
+    this.game.events.emit(EV_UI_SFX, { name: 'deny' })
+  }
+
+  /** Off the screen (no decision): the 'event' hold goes with it. */
+  private closeEventCard(): void {
+    if (this.eventCard.isOpen) this.eventCard.close()
+    this.eventView = null
+    this.release('event')
+  }
+
+  /**
+   * The shown card is no longer the sim's open card — read from the state,
+   * since inside a tick the ViewSim cache still holds the old revision.
+   */
+  private shownCardGone(): boolean {
+    if (!this.eventCard.isOpen) return false
+    const o = getSim(this).state.events.open
+    return (
+      o === null ||
+      o.eventId !== this.eventCard.eventId ||
+      o.openedTick !== this.eventCard.openedTick
+    )
+  }
+
+  /** A job card's objective line (D-M12-6: the UI draws it from the offer it holds). */
+  private jobObjective(v: OpenCardView): string | null {
+    const q = this.vs.quests().offer
+    return q && q.id === v.questId
+      ? objectiveText(this.gd, q, buildingNamer(this.gd))
+      : null
+  }
+
+  /**
+   * An option was chosen (its button, Enter, a news card's tap): decide it.
+   * A refusal shakes the card (`Can't afford`), or closes it when the card
+   * is gone (`no-event`, a withdrawn job card's `applied` refusal, game
+   * over). On success the card closes and the top-bar cells the decision
+   * moved pulse once (a before / after diff of the state — D-M12-17), the
+   * `wah` / `bell` plays, and a chain's end or a decision that moved ≥ $100,
+   * a life, a vehicle or a worker runs a one-line paper. A last life inside
+   * decide has already held 'gameOver' (life:lost → game:over →
+   * event:decided): nothing more then (critique 2).
+   */
+  private onEventOption(eventId: string, index: number): void {
+    const view = this.eventView
+    const before = this.cellSnapshot()
+    const r = this.vs.event.decide(eventId, index)
+    this.eventDirty = true
+    this.questDirty = true
+    if (!r.ok) {
+      const text = failText(r.reason, this.gd)
+      if (
+        r.reason === 'no-event' ||
+        r.reason === 'invalid' ||
+        r.applied === true ||
+        this.vs.gameOver
+      ) {
+        this.closeEventCard()
+        if (r.applied === true && !this.vs.gameOver) this.toast.show(text, true)
+        return
+      }
+      this.eventCard.deny(text, index)
+      return
+    }
+    this.closeEventCard()
+    if (this.vs.gameOver) return
+    const d = cellDiff(before, this.cellSnapshot())
+    if (!reducedMotion()) this.pulseCells(pulsedCells(d))
+    const sfx = decisionSfx(d)
+    if (sfx) this.game.events.emit(EV_UI_SFX, { name: sfx })
+    const opt = view?.options.find((o) => o.index === index)
+    if (view && opt && view.kind !== 'job') {
+      const depth = this.vs.events().history.at(-1)?.depth ?? 1
+      const chainEnd = eventChainEnded(depth, d)
+      if (eventNewsworthy(d, chainEnd))
+        this.queuePaper({
+          kind: 'event',
+          headline: eventNewsHeadline(
+            this.gd,
+            {
+              title: view.title,
+              option: opt.label,
+              kind: view.kind,
+              chainTitle: view.chainTitle,
+              firstLine: opt.lines.find((l) => l.text.trim() !== '')?.text,
+            },
+            chainEnd,
+          ),
+          level: this.vs.level,
+          picture: view.picture,
+        })
+    }
+    if (this.saveSoon !== 'final') this.saveSoon = 'save'
+  }
+
+  /** The cells and counts a decision can move (read from the state: no tick runs in between). */
+  private cellSnapshot(): CellSnapshot {
+    const s = getSim(this).state
+    return {
+      money: this.vs.money,
+      lives: this.vs.lives,
+      mood: this.vs.meanSatisfaction(),
+      earned: this.vs.lifetimeEarned,
+      vehicles: s.vehicles.length,
+      workers: s.employees.length,
+      scheduled: s.events.scheduled.length,
+    }
+  }
+
+  /** One 240-ms alpha dip on each cell the decision moved (B3 §3.4: Reigns' meter dots). */
+  private pulseCells(cells: readonly PulseCell[]): void {
+    const parts: Record<PulseCell, { setAlpha(a: number): unknown }[]> = {
+      money: [this.moneyIcon, this.moneyText],
+      lives: [this.lives.root],
+      mood: [this.moodIcon, this.moodText],
+      level: [this.levelTrack, this.levelFill, this.levelBarText],
+    }
+    for (const c of cells) {
+      const ps = parts[c]
+      this.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: 2 * EVENT_PULSE_MS,
+        onUpdate: (tw) => {
+          const a = eventPulseAlpha(tw.getValue() ?? 1)
+          for (const p of ps) p.setAlpha(a)
+        },
+        onComplete: () => {
+          for (const p of ps) p.setAlpha(1)
+        },
+      })
+    }
+  }
+
+  /**
+   * The event chip: the pending card when it can open now; else the
+   * EffectsCard (B3 §3.4 chip → EffectsCard; critique 20), or closes it.
+   */
+  private onEventChipTap(): void {
+    if (this.eventPending && this.raiseEventCard()) return
+    if (this.effectsCard.isOpen) {
+      this.closeEffects()
+      return
+    }
+    this.openEffects('chip')
+  }
+
+  /**
+   * The EffectsCard (D-M12-15: it never holds). From the pause menu it
+   * takes the Paused card's place at speed 0 (an auto-pause becomes a
+   * plain pause) and gives it back on close.
+   */
+  private openEffects(from: 'chip' | 'pause'): void {
+    if (this.effectsCard.isOpen || this.holds.has('event')) return
+    if (from === 'pause') {
+      this.paused.hide()
+      this.pauseMenu = false
+      if (this.autoPaused) {
+        this.autoPaused = false
+        this.stepper.speed = 0
+        this.release('hidden')
+      }
+      this.prepareModal()
+      this.effectsFromPause = true
+    } else this.prepareModal()
+    this.effectsCard.open(this.vs.events().modifiers)
+  }
+
+  /** Close / Esc / outside on the EffectsCard (it has closed itself). */
+  private closeEffects(): void {
+    if (this.effectsCard.isOpen) this.effectsCard.close()
+    if (this.effectsFromPause) {
+      this.effectsFromPause = false
+      this.openPauseMenu()
+    }
+  }
+
+  /**
+   * create / Sim swap (syncAll): a shown card closes; the open card of the
+   * state (a reload, ?event=, ?quest=, __pm.load) shows next frame.
+   */
+  private syncEvents(): void {
+    this.closeEventCard()
+    this.refreshEvents()
   }
 
   // ---------------------------------------------------------------- step 2
@@ -1911,6 +2414,7 @@ export class HudScene extends Phaser.Scene {
           level: p.level,
           ...(p.district ? { district: p.district } : {}),
           ...(p.role ? { role: p.role } : {}),
+          ...(p.picture ? { picture: p.picture } : {}),
         }),
       }
       if (this.paperHoldMs > 0) this.heldPapers.push(item)
@@ -2270,6 +2774,8 @@ export class HudScene extends Phaser.Scene {
     this.paper.relayout(L)
     this.summary.relayout(L)
     this.questCard.relayout(L)
+    this.eventCard.relayout(L)
+    this.effectsCard.relayout(L)
     this.victoryCard.relayout(L)
     // The VictoryCard / SummaryCard rebuilt their cameras above an open
     // New-game confirm: re-fit it and put it back on top (it is still the
@@ -2352,6 +2858,9 @@ export class HudScene extends Phaser.Scene {
     for (const z of Object.values(this.zones)) z.setDepth(c)
     this.questChip = new QuestChip(this).setDepth(c)
     this.questChip.onTap(() => this.onQuestChipTap())
+    // Build 3 M12 (B3 §3.4): the event chip, right of the level bar.
+    this.eventChip = new EventChip(this).setDepth(c)
+    this.eventChip.onTap(() => this.onEventChipTap())
     this.layoutTopBar()
   }
 
@@ -2372,22 +2881,28 @@ export class HudScene extends Phaser.Scene {
     this.levelFrac = -1
     this.refreshLevel()
     this.layoutShield()
-    this.questChip.setRect(L.questChip.rect, L.questChip.hit)
+    // Row B for the chips that show (B3 §3.4, layout.rowB): with both, the
+    // quest chip compacts to 82 px and the event chip sits left of it.
+    const rb = rowB(L, this.chipShown, this.eventChipShown)
+    const qc = rb.questChip ?? L.questChip
+    this.questChip.setRect(qc.rect, qc.hit)
+    const ec = rb.eventChip ?? L.eventChip
+    this.eventChip.setRect(ec.rect, ec.hit)
     if (this.zones) {
       setZoneRect(this.zones.money, L.money.hit)
       setZoneRect(this.zones.lives, L.lives.hit)
       setZoneRect(this.zones.mood, L.mood.hit)
-      setZoneRect(
-        this.zones.level,
-        this.chipShown ? L.levelChip.hit : L.level.hit,
-      )
+      setZoneRect(this.zones.level, rb.level.hit)
       setZoneRect(this.zones.shield, L.shield.hit)
     }
   }
 
-  /** The level bar: the short one while the quest chip shows (design-m7 §6.4). */
+  /**
+   * The level bar: the short one while the quest chip (design-m7 §6.4)
+   * and / or the event chip (B3 §3.4) show.
+   */
   private levelBarRect(): Rect {
-    return this.chipShown ? this.L.levelBarChip : this.L.levelBar
+    return rowB(this.L, this.chipShown, this.eventChipShown).levelBar
   }
 
   private layoutMood(): void {
@@ -2535,7 +3050,7 @@ export class HudScene extends Phaser.Scene {
 
   private refreshLevel(): void {
     const vs = this.vs
-    const compact = this.chipShown
+    const compact = this.chipShown || this.eventChipShown
     const p = levelProgress(
       this.gd,
       vs.level,
@@ -3375,6 +3890,7 @@ export class HudScene extends Phaser.Scene {
     // A lost-life / game-over / summary / victory card already holds the
     // sim and asks for a tap — or is on its way (its lead-in timer runs, its
     // hold is set): no Paused card under or over it (final review, scenes #4).
+    // M12: so does an EventCard (it holds the sim and waits for an option).
     if (
       this.lostCard.isOpen() ||
       this.overCard.isOpen() ||
@@ -3384,7 +3900,9 @@ export class HudScene extends Phaser.Scene {
       this.overTimer !== null ||
       this.victoryTimer !== null ||
       this.holds.has('victory') ||
-      this.holds.has('gameOver')
+      this.holds.has('gameOver') ||
+      this.eventCard.isOpen ||
+      this.holds.has('event')
     ) {
       this.autoPaused = false
       this.release('hidden')
@@ -3394,6 +3912,7 @@ export class HudScene extends Phaser.Scene {
     // the shield / mood popovers, the district panel or a tooltip (one Esc
     // must not close one of those and resume through the card).
     this.prepareModal()
+    this.paused.setEffectsCount(this.vs.events().modifiers.length)
     this.paused.show()
   }
 
@@ -3500,15 +4019,24 @@ export class HudScene extends Phaser.Scene {
           this.refreshGarageBadge()
           this.refreshDistrict()
         },
+        // Build 3 (B3 §3.5): an event took a vehicle / a parcel.
+        'vehicle:lost': (p) => {
+          if (this.follow.vehicleId === p.id) this.follow.hide()
+          this.refreshGarageBadge()
+          this.refreshDistrict()
+        },
+        'parcel:lost': () => {
+          this.refreshWarehouseBtn()
+          this.refreshDistrict()
+        },
         'vehicle:inactive': () => {
           this.refreshGarageBadge()
           this.refreshStep1()
         },
         'life:lost': (p) => {
-          // M12: the event variant (until then an event's life skips the
-          // lives decrement and the flash here).
-          if (p.cause === 'event') return
-          this.onLifeLost(p)
+          // M12 (B3 §3.5): an event option's life has its own card variant.
+          if (p.cause === 'event') this.onEventLifeLost(p)
+          else this.onLifeLost(p)
         },
         'game:over': () => this.onGameOver(),
         // The daily line is built at the flush, after this tick's payday.
@@ -3522,9 +4050,11 @@ export class HudScene extends Phaser.Scene {
         },
         // M7 quests: the chip / card / district row re-read quests() next
         // frame (questDirty); the lines are the sim's ticker:news.
+        // M12: only the Golden Release's offer auto-opens a QuestCard; a
+        // job offer comes with its EventCard (event:offered).
         'quest:offered': (p) => {
           this.questDirty = true
-          this.questAutoOpen = { id: p.questId, force: false }
+          if (p.ultimate) this.questAutoOpen = { id: p.questId, force: false }
         },
         'quest:accepted': () => {
           this.questDirty = true
@@ -3543,6 +4073,29 @@ export class HudScene extends Phaser.Scene {
         'quest:completed': (p) => this.onQuestCompleted(p),
         'life:gained': (p) => this.onLifeGained(p),
         'game:victory': () => this.onVictory(),
+        // Build 3 M12 (B3 §3.4): the card, the chip and the EffectsCard
+        // re-read events() next frame (the ViewSim cache follows
+        // sim.revision, bumped after the tick's events).
+        'event:offered': () => {
+          this.eventDirty = true
+        },
+        'event:decided': () => {
+          this.eventDirty = true
+        },
+        'event:withdrawn': () => {
+          // A job card the Golden Release displaced: off the screen now.
+          if (this.shownCardGone()) this.closeEventCard()
+          this.eventDirty = true
+        },
+        'event:queued': () => {
+          this.eventDirty = true
+        },
+        'modifier:applied': () => {
+          this.eventDirty = true
+        },
+        'modifier:expired': () => {
+          this.eventDirty = true
+        },
       },
       () => this.syncAll(),
     )
@@ -3698,8 +4251,13 @@ export class HudScene extends Phaser.Scene {
       this.lostCard.destroy()
       this.overCard.destroy()
       this.questCard.destroy()
+      this.eventCard.destroy()
+      this.effectsCard.destroy()
       this.victoryCard.destroy()
       this.questChip.destroy()
+      this.eventChip.destroy()
+      this.questConfetti?.stop()
+      this.questConfetti = null
       this.lostTimer = null
       this.overTimer = null
       this.victoryTimer = null
@@ -3753,6 +4311,7 @@ export class HudScene extends Phaser.Scene {
     this.heldLabels.clear()
     for (const it of vs.holdBay.items) this.rememberLabel(it.parcelId)
     this.syncQuests()
+    this.syncEvents()
     // Cards follow the sim: a game-over state (a reload, __pm.load of a
     // fixture) shows its screen; a live one closes a stale screen.
     if (vs.gameOver) {

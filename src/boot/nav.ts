@@ -45,6 +45,14 @@ export const EV_ATTRACT_END = 'pm:attractEnd'
  * (the Garage's own buy / Replace picker would open over it).
  */
 export const EV_GARAGE_OPENING = 'pm:garageOpening'
+/**
+ * Game event: the HUD raises the pending EventCard (the event chip, the
+ * quest chip on a job offer, the district panel's quest row; B3 §3.4, M12
+ * review hud-1). The Warehouse closes its sheets at once (BuySheet,
+ * SlotCard, HoldBayCard, StationCard, its HireSheet, the dock dialog) so the
+ * card is the only modal — a tap on the pulsing chip is never a dead tap.
+ */
+export const EV_CLOSE_SHEETS = 'pm:closeSheets'
 /** Attract → game: each half of the 300-ms swap fade (out, then in; B2 §5). */
 export const ATTRACT_FADE_MS = 150
 

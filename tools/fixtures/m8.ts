@@ -196,10 +196,17 @@ function l3Docks(): void {
     }
     if (s.state.tick < dockTick + DOCK_SETTLE_S * TICKS_PER_S) return false
     const p = soonest(s)
+    if (p === null || p.clearTick === null) return false
+    // Build 3 (M12 review fixes): no card opens before the clearance + 1 s —
+    // shot-fixtures also runs it WITHOUT the policy, where a card holds.
+    const ev = s.state.events
+    const quietUntil = p.clearTick + TICKS_PER_S
     return (
-      p !== null &&
-      p.clearTick !== null &&
-      p.clearTick - s.state.tick >= CLEAR_LEAD_S * TICKS_PER_S
+      p.clearTick - s.state.tick >= CLEAR_LEAD_S * TICKS_PER_S &&
+      ev.open === null &&
+      ev.queue.length === 0 &&
+      ev.nextDrawTick > quietUntil &&
+      ev.scheduled.every((l) => l.dueTick > quietUntil)
     )
   })
   const st = sim.state

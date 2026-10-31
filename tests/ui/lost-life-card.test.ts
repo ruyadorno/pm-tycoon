@@ -11,18 +11,58 @@
 // left`), a 12-line 6-slot overseas path fits 360×604, elision keeps both
 // overseas lines, and a real clearance's life:lost reads the same; M9: a
 // real Airport clearance at L5 through six live slots ends `— the plane has
-// left` and fits 360×604. Phaser is stubbed (the module imports the kit).
+// left` and fits 360×604. Build 3 M12 (B3 §3.4, D-M12-16): the event
+// variant — its model from a real `life:lost {cause: 'event'}`, and on a stub
+// scene exactly one `lostLife:ok` button (no warehouse), Enter / Esc / OK =
+// Continue, the card ≤ 300 wide and fitted to its content. Phaser is stubbed
+// with chainable no-op game objects (the card builds real kit Buttons).
 import { describe, expect, it, vi } from 'vitest'
 
+type Bag = Record<string | symbol, unknown>
+
+/** A game object whose unknown methods are chainable no-ops. */
+function chain<T extends object>(target: T): T {
+  const base = target as Bag
+  for (const [k, v] of Object.entries({
+    x: 0,
+    y: 0,
+    width: 40,
+    height: 14,
+    visible: true,
+    alpha: 1,
+  }))
+    if (!(k in base)) base[k] = v
+  const proxy: T = new Proxy(target, {
+    get(t, k, receiver) {
+      if (k in t) return Reflect.get(t, k, receiver)
+      if (k === 'getTextBounds') return () => ({ lines: { lengths: [1] } })
+      if (typeof k === 'symbol') return undefined
+      return () => proxy
+    },
+  })
+  return proxy
+}
+
 vi.mock('phaser', () => {
-  class Stub {
+  class GameObject {
+    readonly stub = true
+    constructor() {
+      return chain(this)
+    }
+    destroy(): void {}
+  }
+  class Rectangle {
     readonly stub = true
   }
   return {
     default: {
-      Scene: Stub,
-      GameObjects: { Container: Stub, NineSlice: Stub, Image: Stub },
-      Geom: { Rectangle: Stub },
+      Scene: GameObject,
+      GameObjects: {
+        Container: GameObject,
+        NineSlice: GameObject,
+        Image: GameObject,
+      },
+      Geom: { Rectangle },
     },
   }
 })
@@ -30,11 +70,17 @@ vi.mock('phaser', () => {
 const card = await import('../../src/ui/LostLifeCard.ts')
 const helpers = await import('../sim/helpers.ts')
 const { dataFixture } = helpers
-const { deliverParcel } = await import('../../src/sim/systems/economy.ts')
+const { deliverParcel, loseLifeEvent } =
+  await import('../../src/sim/systems/economy.ts')
+const { computeLayout } = await import('../../src/ui/layout.ts')
+const { modalCount, topModal } = await import('../../src/ui/Sheet.ts')
 const { takeFrom } = await import('../../src/sim/systems/lane.ts')
 const { laneNode } = await import('../../src/sim/types.ts')
 
-import type { LifeLostPayload } from '../../src/sim/events.ts'
+import type {
+  LifeLostEventPayload,
+  LifeLostPayload,
+} from '../../src/sim/events.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import type {
   Checker,
@@ -873,5 +919,155 @@ describe('M9 end to end (design R11): an Airport clearance at the real L5, six l
     const width = await m5x7Width()
     for (const x of lines) expect(width(x), x).toBeLessThanOrEqual(360 - 48)
     expect(card.LOST_LIFE_TITLE).toBe('MALWARE DELIVERED')
+  })
+})
+
+// ---- Build 3 M12: the event variant ------------------------------------------------
+
+function emitter() {
+  const ls = new Map<
+    string,
+    { fn: (...a: unknown[]) => void; ctx: unknown }[]
+  >()
+  return {
+    on: (n: string, fn: (...a: unknown[]) => void, ctx?: unknown) => {
+      ls.set(n, [...(ls.get(n) ?? []), { fn, ctx }])
+    },
+    off: (n: string, fn: (...a: unknown[]) => void, ctx?: unknown) => {
+      ls.set(
+        n,
+        (ls.get(n) ?? []).filter((l) => !(l.fn === fn && l.ctx === ctx)),
+      )
+    },
+    emit: (n: string, ...args: unknown[]) => {
+      for (const l of (ls.get(n) ?? []).slice()) l.fn.call(l.ctx, ...args)
+    },
+  }
+}
+
+const obj = (): object => chain({})
+
+function fakeScene() {
+  const added: unknown[] = []
+  const removed: unknown[] = []
+  const texts: string[] = []
+  const scene = {
+    scale: { width: 360, height: 604, zoom: 1 },
+    add: {
+      rectangle: obj,
+      nineslice: obj,
+      bitmapText: (_x: number, _y: number, _f: string, text: string) => {
+        texts.push(text)
+        return chain({})
+      },
+      image: obj,
+      container: obj,
+      existing: (o: unknown) => o,
+    },
+    cameras: {
+      cameras: [] as unknown[],
+      add: () => {
+        const c = chain({})
+        added.push(c)
+        return c
+      },
+      remove: (c: unknown) => removed.push(c),
+    },
+    children: { list: [] as unknown[] },
+    input: { keyboard: emitter() },
+    events: emitter(),
+    game: { events: emitter() },
+    time: { addEvent: () => ({ remove() {} }) },
+  }
+  return { scene, added, removed, texts }
+}
+
+/** The life:lost payload of a real `Take the strike` (economy.ts loseLifeEvent). */
+function recallStrike(): LifeLostEventPayload {
+  const sim = helpers.makeSim(1)
+  let got: LifeLostEventPayload | null = null
+  sim.events.on('life:lost', (p) => {
+    if (p.cause === 'event') got = p
+  })
+  loseLifeEvent(sim, 'ev_sec_recall', 'The recall', 'Take the strike')
+  if (!got) throw new Error('no event life:lost')
+  return got
+}
+
+describe('B3 §3.4 (M12): the lost-life card event variant', () => {
+  it('eventLostLifeModel: the title, `You chose: {option}`, `Lives: N` and the lives left', () => {
+    const p = recallStrike()
+    const lives = data.economy.lives.start - 1
+    expect(p.report.livesLeft).toBe(lives)
+    expect(card.eventLostLifeModel(p, data)).toEqual({
+      kind: 'event',
+      title: 'The recall',
+      choice: 'You chose: Take the strike',
+      livesText: `Lives: ${lives}`,
+      lives,
+    })
+  })
+
+  it('the width is min(300, max(200, W − 24)); the height follows the wrapped lines, never under 120', () => {
+    expect(card.lostLifeEventWidth(360)).toBe(300)
+    expect(card.lostLifeEventWidth(300)).toBe(276)
+    expect(card.lostLifeEventWidth(180)).toBe(200)
+    expect(card.lostLifeEventHeight(1, 1)).toBe(
+      8 + 18 + 14 + 8 + 18 + 16 + 10 + 44 + 12,
+    )
+    expect(card.lostLifeEventHeight(2, 2)).toBe(
+      card.lostLifeEventHeight(1, 1) + 28,
+    )
+    expect(card.lostLifeEventHeight(1, 1)).toBeLessThanOrEqual(604 - 80)
+  })
+
+  it('builds one full-width OK (`lostLife:ok`, no warehouse); OK, Enter and Esc continue; it sits on the modal stack with its own camera', () => {
+    const { scene, added, removed, texts } = fakeScene()
+    const onContinue = vi.fn()
+    const onOpenWarehouse = vi.fn()
+    const L = computeLayout(360, 604, 0, 0, 1)
+    const c = new card.LostLifeCard(scene as never, L, {
+      onContinue,
+      onOpenWarehouse,
+    })
+    const before = modalCount()
+    const m = card.eventLostLifeModel(recallStrike(), data)
+    c.open(m)
+    expect(c.isOpen()).toBe(true)
+    expect(c.current).toEqual(m)
+    expect(topModal()).toBe(c)
+    expect(modalCount()).toBe(before + 1)
+    expect(added).toHaveLength(1)
+    const buttons = (c as unknown as { buttons: { id: string }[] }).buttons
+    expect(buttons.map((b) => b.id)).toEqual(['lostLife:ok'])
+    expect(texts).toContain('The recall')
+    expect(texts).toContain('You chose: Take the strike')
+    expect(texts).toContain(m.livesText)
+    expect(texts).toContain(card.LOST_LIFE_OK)
+    expect(texts).not.toContain(card.LOST_LIFE_TITLE)
+    expect(texts).not.toContain('Open warehouse')
+    // ≤ 300 wide, centred, fitted to its one-line texts.
+    const r = c.rect!
+    expect(r.w).toBe(300)
+    expect(r.x).toBe(30)
+    expect(r.h).toBe(card.lostLifeEventHeight(1, 1))
+    expect(r.y).toBe(Math.round((604 - r.h) / 2))
+    // Enter = Continue (closes first, then the callback).
+    scene.input.keyboard.emit('keydown', { key: 'Enter' } as KeyboardEvent)
+    expect(onContinue).toHaveBeenCalledTimes(1)
+    expect(onOpenWarehouse).not.toHaveBeenCalled()
+    expect(c.isOpen()).toBe(false)
+    expect(modalCount()).toBe(before)
+    expect(removed).toContain(added[0])
+    // Esc too; and a relayout keeps the variant.
+    c.open(m)
+    c.relayout(computeLayout(393, 659, 0, 0, 1))
+    expect(
+      (c as unknown as { buttons: { id: string }[] }).buttons.map((b) => b.id),
+    ).toEqual(['lostLife:ok'])
+    scene.input.keyboard.emit('keydown', { key: 'Escape' } as KeyboardEvent)
+    expect(onContinue).toHaveBeenCalledTimes(2)
+    expect(c.isOpen()).toBe(false)
+    c.destroy()
   })
 })

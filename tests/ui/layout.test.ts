@@ -1,7 +1,9 @@
 // city-view.md §4 / plan.md §6.9.1: computeLayout at W ∈ {320, 360, 393, 430},
 // zoom ∈ {1, 2}, safeBottom ∈ {0, 34} returns non-overlapping rects and every
 // button's hit box is ≥ 44/zoom logical px on both axes. M7 (design-m7
-// §6.4): the same holds with the quest chip in row B (L.questTargets).
+// §6.4): the same holds with the quest chip in row B (L.questTargets). Build 3
+// M12 (B3 §3.4): and with the event chip alone (L.eventTargets) or beside the
+// compact quest chip (L.bothTargets), picked by rowB().
 import { describe, expect, it } from 'vitest'
 import {
   BTN_H,
@@ -11,8 +13,11 @@ import {
   buttonColumn,
   computeLayout,
   contains,
+  EVENT_CHIP_W,
   overlaps,
+  QUEST_CHIP_COMPACT_W,
   QUEST_CHIP_W,
+  rowB,
   type FixedTargetName,
   type Rect,
   type Target,
@@ -294,5 +299,174 @@ describe('M7 quest chip in row B (design-m7 §6.4)', () => {
         )
         expect(hits.length).toBeLessThanOrEqual(1)
       }
+  })
+})
+
+describe('B3 §3.4 EventChip in row B', () => {
+  const SIZES: [number, number][] = [
+    [360, 604],
+    [393, 659],
+    [430, 932],
+  ]
+
+  it.each(SIZES)(
+    'W=%i H=%i: alone, the chip takes the right end of the quest slot (x W − 90, bar W − 170)',
+    (W, H) => {
+      for (const st of [0, 47])
+        for (const zoom of ZOOMS) {
+          const L = computeLayout(W, H, st, 0, zoom)
+          expect(L.eventChip.rect).toEqual({
+            x: W - 90,
+            y: st + 24,
+            w: EVENT_CHIP_W,
+            h: 24,
+          })
+          expect(L.eventChip.rect.x + L.eventChip.rect.w + 4).toBe(
+            L.shield.rect.x,
+          )
+          expect(L.levelBarEvent).toEqual({
+            x: 76,
+            y: st + 29,
+            w: W - 170,
+            h: 14,
+          })
+          expect(L.levelBarEvent.x + L.levelBarEvent.w + 4).toBe(
+            L.eventChip.rect.x,
+          )
+          // The hit chain: levelEvent → eventChip → shield.
+          expect(L.levelEvent.hit.x).toBe(0)
+          expect(L.levelEvent.hit.x + L.levelEvent.hit.w).toBe(
+            L.eventChip.hit.x,
+          )
+          expect(L.eventChip.hit.x + L.eventChip.hit.w).toBe(L.shield.hit.x)
+          expect(L.eventChip.hit.w).toBeGreaterThanOrEqual(L.minHit)
+          expect(L.eventChip.hit.y).toBe(L.level.hit.y)
+          expect(L.eventChip.hit.h).toBe(L.level.hit.h)
+          expect(L.eventTargets.eventChip).toBe(L.eventChip)
+          expect(L.eventTargets.level).toBe(L.levelEvent)
+          expect('questChip' in L.eventTargets).toBe(false)
+        }
+    },
+  )
+
+  it.each(SIZES)(
+    'W=%i H=%i: both, the compact quest chip (x W − 148, 82 px) and the event chip left of it (x W − 176)',
+    (W, H) => {
+      for (const st of [0, 47])
+        for (const zoom of ZOOMS) {
+          const L = computeLayout(W, H, st, 0, zoom)
+          expect(QUEST_CHIP_COMPACT_W).toBe(82)
+          expect(L.questChipCompact.rect).toEqual({
+            x: W - 148,
+            y: st + 24,
+            w: 82,
+            h: 24,
+          })
+          expect(L.questChipCompact.rect.x + 82 + 4).toBe(L.shield.rect.x)
+          expect(L.eventChipBoth.rect).toEqual({
+            x: W - 176,
+            y: st + 24,
+            w: EVENT_CHIP_W,
+            h: 24,
+          })
+          expect(L.eventChipBoth.rect.x + EVENT_CHIP_W + 4).toBe(
+            L.questChipCompact.rect.x,
+          )
+          expect(L.levelBarBoth).toEqual({
+            x: 76,
+            y: st + 29,
+            w: W - 256,
+            h: 14,
+          })
+          // The hit chain: levelBoth → eventChipBoth → questChipCompact → shield.
+          expect(L.levelBoth.hit.x).toBe(0)
+          expect(L.levelBoth.hit.x + L.levelBoth.hit.w).toBe(
+            L.eventChipBoth.hit.x,
+          )
+          expect(L.eventChipBoth.hit.x + L.eventChipBoth.hit.w).toBe(
+            L.questChipCompact.hit.x,
+          )
+          expect(L.questChipCompact.hit.x + L.questChipCompact.hit.w).toBe(
+            L.shield.hit.x,
+          )
+          expect(L.bothTargets.level).toBe(L.levelBoth)
+          expect(L.bothTargets.questChip).toBe(L.questChipCompact)
+          expect(L.bothTargets.eventChip).toBe(L.eventChipBoth)
+        }
+    },
+  )
+
+  it('both: the level bar keeps ≥ 64 px at 360 and ≥ 96 px at 393 (D-M12-11)', () => {
+    expect(computeLayout(360, 604, 0, 0, 1).levelBarBoth.w).toBe(104)
+    expect(
+      computeLayout(360, 604, 0, 0, 1).levelBarBoth.w,
+    ).toBeGreaterThanOrEqual(64)
+    expect(computeLayout(393, 659, 0, 0, 1).levelBarBoth.w).toBe(137)
+    expect(
+      computeLayout(393, 659, 0, 0, 1).levelBarBoth.w,
+    ).toBeGreaterThanOrEqual(96)
+  })
+
+  it.each(cases)(
+    'W=%i H=%i st=%i sb=%i zoom=%i: eventTargets and bothTargets keep the tap rules',
+    (W, H, st, sb, zoom) => {
+      const L = computeLayout(W, H, st, sb, zoom)
+      hitChecks(L, L.eventTargets)
+      disjoint(L, L.eventTargets)
+      hitChecks(L, L.bothTargets)
+      disjoint(L, L.bothTargets)
+      expect(L.levelBarEvent.w).toBeGreaterThan(0)
+      expect(L.levelBarBoth.w).toBeGreaterThan(0)
+      for (const r of [
+        L.eventChip.rect,
+        L.eventChipBoth.rect,
+        L.questChipCompact.rect,
+      ])
+        expect(inside(L.rowB, r)).toBe(true)
+      expect(overlaps(L.eventChip.rect, L.levelBarEvent)).toBe(false)
+      expect(overlaps(L.eventChipBoth.rect, L.levelBarBoth)).toBe(false)
+      expect(overlaps(L.eventChipBoth.rect, L.questChipCompact.rect)).toBe(
+        false,
+      )
+    },
+  )
+
+  it('with both chips, a tap lands in exactly one target or none', () => {
+    const L = computeLayout(393, 659, 0, 34, 1)
+    for (let y = 0; y < 659; y += 3)
+      for (let x = 0; x < 393; x += 3) {
+        const hits = Object.values(L.bothTargets).filter((t) =>
+          contains(t.hit, x, y),
+        )
+        expect(hits.length).toBeLessThanOrEqual(1)
+      }
+  })
+
+  it('rowB returns the four combinations', () => {
+    const L = computeLayout(393, 659, 47, 34, 1)
+    expect(rowB(L, false, false)).toEqual({
+      levelBar: L.levelBar,
+      level: L.level,
+      questChip: null,
+      eventChip: null,
+    })
+    expect(rowB(L, true, false)).toEqual({
+      levelBar: L.levelBarChip,
+      level: L.levelChip,
+      questChip: L.questChip,
+      eventChip: null,
+    })
+    expect(rowB(L, false, true)).toEqual({
+      levelBar: L.levelBarEvent,
+      level: L.levelEvent,
+      questChip: null,
+      eventChip: L.eventChip,
+    })
+    expect(rowB(L, true, true)).toEqual({
+      levelBar: L.levelBarBoth,
+      level: L.levelBoth,
+      questChip: L.questChipCompact,
+      eventChip: L.eventChipBoth,
+    })
   })
 })

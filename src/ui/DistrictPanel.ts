@@ -25,7 +25,8 @@
 // quest's own flavour already say it) — `ic_quest` + `Rush hour · 4/10 · 1d
 // 12h` (active) or `Job offer: Rush hour ▸` (offered; questText.questRowText);
 // its 44-px tap band (grown over the non-interactive rows around it) calls
-// opts.onQuest(questId) and the HUD opens the QuestCard. The quest comes from
+// opts.onQuest(questId) and the HUD opens the QuestCard (build 3 M12: a job
+// offer's card is its EventCard, which the HUD raises). The quest comes from
 // vs.quests() (the offer or active quest whose target is this district), so
 // the sheet's tallest case (Industrial with every row) stays at M5's height.
 // Locked regions replace rows 2–6 with `Unlocks at Lv 2 — $2,000 lifetime
@@ -383,7 +384,7 @@ const MUTED = PALETTE.grey1
 const RED = PALETTE.red0
 
 export interface DistrictPanelOptions {
-  /** M7: the quest row was tapped (the HUD opens the QuestCard). */
+  /** M7: the quest row was tapped (the HUD opens the QuestCard; M12: a job offer's EventCard). */
   onQuest?: (questId: string) => void
 }
 

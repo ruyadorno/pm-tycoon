@@ -41,6 +41,15 @@ import { Sim } from '../../src/sim/sim.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
 
 const SEED = 7
+/**
+ * l2-lane: the seeds tried in order (build 3, M12: with the decision deck on,
+ * seed 7's policy places the shaker only after L3, so the first seed from 7
+ * with a real L2 lane holding it is used; `fixture.seed` records it).
+ */
+const L2_SEEDS: readonly number[] = Array.from(
+  { length: 24 },
+  (_, i) => SEED + i,
+)
 /** level-up: snapshot at most this long before the run's level-up tick. */
 const LEVEL_LEAD_S = 3
 /** payroll-short: the first payday tried (then the next ones). */
@@ -54,6 +63,8 @@ const L2_SETTLE_S = 40
  * (tests/data/shot-fixtures.test.ts watches 30 s under ?policy=1).
  */
 const L2_QUIET_S = 45
+/** l2-lane: the shot-fixtures test's watch under ?policy=1 (s). */
+const L2_WATCH_S = 30
 /** Give up past this (sim seconds). */
 const CAP_S = 1800
 const OUT_DIR = new URL('../../tests/fixtures/', import.meta.url)
@@ -71,7 +82,7 @@ function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
     fixture: {
       name,
       regenerate: `${REGENERATE} ${name}`,
-      seed: SEED,
+      seed: sim.state.seed,
       tick: sim.state.tick,
       ...fixture,
     },
@@ -88,8 +99,8 @@ function write(name: Name, sim: Sim, fixture: Record<string, unknown>): void {
 }
 
 /** Run the policy until `stop` holds (checked before each step) or the cap. */
-function runPolicy(stop: (sim: Sim) => boolean): Sim {
-  const sim = new Sim(data, SEED)
+function runPolicy(stop: (sim: Sim) => boolean, seed = SEED): Sim {
+  const sim = new Sim(data, seed)
   const policy = createPolicy(sim, 'competent')
   const cap = CAP_S * TICKS_PER_S
   while (!stop(sim) && sim.state.tick < cap) {
@@ -187,30 +198,59 @@ function slotWith(sim: Sim, defId: string): string | null {
 function l2Lane(): void {
   const shaker = data.machines.checkers.find((m) => m.strain === 'rattle')
   if (!shaker) throw new Error('l2-lane: no rattle counter in machines.json')
+  const misses: string[] = []
+  for (const seed of L2_SEEDS) {
+    const why = l2LaneSeed(seed, shaker.id)
+    if (why === null) return
+    misses.push(`seed ${seed}: ${why}`)
+    console.log(`l2-lane: ${misses.at(-1)}`)
+  }
+  throw new Error(`l2-lane: no seed works (${misses.join('; ')})`)
+}
+
+/** Write l2-lane from `seed`, or say why that seed has no L2 shaker lane. */
+function l2LaneSeed(seed: number, shakerId: string): string | null {
   // One probe run to L3 (deterministic) for the shaker's tick and L3's.
   const seen: { placed: number | null } = { placed: null }
   const probe = runPolicy((s) => {
-    if (seen.placed === null && slotWith(s, shaker.id) !== null)
+    if (seen.placed === null && slotWith(s, shakerId) !== null)
       seen.placed = s.state.tick
     return s.state.level.level >= 3
-  })
+  }, seed)
   const placedTick = seen.placed
-  if (placedTick === null) throw new Error('l2-lane: the shaker never placed')
+  if (placedTick === null) return 'the shaker never placed before L3'
   const l3Tick = probe.state.stats.levelTick['3'] ?? Infinity
   // L2_SETTLE_S after the shaker — earlier when L3 would land inside the
-  // shot's quiet window (build 3: seed 7 places it ≈ 60 s before L3).
+  // shot's quiet window (build 3: seed 7 placed it ≈ 60 s before L3).
   const at = Math.min(
     placedTick + L2_SETTLE_S * TICKS_PER_S,
     l3Tick - L2_QUIET_S * TICKS_PER_S,
   )
   if (at <= placedTick)
-    throw new Error(
-      `l2-lane: L3 lands ${(l3Tick - placedTick) / TICKS_PER_S} s after the shaker`,
-    )
-  const sim = runPolicy((s) => s.state.tick >= at)
-  const slot = slotWith(sim, shaker.id)
+    return `L3 lands ${(l3Tick - placedTick) / TICKS_PER_S} s after the shaker`
+  const sim = runPolicy((s) => s.state.tick >= at, seed)
+  const slot = slotWith(sim, shakerId)
   if (sim.state.level.level !== 2 || slot === null)
-    throw new Error('l2-lane: no L2 lane with the shaker')
+    return 'no L2 lane with the shaker at the snapshot'
+  if (
+    sim.state.lane.nodes.filter((n) => n.kind === 'slot' && !n.locked)
+      .length !== 4
+  )
+    return 'not four live slots'
+  if (!sim.state.vehicles.some((v) => v.type === 'truck'))
+    return 'no truck at the snapshot'
+  // tests/data/shot-fixtures.test.ts: 30 s under ?policy=1 from the
+  // snapshot with no level:up and no life lost.
+  const after = Sim.load(data, JSON.parse(JSON.stringify(sim.snapshot())))
+  const watch = createPolicy(after, 'competent')
+  for (let i = 0; i < L2_WATCH_S * TICKS_PER_S; i++) {
+    watch.step()
+    after.tick()
+  }
+  watch.dispose?.()
+  if (after.state.level.level !== 2) return 'a level:up in the watch window'
+  if (after.state.stats.livesLost > sim.state.stats.livesLost)
+    return 'a life lost in the watch window'
   write('l2-lane', sim, {
     level: 2,
     shakerSlot: slot,
@@ -220,6 +260,7 @@ function l2Lane(): void {
       .map((n) => n.id),
     policy: true,
   })
+  return null
 }
 
 const want = process.argv.slice(2)

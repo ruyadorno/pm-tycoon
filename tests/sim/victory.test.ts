@@ -28,6 +28,7 @@ import {
   runTicks,
   runUntil,
   startQuest,
+  withDecisions,
 } from './helpers.ts'
 
 const DAY = TICKS_PER_DAY
@@ -294,31 +295,32 @@ function level5Live(seed: number): Sim {
 }
 
 describe('job cards around the ultimate (B2 §3.4; B3 §3.2: none while it is pending)', () => {
-  it('a fail or an abandon: no job card during the cooldown; the ultimate comes back first, and nothing else while it waits', () => {
-    for (const how of ['malware', 'abandon'] as const) {
-      const sim = level5Live(how === 'malware' ? 11 : 12)
-      const q = acceptOffer(sim)
-      expect(q.ultimate).toBe(true)
-      if (how === 'malware') {
-        delivered(sim, 1, true, true)
+  it('a fail or an abandon: no job card during the cooldown; the ultimate comes back first, and nothing else while it waits', () =>
+    withDecisions(false, () => {
+      for (const how of ['malware', 'abandon'] as const) {
+        const sim = level5Live(how === 'malware' ? 11 : 12)
+        const q = acceptOffer(sim)
+        expect(q.ultimate).toBe(true)
+        if (how === 'malware') {
+          delivered(sim, 1, true, true)
+          runTicks(sim, 1)
+        } else sim.dispatch({ kind: 'abandonQuest' })
+        const t = sim.state.tick
+        expect(sim.state.quests.history.at(-1)).toMatchObject({ id: q.id })
+        expect(sim.state.quests.jobReadyTick).toBeGreaterThanOrEqual(
+          t + sim.data.events.schedule.jobCooldownDays * DAY,
+        )
+        const offered = collect(sim, 'quest:offered')
+        runTicks(sim, DAY - 1)
+        expect(offered).toEqual([]) // on_time_day is eligible, yet nothing comes
         runTicks(sim, 1)
-      } else sim.dispatch({ kind: 'abandonQuest' })
-      const t = sim.state.tick
-      expect(sim.state.quests.history.at(-1)).toMatchObject({ id: q.id })
-      expect(sim.state.quests.jobReadyTick).toBeGreaterThanOrEqual(
-        t + sim.data.events.schedule.jobCooldownDays * DAY,
-      )
-      const offered = collect(sim, 'quest:offered')
-      runTicks(sim, DAY - 1)
-      expect(offered).toEqual([]) // on_time_day is eligible, yet nothing comes
-      runTicks(sim, 1)
-      expect(offered.map((o) => o.templateId)).toEqual(['golden_release'])
-      runTicks(sim, 4 * DAY) // Later: it stays, no job card is drawn
-      expect(offered).toHaveLength(1)
-      expect(sim.state.events.open).toBeNull()
-      expect(sim.state.tick).toBe(t + 5 * DAY)
-    }
-  })
+        expect(offered.map((o) => o.templateId)).toEqual(['golden_release'])
+        runTicks(sim, 4 * DAY) // Later: it stays, no job card is drawn
+        expect(offered).toHaveLength(1)
+        expect(sim.state.events.open).toBeNull()
+        expect(sim.state.tick).toBe(t + 5 * DAY)
+      }
+    }))
 
   it('Victory: job cards resume jobCooldownDays later (at the first draw after), not on the victory tick', () => {
     const sim = level5Live(13)

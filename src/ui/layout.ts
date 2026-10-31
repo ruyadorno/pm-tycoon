@@ -54,6 +54,14 @@ export const QUEST_CHIP_BAR_W = 60
 export const QUEST_CHIP_LABEL_W = 34
 /** Gap between the level bar and the chip, and between the chip and the shield. */
 export const QUEST_CHIP_GAP = 4
+/**
+ * Build 3 M12 (B3 §3.4): the event chip in row B — ic_event 16 + a 1-glyph
+ * count (QUEST_CHIP_GAP from its neighbours). Alone it takes the right end of
+ * the quest chip's slot; beside the quest chip, that chip drops its time label
+ * (QUEST_CHIP_COMPACT_W) and the event chip sits left of it (D-M12-10/11).
+ */
+export const EVENT_CHIP_W = 24
+export const QUEST_CHIP_COMPACT_W = QUEST_CHIP_W - QUEST_CHIP_LABEL_W
 
 export interface Rect {
   x: number
@@ -83,9 +91,19 @@ export type TargetName =
   | 'followClose'
   /** M7: only while a quest is offered or active (Layout.questTargets). */
   | 'questChip'
+  /** Build 3 M12: only while a modifier is live or a card waits (Layout.eventTargets / bothTargets). */
+  | 'eventChip'
 
-/** The always-on targets (the quest chip comes and goes: Layout.questTargets). */
-export type FixedTargetName = Exclude<TargetName, 'questChip'>
+/** The always-on targets (the quest and event chips come and go: rowB). */
+export type FixedTargetName = Exclude<TargetName, 'questChip' | 'eventChip'>
+
+/** Build 3 M12 (B3 §3.4): what row B holds for a quest chip / event chip pair (rowB). */
+export interface RowB {
+  levelBar: Rect
+  level: Target
+  questChip: Target | null
+  eventChip: Target | null
+}
 
 export interface Layout {
   W: number
@@ -113,6 +131,19 @@ export interface Layout {
   questChip: Target
   levelBarChip: Rect
   levelChip: Target
+  /**
+   * Build 3 M12 (B3 §3.4): the event chip alone in row B (the right end of
+   * the quest chip's slot) with its shortened level bar and level cell; and
+   * both chips — the compact quest chip (no time label) right, the event
+   * chip left of it. HudScene picks through rowB().
+   */
+  eventChip: Target
+  levelBarEvent: Rect
+  levelEvent: Target
+  questChipCompact: Target
+  eventChipBoth: Target
+  levelBarBoth: Rect
+  levelBoth: Target
   ticker: Rect
   tickerDay: Rect
   toast: Rect
@@ -145,7 +176,11 @@ export interface Layout {
    */
   targets: Record<FixedTargetName, Target>
   /** The same while the quest chip shows: `level` → levelChip, + questChip. */
-  questTargets: Record<TargetName, Target>
+  questTargets: Record<Exclude<TargetName, 'eventChip'>, Target>
+  /** Build 3 M12: the event chip alone: `level` → levelEvent, + eventChip. */
+  eventTargets: Record<Exclude<TargetName, 'questChip'>, Target>
+  /** Build 3 M12: both chips: `level` → levelBoth, questChip → questChipCompact, eventChip → eventChipBoth. */
+  bothTargets: Record<TargetName, Target>
 }
 
 export const rect = (x: number, y: number, w: number, h: number): Rect => ({
@@ -203,7 +238,7 @@ export function computeLayout(
   // ---- top bar: row A (money · lives · mood), row B (level · bar · shield)
   const topBar = rect(0, st, W, TOP_BAR_H)
   const rowA = rect(0, st, W, ROW_H)
-  const rowB = rect(0, st + ROW_H, W, ROW_H)
+  const rowBRect = rect(0, st + ROW_H, W, ROW_H)
   const livesW = LIVES_SLOTS * LIVES_SLOT + (LIVES_SLOTS - 1) * LIVES_GAP
   const livesX = Math.round(W / 2 - livesW / 2)
   const moodX = W - MARGIN - MOOD_W
@@ -263,6 +298,40 @@ export function computeLayout(
     rect(MARGIN, st + ROW_H, Math.max(0, qx - 2 * MARGIN), ROW_H),
     rect(0, bHitY, qx, bHitH),
   )
+  // Build 3 M12 (B3 §3.4): the event chip QUEST_CHIP_GAP left of `right` (the
+  // shield, or the compact quest chip); its hit box runs to `rightHit` (at
+  // least minHit wide) and the level cell keeps the rest of the row.
+  const eventSlot = (
+    right: number,
+    rightHit: number,
+  ): { chip: Target; bar: Rect; level: Target } => {
+    const ex = right - QUEST_CHIP_GAP - EVENT_CHIP_W
+    const hw = Math.max(rightHit - ex, minHit)
+    const hx = rightHit - hw
+    return {
+      chip: target(
+        rect(ex, st + ROW_H, EVENT_CHIP_W, ROW_H),
+        rect(hx, bHitY, hw, bHitH),
+      ),
+      bar: rect(
+        levelBar.x,
+        levelBar.y,
+        Math.max(0, ex - QUEST_CHIP_GAP - levelBar.x),
+        levelBar.h,
+      ),
+      level: target(
+        rect(MARGIN, st + ROW_H, Math.max(0, hx - 2 * MARGIN), ROW_H),
+        rect(0, bHitY, hx, bHitH),
+      ),
+    }
+  }
+  const ev = eventSlot(shieldX, shieldHitX)
+  const qxc = shieldX - QUEST_CHIP_GAP - QUEST_CHIP_COMPACT_W
+  const questChipCompact = target(
+    rect(qxc, st + ROW_H, QUEST_CHIP_COMPACT_W, ROW_H),
+    rect(qxc, bHitY, Math.max(0, shieldHitX - qxc), bHitH),
+  )
+  const both = eventSlot(qxc, qxc)
   const ticker = rect(0, st + TOP_BAR_H, W, TICKER_H)
   const tickerDay = rect(0, st + TOP_BAR_H, TICKER_DAY_W, TICKER_H)
   const toast = rect(12, st + HUD_TOP_H + 4, W - 24, TOAST_H)
@@ -343,10 +412,21 @@ export function computeLayout(
     garage,
     followClose,
   }
-  const questTargets: Record<TargetName, Target> = {
+  const questTargets: Record<Exclude<TargetName, 'eventChip'>, Target> = {
     ...targets,
     level: levelChip,
     questChip,
+  }
+  const eventTargets: Record<Exclude<TargetName, 'questChip'>, Target> = {
+    ...targets,
+    level: ev.level,
+    eventChip: ev.chip,
+  }
+  const bothTargets: Record<TargetName, Target> = {
+    ...targets,
+    level: both.level,
+    questChip: questChipCompact,
+    eventChip: both.chip,
   }
 
   return {
@@ -359,7 +439,7 @@ export function computeLayout(
     hit,
     topBar,
     rowA,
-    rowB,
+    rowB: rowBRect,
     money,
     lives,
     mood,
@@ -369,6 +449,13 @@ export function computeLayout(
     questChip,
     levelBarChip,
     levelChip,
+    eventChip: ev.chip,
+    levelBarEvent: ev.bar,
+    levelEvent: ev.level,
+    questChipCompact,
+    eventChipBoth: both.chip,
+    levelBarBoth: both.bar,
+    levelBoth: both.level,
     ticker,
     tickerDay,
     toast,
@@ -387,6 +474,43 @@ export function computeLayout(
     world,
     targets,
     questTargets,
+    eventTargets,
+    bothTargets,
+  }
+}
+
+/**
+ * Build 3 M12 (B3 §3.4): row B for the chips that show — both → the compact
+ * quest chip with the event chip left of it; the quest chip alone (M7); the
+ * event chip alone; neither → the full level bar.
+ */
+export function rowB(L: Layout, quest: boolean, event: boolean): RowB {
+  if (quest && event)
+    return {
+      levelBar: L.levelBarBoth,
+      level: L.levelBoth,
+      questChip: L.questChipCompact,
+      eventChip: L.eventChipBoth,
+    }
+  if (quest)
+    return {
+      levelBar: L.levelBarChip,
+      level: L.levelChip,
+      questChip: L.questChip,
+      eventChip: null,
+    }
+  if (event)
+    return {
+      levelBar: L.levelBarEvent,
+      level: L.levelEvent,
+      questChip: null,
+      eventChip: L.eventChip,
+    }
+  return {
+    levelBar: L.levelBar,
+    level: L.level,
+    questChip: null,
+    eventChip: null,
   }
 }
 

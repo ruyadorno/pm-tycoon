@@ -6,8 +6,10 @@
 // spec §5.3 (decay while held), §5.4 (reading the label is the skill);
 // design-m6 §6.2 / spec-build2 §2.6 (the sorter's hint "Pat: looks clean
 // (85%)" under the label, +20 px → 268; line 6 names the flagging inspector;
-// opening the card touches the parcel, D3). Pure helpers + a headless Sim;
-// Phaser is stubbed.
+// opening the card touches the parcel, D3). Build 3 M12 (B3 §3.6): the
+// value quotes what a delivery pays now (ViewSim.parcelValue, the income
+// fold) and the OOPS fee is the sim's own (the wrongTossFee fold, clamped
+// to the balance). Pure helpers + a headless Sim; Phaser is stubbed.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -30,6 +32,7 @@ const { dataFixture, fund, heldParcel, quietSim, standardApplicant } =
   await import('../sim/helpers.ts')
 const { TICKS_PER_S } = await import('../../src/sim/types.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
+const { applyModifier } = await import('../../src/sim/systems/modifierOps.ts')
 
 const data = dataFixture()
 const S = data.parcels.sizes.S.value
@@ -256,5 +259,76 @@ describe('design-m6 §6.2 the sorter hint and the flagging inspector', () => {
     expect(vs.holdBay.touch(p.id)).toEqual({ ok: true })
     expect(sim.state.parcels[String(p.id)]?.touchedTick).toBe(sim.state.tick)
     expect(vs.holdBay.touch(999_999)).toEqual({ ok: false, reason: 'invalid' })
+  })
+})
+
+/** A permanent mult modifier row input (B3 §3.6 tests). */
+const mod = (key: 'income' | 'wrongTossFee', mult: number) => ({
+  key,
+  mult,
+  add: 0,
+  scope: null,
+  untilTick: null,
+  eventId: 'ev_test',
+  label: 'Test',
+})
+
+describe('B3 §3.6 the modifiers on the card and the city stamp', () => {
+  it('valueNow quotes the paid value it is given (the income fold); without it the plain round(base × f)', () => {
+    expect(hb.valueNow(data, parcel(S), at(0), 24).text).toBe(
+      `Value now $24 · drops in ${hb.valueNow(data, parcel(S), at(0)).text.split('drops in ')[1]}`,
+    )
+    expect(hb.valueNow(data, parcel(M), at(floorAtS), 7)).toMatchObject({
+      value: 7,
+      phase: 'floor',
+    })
+    expect(hb.valueNow(data, parcel(S), at(0), null).value).toBe(S)
+  })
+
+  it('through the facade: an income ×1.2 card raises the card value to what a delivery would pay', () => {
+    const sim = fund(quietSim(1))
+    const p = heldParcel(sim, { malware: false })
+    const vs = createViewSim(sim)
+    const plain = vs.parcelValue(p.id)
+    expect(hb.valueNow(data, p, vs.tick, plain).value).toBe(
+      hb.valueNow(data, p, vs.tick).value,
+    )
+    applyModifier(sim, mod('income', 1.2))
+    const paid = vs.parcelValue(p.id)!
+    expect(paid).toBe(Math.round(p.baseValue * p.mult * 1.2))
+    expect(hb.valueNow(data, p, vs.tick, paid).text).toMatch(
+      new RegExp(`^Value now \\$${paid} · `),
+    )
+  })
+
+  it('wrongTossFeeNow is the fee the sim takes (×2 card; clamped to the balance; a ×0 card is free) and the stamp says so', () => {
+    const fee = data.economy.wrongTossFee
+    const sim = fund(quietSim(1), 10_000)
+    expect(hb.wrongTossFeeNow(sim)).toBe(fee)
+    expect(hb.oopsStampText(fee)).toBe(`OOPS −$${fee}`)
+    applyModifier(sim, mod('wrongTossFee', 2))
+    const want = hb.wrongTossFeeNow(sim)
+    expect(want).toBe(2 * fee)
+    // The real toss debits exactly that (parcel:tossed fires before it).
+    const p = heldParcel(sim, { malware: false })
+    let seen: number | null = null
+    sim.events.on('parcel:tossed', () => {
+      seen = hb.wrongTossFeeNow(sim)
+    })
+    const vs = createViewSim(sim)
+    const before = vs.money
+    expect(vs.holdBay.toss(p.id).ok).toBe(true)
+    expect(seen).toBe(want)
+    expect(before - vs.money).toBe(want)
+    // Clamped to the balance; nothing charged reads plain OOPS.
+    sim.state.economy.balance = 10
+    expect(hb.wrongTossFeeNow(sim)).toBe(10)
+    sim.state.economy.balance = 0
+    expect(hb.wrongTossFeeNow(sim)).toBe(0)
+    expect(hb.oopsStampText(0)).toBe('OOPS')
+    // A ×0 card waives the fee at any balance.
+    const free = fund(quietSim(2), 10_000)
+    applyModifier(free, mod('wrongTossFee', 0))
+    expect(hb.wrongTossFeeNow(free)).toBe(0)
   })
 })

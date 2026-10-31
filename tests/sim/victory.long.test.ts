@@ -33,6 +33,11 @@
 // leaves that much after the latest victory seen (~50 min), and the endless
 // test asserts the check ran on at least one winning seed (never vacuous).
 //
+// Build 3, M12: these are pass-1 runs (B3 §2.3: the decision draw off) until
+// M14's pass 2 re-times the Golden Release with the deck on — with the M12
+// deck the victories land later and no winning seed keeps ENDLESS_WINDOW
+// inside RUN_MINUTES (the drift is in docs/status.md).
+//
 // Tagged [long]: excluded from `vlr check:quick` (tools/check.mjs), run by
 // the full `vlr check`.
 
@@ -44,7 +49,7 @@ import { TICKS_PER_DAY, ticksFromS } from '../../src/sim/types.ts'
 import { runSeed } from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
 import type { RecordedEvent } from '../../tools/sim/report.ts'
-import { dataFixture } from './helpers.ts'
+import { dataFixture, withDecisions } from './helpers.ts'
 
 const data = dataFixture()
 const targets = data.economy.pacingTargets
@@ -86,27 +91,29 @@ interface VictoryRun {
 let cached: VictoryRun[] | null = null
 /** The seeds 1-3 competent runs (computed once for this file). */
 function runs(): VictoryRun[] {
-  cached ??= SEEDS.map((seed) => {
-    let counters: VictoryRun['counters'] = null
-    let last: Sim | null = null
-    const run = runSeed(data, seed, RUN_MINUTES, createPolicy, {
-      onEvent: (_e, sim) => {
-        last = sim
-        const a = sim.state.quests.active
-        if (a?.ultimate && a.progress.kind === 'ultimate') {
-          counters = { ...a.progress }
-        }
-      },
-    })
-    const s = (last as Sim | null)?.state
-    return {
-      run,
-      counters,
-      victory: s?.economy.victory ?? false,
-      victoryTick: s?.stats.victoryTick ?? null,
-      trucks: s?.vehicles.filter((v) => v.type === 'truck').length ?? 0,
-    }
-  })
+  cached ??= withDecisions(false, () =>
+    SEEDS.map((seed) => {
+      let counters: VictoryRun['counters'] = null
+      let last: Sim | null = null
+      const run = runSeed(data, seed, RUN_MINUTES, createPolicy, {
+        onEvent: (_e, sim) => {
+          last = sim
+          const a = sim.state.quests.active
+          if (a?.ultimate && a.progress.kind === 'ultimate') {
+            counters = { ...a.progress }
+          }
+        },
+      })
+      const s = (last as Sim | null)?.state
+      return {
+        run,
+        counters,
+        victory: s?.economy.victory ?? false,
+        victoryTick: s?.stats.victoryTick ?? null,
+        trucks: s?.vehicles.filter((v) => v.type === 'truck').length ?? 0,
+      }
+    }),
+  )
   return cached
 }
 

@@ -9,9 +9,13 @@
 // checker held as a quest voucher reads a gold `FREE` tag and stays enabled
 // at any balance; the lane draws the golden parcel as `parcel_s_magic` and
 // its checkers skip it — LaneRenderer's pure helpers, the warehouse half of
-// the M7 world lane).
+// the M7 world lane). Build 3 M12 (B3 §3.6): machine rows read
+// ViewSim.priceOf('machine', ·) — a `SALE` flag (and pill) under the list
+// price, the voucher beating a sale, desks untouched, the pill clear of the
+// name at 360, and the facade charging and storing the sale price.
 // Pure helpers only; Phaser is stubbed because the module imports the
 // Button kit.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -34,6 +38,7 @@ const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { frameOrNull } = await import('../../src/render/frames.ts')
 const { textTop } = await import('../../src/ui/text.ts')
 const lane = await import('../../src/render/warehouse/LaneRenderer.ts')
+const { applyModifier } = await import('../../src/sim/systems/modifierOps.ts')
 
 const data = dataFixture()
 const def = (id: string) => {
@@ -486,6 +491,100 @@ describe('design-m7 §6.8 quest vouchers: a gold FREE tag, enabled at any balanc
     const after = rowOf()
     expect(after?.priceText).toBe(`$${md.price}`)
     expect(after && bs.rowState(after, vs.money)).toBe('poor')
+  })
+})
+
+/** A ×0.5 machinePrice fold (B3 §3.6 tests). */
+const half = (l: number): number => Math.round(l * 0.5)
+
+describe('B3 §3.6 machinePrice: the SALE tag (priceOf)', () => {
+  const adv = new Map<number, number>()
+  for (const m of readFileSync(
+    new URL('../../src/assets/m5x7.xml', import.meta.url),
+    'utf8',
+  ).matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+    adv.set(Number(m[1]), Number(m[2]))
+  const width = (s: string): number =>
+    [...s].reduce((w, ch) => w + (adv.get(ch.codePointAt(0)!) ?? 6), 0)
+
+  it('machine rows take the modified price and carry sale + listPrice; desk rows keep theirs', () => {
+    const plain = bs.buyRows(data, 3, [])
+    const sale = bs.buyRows(data, 3, [], [], half)
+    expect(sale.map((r) => r.id)).toEqual(plain.map((r) => r.id))
+    for (const r of sale) {
+      const was = plain.find((x) => x.id === r.id)!
+      if (r.kind !== 'machine') {
+        expect(r).toEqual(was)
+        continue
+      }
+      const d = def(r.id)
+      expect(r.listPrice).toBe(d.price)
+      expect(r.price).toBe(half(d.price))
+      expect(r.priceText).toBe(bs.priceText(half(d.price)))
+      expect(r.sale).toBe(true)
+      expect(was.sale).toBeUndefined()
+      expect(was.listPrice).toBe(d.price)
+    }
+    // Affordable at the sale price only.
+    const md = sale.find((r) => r.id === 'metal_detector')!
+    expect(bs.rowState(md, half(def('metal_detector').price))).toBe('ok')
+    expect(
+      bs.rowState(
+        plain.find((r) => r.id === 'metal_detector')!,
+        half(def('metal_detector').price),
+      ),
+    ).toBe('poor')
+  })
+
+  it('a dearer price is no sale; the voucher beats a sale (FREE, no SALE)', () => {
+    const dear = bs.buyRows(data, 1, [], [], (l) => Math.round(l * 1.25))
+    const md = dear.find((r) => r.id === 'metal_detector')!
+    expect(md.price).toBe(Math.round(def('metal_detector').price * 1.25))
+    expect(md.sale).toBeUndefined()
+    const v = bs
+      .buyRows(data, 1, [], ['metal_detector'], half)
+      .find((r) => r.id === 'metal_detector')!
+    expect(v).toMatchObject({ price: 0, priceText: 'FREE', voucher: true })
+    expect(v.sale).toBeUndefined()
+  })
+
+  it('the SALE pill sits on the name line left of the price, clear of every machine name at 360', () => {
+    expect(bs.SALE_TEXT).toBe('SALE')
+    const rowW = 360 - 2 * bs.PAD
+    const pillW = width(bs.SALE_TEXT) + 2 * bs.VOUCHER_PAD_X
+    for (const f of [half, (l: number) => Math.round(l * 0.9)])
+      for (const r of bs.buyRows(data, 5, [], [], f)) {
+        if (r.kind !== 'machine') continue
+        const priceX = rowW - 8 - width(r.priceText)
+        const pillX = priceX - bs.SALE_GAP - pillW
+        expect(bs.ROW_TEXT_X + width(r.name) + 4, r.name).toBeLessThanOrEqual(
+          pillX,
+        )
+      }
+  })
+
+  it('through the facade: a machinePrice ×0.5 card — the row, the debit and the stored price agree', () => {
+    const sim = fund(makeSim(1))
+    applyModifier(sim, {
+      key: 'machinePrice',
+      mult: 0.5,
+      add: 0,
+      scope: null,
+      untilTick: null,
+      eventId: 'ev_test_sale',
+      label: 'Test sale',
+    })
+    const vs = createViewSim(sim)
+    const md = def('metal_detector')
+    const row = bs
+      .buyRows(data, vs.level, [], [], (l) => vs.priceOf('machine', l))
+      .find((r) => r.id === 'metal_detector')!
+    expect(row).toMatchObject({ price: half(md.price), sale: true })
+    const money = vs.money
+    expect(vs.lane.buyMachine('metal_detector', 'slot2')).toEqual({ ok: true })
+    expect(vs.money).toBe(money - row.price)
+    const fixture = vs.lane.nodes().find((n) => n.id === 'slot2')?.fixture
+    expect(fixture?.checker.price).toBe(row.price)
   })
 })
 

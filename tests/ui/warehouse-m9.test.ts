@@ -7,7 +7,9 @@
 // one slot left past the column (`Slot 6 — unlocks at Lv 5`), the X-ray
 // row in the BuySheet at the real L4 (shipped cap 5: no "coming soon"),
 // and the StationCard's Arm state with its `sorter_arm_f0` picture at the
-// card's top right. Phaser is stubbed (the modules import the UI kit).
+// card's top right. Build 3 M12 (B3 §3.5, D-M12-13): the shelf tooltip's
+// `(+N)` for a `cap` card's bonus, kept through a level-up. Phaser is
+// stubbed (the modules import the UI kit).
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -35,6 +37,7 @@ const { FRAME_ATLAS, FRAMES, SHARED_FRAMES } =
 const { dataFixture, fund, makeSim } = await import('../sim/helpers.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { SORTER_ARM_ID } = await import('../../src/sim/systems/sorter.ts')
+const { applyModifier } = await import('../../src/sim/systems/modifierOps.ts')
 
 const data = dataFixture()
 const atlasOf = (f: string): string | undefined =>
@@ -225,5 +228,35 @@ describe('design-m8-m9 §6.1 (M9): the StationCard shows the Sorter Arm', () => 
     expect(st.armArt(360, () => false)).toBeNull()
     // world-bound card: the frame's home is world (packed into both)
     expect(atlasOf('sorter_arm_f0')).toBe('world')
+  })
+})
+
+describe('B3 §3.5 (M12): the shelf cap bonus in the shelf tooltip', () => {
+  it('no bonus reads nothing; a cap +20 card reads ` (+20)` and survives a level-up', () => {
+    const sim = fund(makeSim(1))
+    const vs = createViewSim(sim)
+    const l1 = data.levels.find((l) => l.level === 1)!.shelfCap
+    expect(vs.shelf.cap).toBe(l1)
+    expect(ws.shelfBonus(data, vs.level, vs.shelf.cap)).toBe(0)
+    expect(ws.shelfBonusText(data, vs.level, vs.shelf.cap)).toBe('')
+    applyModifier(sim, {
+      key: 'shelfCap',
+      mult: 1,
+      add: 20,
+      scope: null,
+      untilTick: null,
+      eventId: 'ev_test_cap',
+      label: 'Test cap',
+    })
+    expect(vs.shelf.cap).toBe(l1 + 20)
+    expect(ws.shelfBonus(data, vs.level, vs.shelf.cap)).toBe(20)
+    expect(ws.shelfBonusText(data, vs.level, vs.shelf.cap)).toBe(' (+20)')
+    expect(sim.dispatch({ kind: 'debugForceLevel', level: 2 }).ok).toBe(true)
+    const l2 = data.levels.find((l) => l.level === 2)!.shelfCap
+    expect(vs.shelf.cap).toBe(l2 + 20)
+    expect(ws.shelfBonusText(data, vs.level, vs.shelf.cap)).toBe(' (+20)')
+    // A cap under the row (never expected) or an unknown level reads nothing.
+    expect(ws.shelfBonus(data, 2, l2 - 5)).toBe(0)
+    expect(ws.shelfBonus(data, 99, 500)).toBe(0)
   })
 })

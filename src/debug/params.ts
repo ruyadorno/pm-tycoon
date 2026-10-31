@@ -8,6 +8,9 @@
 // M7 (design-m7 §6.10, plan-build2 §8.4 task 6): ?quest=<id> (debug only)
 // offers that quests.json template (or the ultimate id, `golden_release`) on
 // every fresh player's game through debug.offerQuest, after ?level=.
+// Build 3 M12 (B3 §3.4, §6): ?event=<id> (debug only) offers that events.json
+// deck card on every fresh player's game through debug.offerEvent, after
+// ?quest= (a card opened at tick 0 holds the sim: ?fastForward= then waits).
 import type { PolicyKind } from '../sim/sim.ts'
 
 export type ViewName = 'city' | 'warehouse' | 'gallery'
@@ -43,6 +46,13 @@ export interface Params {
    * absent or blank. An unknown id is refused by the sim (Boot warns).
    */
   quest: string | null
+  /**
+   * ?event=<eventId> (debug builds, B3 §3.4): offer that deck card on a fresh
+   * game (sim command debugOfferEvent — the scheduler, the conditions and the
+   * cooldowns are skipped; replays stay exact); null when absent or blank.
+   * An unknown id is refused by the sim (Boot warns).
+   */
+  event: string | null
   /** Install window.__pm, the overlay and 4x speed in a production build. */
   debug: boolean
   mute: boolean
@@ -101,6 +111,7 @@ export function parseParams(search: string, fallbackSeed: number): Params {
   const levelArg = int(q, 'level')
   const policyArg = q.get('policy')?.trim().toLowerCase() ?? null
   const questArg = q.get('quest')?.trim() ?? ''
+  const eventArg = q.get('event')?.trim() ?? ''
   return {
     seed,
     seedFromUrl,
@@ -112,6 +123,7 @@ export function parseParams(search: string, fallbackSeed: number): Params {
     policyKind: policyArg === 'delegating' ? 'delegating' : 'competent',
     level: levelArg !== null && levelArg >= MIN_FORCED_LEVEL ? levelArg : null,
     quest: questArg === '' ? null : questArg,
+    event: eventArg === '' ? null : eventArg,
     debug: flag(q, 'debug'),
     mute: flag(q, 'mute'),
     audio: !(audioArg === '0' || audioArg === 'false'),

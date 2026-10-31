@@ -6,7 +6,11 @@
 // Replace), the action slot (Hire driver / Re-hire / `···`), the popover
 // (Replace / Fire / Sell) and the buy, Replace and Fire copy. Pure helpers
 // only; Phaser is stubbed because the modules import the Button kit (Phaser
-// cannot load under Node).
+// cannot load under Node). Build 3 M12 (B3 §3.6): the refund is half of the
+// price PAID (a gift refunds 0, a sale-bought vehicle half the sale price),
+// and the buy cards read ViewSim.priceOf (the SALE flag, affordability at
+// the sale price) — also against a live sim with a vehiclePrice modifier.
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -28,6 +32,8 @@ const zp = await import('../../src/ui/ZonePicker.ts')
 const { followIconPos } = await import('../../src/ui/FollowStrip.ts')
 const { salaryOf } = await import('../../src/sim/systems/people.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
+const { applyModifier } = await import('../../src/sim/systems/modifierOps.ts')
+const { SALE_TEXT } = await import('../../src/ui/warehouse/BuySheet.ts')
 const {
   buy,
   dataFixture,
@@ -44,6 +50,24 @@ import type { VehicleSnapshot } from '../../src/sim/view-api.ts'
 const data = dataFixture()
 /** A stand-in for BitmapText width: 6 px per character. */
 const measure = (s: string): number => s.length * 6
+
+/** A ×0.5 vehiclePrice fold (B3 §3.6 tests). */
+const half = (l: number): number => Math.round(l * 0.5)
+
+/** The real m5x7 advance widths (the SALE pill fit). */
+const m5x7Adv = new Map<number, number>()
+for (const m of readFileSync(
+  new URL('../../src/assets/m5x7.xml', import.meta.url),
+  'utf8',
+).matchAll(/<char id="(\d+)"[^>]*xadvance="(-?\d+)"/g))
+  m5x7Adv.set(Number(m[1]), Number(m[2]))
+const m5x7Width = (s: string): number =>
+  [...s].reduce((w, ch) => w + (m5x7Adv.get(ch.codePointAt(0)!) ?? 6), 0)
+
+/** vehicles.json list price of `type` (a list-bought snapshot's purchasePrice). */
+function listPrice(type: string): number {
+  return data.vehicles.types.find((t) => t.id === type)?.price ?? 0
+}
 
 function snap(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
   return {
@@ -71,6 +95,7 @@ function snap(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
     stopsLeft: 0,
     unitsUsed: 0,
     capacityUnits: 4,
+    purchasePrice: listPrice(over.type ?? 'bike'),
     ...over,
   }
 }
@@ -169,13 +194,34 @@ describe('Garage sheet geometry (city-view §7, §7.2-§7.3)', () => {
 })
 
 describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)', () => {
-  it('sell refund = vehicles.json price × economy.sellRefund (bike $100, van $500, truck $600)', () => {
-    expect(garage.sellRefund(data, 'bike')).toBe(100)
-    expect(garage.sellRefund(data, 'van')).toBe(500)
+  it('sell refund = the price paid × economy.sellRefund (list-bought bike $100, van $500, truck half its price)', () => {
+    expect(garage.sellRefund(data, snap())).toBe(100)
+    expect(garage.sellRefund(data, snap({ type: 'van' }))).toBe(500)
     const truck = data.vehicles.types.find((t) => t.id === 'truck')!
-    expect(garage.sellRefund(data, 'truck')).toBe(
+    expect(garage.sellRefund(data, snap({ type: 'truck' }))).toBe(
       Math.round(truck.price * data.economy.sellRefund),
     )
+  })
+
+  it('B3 §3.6: a gift refunds $0, a sale-bought vehicle round(paid × 0.5) — the sim formula', () => {
+    expect(data.economy.sellRefund).toBe(0.5)
+    expect(garage.sellRefund(data, { purchasePrice: 0 })).toBe(0)
+    expect(garage.sellRefund(data, { purchasePrice: 170 })).toBe(85)
+    expect(garage.sellRefund(data, { purchasePrice: 175 })).toBe(
+      Math.round(175 * 0.5),
+    )
+    expect(garage.sellAction(snap({ purchasePrice: 0 }), data, 2).label).toBe(
+      'Sell $0',
+    )
+    expect(
+      garage.sellAction(snap({ type: 'van', purchasePrice: 700 }), data, 2)
+        .label,
+    ).toBe('Sell $350')
+    expect(
+      garage
+        .menuItems(snap({ purchasePrice: 150 }), data, 3)
+        .find((i) => i.kind === 'sell')?.label,
+    ).toBe('Sell $75')
   })
 
   it('the last vehicle cannot be sold: Sell (in the ··· popover) disabled with "Keep at least one vehicle"', () => {
@@ -455,7 +501,6 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
   })
 
   it('the longest Re-hire / Hire driver, popover and zone-chip labels keep Button.CONTENT_PAD of air in m5x7 (UX M3: `Re-hire $25` touched its 64-px face)', async () => {
-    const { readFileSync } = await import('node:fs')
     const xml = readFileSync(
       new URL('../../src/assets/m5x7.xml', import.meta.url),
       'utf8',
@@ -490,7 +535,9 @@ describe('Garage rows: state, driver, sell / re-hire (spec §4.1, §4.6, §7.4)'
         garage.MENU_W - 8 - 2 * CONTENT_PAD,
       )
     const menu = data.vehicles.types.flatMap((t) =>
-      garage.menuItems({ type: t.id }, data, 3).map((i) => i.label),
+      garage
+        .menuItems({ type: t.id, purchasePrice: t.price }, data, 3)
+        .map((i) => i.label),
     )
     for (const label of menu)
       expect(width(label), label).toBeLessThanOrEqual(
@@ -617,6 +664,44 @@ describe('Garage buy cards (city-view §7.3)', () => {
     expect(l2.every((c) => c.enabled)).toBe(true)
   })
 
+  it('B3 §3.6: priceOf sets the price, the affordability and the SALE flag (list price kept)', () => {
+    const list = garage.buyCards(data, 450, 2)
+    expect(list.every((c) => !c.sale)).toBe(true)
+    expect(list.map((c) => c.listPrice)).toEqual(
+      data.vehicles.types.map((t) => t.price),
+    )
+    const sale = garage.buyCards(data, 500, 2, half)
+    const [bike, van, truck] = sale
+    expect(bike).toMatchObject({
+      price: 100,
+      priceText: '$100',
+      listPrice: 200,
+      sale: true,
+      affordable: true,
+      enabled: true,
+    })
+    // The van ($1,000 → $500) is affordable at the sale price only.
+    expect(van).toMatchObject({ price: 500, sale: true, affordable: true })
+    expect(garage.buyCards(data, 500, 2)[1]?.affordable).toBe(false)
+    expect(truck?.sale).toBe(true)
+    expect(garage.buyDeniedToast({ ...van!, affordable: false })).toBe(
+      'Not enough money — Van costs $500',
+    )
+    // A price over the list price is not a sale.
+    const dear = garage.buyCards(data, 5000, 2, (l) => Math.round(l * 1.2))
+    expect(dear.every((c) => !c.sale && c.price > c.listPrice)).toBe(true)
+  })
+
+  it('B3 §3.6: the SALE pill fits the 66–81 band of the narrowest card, clear of the pips', () => {
+    const cw = garage.cardWidth(360)
+    expect(
+      garage.SALE_X + m5x7Width(SALE_TEXT) + 2 * garage.SALE_PAD_X,
+    ).toBeLessThanOrEqual(cw - 4)
+    expect(garage.SALE_Y + garage.SALE_H).toBeLessThanOrEqual(garage.CARD_H - 4)
+    // The speed pips sit in the 52–66 line above it.
+    expect(garage.SALE_Y).toBeGreaterThanOrEqual(52 + 14)
+  })
+
   it('compact capacity collapses only contiguous runs of three or more sizes', () => {
     expect(
       garage.capacityText({ capacityUnits: 4, sizes: ['S', 'M'] }, true),
@@ -652,6 +737,50 @@ function rowOf(vs: ReturnType<typeof createViewSim>, id: number) {
 }
 
 describe('Garage rows against a live sim (spec §7.1, §4.1; M6 design §4.5, §6.3)', () => {
+  it('B3 §3.6: under a vehiclePrice ×0.5 card the cards show the sale, the buy charges it, the snapshot stores it and Sell refunds half of it', () => {
+    const sim = fund(quietSim(1))
+    const vs = createViewSim(sim)
+    const priceOf = (l: number): number => vs.priceOf('vehicle', l)
+    expect(
+      garage.buyCards(vs.data, vs.money, vs.level, priceOf)[0],
+    ).toMatchObject({ price: 200, sale: false })
+    const row = applyModifier(sim, {
+      key: 'vehiclePrice',
+      mult: 0.5,
+      add: 0,
+      scope: null,
+      untilTick: null,
+      eventId: 'ev_test_sale',
+      label: 'Test sale',
+    })
+    expect(
+      garage.buyCards(vs.data, vs.money, vs.level, priceOf)[0],
+    ).toMatchObject({
+      price: 100,
+      priceText: '$100',
+      listPrice: 200,
+      sale: true,
+    })
+    let money = vs.money
+    expect(vs.buyVehicle('bike', null).ok).toBe(true)
+    expect(vs.money).toBe(money - 100)
+    const cheap = vs.vehicles.at(-1)!
+    expect(cheap.purchasePrice).toBe(100)
+    // The sale ends: the next bike costs the list price and stores it.
+    sim.state.modifiers = sim.state.modifiers.filter((m) => m.id !== row.id)
+    expect(garage.buyCards(vs.data, vs.money, vs.level, priceOf)[0]?.sale).toBe(
+      false,
+    )
+    expect(vs.buyVehicle('bike', null).ok).toBe(true)
+    const full = vs.vehicles.at(-1)!
+    expect(full.purchasePrice).toBe(200)
+    expect(garage.sellAction(cheap, vs.data, 2).label).toBe('Sell $50')
+    expect(garage.sellAction(full, vs.data, 2).label).toBe('Sell $100')
+    money = vs.money
+    expect(vs.sellVehicle(cheap.id).ok).toBe(true)
+    expect(vs.money).toBe(money + garage.sellRefund(vs.data, cheap))
+  })
+
   it('a new game has no vehicle (empty state); the first bike, bought with a picked driver, reads Idle, the driver, pips, pay, Any ▾, ···, Sell disabled', () => {
     const sim = makeSim(1)
     const vs = createViewSim(sim)

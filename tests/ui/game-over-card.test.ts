@@ -2,7 +2,10 @@
 // block (days survived, lifetime earned, parcels delivered, malware caught /
 // missed, level reached, best day's $). Phaser is stubbed (the module
 // imports the Button kit). Build 2 (report-playtest1 §6.12): Enter opens the
-// run summary instead of starting a new game.
+// run summary instead of starting a new game. Build 3 M12 (B3 §3.4): when an
+// event option took the last life the headline names the card and the
+// choice (`The recall — you chose: Take the strike`); the stats and buttons
+// are unchanged.
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => {
@@ -20,7 +23,8 @@ vi.mock('phaser', () => {
 
 const go = await import('../../src/ui/GameOverCard.ts')
 const { claimKey, popModal, pushModal } = await import('../../src/ui/Sheet.ts')
-const { dataFixture } = await import('../sim/helpers.ts')
+const { dataFixture, makeSim } = await import('../sim/helpers.ts')
+const { loseLifeEvent } = await import('../../src/sim/systems/economy.ts')
 
 const data = dataFixture()
 
@@ -89,6 +93,54 @@ describe('§9.4: the stats block', () => {
       data,
     )
     expect(m.stats[2]).toEqual(['Parcels delivered', '0'])
+  })
+})
+
+describe('B3 §3.4 (M12): the game-over event variant', () => {
+  const input = {
+    day: 9,
+    lifetimeEarned: 2100,
+    deliveries: 120,
+    malwareMissed: 1,
+    defused: 6,
+    level: 2,
+    rows: [{ earned: 300 }],
+  }
+
+  it('the headline is `{title} — you chose: {option}`; the stats are the same', () => {
+    const plain = go.gameOverModel(input, data)
+    const ev = go.gameOverModel(
+      { ...input, event: { title: 'The recall', option: 'Take the strike' } },
+      data,
+    )
+    expect(ev.headline).toBe('The recall — you chose: Take the strike')
+    expect(ev.stats).toEqual(plain.stats)
+  })
+
+  it('without an event (absent or null) the malware headline is unchanged', () => {
+    expect(go.gameOverModel(input, data).headline).toBe(
+      'One malware parcel reached a customer',
+    )
+    expect(go.gameOverModel({ ...input, event: null }, data).headline).toBe(
+      go.gameOverHeadline(1),
+    )
+  })
+
+  it('from a real last-life strike: lastLostLife (kind event) feeds the variant (a reload shows it too)', () => {
+    const sim = makeSim(1)
+    sim.state.economy.lives = 1
+    const over: string[] = []
+    sim.events.on('game:over', (p) => over.push(p.cause))
+    loseLifeEvent(sim, 'ev_sec_recall', 'The recall', 'Take the strike')
+    expect(over).toEqual(['event'])
+    const last = sim.state.lastLostLife
+    expect(last?.kind).toBe('event')
+    if (last?.kind !== 'event') throw new Error('no event report')
+    const m = go.gameOverModel(
+      { ...input, event: { title: last.title, option: last.option } },
+      data,
+    )
+    expect(m.headline).toBe('The recall — you chose: Take the strike')
   })
 })
 

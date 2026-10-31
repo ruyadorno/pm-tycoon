@@ -11,6 +11,7 @@ import type {
   SimEventName,
   SimEventPayloads,
 } from '../../src/sim/events.ts'
+import { SIM_FEATURES } from '../../src/sim/features.ts'
 import { replay, Sim } from '../../src/sim/sim.ts'
 import { cardOptions, DECK_OFF_TICK } from '../../src/sim/systems/deck.ts'
 import type {
@@ -85,6 +86,23 @@ export function deckOn(sim: Sim): Sim {
     sim.data.events.schedule.firstEventS,
   )
   return sim
+}
+
+/**
+ * Run `f` with the deck's decision draw on or off (SIM_FEATURES.events),
+ * restored after. On since M12; a test written for the M11 default (a due
+ * draw with no job is a blank) runs under `withDecisions(false, …)`, and the
+ * pacing tests calibrated in pass 1 (B3 §2.3, §3.9: the level rows "pass 1
+ * with events off, pass 2 on") stay there until M14's pass 2.
+ */
+export function withDecisions<T>(on: boolean, f: () => T): T {
+  const was = SIM_FEATURES.events
+  SIM_FEATURES.events = on
+  try {
+    return f()
+  } finally {
+    SIM_FEATURES.events = was
+  }
 }
 
 /** Answer the open card with option `option` (throws when refused). */

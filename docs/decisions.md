@@ -942,3 +942,170 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
 - `quests-policy.long`: a Golden Release failed by a malware life on the same tick is allowed when the median of such
   failures stays within `maxLivesLost` (the gate's own semantics); no seed fails on the shipped data.
 - Step time at L5 (R23): `sim.tick` mean 0.03 ms, p99 ≤ 0.15 ms, max 0.40 ms — far under 1 ms; no dirty flag needed.
+
+## Run decisions and deviations (M12 — the cards on screen)
+
+### The contract's decisions (the M12 contract's D-numbers; the critique's numbers in brackets)
+
+- **D-M12-1** The EventCard and the EffectsCard are bottom cards on the HUD camera (QuestCard architecture, depth 6000),
+  so the deny tooltip, toasts and the red flash draw over them; the scrims are Zones (D-M12-20: no draw call).
+- **D-M12-2** Enter takes the **first** shown option — never a `danger` or an unaffordable one (it shows `Tap an
+  option` and denies instead); on a news card Enter is the OK. B3 §3.2/§4.1 say "Enter = default", but the default is
+  invisible and can be the danger face (`ev_crime_gang_watch` "No"). Esc is swallowed on decision and job cards.
+- **D-M12-3** A greyed option's effects row reads `Can't afford · $N` (the reason plus the price; many labels carry no
+  price).
+- **D-M12-4 / D-M12-5** A waiting card opens only when no visible paper, level-up moment, HUD hold or lead-in timer is
+  up; the Golden Release goes first only when its card could open now [3]. No HUD hold while a card only waits — the
+  sim holds itself (`Sim.held`) and the event chip pulses. The order is lost-life → EventCard → papers.
+- **A card waiting behind a sheet freezes the sim** [4]: with M11's sim-side hold (`Sim.held`), an open card holds the
+  sim whatever is on top of it — a departure from B3 §3.4 "a sheet does not hold the sim" (M11 D-15). The ticker
+  freezes with it (stream D).
+- **D-M12-6** The job objective is drawn by the UI (`questText.objectiveText`); the sim's job lines carry the reward and
+  the limit.
+- **D-M12-7** [9] The copy fit lives in `tests/data/events-fit.test.ts` (every non-router card and job template through
+  the real ViewSim and `layoutEventCard`, states S1–S3, every target district, jobs at L5, the balance-0 guard [10]).
+  The plan §8.3 acceptance command becomes `vlr test -- tests/data/events` (it matches both files; the literal
+  `tests/data/events.test.ts` would skip it).
+- **D-M12-8** `wrapHeadline` lives in the Phaser-free `src/ui/text.ts`; Newspaper re-exports it. `src/ui/effectText.ts`
+  joins the sim-purity Phaser-free list (AGENTS.md updated).
+- **D-M12-9** The $100 bell / paper thresholds are UI constants in hudKit, not balance data.
+- **D-M12-10** The compact quest chip (82 px, beside the event chip) drops its label and keeps the warning in its bar
+  fill: red on danger, amber on warn, gold otherwise (`questChipFillColour`).
+- **D-M12-11** The event chip alone sits right-aligned in the quest chip's slot; B3 §3.4's width sums are 4 px off, the
+  pins (≥ 64 px of row B at 360, ≥ 96 at 393) hold.
+- **D-M12-12** `victory_art` sits 1:1 under `TYCOON`; the confetti plays on `game:victory` and on a reload's reopen,
+  never on a relayout, after Back from the summary, or under reduced motion; teardown stops the burst before the root
+  is destroyed [16]. The Golden Release stamp's burst is centred on the stamp, clamped to `CONFETTI_HALF_SPAN` (112 px)
+  from both screen edges [15], and stopped where the stamp is destroyed.
+- **D-M12-13** A raised shelf cap past the room's drawn capacity draws no extra minis; the badge counts `/N` and the
+  tooltip reads `Shelf a/b (+N)`.
+- **D-M12-14** The director's `quest:offered` bell rings for the Golden Release only; the HUD pings job cards when it
+  shows them (policy runs and queued cards stay silent).
+- **D-M12-15** The EffectsCard never holds; opened from the pause menu it keeps speed 0 and returns to the menu on close.
+- **D-M12-16** An event's lost life gets the lost-life card's event variant (the card title in red, `You chose: …`,
+  `Lives: N`, one OK) and no incident paper — the decision's paper covers it; a last life gets the GameOver variant
+  headline (`<title> — you chose: <label>`).
+- **D-M12-17** The HUD-cell pulses come from a state diff around `decide` (the mood on the unrounded mean [14]).
+- **D-M12-18 / [18]** The HUD matches its card to the sim's on `eventId` + `openedTick` (back-to-back job cards share
+  `job:<templateId>`).
+- **D-M12-19** The EventCard rebuilds its children on each open or relayout; opening it again with the same card
+  rebuilds in place without a new slide.
+- **[5]** A card is a news card only when its data kind says so; "three" is three shown options.
+- **[6] / [7] The paper headline**: a chain end reads `<chain head title> — the story ends` (the sim's ticker rule); a
+  news card reads its title (plus the first effect line), never `you chose: OK`; a decision reads
+  `<title> — you chose: <label>`.
+- **[8]** At game over a waiting card neither shows the chip nor makes it pulse (`eventChipModel(ev, pending,
+  gameOver)`, and the HUD's own `!gameOver` guard); `onEventOption` returns right after closing the card when the
+  decision ended the run [2].
+- **[19]** News-card dismiss taps on the scrim or the panel are ignored for `EVENT_CARD_IN_MS` (300 ms) of scene clock;
+  option buttons and keys are not guarded.
+- **[20]** A chip tap opens the waiting card when the open check passes, else the EffectsCard; a refusal closes
+  nothing. Opening a card closes the player's panels, the EffectsCard included.
+- **[23]** Effect lines are split at an internal `·` before wrapping, and a lone `—`, `·` or `–` sticks to the word
+  before it, so no row starts with a separator; a separator inside a line draws neutral grey.
+- **`?event=<id>`** (debug only, a fresh game): offers that card at create through `offerEventParam`, registered after
+  `?quest=`.
+
+### Wave 1 deviations (the stream reports; recorded at the merge)
+
+- **Copy fit** (stream A): a button label wider than the inner width − 2 × `CONTENT_PAD` (266 px at 300) fails the fit —
+  labels never wrap (`OptionLayout.labelOverflow`, critique 10a); `wrapFlow` also cuts a single word wider than its
+  line with `…`, so nothing draws past the card edge.
+- **EffectsCard icons** (stream B, critique 17): each row icon sits on a grey3 plate with a 1-px outline (the EventCard
+  picture inset's look) instead of a `textDark` tint — the tint turns every icon into a near-black silhouette; only
+  `ic_shield` and `ic_speed2` vanished on the light panel. Enter closes the card too (Close is its only button), and
+  `refresh()` updates in place when the rows keep their shape (the 2-Hz poll would otherwise destroy Close mid-press).
+- **Prices** (stream C): the OOPS stamp shows what the sim takes (the `wrongTossFee` modifier, clamped to the balance;
+  plain `OOPS` at $0, `wrongTossFeeNow`); the BuySheet draws no SALE pill on a locked row (the Garage's locked cards
+  match; the model still flags it); the Hold Bay card's value includes the income modifier (`vs.parcelValue`); the
+  Garage refunds half the price paid (`purchasePrice`), so a sale purchase refunds half the sale price.
+- **HUD** (stream D): a leftover `'event'` hold with no card on screen is dropped, so the game cannot freeze on it; the
+  interim job-card answer and the interim auto-answer of non-job cards (M11 D-18) are retired —
+  `tests/ui/interim-card.test.ts` is deleted (the loaner stays covered in `tests/sim`, the hold/replay in `hud-m12`).
+- **The deck** (stream E, plan §8.3 tasks 4–5): **62 cards + 1 router** (40 drawable at L1) — every L1 single of B3 §4,
+  the investor and rival chains, the kept seed cards (gang, audit, loaner, grant, …) and both sales. The plan's
+  "about 40" undercounts its own list. Copy is B3 §4's; no `puns.json` keys were needed. Deviations from B3 §4:
+  - the price war (`ev_cust_rival_opens`) costs $100 instead of income ×0.9 for 3 days (three effect segments do not
+    fit two 276-px rows); the gang raid's effects are reordered (wanted, money, lives, satisfaction) to fit at the
+    lives cap;
+  - the rival poach's quit uses pick `one` (the named `{driver}` leaves; B3 says `best`), the link needs
+    `balanceAtLeast` 200 (both head options book it and the paid "Match it" is the only way out), and the head carries
+    `pick: driver` for the link's `{driver}`;
+  - targets where B3 names none: the alley and the roadworks `random`; theft, graffiti, wallet and slow week
+    `busiest`;
+  - cost convention: a voluntary flat payment is a `cost` (greyed when short), a consequence is a money delta, a
+    per-vehicle charge is `moneyPerVehicle`.
+- **The EV band** (stream E; R21/R33 — card weights and one cooldown only, no policy weight and no card number moved):
+  with B3 §4's default weights the policy's EV per card was 40.01 on seeds 1–10 (44.1 on 40 seeds), over the −20…40
+  band (the driver-pip cards and the one-time gifts). Lowered: pauses 2, training 2 (cooldown 5 → 8 days), shortcut 2,
+  fair 2, drill 2, grant 2, cat 2, tips 1, update 1, barcode 1; raised: birthday 4, heat 4 (cheap cards where the
+  policy takes the non-default). After: EV 30.4 (seeds 1–10), 25.4 (40 seeds); non-default share 0.64 / 0.58.
+- **Tests under the flag flip** (stream E): `withDecisions(on, f)` in `tests/sim/helpers.ts` keeps the decisions-off
+  premise where a due draw with no job must be a blank (8 tests in `events.test.ts`, 3 in `quests.test.ts`, 1 in
+  `victory.test.ts`); the pacing tests (`policy.test.ts` / `quests-policy.long` `runs()`, `levels3.long`,
+  `victory.long`) and the fun-bar-2 profile in `tests/metrics/playtest-schema.test.ts` stay pass-1 runs (decisions off)
+  until M14 / M15 (B3 §2.3: pass 1 events off, pass 2 on); `events-policy.long` gates the event rows with the deck on;
+  `robust.ts` exempts absent vehicles from "inactive with an active driver" and counts only inspectors on duty; the
+  90-min perf test expects `11 + gifted − lost` vehicles.
+
+### Wave 2 (the merge: fixtures and smoke)
+
+- **Fixtures under the deck** (`vlr fixtures`, events on): every fixture has `events.open === null`; the next draw is
+  33–1059 ticks after the snapshot (`level-up` 33, `l2-lane` 86 — both loaded with `?policy=1`; the policy-less shots
+  have ≥ 530). Seed 7's trajectory moved with the deck, so:
+  - `l2-lane` tries seeds from 7 and takes the first with a real L2 lane holding the shaker, a truck, and a clean
+    30-s policy watch (no level:up, no life lost) — **seed 8** (seed 7 places the shaker only after L3);
+  - `people-l3` tries seeds from 7 for a real L3 that is still L3 after the settle (`debugForceLevel` only if no seed
+    reaches one) — **seed 9** (seed 7 crosses L4 inside the settle; seed 8 is still at L2 at the stop);
+  - `attract.json`: seed 7 reaches L5 at ≈ 29.9 min and buys its van at ≈ 34.7 and its 2nd truck at ≈ 39.3 min, so the
+    scan runs to 45 min, and `attractProblems` adds a 2-min policy watch (deliveries, no life lost, no stall — the
+    shot-fixtures test's own watch; minutes 40 and 41 lose a life to an unchecked parcel): the city is **minute 42**.
+  - `overseas-malware`'s test counts lives **lost** (`stats.livesLost`), not lives: seed 7's magic_parcel job pays +1
+    life 18.8 s after the load.
+- **Smoke**: the M11 interim-answer smoke test now drives the EventCard (the loaner shows under the `'event'` hold,
+  `event:opt0` answers it).
+
+### Review fixes (M12 confirmed findings; the review ids in brackets)
+
+- **The chip over a Warehouse sheet** [hud-1, card-1]: `raiseEventCard` now closes the room's sheets too — a new game
+  event `pm:closeSheets` (`nav.ts EV_CLOSE_SHEETS`) that WarehouseScene answers with `closeSheets(true)` (BuySheet,
+  SlotCard, HoldBayCard, StationCard, its HireSheet, the dock dialog; synchronous pops) — so a tap on the pulsing
+  chip opens the card on the same tap. It returns true only when the card showed (or the Garage is on its queued
+  sleep); otherwise the event chip falls back to the EffectsCard (critique 20), and a job offer's quest chip / district
+  row plays `deny` instead of doing nothing (no new copy).
+- **pm:goto's BuySheet under a card** [hud-2]: `WarehouseScene.highlight()` opens the BuySheet only on an empty modal
+  stack (`modalCount() === 0`); the slot pulse and the scroll stay. The card stays the top modal (Enter / Esc its own).
+- **Held, ❚❚ lights** [hud-3]: the speed segment reads `stepper.paused || vs.held` (critique 4's third symptom). The
+  playtest recorder's `isPaused` is unchanged: whether a held wait behind a sheet counts as paused play is M15's
+  metrics-v3 call (think times), recorded there.
+- **Option taps wait for the slide** [card-2]: an option button (and a greyed one's deny) is ignored for the first
+  `EVENT_CARD_IN_MS` after the card opened or another card took the slot — critique 19's guard, extended from the news
+  card's scrim / panel. `EventCard.tap()` (tests, e2e) and Enter / Esc are not guarded.
+- **`costPerVehicle`** [deck-1]: a voluntary per-vehicle purchase is an option field `costPerVehicle: {each, type?}`
+  — its price `each ×` the owned vehicles (of `type`) is the option's `cost` in `cardOptions` (greyed while short,
+  debited once, never clamped), its line keeps `−$120 ($40 × 3 vehicles)` (`effects.ts perVehicleLine`). The schema
+  refuses it with `cost`, on the default, in a way out (`safeExit`), and counts it as paid for the unpaid-sibling rule;
+  `staticScore` counts one vehicle. The radio, the fleet service and the livery moved to it (`moneyPerVehicle` stays a
+  consequence, clamped). The cost convention above becomes: voluntary flat = `cost`, voluntary per vehicle =
+  `costPerVehicle`, consequence = a money / moneyPerVehicle delta. M13's draft (`ev_fleet_fuel` Absorb it,
+  `ev_fleet_ebike` Convert them — `type: bike` —, `ev_wx_snow` Tyres) should use it too.
+- **CREW** [deck-2, R28]: the policy (both kinds) seats the best driver applicant in any vehicle with no driver and
+  no pending Replace (a card's quit, a driverless gift), oldest vehicle first, at hire fee + purchaseBuffer, right
+  after REHIRE; an empty pool waits. A no-op on every deck-off run.
+- **The poach tie** [deck-3]: `ev_cust_rival_poach`'s bonus $200 → **$180** (the link's cond `balanceAtLeast` 200 →
+  180 with it): against staffQuit 200 the old price was an exact tie that went to the default (`Let them go`) on 8/8
+  poaches over 40 seeds. Gate row: none moved by design (a tie-break; the policy's non-default share / EV rows are
+  re-read in the gate below). A data test now refuses any harsh option that ties a harsh-free sibling state-free.
+- **Not fixed here** [hud-5]: `e2e/quests.spec.ts`'s three job-offer tests and `e2e/shots.spec.ts`'s `quest-offer`
+  shot still drive the retired job QuestCard; they belong to the M12 contract §9 wave-2 e2e repair (events.spec.ts
+  test 5, the `event-card-job` shot), which owns those files.
+- **Fixtures and the gate after the fixes** (data `6c7f8631`): every fixture regenerated (`vlr fixtures`). Seed 7's
+  run moved (its fleet service is now `Skip it` when short instead of a free `Service now`): L5 at ≈ 32.7 min and its
+  Golden Release times out three times by 60 min, so `tools/fixtures/m9.ts` victory tries seeds from 7 and takes
+  **seed 8** (wins at ≈ 47.8 min; `fixture.seed` records it); the attract city is **minute 40**; `l3-docks`
+  (`tools/fixtures/m8.ts`) now also waits for a snapshot with no card due before its clearance + 1 s (shot-fixtures
+  runs it without the policy, where a card holds) — tick 17150, L4, clearInS 29.6. Gate (seeds 1–10 × 30 min) PASS:
+  first delivery 43.3 s, catch 178.3 s, L2 10.29, truck +2.78, lives 0, stall 0, hold/10 min 8.89, quests 6 / 3.5,
+  L3 16.73, overseas +2.55, L4 20.13, L5 25.46, cards 21, L1 plateau 3, EV/card 25.01, non-default 0.63
+  (was EV 30.37, L4 20.60, L5 26.17); 35 min PASS (Golden Release offered by 25.46, EV 38.1, non-default 0.57);
+  delegating PASS (EV 18.1, non-default 0.59, events took no workers — was 2).

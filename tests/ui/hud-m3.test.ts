@@ -60,6 +60,7 @@ function snap(over: Partial<VehicleSnapshot> = {}): VehicleSnapshot {
     stopsLeft: 0,
     unitsUsed: 0,
     capacityUnits: 4,
+    purchasePrice: 0,
     ...over,
   }
 }

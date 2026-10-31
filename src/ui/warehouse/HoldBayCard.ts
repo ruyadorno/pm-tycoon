@@ -24,7 +24,8 @@
 //   line 4  `Flagged by: Metal detector (metal)`
 //   line 5  decay ring + `Value now $38 · falling` (re-read every 500 ms,
 //           spec §5.3: the value keeps decaying while held; `drops in 0:42`
-//           inside the grace window, `floor` at the floor)
+//           inside the grace window, `floor` at the floor; build 3: what a
+//           delivery pays now, the income modifier folded in)
 //   line 6  `Inspector Lin` (desk flags: the inspector whose roll flagged
 //           it, from the flag's trace entry)
 //   TOSS (left, red, 160×48) / CLEAR (right, green `ui_btn_green` face,
@@ -45,6 +46,7 @@
 import type Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import { frameOrNull } from '../../render/frames.ts'
+import { modMult, type ModCtx } from '../../sim/modifiers.ts'
 import type {
   Checker,
   LaneNode,
@@ -183,14 +185,17 @@ export type ValuePhase = 'grace' | 'falling' | 'floor' | 'locked'
  * `Value now $38 · falling` (spec §5.3: f = 1 up to decay.graceS, linear to
  * decay.floor at floorAtS, flat after): `· drops in 0:42` in the grace
  * window, `· floor` at the floor; an overseas value locked at hand-off is
- * `· locked` (build 2).
+ * `· locked` (build 2). Build 3 (B3 §3.6): `paid` is what a delivery would
+ * pay now — ViewSim.parcelValue, the income modifier folded in — so the
+ * card quotes the payout; without it the unmodified round(base × f(t)).
  */
 export function valueNow(
   data: GameData,
   p: Pick<Parcel, 'spawnedTick' | 'baseValue' | 'mult' | 'lockedValue'>,
   tick: Tick,
+  paid: number | null = null,
 ): { value: number; phase: ValuePhase; text: string } {
-  const value = paidValue(data, p, tick)
+  const value = paid ?? paidValue(data, p, tick)
   const head = `Value now ${formatMoney(value)}`
   if (p.lockedValue !== null)
     return { value, phase: 'locked', text: `${head} · locked` }
@@ -251,6 +256,24 @@ export function useGreenFace(btn: Button): { sync: () => void } {
     btn.bg.on(ev, sync)
   sync()
   return { sync }
+}
+
+/**
+ * Build 3 M12 (B3 §3.6): what a wrong Toss (a clean parcel) costs right now
+ * — holdbay.ts tossParcel's own formula: round(economy.wrongTossFee × the
+ * wrongTossFee fold), clamped to the balance. `parcel:tossed` is emitted
+ * before the debit, so a handler reads the fee the sim is about to take.
+ */
+export function wrongTossFeeNow(ctx: ModCtx): number {
+  const fee = Math.round(
+    ctx.data.economy.wrongTossFee * modMult(ctx, 'wrongTossFee'),
+  )
+  return Math.max(0, Math.min(fee, ctx.state.economy.balance))
+}
+
+/** The city's grey stamp over the roof: `OOPS −$25`, plain `OOPS` when nothing is charged. */
+export function oopsStampText(fee: number): string {
+  return fee > 0 ? `OOPS ${formatMoney(-fee)}` : 'OOPS'
 }
 
 /** Why CLEAR is disabled (Q35: the shelf is at cap), or null. */
@@ -317,17 +340,30 @@ export class HoldBayCard extends WarehouseSheet {
       if (p.id === this.pid) this.close()
     }
     const shelf = (): void => this.updateActions()
+    // Build 3 M12 (B3 §3.6): an income card moves the value; a `cap` card
+    // raises the shelf cap (vs.shelf.cap) and so the Clear block.
+    const modified = (): void => {
+      this.updateActions()
+      this.updateValue()
+    }
     this.bind({
       'parcel:tossed': gone,
       'parcel:cleared_by_player': gone,
       'parcel:shelved': shelf,
       'parcel:loaded': shelf,
       'parcel:returned': shelf,
+      // Build 3 M12: `parcels {lose: shelf}` frees shelf room.
+      'parcel:lost': (p) => {
+        gone(p)
+        shelf()
+      },
       'parcel:held': () => this.updateBay(),
       'sorter:decided': (p) => {
         if (p.parcelId === this.pid) this.markDirty()
       },
       'level:up': shelf,
+      'modifier:applied': modified,
+      'modifier:expired': modified,
     })
   }
 
@@ -498,9 +534,10 @@ export class HoldBayCard extends WarehouseSheet {
 
   private updateValue(): void {
     const id = this.pid
-    const p = id === null ? null : this.vs.parcel(id)
-    if (!p || !this.valueText) return
-    const v = valueNow(this.vs.data, p, this.vs.tick)
+    if (id === null || !this.valueText) return
+    const p = this.vs.parcel(id)
+    if (!p) return
+    const v = valueNow(this.vs.data, p, this.vs.tick, this.vs.parcelValue(id))
     if (this.valueText.text !== v.text) this.valueText.setText(v.text)
     this.valueText.setTint(VALUE_TINT[v.phase])
     const ring = frameOrNull(`ring_${ringIndex(this.vs.data, p, this.vs.tick)}`)

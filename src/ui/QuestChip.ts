@@ -8,6 +8,10 @@
 // The texts come from questText.ts (the card and the chip share them); the
 // model is pure and Node-tested (tests/ui/hud-m7.test.ts), Phaser is a
 // type-only import. World-atlas frames only (the HUD binds `world`).
+// Build 3 M12 (B3 §3.4, D-M12-10): beside the event chip the quest chip is
+// compact — QUEST_CHIP_COMPACT_W (82 px: icon + bar, no time label) — and the
+// warning the dropped label carried moves into the bar fill (amber on warn,
+// red on danger, gold otherwise).
 import type Phaser from 'phaser'
 import { UI_ATLAS } from '../render/atlases.ts'
 import type { GameData } from '../data/types.ts'
@@ -15,12 +19,13 @@ import type { QuestsView } from '../sim/view-api.ts'
 import { addTapZone, setZoneRect } from './hudKit.ts'
 import {
   QUEST_CHIP_BAR_W,
+  QUEST_CHIP_COMPACT_W,
   QUEST_CHIP_ICON,
   QUEST_CHIP_W,
   ROW_H,
   type Rect,
 } from './layout.ts'
-import { addBar, BAR_H, barFrame, setBarFill } from './Panel.ts'
+import { addBar, BAR_H, barFrame, setBarFill, type BarColour } from './Panel.ts'
 import { chipLabel, chipProgressText } from './questText.ts'
 import { addText, ellipsize, textTop } from './text.ts'
 import { THEME } from './theme.ts'
@@ -123,13 +128,17 @@ export const QUEST_CHIP_BAR_MIN_W = 44
  * m5x7). A label that leaves QUEST_CHIP_LABEL_GAP px before the 60-px bar
  * keeps it; a wider one takes the difference from the bar, down to
  * QUEST_CHIP_BAR_MIN_W, and only past that is ellipsized. `measure` is the
- * label's advance width (`s => t.setText(s).width`).
+ * label's advance width (`s => t.setText(s).width`). The compact chip (at
+ * most QUEST_CHIP_COMPACT_W, beside the event chip) drops the label and keeps
+ * the full bar (D-M12-10).
  */
 export function questChipFit(
   label: string,
   chipW: number,
   measure: (s: string) => number,
 ): { label: string; barW: number } {
+  if (chipW <= QUEST_CHIP_COMPACT_W)
+    return { label: '', barW: QUEST_CHIP_BAR_W }
   const room = (barW: number): number =>
     chipW - QUEST_CHIP_BAR_X - barW - QUEST_CHIP_LABEL_GAP
   const w = Math.ceil(measure(label))
@@ -140,6 +149,21 @@ export function questChipFit(
     label: w <= room(barW) ? label : ellipsize(label, room(barW), measure),
     barW,
   }
+}
+
+/**
+ * The bar fill's colour: gold on the full chip; on the compact chip (no time
+ * label) the label's warning moves into the bar — red on danger, amber on
+ * warn, else gold (D-M12-10).
+ */
+export function questChipFillColour(
+  m: Pick<QuestChipModel, 'tone'>,
+  chipW: number,
+): BarColour {
+  if (chipW > QUEST_CHIP_COMPACT_W) return 'gold'
+  if (m.tone === 'danger') return 'red'
+  if (m.tone === 'warn') return 'amber'
+  return 'gold'
 }
 
 export class QuestChip {
@@ -231,6 +255,8 @@ export class QuestChip {
     }
     const offer = m.bar === null
     this.track.setVisible(!offer)
+    const fillFrame = barFrame(questChipFillColour(m, this.w))
+    if (this.fill.frame.name !== fillFrame) this.fill.setFrame(fillFrame)
     if (offer) this.fill.setVisible(false)
     else setBarFill(this.fill, this.barW, m.bar ?? 0)
     this.barText.setText(m.barText)

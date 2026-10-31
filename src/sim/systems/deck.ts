@@ -40,6 +40,7 @@ import type {
   GameData,
   NextBranchDef,
   VehicleTypeDef,
+  VehicleTypeId,
 } from '../../data/types.ts'
 import type { CommandResult, FailReason } from '../commands.ts'
 import { announcedStrains, laneCatchRate } from '../detection.ts'
@@ -64,7 +65,14 @@ import {
   ticksFromS,
 } from '../types.ts'
 import type { EffectCtx, EffectLine } from './effects.ts'
-import { absenceStep, applyEffect, dayText, effectSummary } from './effects.ts'
+import {
+  absenceStep,
+  applyEffect,
+  dayText,
+  effectSummary,
+  perVehicleLine,
+  vehicleCount,
+} from './effects.ts'
 import { modifiersStep } from './modifierOps.ts'
 import { payrollTicks } from './payroll.ts'
 import {
@@ -107,13 +115,18 @@ export interface CardOption {
   /** Placeholders filled. */
   label: string
   effects: readonly EventEffect[]
-  /** 0 when the option has no cost. */
+  /**
+   * The price: `cost`, or `costPerVehicle` × the owned vehicles now (review
+   * deck-1) — debited once on decide; 0 when the option has no price.
+   */
   cost: number
+  /** The option's costPerVehicle when the price is per vehicle (its line names the count). */
+  perVehicle?: { each: number; type?: VehicleTypeId }
   default: boolean
   danger: boolean
   /** Its `if` holds now (hidden options are never offered). */
   visible: boolean
-  /** balance ≥ cost. */
+  /** balance ≥ cost (the per-vehicle price too). */
   affordable: boolean
   /** A conditional next's filled hint, else null. */
   hint: string | null
@@ -839,7 +852,9 @@ export function cardOptions(sim: Sim, card: OpenCard): CardOption[] {
   const def = eventDef(sim.data, card.eventId)
   if (def === null || !def.options) return []
   return def.options.map((o, i) => {
-    const cost = o.cost ?? 0
+    const per = o.costPerVehicle
+    const cost =
+      (o.cost ?? 0) + (per ? per.each * vehicleCount(s, per.type) : 0)
     let hint: string | null = null
     for (const e of o.effects) {
       if (e.kind === 'next' && 'branches' in e) {
@@ -856,6 +871,7 @@ export function cardOptions(sim: Sim, card: OpenCard): CardOption[] {
       visible: condHolds(sim, o.if, card),
       affordable: s.economy.balance >= cost,
       hint,
+      ...(per ? { perVehicle: { ...per } } : {}),
     }
   })
 }
@@ -881,7 +897,9 @@ export function optionLines(
     return [{ text: `Next job in ${dayText(days)}`, tone: 'neutral' }]
   }
   const out: EffectLine[] = []
-  if (opt.cost > 0) out.push({ text: `−$${opt.cost}`, tone: 'cost' })
+  const per = opt.perVehicle
+  if (per) out.push(perVehicleLine(sim, -per.each, per.type))
+  else if (opt.cost > 0) out.push({ text: `−$${opt.cost}`, tone: 'cost' })
   const world = opt.effects.filter((e) => !DECK_KINDS.includes(e.kind))
   out.push(...effectSummary(sim, world, refs))
   for (const e of opt.effects) {

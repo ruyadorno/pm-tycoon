@@ -137,6 +137,7 @@ import {
   quietSim,
   runTicks,
   standardApplicant,
+  withDecisions,
 } from './helpers.ts'
 
 const data = dataFixture()
@@ -178,11 +179,21 @@ const PLAN_BUYS = [
 ] as const
 
 let gateRuns: RunResult[] | null = null
-/** The 10-seed × 30-min policy runs (computed once for this file). */
+/**
+ * The 10-seed × 30-min policy runs (computed once for this file). Build 3,
+ * M12: pass 1 (B3 §2.3, §3.9 — the level rows gated "pass 1 with events off,
+ * pass 2 on"): the decision draw stays off here until M14's pass 2 re-gates
+ * the windows with the deck; the deck-on event rows are gated in
+ * tests/sim/events-policy.long.test.ts and by `vlr sim:gate`.
+ */
 function runs(): RunResult[] {
-  gateRuns ??= SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy))
+  gateRuns ??= withDecisions(false, () =>
+    SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy)),
+  )
   return gateRuns
 }
+/** The pass-1 feature set the runs above use (the shipped flags, decisions off). */
+const PASS1 = { ...SIM_FEATURES, events: false }
 
 describe('competent policy (spec §7) [gate]', () => {
   it("opening A at t = 0: a bike with the best driver + a Metal detector, $100 − the driver's fee left; then bikes at price + $50 until 3; a 2nd Metal detector (COUNTERS); at L2 the truck, then the Shaky shaker; at L3 (M8) the Battery checker REPLACEs the 2nd Metal detector, then dock 2, a van, a 2nd truck; at L4 (M9) the X-ray, dock 3, the Sorter Arm, a 2nd van; at L5 a 3rd truck — each at price + $50 (a REPLACE counts its refund, a voucher makes a machine free), each vehicle with the best driver for its type (seed 1 × 35 min)", () => {
@@ -536,6 +547,7 @@ describe('competent policy (spec §7) [gate]', () => {
         policy: 'competent',
         minutes: 30,
         targets,
+        features: PASS1,
       },
     )
     expect(SIM_FEATURES).toEqual({
@@ -547,7 +559,7 @@ describe('competent policy (spec §7) [gate]', () => {
       quests: true,
       levels3plus: true,
       levels45: true,
-      events: false,
+      events: true,
     })
     expect(g.checks.map((c) => [c.key, c.note])).toEqual([
       ['firstDeliveryS', null],
@@ -563,7 +575,8 @@ describe('competent policy (spec §7) [gate]', () => {
       ['firstOverseasClearedAfterLevel3MaxMin', null],
       ['level4Min', null],
       ['level5Min', null],
-      // Build 3 (B3 §3.9): gated once M12 flips SIM_FEATURES.events.
+      // Build 3 (B3 §3.9): gated with the deck on since M12 — these are the
+      // pass-1 runs (decisions off), so they stay informational here.
       ['eventsOfferedBy30MinMin', 'informational (M12)'],
       ['eventsOpenMaxTicks', 'informational (M12)'],
       ['eventsL1PlateauMin', 'informational (M12)'],

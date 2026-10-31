@@ -857,6 +857,7 @@ const eventOption = obj(
   { label: str, effects: arr(effect) },
   {
     cost: int(1),
+    costPerVehicle: obj({ each: int(1) }, { type: oneOf(VEHICLES) }),
     default: oneOf([true]),
     danger: oneOf([true]),
     if: cond,
@@ -1632,6 +1633,7 @@ function checkEvents(d: Tables, out: Problems): void {
   const safeExit = (h: EventDef, x: EventOptionDef): boolean =>
     x.if === undefined &&
     !x.effects.some((e) => isHarshEffect(e)) &&
+    x.costPerVehicle === undefined &&
     (x.cost === undefined || (h.cond?.balanceAtLeast ?? 0) >= x.cost)
   const flagsSet = new Set<string>()
   for (const c of deck)
@@ -1939,13 +1941,24 @@ function checkEvents(d: Tables, out: Problems): void {
       const harsh = o.effects.some((e) => isHarshEffect(e))
       if (o.effects.some((e) => e.kind === 'lives' && e.delta < 0) && !o.danger)
         bad(`${op}.danger`, 'an option that can take a life is `danger: true`')
-      if (o.cost !== undefined) {
+      // A price is `cost` or `costPerVehicle` (review deck-1), never both.
+      const priced = o.cost !== undefined ? 'cost' : 'costPerVehicle'
+      if (o.cost !== undefined && o.costPerVehicle !== undefined)
+        bad(
+          `${op}.costPerVehicle`,
+          'an option takes `cost` or `costPerVehicle`, not both',
+        )
+      if (o.cost !== undefined || o.costPerVehicle !== undefined) {
         const free = opts.some(
-          (x, k) => k !== j && x.cost === undefined && x.if === undefined,
+          (x, k) =>
+            k !== j &&
+            x.cost === undefined &&
+            x.costPerVehicle === undefined &&
+            x.if === undefined,
         )
         if (!free)
           bad(
-            `${op}.cost`,
+            `${op}.${priced}`,
             'a paid option needs an unpaid sibling with no `if` (a card never greys out every option)',
           )
       }
@@ -1956,6 +1969,11 @@ function checkEvents(d: Tables, out: Problems): void {
           bad(
             `${op}.cost`,
             `a paid default needs the card's cond balanceAtLeast ≥ ${o.cost} (the default must be affordable)`,
+          )
+        if (o.costPerVehicle !== undefined)
+          bad(
+            `${op}.costPerVehicle`,
+            'the default never takes a per-vehicle price (a fleet-sized price no cond can cover)',
           )
       }
       if (harsh) {

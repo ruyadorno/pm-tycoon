@@ -18,6 +18,11 @@
 // recipe (src/data/configStart.ts; ?config=tycoon) plays it on the same
 // fresh games through src/boot/configStart.ts — first, so a ?level= or
 // ?quest= on top finds the game no longer fresh and stays out of it.
+// Build 3 M12 (B3 §3.4, §6): ?event=<id> offers that deck card
+// (debug.offerEvent) on the same fresh games, after ?quest= (a job card it
+// opened is the open card; the event then queues behind it); the HUD shows
+// the open card when it starts. A card opened at tick 0 holds the sim, so a
+// ?fastForward= after it runs no tick until the card is answered.
 import Phaser from 'phaser'
 import type { AudioDirector, SimLookups } from '../audio/director.ts'
 import {
@@ -219,6 +224,37 @@ export function offerQuestParam(
   return res
 }
 
+/**
+ * ?event=<eventId> (debug builds; B3 §3.4, §6): offer that events.json deck
+ * card on a fresh player's game through the ViewSim's debug.offerEvent — a
+ * logged sim command (debugOfferEvent), so replays and saves stay exact.
+ * Fresh = tick 0 with nothing but ?level='s debugForceLevel and ?quest='s
+ * debugOfferQuest in the command log (Boot's own new sim and every New game;
+ * never a Continue, a __pm.load or the attract sim — the caller skips it).
+ * The card opens at once and holds a policy-less sim (B3 §6), so a
+ * ?fastForward= after it runs no tick. null when nothing was asked, the sim is
+ * not fresh, or the build has no debug facet; a refusal (an unknown id, a
+ * full queue) is returned and warned about, never thrown.
+ */
+export function offerEventParam(
+  vs: ViewSim,
+  sim: Sim,
+  eventId: string | null,
+): CommandResult | null {
+  if (eventId === null || !vs.debug) return null
+  if (sim.state.tick !== 0) return null
+  if (
+    sim.commandLog.some(
+      (e) =>
+        e.cmd.kind !== 'debugForceLevel' && e.cmd.kind !== 'debugOfferQuest',
+    )
+  )
+    return null
+  const res = vs.debug.offerEvent(eventId)
+  if (!res.ok) console.warn(`event=${eventId}: refused (${res.reason})`)
+  return res
+}
+
 /** The ground bake needs a 3072-px texture; refuse below 4096 (city-view.md §1.2). */
 export const MIN_TEXTURE_SIZE = 4096
 
@@ -367,6 +403,15 @@ export class BootScene extends Phaser.Scene {
     if (quest !== null)
       game.events.on(SIM_REPLACED, (e: SimReplaced) => {
         if (!e.attract) offerQuestParam(e.viewSim, e.sim, quest)
+      })
+    // ?event=<id> (build 3 M12): after ?quest= (registered after its
+    // listener too). The card holds the sim from tick 0: a ?fastForward=
+    // below runs no tick until it is answered; the HUD shows it at create.
+    const eventId = debugEnabled() ? p.event : null
+    if (!resume.game) offerEventParam(vs, sim, eventId)
+    if (eventId !== null)
+      game.events.on(SIM_REPLACED, (e: SimReplaced) => {
+        if (!e.attract) offerEventParam(e.viewSim, e.sim, eventId)
       })
     const waitFrom = performance.now()
     const audio = await (this.audioModule ?? importAudio())

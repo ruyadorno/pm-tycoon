@@ -91,8 +91,16 @@
 // slot unrolls after it; a WAKE or a sim swap at another row count
 // rebuilds at once. A level-up within the same rows keeps the in-place
 // cross-fade.
+//
+// Build 3 M12 (B3 §3.5): `parcel:lost` puffs the shelf mini away
+// (LaneRenderer.onLost) and the shelf tooltip adds the `cap` cards' bonus,
+// `Shelf 12/80 (+20)` (shelfBonusText; D-M12-13). The HUD raising the
+// pending EventCard (pm:closeSheets, nav.ts EV_CLOSE_SHEETS) closes every
+// sheet of the room at once; pm:goto's BuySheet opens only on an empty modal
+// stack, so it never stacks over a card (M12 review hud-1, hud-2).
 import Phaser from 'phaser'
 import {
+  EV_CLOSE_SHEETS,
   EV_GARAGE_OPENING,
   EV_GOTO,
   EV_VIEW,
@@ -149,7 +157,7 @@ import { Dialog } from '../ui/Dialog.ts'
 import { HireSheet } from '../ui/HireSheet.ts'
 import { computeLayout, type Layout } from '../ui/layout.ts'
 import { addPanel, setPanelRect, SLICE } from '../ui/Panel.ts'
-import { claimKey } from '../ui/Sheet.ts'
+import { claimKey, modalCount } from '../ui/Sheet.ts'
 import { laneReadout, strainRows, TONE_TEXT } from '../ui/ShieldPopover.ts'
 import { addText, textTop } from '../ui/text.ts'
 import { PALETTE, THEME } from '../ui/theme.ts'
@@ -270,6 +278,26 @@ export function lockedSlotTooltip(
 ): string {
   const soon = level > data.economy.playtestMaxLevel ? ' · coming soon' : ''
   return `${label} — unlocks at Lv ${level}${soon}`
+}
+
+/**
+ * Build 3 M12 (B3 §3.5, D-M12-13): how far the shelf cap stands over the
+ * level's levels.json shelfCap (a `cap` card's permanent bonus); 0 without
+ * one (or for a level with no row).
+ */
+export function shelfBonus(data: GameData, level: number, cap: number): number {
+  const row = data.levels.find((l) => l.level === level)
+  return row ? Math.max(0, cap - row.shelfCap) : 0
+}
+
+/** The shelf tooltip's ` (+20)` after `Shelf 12/80`; '' without a bonus. */
+export function shelfBonusText(
+  data: GameData,
+  level: number,
+  cap: number,
+): string {
+  const b = shelfBonus(data, level, cap)
+  return b > 0 ? ` (+${b})` : ''
 }
 
 /** Wanted-poster rows: revealed malware labels grouped by strain (§5.1). */
@@ -396,6 +424,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         'sorter:decided': (p) => this.workers.onSorterDecided(p),
         'desk:placed': (p) => this.onDeskPlaced(p),
         'parcel:cleared_by_player': (p) => this.lane.onCleared(p.id),
+        // Build 3 M12 (B3 §3.5): a shelf parcel an event took puffs away.
+        'parcel:lost': (p) => this.lane.onLost(p.id),
         'lane:fixturePlaced': (p) => this.lane.onFixturePlaced(p.nodeId),
         'lane:fixtureMoved': () => this.lane.syncSlots(),
         'lane:fixtureRemoved': () => this.lane.syncSlots(),
@@ -404,6 +434,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
         'worker:walkedOut': (p) => this.workers.onWalkedOut(p.employeeId),
         'level:up': () => this.onLevelUp(),
         'dock:bought': (p) => this.dock.onBought(p.index),
+        // Either cause cracks the sign (an event life too, B3 §3.5).
         'life:lost': () => this.lane.onLifeLost(),
         'day:ended': () => this.lane.refreshSign(),
         'game:over': () => this.onGameOver(),
@@ -866,12 +897,20 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
   /** The Garage opens over the room: no second applicant picker under it. */
   private onGarageOpening = (): void => this.dropHire()
 
+  /**
+   * The HUD raises the pending EventCard (nav.ts EV_CLOSE_SHEETS, M12
+   * review hud-1): every sheet of the room closes at once (no slide, no
+   * reopen), so the card opens on the same tap. Asleep, they are closed.
+   */
+  private onCloseSheets = (): void => this.closeSheets(true)
+
   private installGameEvents(): void {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize)
     this.registry.events.on('changedata', this.onRegistry)
     this.input.keyboard?.on('keydown', this.onKey, this)
     this.game.events.on(EV_GOTO, this.onGotoAwake)
     this.game.events.on(EV_GARAGE_OPENING, this.onGarageOpening)
+    this.game.events.on(EV_CLOSE_SHEETS, this.onCloseSheets)
   }
 
   private removeGameEvents(): void {
@@ -880,6 +919,7 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
     this.input.keyboard?.off('keydown', this.onKey, this)
     this.game.events.off(EV_GOTO, this.onGotoAwake)
     this.game.events.off(EV_GARAGE_OPENING, this.onGarageOpening)
+    this.game.events.off(EV_CLOSE_SHEETS, this.onCloseSheets)
   }
 
   /** Esc / Android back → the city (§1.10), unless a modal owns the key. */
@@ -959,7 +999,12 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
 
   // ---------------------------------------------------------------- highlight
 
-  /** pm:goto {view: 'warehouse', highlight: machineId} (§1.9 / city §5.3). */
+  /**
+   * pm:goto {view: 'warehouse', highlight: machineId} (§1.9 / city §5.3).
+   * The BuySheet opens only on an empty modal stack (M12 review hud-2): an
+   * EventCard the HUD opened during the fade + SHEET_DELAY_MS stays the top
+   * modal (Enter / Esc stay its own); the slot pulses either way.
+   */
   private highlight(machineId: string): void {
     const empty = this.firstEmptySlot()
     if (!empty) {
@@ -971,7 +1016,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       return
     }
     this.lane.pulseSlot(empty, PALETTE.blue1, HIGHLIGHT_MS)
-    if (!this.anySheetOpen()) this.buy?.open(empty, machineId)
+    if (!this.anySheetOpen() && modalCount() === 0)
+      this.buy?.open(empty, machineId)
     const r = this.layout.rectFor(empty)
     if (r) this.showInView(r, this.buy?.isOpen() ? this.buy.top : undefined)
   }
@@ -1346,7 +1392,8 @@ export class WarehouseScene extends Phaser.Scene implements WorldTransition {
       since === null
         ? ''
         : ` · oldest ${formatMmSs((this.vs.tick - since) / 10)} ago`
-    return `Shelf ${s.ids.length}/${s.cap}${age}`
+    const bonus = shelfBonusText(this.vs.data, this.vs.level, s.cap)
+    return `Shelf ${s.ids.length}/${s.cap}${bonus}${age}`
   }
 
   private tooltip(text: string, at: Point): void {

@@ -15,11 +15,21 @@
 // origin, so nothing in the HUD covers it, and on the modal stack while
 // open. The stats are pure (tests/ui/victory-card.test.ts); Phaser is a
 // type-only import.
+//
+// Build 3 M12 (B3 §5, D-M12-12): the `victory_art` illustration (208×104,
+// drawn 1:1) sits right under `TYCOON`, before the headline (the card grows
+// 112 px and still fits 360×604); `open(m, {burst: true})` plays the
+// confetti burst (src/ui/confetti.ts) over the card's top edge — the
+// game:victory open and a reload's reopen only; a relayout rebuilds with no
+// burst, and teardown stops a running burst before the container goes.
 import type Phaser from 'phaser'
 import { removeCamera } from './cameraBits.ts'
 import type { GameData } from '../data/types.ts'
+import { UI_ATLAS } from '../render/atlases.ts'
+import { frameOrNull } from '../render/frames.ts'
 import { TICKS_PER_DAY } from '../sim/types.ts'
 import { Button } from './Button.ts'
+import { confettiBurst, type ConfettiBurst } from './confetti.ts'
 import { levelLabel } from './hudKit.ts'
 import type { Layout } from './layout.ts'
 import { addPanel } from './Panel.ts'
@@ -37,6 +47,11 @@ const BTN_GAP = 8
 const TITLE_H = 28
 /** Gold that reads on the light card. */
 const GOLD_TEXT = PALETTE.gold0
+/** B3 §5: the victory illustration, drawn 1:1 under the masthead. */
+export const VICTORY_ART_W = 208
+export const VICTORY_ART_H = 104
+/** Air between the art and the headline. */
+export const VICTORY_ART_GAP = 8
 
 // ---- model (pure) ---------------------------------------------------------------
 
@@ -93,12 +108,20 @@ export function victoryModel(
   }
 }
 
-/** Card height for `headLines` headline lines and `rows` stats rows. */
-export function victoryCardHeight(headLines: number, rows: number): number {
+/**
+ * Card height for `headLines` headline lines and `rows` stats rows; `art`
+ * adds the victory illustration and its gap (B3 §5: +112 px).
+ */
+export function victoryCardHeight(
+  headLines: number,
+  rows: number,
+  art = true,
+): number {
   return (
     PAD +
     TITLE_H +
     10 +
+    (art ? VICTORY_ART_H + VICTORY_ART_GAP : 0) +
     Math.max(1, headLines) * LINE_H +
     14 +
     rows * ROW_H +
@@ -129,6 +152,10 @@ export class VictoryCard {
   private root: Phaser.GameObjects.Container | null = null
   private cam: Phaser.Cameras.Scene2D.Camera | null = null
   private buttons: Button[] = []
+  private burst: ConfettiBurst | null = null
+  /** The panel's top edge and the card's centre x (the confetti's anchor). */
+  private top = 0
+  private cx = 0
 
   constructor(
     scene: Phaser.Scene,
@@ -150,7 +177,17 @@ export class VictoryCard {
     return this.m
   }
 
-  open(m: VictoryModel): void {
+  /** True while a confetti burst runs (e2e / tests). */
+  get bursting(): boolean {
+    return this.burst !== null && !this.burst.done
+  }
+
+  /**
+   * Build 3 M12 (B3 §5, D-M12-12): `burst` plays the confetti once (the
+   * game:victory open and a reload's reopen; never a relayout or Back from
+   * the summary — HudScene passes it, false under reduced motion).
+   */
+  open(m: VictoryModel, opts: { burst?: boolean } = {}): void {
     this.teardown()
     if (!this.m) {
       pushModal(this)
@@ -158,6 +195,11 @@ export class VictoryCard {
     }
     this.m = m
     this.build()
+    const root = this.root
+    if (opts.burst && root)
+      this.burst = confettiBurst(this.scene, this.cx, this.top, (img) =>
+        root.add(img),
+      )
   }
 
   close(): void {
@@ -186,6 +228,9 @@ export class VictoryCard {
   }
 
   private teardown(): void {
+    // The burst's images live in the root: stop it first (critique 16).
+    this.burst?.stop()
+    this.burst = null
     for (const b of this.buttons) b.destroy()
     this.buttons = []
     this.root?.destroy()
@@ -215,17 +260,28 @@ export class VictoryCard {
       align: 'center',
     })
     const headLines = lineCount(head)
-    const ch = victoryCardHeight(headLines, m.stats.length)
+    const art = frameOrNull('victory_art')
+    const ch = victoryCardHeight(headLines, m.stats.length, art !== null)
     const avail = H - L.safeTop - L.safeBottom
     const cx = Math.round((W - cw) / 2)
     const cy = L.safeTop + Math.max(0, Math.round((avail - ch) / 2))
     const panel = addPanel(scene, cx, cy, cw, ch, 'ui_card_gold')
     panel.setInteractive()
     const parts: Phaser.GameObjects.GameObject[] = [backdrop, panel]
+    this.top = cy
+    this.cx = Math.round(W / 2)
 
     let y = cy + PAD
     title.setPosition(Math.round((W - title.width) / 2), y - 4)
     y += TITLE_H + 10
+    if (art) {
+      parts.push(
+        scene.add
+          .image(Math.round((W - VICTORY_ART_W) / 2), y, UI_ATLAS, art)
+          .setOrigin(0, 0),
+      )
+      y += VICTORY_ART_H + VICTORY_ART_GAP
+    }
     head.setPosition(Math.round((W - head.width) / 2), y - 3)
     y += headLines * LINE_H + 14
     parts.push(title, head)

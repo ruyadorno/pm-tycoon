@@ -736,3 +736,47 @@ M7 review fixes (rules the M7 contract did not state, or stated against the spec
 - **Docs**: the first job offer is on Day 4 (3:00; spicy: Day 2, 1:00); the tall-room scroll needs a 393 × 659 (or
   360 × 604) custom device in devtools — at 393 × 852 tier 5 fits; item 4 counts real minutes; check-dist labels the
   policy chunk as loaded by the Title's demo city.
+
+## Run decisions (build 3)
+
+### Run-start findings (2026-10-31)
+
+- **Part A of `prompt-build3.md` was never run.** The author pasted part B (M13 → M15, "continue from the M12
+  commit"), but `main`, `origin/main` and the reflog all end at the build-2 hand-off (2db4c6e): there is no M11 or M12
+  commit and no `docs/feel-check-m12.md`. The prompt says "never wait on me", so this run implements **M11 → M15 in
+  one go**: M11 and M12 as part A specifies (plan-build3 §8.2–§8.3), M12 pushed with `docs/feel-check-m12.md` as a
+  checkpoint the author can still play, then M13 → M15 as part B specifies. Q-B3-13 ("stop after M12") is overridden by
+  the later part-B instruction; the M12 zip is sent mid-run so the feel check can still happen in parallel.
+- **The feel-check notes block was empty** (the template placeholder `[the author pastes the notes here …]`). M13's
+  deck review therefore runs on plan-build3 §8.4 task 3's rules alone; no Q-B3 default is changed by a note. If notes
+  arrive later they go into a follow-up deck pass.
+
+### Q-B3 defaults taken (plan-build3 §11; the author: "the rest looks good")
+
+- [Q-B3-1] Pacing: every level median −10 % (windows × 0.9: L2 7–13.5, L3 13.5–18, L4 18–22.5, L5 22.5–27 min;
+  Golden Release ≤ 29); the threshold scan runs with `newStrainDelayS` 90 from its first gate, then the L1 openers,
+  then `perLevel` 0.015; −8 % accepted before any other value moves — `economy.json pacingTargets`, `levels.json`.
+- [Q-B3-2] **Author's answer, not a default:** every card pauses the sim and never expires; job offers too, no Later —
+  `src/sim/systems/deck.ts` (the hold), `src/ui/EventCard.ts`.
+- [Q-B3-3] Event cash is balance-only (never lifetime earned) — `src/sim/systems/effects.ts` (`money*` appliers credit
+  with `earned: false`).
+- [Q-B3-4] **Author's answer:** events may take the last life, the last vehicle and the only inspector, with a way out
+  on the card or its chain head (the harsh-consequence rule, schema-checked) — `effects.ts`, `tests/data/events.test.ts`.
+- [Q-B3-5] Cadence bands by level (L1 60–100 s … L5 90–140 s, sim time), first card at 200 s, one open + one queued;
+  links and outcome cards do not restart the timer — `events.json schedule`.
+- [Q-B3-6] Jobs stay blocked while the Golden Release is pending (decision cards keep coming) — `deck.ts` job
+  eligibility.
+- [Q-B3-7] **Author's answer:** `minOnTimeRate` 0.85 plus the Victory art — `levels.json ultimateQuest`, B3 §5.
+- [Q-B3-8] The policy scores options with the data weights of `events.json policy.weights` (life $600, −∞ for the last
+  one); gate rows `policyEvPerCard` ∈ [−20, 40] and `policyNonDefaultShare` ≥ 0.4 — `src/sim/policies/eventPolicy.ts`.
+- [Q-B3-9] 13 PixelLab category pictures (48×48 `event-pic`) + the Victory art, budget 400 + 100 reserve, G7 —
+  `art/manifest.json`.
+- [Q-B3-10] No chance rolls: outcomes are deterministic or decided by a stated condition on the player's own state —
+  `deck.ts` conditional next.
+- [Q-B3-11] Ship 100–120 cards from the 145-card pool, the M13 review cutting whole singles only — `events.json deck`.
+- [Q-B3-12] `STATE_VERSION` 6 under `pm.save.v2`; build-2 saves are discarded with the stale-save toast —
+  `src/sim/types.ts`, `src/sim/save.ts`.
+- [Q-B3-13] **Author's answer** (stop after M12) — overridden by the part-B prompt, see the run-start findings above.
+- [Q-B3-14] `spicy.json` cadence halves (first card at 60 s, bands 30–70 s) — `public/configs/spicy.json`.
+- [Q-B3-15] The job offer moves to the EventCard (Accept / Decline); the QuestCard keeps active / complete and the gold
+  Golden Release offer — `src/ui/EventCard.ts`, `src/ui/QuestCard.ts`.

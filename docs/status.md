@@ -1,7 +1,13 @@
-# pm-tycoon — run status (playtest 1 + build 2)
+# pm-tycoon — run status (playtest 1 + builds 2–3)
 
 Filled in place by the runs (format: plans/pm-tycoon/status.md); newest checkpoint entry first. Playtest 1 (M0–M4) was
-copied back to plans/pm-tycoon/status.md at its end; build 2 (M5–M10, plan-build2.md) copies the file back at M10.
+copied back to plans/pm-tycoon/status.md at its end; build 2 (M5–M10, plan-build2.md) at M10; build 3 (M11–M15,
+plan-build3.md) copies the file back at M15.
+
+Run (build 3): started 2026-10-31 — plan-build3.md DRAFT v3 + spec-build3.md — from the part-B prompt with part A
+never run (M11 → M15 in one run; no author feel-check notes; docs/decisions.md "Run decisions (build 3)") — Node v26 /
+vlt 1.6.x — Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab
+token: present; budget 400 generations with a 100 reserve.
 
 Run (build 2): started 2026-10-30 00:46 UTC — plan-build2.md DRAFT v2 + spec-build2.md — Node v26 / vlt 1.6.1 —
 Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab token: present,
@@ -9,6 +15,14 @@ Tier 2; budget 1,500 generations with a 300 reserve (author's run prompt); 877 s
 13245fd + the hand-off docs commit; zip dist-zip/pm-tycoon-13245fd.zip; Pages dispatch refused (HTTP 403).
 
 Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 / vlt 1.6.0 — Chromium: installed (Chrome for Testing 156.0.8078.4, SwiftShader WebGL, max texture 8192) — Playwright device: iPhone 16 — PixelLab token: present, Tier 2 (5,000 generations) — m5x7: vendored TTF — music: live, unheard on this VM (author to judge; offline render bars −22…−25 dBFS, peak 0.44) — current head: 77615ef (M4) + the hand-off docs commit; zip dist-zip/pm-tycoon-77615ef.zip
+
+## Milestone checklist (build 3)
+
+- [ ] M11 pacing pass 1 + the events engine: windows, the threshold scan, the modifier registry, `events.json`, deck/effects/policy, gate rows, save v6 (commit `M11: …`)
+- [ ] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
+- [ ] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
+- [ ] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
+- [ ] M15 playtest-3 build: metrics v3, summary card v3 + fun bar 3, shots, report, hand-off (commit `M15: …`)
 
 ## Milestone checklist (build 2)
 
@@ -333,6 +347,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Art approvals pending
 
+- G7 event pictures + Victory art (build 3): <not yet presented>
 - G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
 - G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural presented at M7 — `art/contact/rural@4x.png` (ten uniques, agent picks); Docks (live), Airport, Park & civic presented at M8 — `art/contact/{docks,airport,civic}@4x.png` (agent picks, 2 candidates for L5)
 - G6 tiers 3–5 + machines + people (build 2): presented — `art/contact/people@4x.png`, `art/contact/tiers@4x.png`, `art/contact/g6-tiers-machines-people@4x.png`, `art/contact/warehouse-tier3@4x.png` (agent picks `battery_checker`, `xray` (M9 re-roll), `sorter_arm`, `wh_ext_t3/t4/t5`; procedural faces, pips, ★, `worker_sorter`, `hold_station`, tier 3–5 interiors); commands in docs/report-playtest2.md §9

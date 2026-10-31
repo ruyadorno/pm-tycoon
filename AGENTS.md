@@ -1,9 +1,10 @@
 # pm-tycoon — agent rules
 
 Package Management Tycoon: a portrait, pixel-art, isometric tycoon game (Phaser 4.2.1 + TypeScript 5.9 + Vite 8).
-The plan lives outside this repo at /home/ruybot/agents/main/plans/pm-tycoon/ — build 2: `plan-build2.md` is the entry
-point and `spec-build2.md` (cited `B2 §N`) wins over `spec-core.md` (cited `§N`) where they differ; `plan.md` §5, §6,
-§12.1 and §13 still apply. Cite spec section numbers in commits and docs.
+The plan lives outside this repo at /home/ruybot/agents/main/plans/pm-tycoon/ — build 3: `plan-build3.md` is the entry
+point and `spec-build3.md` (cited `B3 §N`) wins over `spec-build2.md` (cited `B2 §N`) and `spec-core.md` (cited `§N`)
+where they differ; `plan.md` §5, §6, §12.1 and §13 and `plan-build2.md` §8.8 still apply. Cite spec section numbers
+in commits and docs.
 Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under .agents/skills (`vlt skills link -y '#phaser'`).
 
 ## Commands (vlt only — never npm/pnpm/yarn/npx)
@@ -27,7 +28,7 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
   only (no test files, no art manifest, no policy.ts, no Chromium). `vlr check:quick` (the first five steps, gate tests
   excluded) is the pre-commit hook; the full check is the rule.
 - Commit subject `<area>: <imperative summary>` (areas: scaffold, data, sim, city, warehouse, hud, audio, art, tools, tests,
-  docs, people, quests, title, M0…M10); a body when the diff is not obvious; the last line is `Co-authored-by: Ruy Adorno <ruy@vlt.sh>`.
+  docs, people, quests, events, title, M0…M15); a body when the diff is not obvious; the last line is `Co-authored-by: Ruy Adorno <ruy@vlt.sh>`.
 - No AI-attribution lines anywhere in commits, PR bodies or files (no "Generated with", no session links, no Co-Authored-By: Claude).
 - `git commit --no-verify` is not allowed.
 - Trunk only: commit directly to `main` in this checkout. Never create branches, worktrees, forks or pull requests; never run
@@ -72,28 +73,36 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
   and is idempotent (seeded procedural art, hashed finals).
 - `vlr art:gen` needs PIXELLAB_TOKEN in the gitignored .env (already there; never paste it into chat, a commit or a log);
   without it the procedural placeholders stay and the script exits 0. One agent at a time calls PixelLab; `vlr art:balance`
-  first. Build-2 budget 1,500 generations with a 300 reserve; the author approves or rejects ids after the run (G4–G6).
+  first. Build-3 budget 400 generations with a 100 reserve (B3 §5, Q-B3-9); the author approves or rejects ids after the run
+  (G7; G4–G6 stay open from build 2).
 
 ## Status and reports
 
-- docs/status.md: one entry per checkpoint (M0–M10), newest first, in the format of plans/pm-tycoon/status.md; PARTIAL
-  entries list unfinished task numbers. Copy the filled file back to plans/pm-tycoon/status.md at the end of M10.
-- docs/decisions.md: every "(default — confirm)" choice taken (with the plan.md / plan-build2.md question number, build 2
-  under "Run decisions (build 2)") and every runtime dep.
-- docs/report-playtest2.md: the build-2 end-of-run report (plan.md §13.4 sections + plan-build2.md §8.7 task 6);
-  docs/report-playtest1.md stays as the playtest-1 record.
+- docs/status.md: one entry per checkpoint (M0–M15), newest first, in the format of plans/pm-tycoon/status.md; PARTIAL
+  entries list unfinished task numbers. Copy the filled file back to plans/pm-tycoon/status.md at the end of M15.
+- docs/decisions.md: every "(default — confirm)" choice taken (with the plan.md / plan-build2.md / plan-build3.md question
+  number; build 3 under "Run decisions (build 3)") and every runtime dep.
+- docs/report-playtest3.md: the build-3 end-of-run report (plan.md §13.4 sections + plan-build3.md §8.6 task 5);
+  docs/report-playtest1.md and docs/report-playtest2.md stay as the playtest-1 and playtest-2 records.
 
 ## Sim gate
 
 - `vlr sim -- --minutes 30 --seed N` prints the per-minute timeline; `vlr sim:gate` runs seeds 1–10 × 30 min and checks the
-  windows of spec §7 + B2 §7.3 (first delivery < 60 s, scripted malware caught, L2 at 8–15 min, truck ≤ 4 min after L2,
-  no lost life, no shelf stall under the Toss-everything policy; L3–L5 and quest rows as their `SIM_FEATURES` flags
-  land); from M9 also `vlr sim:gate -- --minutes 35` (Golden Release row). Medians must pass; retune JSON, not code, in
-  the B2 §7.3 tuning order.
+  windows of spec §7 + B2 §7.3 + B3 §2.1 (first delivery < 60 s, scripted malware caught, L2 at 7–13.5 min, truck ≤ 4
+  min after L2, L3 13.5–18, L4 18–22.5, L5 22.5–27, no lost life, no shelf stall under the Toss-everything policy, the
+  quest rows) and, once `SIM_FEATURES.events` is on (M12), the event rows of B3 §3.9 (≥ 15 cards by 30 min, no card open
+  past its step, ≥ 3 decision cards on the L1 plateau, `policyEvPerCard` inside the EV band, `policyNonDefaultShare` ≥
+  0.4); also `vlr sim:gate -- --minutes 35` (Golden Release offered ≤ 29 min), `vlr sim:delegating` and the 40-seed lives
+  run (`vlr sim -- --gate --seeds 1-40 --minutes 30`, share of seeds losing a life ≤ 35 %). `vlr sim -- --events off`
+  zeroes the decision draw only (job cards keep coming). Medians must pass; retune JSON, not code, in the B3 §2.2 /
+  B2 §7.3 tuning order.
 
-## Scope guard (build 2 / playtest 2)
+## Scope guard (build 3 / playtest 3)
 
-- Levels 1–5, quests, people (applicants, desks, the Hold Bay sorter, drivers); the fixed lane only — no belts of any kind,
-  no management scene, no train, no splitters/traffic/day-night/bankruptcy, no PWA/service worker, no save migrations
-  (v1 saves are discarded), no ready-made art packs. Pages deploy only through the `pages.yml` workflow dispatch at M10
-  (Q-B2-9); GitHub mechanics beyond that and `git push origin main` stay out. The sorter is Toss-only (it never Clears).
+- Levels 1–5, people, quests as job cards, **events** (decision cards that pause the sim and never expire, chains,
+  routers, flags, the modifier registry); the fixed lane only — no belts of any kind, no management scene, no train,
+  no splitters/traffic/day-night/bankruptcy, no PWA/service worker, no save migrations (v5 saves are discarded), no
+  ready-made art packs, no chance rolls in events (Q-B3-10), no timed cards or `Later` on event cards (Q-B3-2), no new
+  quest templates or goal kinds, no art beyond the 13 category pictures, `ic_event`, `victory_art` and `fx_confetti`
+  (B3 §5). Pages deploy only through the `pages.yml` workflow dispatch at M15; GitHub mechanics beyond that and
+  `git push origin main` stay out. The sorter is Toss-only (it never Clears).

@@ -125,6 +125,9 @@ export const SFX_NAMES = [
   'regionUnlocked',
   'deny',
   'questDone',
+  // Build 3 (B3 §3.4, §7): a card opens — a soft two-note bell, throttled
+  // 2 s (audio.json throttleMs); the director wiring is M12.
+  'eventPing',
 ] as const
 export const BRUSH_NAMES = ['ride', 'hat'] as const
 

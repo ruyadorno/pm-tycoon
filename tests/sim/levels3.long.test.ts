@@ -3,12 +3,20 @@
 // the competent policy over seeds 1-10 × 25 min reaches L3 on every seed with
 // the L3 median inside economy.pacingTargets.level3Min, and the first
 // overseas clearance lands ≤ firstOverseasClearedAfterLevel3MaxMin after L3
-// by median; at L3 every seed buys the Battery checker on the L3 tick
-// (REPLACEing COUNTERS' 2nd Metal detector) and then dock 2, in plan order;
-// the levels come in order (M9: the cap is 5, so L4 may land inside the 25
-// minutes — the L3 plan still comes first); the CLI invariants hold. Tagged
-// [long]: excluded from `vlr check:quick` (tools/check.mjs), run by the full
+// by median; at L3 every seed buys the Battery checker first (REPLACEing
+// COUNTERS' 2nd Metal detector) and then dock 2, in plan order; the levels
+// come in order (M9: the cap is 5, so L4 may land inside the 25 minutes —
+// the L3 plan still comes first); the CLI invariants hold. Tagged [long]:
+// excluded from `vlr check:quick` (tools/check.mjs), run by the full
 // `vlr check`.
+//
+// Build 3 (M11, B3 §2.1-§2.2: L3 $3,700 → $3,250): the balance at L3 is
+// thinner ($233-$390 on seven of seeds 1-10), so the Battery checker
+// ($500, price + buffer) lands on the first tick the policy can afford it
+// at or after L3 (21-96 s later), with nothing bought in between and the
+// REPLACE on that tick. L4 can now arrive before dock 2 (seeds 7 and 8):
+// NEW STRAIN FIRST (levelPlan.ts) then buys the X-ray ahead of dock 2,
+// which may fall past the 25 minutes.
 
 import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
@@ -51,37 +59,65 @@ describe('the L3 window under the competent policy (seeds 1-10 × 25 min) [long]
     ).toBeLessThanOrEqual(targets.firstOverseasClearedAfterLevel3MaxMin)
   }, 120_000)
 
-  it('the plan at L3: the Battery checker on the L3 tick (REPLACE of the duplicate Metal detector), then dock 2 before any L4 purchase; the levels in order', () => {
+  it('the plan at L3: the Battery checker first (on the first affordable tick at or after L3, nothing bought before it, the REPLACE of the duplicate Metal detector on its tick), then dock 2 before any L4 purchase — unless L4 lands first, when the X-ray goes ahead of it; the levels in order', () => {
+    const BUYS = new Set([
+      'lane:fixturePlaced',
+      'dock:bought',
+      'vehicle:bought',
+    ])
+    const isChecker = (e: RunResult['events'][number], id: string): boolean =>
+      e.name === 'lane:fixturePlaced' &&
+      (e.fixture as { checker?: { defId?: string } }).checker?.defId === id
+    const late: string[] = []
     for (const r of runs()) {
       const l3 = r.events.find((e) => e.name === 'level:up' && e.level === 3)!
-      const placed = r.events.find(
-        (e) =>
-          e.name === 'lane:fixturePlaced' &&
-          (e.fixture as { checker?: { defId?: string } }).checker?.defId ===
-            'battery_checker',
-      )
-      expect(placed?.tick, `seed ${r.seed}`).toBe(l3.tick)
+      const l4 = r.events.find((e) => e.name === 'level:up' && e.level === 4)
+      const placed = r.events.find((e) => isChecker(e, 'battery_checker'))
+      expect(placed, `seed ${r.seed}`).toBeDefined()
+      expect(placed!.tick, `seed ${r.seed}`).toBeGreaterThanOrEqual(l3.tick)
+      // Nothing else is bought between L3 and the Battery checker.
+      expect(
+        r.events
+          .filter(
+            (e) =>
+              BUYS.has(e.name) && e.tick >= l3.tick && e.tick < placed!.tick,
+          )
+          .map((e) => [e.tick, e.name]),
+        `seed ${r.seed}`,
+      ).toEqual([])
       const removed = r.events.filter(
-        (e) => e.name === 'lane:fixtureRemoved' && e.tick === l3.tick,
+        (e) => e.name === 'lane:fixtureRemoved' && e.tick === placed!.tick,
       )
       expect(removed, `seed ${r.seed}`).toHaveLength(1)
+      expect(removed[0]!.nodeId, `seed ${r.seed}`).toBe(placed!.nodeId)
       const dock = r.events.find((e) => e.name === 'dock:bought')
-      expect(dock, `seed ${r.seed}`).toMatchObject({ index: 2 })
-      expect(dock!.tick).toBeGreaterThan(l3.tick)
-      // M9: the L4 X-ray waits for the whole L3 plan (dock 2 included).
-      const xray = r.events.find(
-        (e) =>
-          e.name === 'lane:fixturePlaced' &&
-          (e.fixture as { checker?: { defId?: string } }).checker?.defId ===
-            'xray',
-      )
-      if (xray) expect(xray.tick, `seed ${r.seed}`).toBeGreaterThan(dock!.tick)
+      const xray = r.events.find((e) => isChecker(e, 'xray'))
+      const l4First =
+        l4 !== undefined && (dock === undefined || l4.tick < dock.tick)
+      if (dock !== undefined) {
+        expect(dock, `seed ${r.seed}`).toMatchObject({ index: 2 })
+        expect(dock.tick, `seed ${r.seed}`).toBeGreaterThan(placed!.tick)
+      } else {
+        // Dock 2 falls past the run only behind NEW STRAIN FIRST's X-ray.
+        expect(l4First, `seed ${r.seed}: no dock 2 and no L4`).toBe(true)
+      }
+      if (l4First) late.push(`${r.seed}`)
+      if (xray !== undefined) {
+        expect(xray.tick, `seed ${r.seed}`).toBeGreaterThanOrEqual(l4!.tick)
+        // M9: the L4 X-ray waits for the whole L3 plan (dock 2 included)
+        // when dock 2 came before L4.
+        if (!l4First)
+          expect(xray.tick, `seed ${r.seed}`).toBeGreaterThan(dock!.tick)
+      }
       const ups = r.events
         .filter((e) => e.name === 'level:up')
         .map((e) => e.level as number)
       expect(ups.slice(0, 2), `seed ${r.seed}`).toEqual([2, 3])
       expect(ups, `seed ${r.seed}`).toEqual(ups.map((_, i) => i + 2))
     }
+    console.log(
+      `[levels3] L4 before dock 2 (NEW STRAIN FIRST): seeds ${late.join(',') || 'none'}`,
+    )
   }, 120_000)
 
   it('every seed: the CLI invariants hold (conservation incl. cleared, no stuck vehicle, balance ≥ 0)', () => {

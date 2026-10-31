@@ -118,10 +118,11 @@ export function deck(sim: Sim, _ctx: TickContext): void {
 
 /**
  * 11. Quests (M7, systems/quests.ts): the active quest's derived values, day
- * close, completion / fail and progress; offer expiry; the ultimate quest
- * from its level on; a regular offer when due (one quest-stream draw — never
- * state.rng). After `levels` (a level:up offers the ultimate the same tick),
- * before `day` (a boundary closes onTimeRateDay with all of its deliveries).
+ * close, completion / fail and progress; the ultimate quest from its level
+ * on. Build 3: regular offers are job cards drawn by the deck (10b — one
+ * quest-stream draw per job, never state.rng; no offer expiry). After
+ * `levels` (a level:up offers the ultimate the same tick), before `day` (a
+ * boundary closes onTimeRateDay with all of its deliveries).
  */
 export function quests(sim: Sim, ctx: TickContext): void {
   questsStep(sim, ctx)

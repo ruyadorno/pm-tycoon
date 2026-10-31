@@ -68,7 +68,11 @@
 // tap opens the QuestCard (offer: Accept / Later / Decline; active:
 // Abandon / Close) on the modal stack without holding the sim. A new offer
 // opens the card by itself when nothing else is up in the city
-// (questCardAutoOpens; otherwise the chip pulses and it retries).
+// (questCardAutoOpens; otherwise the chip pulses and it retries). Build 3
+// interim (M11, D-18): a job offer is an event card the sim holds on — its
+// QuestCard has Accept / Decline only (routed by the sim to decideEvent),
+// opens in either view, and Esc only hides it (the chip reopens it); the
+// EventCard takes over in M12.
 // quest:completed plays the gold `QUEST COMPLETE +$300` stamp rising from the
 // toast lane at the money cell, turns an open card to its complete state and
 // queues a quest / ★ paper; life:gained blinks the newly lit bomb slot (4–5
@@ -268,6 +272,7 @@ import { addBar, addPanel, BAR_H, setBarFill } from '../ui/Panel.ts'
 import { QuestCard, type QuestCardMode } from '../ui/QuestCard.ts'
 import { QuestChip, questChipModel } from '../ui/QuestChip.ts'
 import {
+  interimCardAnswer,
   newsHeadline,
   questBlockedBy,
   questWaitingOn,
@@ -913,6 +918,7 @@ export class HudScene extends Phaser.Scene {
       if (this.district?.isOpen()) this.district.refresh()
     }
     if (this.questAutoOpen) this.tryAutoOpenQuest()
+    this.answerInterimCard()
     if (time >= this.pollAt) {
       this.pollAt = time + POLL_MS
       this.refreshQuest(false)
@@ -1520,19 +1526,42 @@ export class HudScene extends Phaser.Scene {
       if (this.questCard.questId === q.id) this.questAutoOpen = null
       return
     }
+    // Build 3 interim (M11, D-18): a job offer is a card the sim holds on
+    // (B3 §6), so its QuestCard opens in either view and through the tour —
+    // otherwise the game would sit frozen with nothing on screen. It still
+    // waits for a modal, a paper or a HUD hold to clear.
+    const holdsSim = this.vs.events().open?.questId === q.id
     const ok = questCardAutoOpens({
       modals: modalCount(),
       onboardingStep: this.onboarding.activeStep,
-      view: this.view,
+      view: holdsSim ? 'city' : this.view,
       held: this.holds.size > 0 || this.paused.isOpen(),
       paperVisible: this.paperBusy(),
       blocked: q.ultimate && qs.active !== null,
-      force: want.force,
+      force: want.force || holdsSim,
       policy: this.stepper.policy !== null,
     })
     if (!ok) return
     this.questAutoOpen = null
     this.openQuestCard(q)
+  }
+
+  /**
+   * Build 3 interim (M11, review deck-1): an open deck card that is not a
+   * job card (the rescue's loaner, a debug card) holds the sim (B3 §6) and
+   * nothing draws it until M12's EventCard — so the HUD answers it with its
+   * default option (interimCardAnswer, a logged decideEvent) once no HUD
+   * hold is up, and tickers what it did. Never under a policy (it answers
+   * cards itself) or at game over.
+   */
+  private answerInterimCard(): void {
+    const vs = this.vs
+    if (this.stepper.policy !== null || vs.gameOver || this.holds.size > 0)
+      return
+    const a = interimCardAnswer(vs.events().open)
+    if (a === null) return
+    if (vs.event.decide(a.eventId, a.index).ok)
+      this.ticker.push(a.line, 'event')
   }
 
   /**

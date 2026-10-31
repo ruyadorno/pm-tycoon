@@ -44,7 +44,9 @@
 //   shield-popover      level-up.json + policy, past the level-up: the real
 //                       shield tap → metal + rattle rows, "→ Shaky shaker"
 //   payroll-short       payroll-short.json WITHOUT the policy: $0 at the
-//                       day-4 payday → red toast + the Garage "!"
+//                       day-4 payday → red toast + the Garage "!" (build 3:
+//                       any card a draw opens on the way is answered —
+//                       a policy-less sim holds on it)
 //   city-10min          seed 7, ?policy=1&fastForward=600 (t = 600 s)
 //   warehouse-tier2     level-up.json + policy in the room: level:up while
 //                       inside → tier-2 cross-fade + slot-4 unroll, settled
@@ -113,10 +115,11 @@
 // tools/fixtures/people.ts writes both fixtures (same staleness rule).
 //
 // M7 (plan-build2 §8.4 task 8; design-m7 §6.3-§6.8, §7 "e2e/shots.spec.ts"):
-//   quest-offer           ?quest=rush_district on a new game (Boot's debug
-//                         offer, its card opened at create), 20 s of a
-//                         player-less city behind it (waiting badges): the
-//                         JOB BOARD card, Accept · Later · Decline
+//   quest-offer           a new game, 20 s of a player-less city (waiting
+//                         badges), then debug.offerQuest('rush_district')
+//                         (the ?quest= command — build 3: a job card the
+//                         sim holds on, so the 20 s run first): the JOB
+//                         BOARD card, Accept · Decline (no Later, D-18)
 //                         (+ `-360x604`: the card inside the canvas, above
 //                         the bottom bar)
 //   quest-chip            policy, ?fastForward=720 (L2 at ~11.9 min on
@@ -1263,8 +1266,10 @@ test.describe('M3 shots', () => {
     const { fixture } = await loadFixture(page, pm, 'payroll-short')
     await pm.settle(5)
     const capMs = ((fixture.paydayInS as number) + 10) * 1000
+    // Build 3: answer any card a draw opens before the payday (no policy —
+    // the sim would hold on it).
     const w = await page.evaluate(
-      (cap) => window.__pm!.waitEvent('payroll:short', cap),
+      (cap) => window.__pm!.waitEvent('payroll:short', cap, true),
       capMs,
     )
     expect(w.ok, 'the $0 payday runs short').toBe(true)
@@ -2403,16 +2408,19 @@ async function magicQuest(
 test.describe('M7 shots', () => {
   test('quest-offer', async ({ page, pm, consoleErrors }) => {
     phoneAndMinFit()
-    await pm.open(`${CITY}&quest=rush_district`)
+    await pm.open(CITY)
     await pm.freeze()
-    // 20 s with no player: parcels wait (the badges), the offer stands (1 day).
+    // 20 s with no player: parcels wait (the badges). Then the ?quest=
+    // command: a job card, which holds the policy-less sim (B3 §6) — so it
+    // comes after the 20 s, not at create.
     await page.evaluate(() => window.__pm!.advance(20_000))
+    await debugQuest(page, 'rush_district', false)
     expect(
       await settleUntil(page, pm, async () => {
         const ui = await questUi(page)
         return ui.card.open && ui.card.mode === 'offer'
       }),
-      'the ?quest= offer opens its card',
+      'the job offer opens its card',
     ).toBe(true)
     await pm.settle(30)
     const ui = await questUi(page)
@@ -2422,17 +2430,14 @@ test.describe('M7 shots', () => {
     )
     expect(ui.card).toMatchObject({
       title: 'Rush hour',
-      buttons: ['accept', 'later', 'decline'],
+      buttons: ['accept', 'decline'],
     })
+    expect(ui.openCard?.kind, 'a job card').toBe('job')
     expect(fit.card.x).toBeGreaterThanOrEqual(0)
     expect(fit.card.x + fit.card.w).toBeLessThanOrEqual(fit.W)
     expect(fit.card.y).toBeGreaterThanOrEqual(fit.bandTop)
     expect(fit.card.y + fit.card.h).toBeLessThanOrEqual(fit.bandBottom)
-    await expectInside(page, 'HUD', [
-      'quest:accept',
-      'quest:later',
-      'quest:decline',
-    ])
+    await expectInside(page, 'HUD', ['quest:accept', 'quest:decline'])
     await pm.shot(shotName('quest-offer'), 20)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

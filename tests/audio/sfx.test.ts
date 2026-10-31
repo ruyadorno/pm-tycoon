@@ -66,6 +66,25 @@ describe('Sfx', () => {
     expect(t.ctx.played()).toHaveLength(1)
   })
 
+  it('eventPing (build 3, B3 §3.4 / §7): a soft two-note bell, the last one-shot of sfx.json, throttled 2 s', () => {
+    const t = setup()
+    const p = data.sfx.eventPing as number[]
+    // zzfx order: frequency 1320, pitchJump +440 at 0.06 s (the second note)
+    expect(p[2]).toBe(1320)
+    expect(p[10]).toBeGreaterThan(0)
+    expect(p[11]).toBeGreaterThan(0)
+    // Appended after the band's hat, so every older sound keeps its order.
+    expect(Object.keys(data.sfx).at(-1)).toBe('eventPing')
+    expect(SFX_NAMES.at(-1)).toBe('eventPing')
+    expect(data.config.throttleMs.eventPing).toBe(2000)
+    expect(t.sfx.play('eventPing')).toBe(true)
+    t.advance(1999)
+    expect(t.sfx.play('eventPing')).toBe(false)
+    t.advance(1)
+    expect(t.sfx.play('eventPing')).toBe(true)
+    expect(t.ctx.played()).toHaveLength(2)
+  })
+
   it('plays nothing before the unlock gesture, even on a running context, and does not count it', () => {
     const t = setup({ armed: false })
     expect(t.sfx.play('tap')).toBe(false)

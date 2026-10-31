@@ -1,8 +1,9 @@
 // M7 quests (spec-build2 §3, §8, §9; plan-build2 §8.4 task 7 + acceptance;
-// design-m7 §3, §4, §7): the offer scheduler ("first offer on day 3, next 2
-// days after completion, 1 day after decline", expiry, one active quest, no
-// back-to-back repeat, no draw on an empty pool), the quest stream (an offer
-// and a magic Accept never advance state.rng), targets and conditions, every
+// design-m7 §3, §4, §7): job offers — build 3 (B3 §3.1–§3.2): drawn by the
+// event deck as job cards at its draws (first at 200 s, the job cooldown
+// after a quest ends, the decline cooldown, no expiry, one active quest, no
+// back-to-back repeat, a blank draw on an empty pool), the quest stream (a
+// job template and a magic Accept never advance state.rng), targets and conditions, every
 // template's goal counter on a scripted event feed, the rewards ("cash
 // counts toward lifetime earned, lives capped at 5, star applicant appears
 // with fee 0 and leaves after 2 days", satisfaction outside the cap, the
@@ -25,13 +26,15 @@ import {
   rewardSummary,
 } from '../../src/sim/systems/quests.ts'
 import type { Parcel, Quest, QuestProgress } from '../../src/sim/types.ts'
-import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
+import { laneNode, TICKS_PER_DAY, ticksFromS } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   acceptOffer,
+  answerCards,
   buy,
   collect,
   dataFixture,
+  deckOn,
   eventLog,
   fund,
   injectParcel,
@@ -43,6 +46,7 @@ import {
   quietSim,
   replayOf,
   runTicks,
+  runUntil,
   startQuest,
   unlockDistrict,
 } from './helpers.ts'
@@ -93,14 +97,8 @@ function cleared(sim: Sim, p: Parcel, hub: string, onTime = true): void {
 }
 
 describe('quests.json (B2 §9) and the start state', () => {
-  it('ships the B2 §9 table, the quest slots empty, the first offer due on day 3', () => {
-    expect(offerDef).toEqual({
-      firstOfferDay: 3,
-      intervalDays: 2,
-      declineCooldownDays: 1,
-      offerExpiresDays: 1,
-      maxActive: 1,
-    })
+  it('ships the B2 §9 table, the quest slots empty, jobs ready from tick 0 (the deck offers them, B3 §3.2)', () => {
+    expect(offerDef).toEqual({ declineCooldownDays: 1, maxActive: 1 })
     expect(data.quests.templates.map((t) => t.id)).toEqual([
       'rush_district',
       'cheer_up',
@@ -117,7 +115,7 @@ describe('quests.json (B2 §9) and the start state', () => {
     expect(sim.state.quests).toMatchObject({
       offer: null,
       active: null,
-      nextOfferTick: 3 * DAY,
+      jobReadyTick: 0,
       ultimateNextTick: 0,
       lastOfferDay: null,
       history: [],
@@ -169,14 +167,27 @@ describe('quests.json (B2 §9) and the start state', () => {
   })
 })
 
-describe('scheduler (B2 §3.1): first offer on day 3, next 2 days after completion, 1 day after decline', () => {
-  it('first offer on day 3: none before tick 1800, one at 1800 (quest:offered, then the ticker line)', () => {
-    const sim = quietSim(1, RUSH_ONLY)
+/** Every due draw is a job while one is eligible (jobShare 1; the cadence roll is still drawn). */
+const ALWAYS_JOBS = { events: { schedule: { jobShare: 1 } } }
+/** Rush hour only, every due draw a job. */
+const RUSH_JOBS = { ...RUSH_ONLY, ...ALWAYS_JOBS }
+/** The first draw (B3 §3.2: 200 s). */
+const FIRST = ticksFromS(data.events.schedule.firstEventS)
+/** The job cooldown after a quest ends (B3 §3.2: 1 day). */
+const JOB_CD = data.events.schedule.jobCooldownDays * DAY
+
+describe('job cards (B3 §3.1–§3.2): the deck draws jobs; Accept / Decline; the cooldowns; no expiry', () => {
+  it('the first job card at firstEventS (200 s): none before tick 2000; quest:offered, its ticker line, then event:offered {kind job}; the offer never expires and the card holds the sim', () => {
+    const sim = deckOn(quietSim(1, RUSH_JOBS))
     injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
     const log = eventLog(sim)
-    runTicks(sim, 3 * DAY - 1)
+    runTicks(sim, FIRST - 1)
     expect(sim.state.quests.offer).toBeNull()
-    expect(log.filter((e) => e.name.startsWith('quest:'))).toEqual([])
+    expect(
+      log.filter(
+        (e) => e.name.startsWith('quest:') || e.name.startsWith('event:'),
+      ),
+    ).toEqual([])
     runTicks(sim, 1)
     const q = sim.state.quests.offer!
     expect(q).toMatchObject({
@@ -186,60 +197,123 @@ describe('scheduler (B2 §3.1): first offer on day 3, next 2 days after completi
       target: 'downtown',
       goal: 6,
       reward: { cash: 120, lives: 0, star: null, victory: false },
-      offeredTick: 1800,
-      expiresTick: 2400,
+      offeredTick: FIRST,
+      expiresTick: null,
       acceptedTick: null,
       deadlineTick: null,
     })
+    expect(sim.state.events.open).toMatchObject({
+      eventId: 'job:rush_district',
+      kind: 'job',
+      category: 'job',
+      questId: 'q1',
+      target: 'downtown',
+      pick: null,
+      openedTick: FIRST,
+      parentChoice: null,
+      chainHeadId: null,
+      depth: 1,
+      drawn: true,
+    })
     expect(sim.state.quests.lastOfferDay).toBe(3)
-    const at = log.filter((e) => e.tick === 1800).map((e) => e.name)
-    const i = at.indexOf('quest:offered')
-    expect(at.slice(i, i + 2)).toEqual(['quest:offered', 'ticker:news'])
-    expect(log.find((e) => e.name === 'quest:offered')?.p).toEqual({
+    const at = log.filter((e) => e.tick === FIRST)
+    const names = at.map((e) => e.name)
+    const i = names.indexOf('quest:offered')
+    expect(names.slice(i, i + 3)).toEqual([
+      'quest:offered',
+      'ticker:news',
+      'event:offered',
+    ])
+    expect(at.find((e) => e.name === 'quest:offered')?.p).toEqual({
       questId: 'q1',
       templateId: 'rush_district',
       target: 'downtown',
       ultimate: false,
     })
-    expect(
-      log.find((e) => e.name === 'ticker:news' && e.tick === 1800)?.p,
-    ).toEqual({
-      text: 'New job on the board: Rush hour',
-      kind: 'quest',
+    expect(at.find((e) => e.name === 'event:offered')?.p).toEqual({
+      eventId: 'job:rush_district',
+      kind: 'job',
+      category: 'job',
+      chain: false,
+      questId: 'q1',
     })
-    // The shipped data offers something at 3:00 too (Like clockwork needs nothing).
-    const plain = quietSim(1)
-    runTicks(plain, 3 * DAY)
-    expect(plain.state.quests.offer?.templateId).toBe('on_time_day')
+    // D-13: a job card keeps the quest's own ticker line only.
+    expect(at.filter((e) => e.name === 'ticker:news').map((e) => e.p)).toEqual([
+      { text: 'New job on the board: Rush hour', kind: 'quest' },
+    ])
+    // No expiry, no Later (Q-B3-2): the card holds the sim until answered.
+    runTicks(sim, 2 * DAY)
+    expect(sim.state.tick).toBe(FIRST)
+    expect(sim.state.quests.offer?.id).toBe('q1')
+    expect(sim.state.quests.history).toEqual([])
   })
 
-  it('next 2 days after completion', () => {
-    const sim = quietSim(2, RUSH_ONLY)
+  it('Accept = acceptQuest semantics (the deadline; the card closes decided; the draw timer restarts at close); after the quest ends the next job waits jobCooldownDays', () => {
+    const sim = deckOn(quietSim(2, RUSH_JOBS))
     injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    runTicks(sim, 3 * DAY)
+    runTicks(sim, FIRST)
+    const gap = sim.state.events.open!.gapTicks!
+    expect(gap % 10).toBe(0)
+    expect(gap).toBeGreaterThanOrEqual(600)
+    expect(gap).toBeLessThanOrEqual(1000)
+    const decided = collect(sim, 'event:decided')
     const q = acceptOffer(sim)
-    expect(q.deadlineTick).toBe(1800 + 3 * DAY)
+    expect(q.deadlineTick).toBe(FIRST + 3 * DAY)
+    expect(sim.state.quests.active?.id).toBe(q.id)
+    expect(sim.state.events.open).toBeNull()
+    expect(sim.state.events.nextDrawTick).toBe(FIRST + gap)
+    expect(decided).toEqual([
+      {
+        eventId: 'job:rush_district',
+        option: 0,
+        label: 'Accept',
+        default: false,
+        kind: 'job',
+        effects: expect.any(Array),
+      },
+    ])
+    expect(sim.state.events.history.at(-1)).toMatchObject({
+      eventId: 'job:rush_district',
+      outcome: 'decided',
+      option: 0,
+      default: false,
+      openedTick: FIRST,
+      closedTick: FIRST,
+    })
     runTicks(sim, 10)
     if (q.progress.kind !== 'deliveriesFrom') throw new Error('kind')
     q.progress.count = q.goal
     runTicks(sim, 1)
+    const done = FIRST + 11
     expect(sim.state.quests.active).toBeNull()
     expect(sim.state.quests.history.at(-1)).toMatchObject({
       id: q.id,
       outcome: 'completed',
-      tick: 1811,
+      tick: done,
     })
-    expect(sim.state.quests.nextOfferTick).toBe(1811 + 2 * DAY)
-    runTicks(sim, 2 * DAY - 1)
-    expect(sim.state.quests.offer).toBeNull()
-    runTicks(sim, 1)
-    expect(sim.state.quests.offer?.offeredTick).toBe(1811 + 2 * DAY)
+    expect(sim.state.quests.jobReadyTick).toBe(done + JOB_CD)
+    const offered = collect(sim, 'quest:offered')
+    expect(
+      runUntil(sim, () => sim.state.quests.offer !== null, 4 * DAY),
+    ).toBeGreaterThan(0)
+    expect(offered).toHaveLength(1)
+    expect(sim.state.quests.offer!.offeredTick).toBeGreaterThanOrEqual(
+      done + JOB_CD,
+    )
   })
 
-  it('1 day after decline', () => {
-    const sim = quietSim(3, RUSH_ONLY)
+  it('Decline: the card closes (decided, the default option), the decline cooldown (declineCooldownDays) — a draw inside it is a blank — then the next job', () => {
+    const sim = deckOn(
+      quietSim(3, {
+        quests: {
+          templates: RUSH_ONLY.quests.templates,
+          offer: { declineCooldownDays: 2 },
+        },
+        ...ALWAYS_JOBS,
+      }),
+    )
     injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    runTicks(sim, 3 * DAY)
+    runTicks(sim, FIRST)
     const q = sim.state.quests.offer!
     const declined = collect(sim, 'quest:declined')
     expect(sim.dispatch({ kind: 'declineQuest', questId: q.id })).toEqual({
@@ -250,54 +324,46 @@ describe('scheduler (B2 §3.1): first offer on day 3, next 2 days after completi
     ])
     expect(sim.state.quests.history.at(-1)).toMatchObject({
       outcome: 'declined',
-      tick: 1800,
+      tick: FIRST,
     })
-    expect(sim.state.quests.nextOfferTick).toBe(1800 + DAY)
-    runTicks(sim, DAY - 1)
-    expect(sim.state.quests.offer).toBeNull()
-    runTicks(sim, 1)
-    expect(sim.state.quests.offer?.offeredTick).toBe(2400)
+    expect(sim.state.events.open).toBeNull()
+    expect(sim.state.events.history.at(-1)).toMatchObject({
+      outcome: 'decided',
+      option: 1,
+      label: 'Decline',
+      default: true,
+    })
+    expect(sim.state.quests.jobReadyTick).toBe(FIRST + 2 * DAY)
+    const blanks = sim.state.events.stats.blanks
+    const offered = collect(sim, 'quest:offered')
+    runTicks(sim, 2 * DAY - 1)
+    expect(offered).toEqual([])
+    // The draw one gap (≤ 100 s) after the Decline fell inside the cooldown.
+    expect(sim.state.events.stats.blanks).toBeGreaterThan(blanks)
+    expect(
+      runUntil(sim, () => sim.state.quests.offer !== null, 2 * DAY),
+    ).toBeGreaterThan(0)
+    expect(sim.state.quests.offer!.offeredTick).toBeGreaterThanOrEqual(
+      FIRST + 2 * DAY,
+    )
   })
 
-  it('an unanswered offer expires after offerExpiresDays → quest:declined {expired} and the 1-day cooldown', () => {
-    const sim = quietSim(4, RUSH_ONLY)
+  it('maxActive 1: no job card while a quest is active (its draws are blanks); a timeout fails it (grey ticker line, no penalty), then the job cooldown', () => {
+    const sim = deckOn(quietSim(5, RUSH_JOBS))
     injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    const declined = collect(sim, 'quest:declined')
-    runTicks(sim, 3 * DAY + DAY - 1)
-    expect(sim.state.quests.offer?.id).toBe('q1')
-    runTicks(sim, 1)
-    expect(sim.state.quests.offer).toBeNull()
-    expect(declined).toEqual([
-      { questId: 'q1', templateId: 'rush_district', reason: 'expired' },
-    ])
-    expect(sim.state.quests.history).toEqual([
-      {
-        id: 'q1',
-        templateId: 'rush_district',
-        outcome: 'expired',
-        tick: 2400,
-        reason: null,
-      },
-    ])
-    runTicks(sim, DAY)
-    expect(sim.state.quests.offer).toMatchObject({
-      id: 'q2',
-      offeredTick: 3000,
-    })
-  })
-
-  it('maxActive 1: no offer while a quest is active; a timeout fails it (grey ticker line, no penalty) and the next waits intervalDays', () => {
-    const sim = quietSim(5, RUSH_ONLY)
-    injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    runTicks(sim, 3 * DAY)
+    runTicks(sim, FIRST)
     const q = acceptOffer(sim)
     const money = sim.state.economy.balance
     const failed = collect(sim, 'quest:failed')
     const news = collect(sim, 'ticker:news')
+    const offered = collect(sim, 'quest:offered')
+    const blanks = sim.state.events.stats.blanks
     runTicks(sim, 3 * DAY)
     expect(sim.state.tick).toBe(q.deadlineTick)
     expect(sim.state.quests.active?.id).toBe(q.id)
     expect(sim.state.quests.offer).toBeNull()
+    expect(offered).toEqual([])
+    expect(sim.state.events.stats.blanks).toBeGreaterThan(blanks)
     runTicks(sim, 1)
     expect(sim.state.quests.active).toBeNull()
     expect(failed).toEqual([
@@ -310,59 +376,73 @@ describe('scheduler (B2 §3.1): first offer on day 3, next 2 days after completi
       outcome: 'failed',
       reason: 'timeout',
     })
-    expect(sim.state.quests.nextOfferTick).toBe(q.deadlineTick! + 1 + 2 * DAY)
+    expect(sim.state.quests.jobReadyTick).toBe(q.deadlineTick! + 1 + JOB_CD)
     // No penalty (Q-B2-7): only payroll moved the balance.
     const payroll = sim.state.employees.reduce((s, e) => s + e.salaryPerDay, 0)
     expect(sim.state.economy.balance).toBe(money - 3 * payroll)
   })
 
-  it('no back-to-back repeat: the newest history template is left out while another is eligible', () => {
+  it('no back-to-back repeat: the newest history template is left out while another is eligible (seeds 1–10)', () => {
     for (let seed = 1; seed <= 10; seed++) {
-      const sim = quietSim(seed)
+      const sim = deckOn(quietSim(seed, ALWAYS_JOBS))
       injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-      runTicks(sim, 3 * DAY)
+      runTicks(sim, FIRST)
       const first = sim.state.quests.offer!
       expect(['rush_district', 'on_time_day']).toContain(first.templateId)
       sim.dispatch({ kind: 'declineQuest', questId: first.id })
-      runTicks(sim, DAY)
+      expect(
+        runUntil(sim, () => sim.state.quests.offer !== null, 3 * DAY),
+      ).toBeGreaterThan(0)
       const second = sim.state.quests.offer!
       expect(second.templateId).not.toBe(first.templateId)
       expect(['rush_district', 'on_time_day']).toContain(second.templateId)
     }
   })
 
-  it('an empty pool offers nothing and draws nothing; the next tick with an eligible template offers with one quest-stream draw', () => {
+  it('an empty pool: the due draw is a blank (no job roll, no quest-stream draw — one cadence draw, the gap); the next draw with an eligible template offers with one quest-stream draw', () => {
     // Like clockwork locked to L2: nothing at L1 is eligible in a quiet city.
-    const sim = quietSim(6, {
-      quests: { templates: [{}, {}, {}, {}, { unlockLevel: 2 }] },
-    })
+    const sim = deckOn(
+      quietSim(6, {
+        quests: { templates: [{}, {}, {}, {}, { unlockLevel: 2 }] },
+        ...ALWAYS_JOBS,
+      }),
+    )
     const word = sim.state.quests.rng
-    runTicks(sim, 3 * DAY + 200)
+    const cadence = sim.state.events.rng
+    runTicks(sim, FIRST)
     expect(sim.state.quests.offer).toBeNull()
+    expect(sim.state.events.open).toBeNull()
+    expect(sim.state.events.stats.blanks).toBe(1)
     expect(sim.state.quests.rng).toBe(word)
-    expect(sim.state.quests.nextOfferTick).toBe(3 * DAY)
+    expect(sim.state.events.rng).toBe(afterDraws(cadence, 1))
     expect(eligibleTemplates(sim)).toEqual([])
     injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
-    runTicks(sim, 1)
+    const next = sim.state.events.nextDrawTick
+    expect(
+      runUntil(sim, () => sim.state.quests.offer !== null, 2 * DAY),
+    ).toBeGreaterThan(0)
+    expect(sim.state.tick).toBe(next)
     expect(sim.state.quests.offer?.templateId).toBe('rush_district')
     expect(sim.state.quests.rng).toBe(afterDraws(word, 1))
+    expect(sim.state.events.rng).toBe(afterDraws(cadence, 3))
   })
 })
 
-describe('the quest stream: offers and a magic Accept never advance state.rng (design-m7 §3.6)', () => {
-  it('quiet city: the offer is one quest-stream draw, the magic route ≤ 2; the main word never moves', () => {
-    const sim = quietSim(7)
+describe('the quest stream: job templates and a magic Accept never advance state.rng (design-m7 §3.6; B3 D-2)', () => {
+  it('quiet city: a job card is one quest-stream draw, the magic route ≤ 2; the main word never moves', () => {
+    const sim = deckOn(quietSim(7, ALWAYS_JOBS))
     buy(sim, 'bike')
     sim.state.lane.quarantine.count = 1 // a first Toss happened
     const main = sim.state.rng
-    runTicks(sim, 3 * DAY - 1)
+    runTicks(sim, FIRST - 1)
     const quest = sim.state.quests.rng
     runTicks(sim, 1)
     expect(sim.state.quests.offer).not.toBeNull()
     expect(sim.state.rng).toBe(main)
     expect(sim.state.quests.rng).toBe(afterDraws(quest, 1))
+    sim.dispatch({ kind: 'declineQuest', questId: sim.state.quests.offer!.id })
     const before = sim.state.quests.rng
-    offerQuest(sim, 'magic_parcel') // a debug offer draws nothing
+    offerQuest(sim, 'magic_parcel') // a debug job card draws nothing
     expect(sim.state.quests.rng).toBe(before)
     const q = acceptOffer(sim)
     expect(q.progress).toMatchObject({ kind: 'magicParcel' })
@@ -372,18 +452,18 @@ describe('the quest stream: offers and a magic Accept never advance state.rng (d
     )
   })
 
-  it('a live run: the main word at the offer and after a magic Accept equals a run whose offers the test skipped', () => {
+  it('a live run: the main word with job cards answered equals a deck-off run (seeds 1, 4, 9)', () => {
     for (const seed of [1, 4, 9]) {
-      const a = makeSim(seed)
-      const b = makeSim(seed)
+      const a = deckOn(makeSim(seed, ALWAYS_JOBS))
+      const b = makeSim(seed, ALWAYS_JOBS)
       for (const sim of [a, b]) openingA(sim, 'pool')
-      noOffers(b)
-      runTicks(a, 3 * DAY)
-      runTicks(b, 3 * DAY)
+      runTicks(a, FIRST)
+      runTicks(b, FIRST)
       expect(a.state.quests.offer).not.toBeNull()
       expect(b.state.quests.offer).toBeNull()
       expect(a.state.rng).toBe(b.state.rng)
       expect(a.state.parcels).toEqual(b.state.parcels)
+      a.dispatch({ kind: 'declineQuest', questId: a.state.quests.offer!.id })
       a.state.lane.quarantine.count = Math.max(1, a.state.lane.quarantine.count)
       offerQuest(a, 'magic_parcel')
       const res = a.dispatch({
@@ -839,31 +919,30 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
     expect(isCommand({ kind: 'declineQuest' })).toBe(false)
   })
 
-  it('acceptQuest: invalid, quest-expired (expired / withdrawn), quest-active, game over', () => {
-    const sim = quietSim(1, RUSH_ONLY)
+  it('acceptQuest: invalid, quest-expired (withdrawn — job offers never expire, B3 §3.2), quest-active, game over', () => {
+    const sim = noOffers(quietSim(1, RUSH_ONLY))
     injectParcel(sim, 'dt_registry_tower', 'hr_towers_a')
     expect(sim.dispatch({ kind: 'acceptQuest', questId: 'q1' })).toEqual({
       ok: false,
       reason: 'invalid',
     })
-    runTicks(sim, 4 * DAY) // q1 offered at 3:00, expired at 4:00
-    expect(sim.state.quests.history.at(-1)?.outcome).toBe('expired')
+    offerQuest(sim, 'rush_district') // q1, a job card
+    offerQuest(sim, 'big_haul') // q2 withdraws q1 and closes its card
+    expect(sim.state.quests.history.at(-1)).toMatchObject({
+      id: 'q1',
+      outcome: 'withdrawn',
+    })
+    expect(sim.state.events.history.at(-1)).toMatchObject({
+      eventId: 'job:rush_district',
+      outcome: 'withdrawn',
+      option: null,
+    })
+    expect(sim.state.events.open?.eventId).toBe('job:big_haul')
     expect(sim.dispatch({ kind: 'acceptQuest', questId: 'q1' })).toEqual({
       ok: false,
       reason: 'quest-expired',
     })
-    noOffers(sim)
-    offerQuest(sim, 'rush_district') // q2
-    offerQuest(sim, 'big_haul') // q3 withdraws q2
-    expect(sim.state.quests.history.at(-1)).toMatchObject({
-      id: 'q2',
-      outcome: 'withdrawn',
-    })
-    expect(sim.dispatch({ kind: 'acceptQuest', questId: 'q2' })).toEqual({
-      ok: false,
-      reason: 'quest-expired',
-    })
-    acceptOffer(sim) // q3 active
+    acceptOffer(sim) // q2 active
     // The ultimate waits in the offer slot while a quest is active.
     sim.state.level.level = 5
     runTicks(sim, 1)
@@ -880,10 +959,11 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
     })
   })
 
-  it('acceptQuest of a magic offer nobody can carry: withdrawn (logged), quest-expired, the decline cooldown', () => {
+  it('acceptQuest of a magic offer nobody can carry: withdrawn with its card (logged), quest-expired, the decline cooldown', () => {
     const sim = noOffers(quietSim(1))
     const q = offerQuest(sim, 'magic_parcel')
     const declined = collect(sim, 'quest:declined')
+    const withdrawn = collect(sim, 'event:withdrawn')
     const res = sim.dispatch({ kind: 'acceptQuest', questId: q.id })
     expect(res).toEqual({ ok: false, reason: 'quest-expired', applied: true })
     expect(sim.commandLog.at(-1)?.cmd).toEqual({
@@ -898,7 +978,14 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
       reason: 'unavailable',
     })
     expect(sim.state.quests.offer).toBeNull()
-    expect(sim.state.quests.nextOfferTick).toBe(sim.state.tick + DAY)
+    // Its job card closed as withdrawn (critique 18: once).
+    expect(sim.state.events.open).toBeNull()
+    expect(withdrawn).toEqual([{ eventId: 'job:magic_parcel' }])
+    expect(sim.state.events.history).toMatchObject([
+      { eventId: 'job:magic_parcel', outcome: 'withdrawn', option: null },
+    ])
+    expect(sim.state.events.stats.withdrawn).toBe(1)
+    expect(sim.state.quests.jobReadyTick).toBe(sim.state.tick + DAY)
   })
 
   it('declineQuest: invalid for another id and for the ultimate (Later only)', () => {
@@ -917,7 +1004,7 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
     })
   })
 
-  it('abandonQuest: invalid with none; abandons with no ticker line, the next offer after intervalDays', () => {
+  it('abandonQuest: invalid with none; abandons with no ticker line, the next job after jobCooldownDays', () => {
     const sim = noOffers(quietSim(1))
     expect(sim.dispatch({ kind: 'abandonQuest' })).toEqual({
       ok: false,
@@ -935,7 +1022,7 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
       outcome: 'abandoned',
       reason: 'abandoned',
     })
-    expect(sim.state.quests.nextOfferTick).toBe(sim.state.tick + 2 * DAY)
+    expect(sim.state.quests.jobReadyTick).toBe(sim.state.tick + JOB_CD)
   })
 
   it('debugOfferQuest: invalid id, quest-active; ignores unlockLevel / condition / requires; the debug target fallbacks', () => {
@@ -960,12 +1047,10 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
 
   it('ViewSim: quests() views, quest.accept / decline / abandon, debug.offerQuest, victory', () => {
     const sim = noOffers(quietSim(1))
-    sim.state.quests.nextOfferTick = 1800
     const vs = createViewSim(sim, { debug: true })
     expect(vs.quests()).toMatchObject({
       offer: null,
       active: null,
-      nextOfferInTicks: 1800,
       victory: false,
       victoryTick: null,
     })
@@ -977,7 +1062,7 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
       flavour: 'Node Heights is swamped — get their parcels moving',
       kind: 'deliveriesFrom',
       progress01: 0,
-      ticksLeft: DAY,
+      ticksLeft: null, // a job offer never expires (B3 §3.2)
       limitTicks: 3 * DAY,
       targetName: 'Node Heights',
       route: null,
@@ -998,13 +1083,13 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
   })
 })
 
-/** A run where every offer is accepted at once (the policy rule, written here). */
+/** A deck-on run where every job card is accepted at once (the policy rule, written here). */
 function questRun(
   seed: number,
   ticks: number,
   saveAt?: number,
 ): { sim: Sim; snap: string | null } {
-  const sim = makeSim(seed)
+  const sim = deckOn(makeSim(seed))
   openingA(sim, 'pool')
   let snap: string | null = null
   for (let t = 0; t < ticks; t++) {
@@ -1012,6 +1097,7 @@ function questRun(
     if (o && sim.state.quests.active === null) {
       sim.dispatch({ kind: 'acceptQuest', questId: o.id })
     }
+    answerCards(sim, 'default') // anything else still open
     if (saveAt !== undefined && t === saveAt) {
       snap = JSON.stringify(sim.snapshot())
     }

@@ -106,6 +106,7 @@ import {
 import type { RunResult } from '../../tools/sim/cli.ts'
 import type { GateCheck, RecordedEvent } from '../../tools/sim/report.ts'
 import {
+  BASELINE_KEYS,
   baselineLine,
   checkMetrics,
   checkOk,
@@ -115,6 +116,7 @@ import {
   formatGate,
   Highlights,
   gateMarkdown,
+  LEVEL_BASELINE_BAND,
   levelWindowMinutes,
   median,
   questMetrics,
@@ -122,6 +124,7 @@ import {
   summarise,
   windowNote,
   withinBand,
+  withinShift,
 } from '../../tools/sim/report.ts'
 import {
   collect,
@@ -560,6 +563,12 @@ describe('competent policy (spec §7) [gate]', () => {
       ['firstOverseasClearedAfterLevel3MaxMin', null],
       ['level4Min', null],
       ['level5Min', null],
+      // Build 3 (B3 §3.9): gated once M12 flips SIM_FEATURES.events.
+      ['eventsOfferedBy30MinMin', 'informational (M12)'],
+      ['eventsOpenMaxTicks', 'informational (M12)'],
+      ['eventsL1PlateauMin', 'informational (M12)'],
+      ['policyEvPerCard', 'informational (M12)'],
+      ['policyNonDefaultShare', 'informational (M12)'],
     ])
     expect(
       g.checks
@@ -570,7 +579,7 @@ describe('competent policy (spec §7) [gate]', () => {
     expect(g.pass).toBe(true)
   }, 60_000)
 
-  it('M8 acceptance (plan-build2 §8.5): L3 median in [15, 20] min and the first overseas clearance ≤ 3 min after L3 (median); every seed reaches L3 and clears overseas', () => {
+  it('M8 acceptance (plan-build2 §8.5; build 3 windows): L3 median inside level3Min and the first overseas clearance ≤ 3 min after L3 (median); every seed reaches L3 and clears overseas', () => {
     const m = runs().map((r) => r.result.metrics)
     for (const x of m) {
       expect(x.level3Min, `seed ${x.seed}`).not.toBeNull()
@@ -589,7 +598,7 @@ describe('competent policy (spec §7) [gate]', () => {
     ).toBeLessThanOrEqual(targets.firstOverseasClearedAfterLevel3MaxMin)
   }, 60_000)
 
-  it('M9 acceptance (plan-build2 §8.6): L4 median in [20, 25] min and L5 median in [25, 30] min; L4 never before L3, L5 never before L4 (per-seed minutes printed)', () => {
+  it('M9 acceptance (plan-build2 §8.6; build 3 windows): L4 median inside level4Min and L5 median inside level5Min; L4 never before L3, L5 never before L4 (per-seed minutes printed)', () => {
     const m = runs().map((r) => r.result.metrics)
     console.log(
       `[policy] L3/L4/L5 min by seed: ${m.map((x) => `${x.seed}:${x.level3Min ?? '—'}/${x.level4Min ?? '—'}/${x.level5Min ?? '—'}`).join(' ')}`,
@@ -615,7 +624,7 @@ describe('competent policy (spec §7) [gate]', () => {
     }
   }, 60_000)
 
-  it('L2 median in [8, 15] min (lifetime earned reaches the levels.json threshold)', () => {
+  it('L2 median inside level2Min (build 3: 7-13.5 min; lifetime earned reaches the levels.json threshold)', () => {
     const l2 = runs().map((r) => r.result.metrics.level2Min)
     for (const [i, m] of l2.entries()) {
       expect(m, `seed ${SEEDS[i]}`).not.toBeNull()
@@ -1776,7 +1785,7 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     expect(summarise(broken, meta('delegating')).pass).toBe(false)
   })
 
-  it('--baseline: the Δ% of the seven medians and "playtest-1 rows within ±5 %" (both never = within, a 0 baseline compares absolutely)', () => {
+  it('--baseline: the Δ% of the playtest-1 medians and L3-L5, "within band" — ±5 % for the playtest-1 rows, −12…−8 % for the level rows (B3 §2.1; both never = within, a 0 baseline compares absolutely)', () => {
     expect(withinBand(13.05, 12.28)).toBe(false) // −5.9 %
     expect(withinBand(2.1, 2.0)).toBe(true) // −4.8 %
     expect(withinBand(0, 0)).toBe(true)
@@ -1803,20 +1812,49 @@ describe('the gate report, build 2 (tools/sim/report.ts + cli.ts; design §5.3)'
     ])
     expect(b.within).toBe(false)
     expect(baselineLine(b)).toBe(
-      'playtest-1 rows within ±5 %: no (rows: level2Min -5.9%, maxLivesLost —)',
+      'baseline rows within band (±5 %; level rows −12…−8 %): no (rows: level2Min -5.9%, maxLivesLost —)',
     )
+    // The level rows are meant to move −8…−12 % (B3 §2.1).
+    expect(withinShift(13.05, 13.05 * 0.9, [-0.12, -0.08])).toBe(true)
+    expect(withinShift(13.05, 13.05 * 0.95, [-0.12, -0.08])).toBe(false)
+    expect(withinShift(null, null, [-0.12, -0.08])).toBe(true)
     const g = summarise(
       runs().map((r) => r.result),
       meta('competent'),
     )
     g.baseline = compareBaseline(g, g, 'self.json')
+    expect(g.baseline.rows.map((r) => r.key)).toEqual(
+      BASELINE_KEYS.filter((k) => g.checks.some((c) => c.key === k)),
+    )
+    // Against itself the playtest-1 rows hold and the level rows did not move.
+    expect(g.baseline.rows.filter((r) => !r.within).map((r) => r.key)).toEqual([
+      'level2Min',
+      'level3Min',
+      'level4Min',
+      'level5Min',
+    ])
+    // A baseline 10 % slower on every level row: every row within band.
+    const slower = {
+      dataHash: 'b2',
+      checks: g.checks.map((c) =>
+        LEVEL_BASELINE_BAND[c.key as keyof typeof LEVEL_BASELINE_BAND] &&
+        c.value !== null
+          ? { ...c, value: c.value / 0.9 }
+          : c,
+      ),
+    }
+    g.baseline = compareBaseline(g, slower, 'b2.json')
     expect(g.baseline.within).toBe(true)
-    expect(baselineLine(g.baseline)).toBe('playtest-1 rows within ±5 %: yes')
-    const md = gateMarkdown(g, 'vlr sim:gate -- --baseline self.json')
+    expect(baselineLine(g.baseline)).toBe(
+      'baseline rows within band (±5 %; level rows −12…−8 %): yes',
+    )
+    const md = gateMarkdown(g, 'vlr sim:gate -- --baseline b2.json')
     expect(md).toContain(
       '| window | median | target | result | Δ% vs baseline |',
     )
-    expect(md).toContain('playtest-1 rows within ±5 %: yes')
+    expect(md).toContain(
+      'baseline rows within band (±5 %; level rows −12…−8 %): yes',
+    )
   }, 60_000)
 
   it('cli: the per-run quests line (offers / completions by 30 min, the plateau, magic, per template)', () => {
@@ -1942,7 +1980,10 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
       level3Min: [null, false],
       firstOverseasClearedAfterLevel3MaxMin: [null, false],
     })
-    expect(rows({ level3Min: 14.9 }).level3Min).toEqual([null, false])
+    expect(rows({ level3Min: targets.level3Min[0] - 0.1 }).level3Min).toEqual([
+      null,
+      false,
+    ])
     expect(rows({ level3Min: null }).level3Min).toEqual([null, false])
     expect(rows({ minutes: 20, quick: true })).toMatchObject({
       level3Min: ['informational (quick)', true],
@@ -1973,12 +2014,22 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
     ])
     // M9: levels45 on — L4/L5 gate (null = never reached = fail).
     expect(SIM_FEATURES.levels45).toBe(true)
-    expect(rows({ minutes: 30, level4Min: 22, level5Min: 28 })).toMatchObject({
+    expect(
+      rows({
+        minutes: 30,
+        level4Min: targets.level4Min[1] - 0.5,
+        level5Min: targets.level5Min[1] - 0.5,
+      }),
+    ).toMatchObject({
       level4Min: [null, true],
       level5Min: [null, true],
     })
     expect(
-      rows({ minutes: 30, level4Min: 25.5, level5Min: 24.9 }),
+      rows({
+        minutes: 30,
+        level4Min: targets.level4Min[1] + 0.5,
+        level5Min: targets.level5Min[0] - 0.1,
+      }),
     ).toMatchObject({
       level4Min: [null, false],
       level5Min: [null, false],
@@ -1987,8 +2038,9 @@ describe('the gate report, M8 (tools/sim/report.ts + cli.ts; design-m8-m9 §5.3)
       'informational (quick)',
       false,
     ])
-    expect(rows({ minutes: 29 }).level5Min).toEqual([
-      'informational (run < 30 min)',
+    const l5End = targets.level5Min[1]
+    expect(rows({ minutes: Math.ceil(l5End) - 1 }).level5Min).toEqual([
+      `informational (run < ${l5End} min)`,
       false,
     ])
     const m8 = { ...SIM_FEATURES, levels45: false }

@@ -14,20 +14,26 @@
 //   80     objective (≤ 2 lines, questText.objectiveText)
 //   112    reward (`Reward: …`, the sim's rewardSummary; one line — the
 //          district drops off when it would overflow)
-//   126    time (`Time: 3 days · offer ends in 18h` / `Time left: 1d 12h`)
+//   126    time (`Time: 3 days · waiting for you` / `Time left: 1d 12h`)
 //   140    an offer that waits on the active quest: `Finish "Rush hour" first`
 //   144    gold progress bar, 8 px (active; full when complete)
-//   160    buttons, 44 px: offer `Accept` (primary 120, x 6) · `Later` (72,
-//          x 134) · `Decline` (72, x 214); the Golden Release offer has no
-//          Decline (Later only, spec-core §8); active `Abandon` (red 96,
-//          x 6; a confirm Dialog) · `Close` (120, right); complete `OK`.
-// It never pauses the sim (B2 §3.1 "the sim keeps running") but sits on the
-// modal stack while open, so the Newspaper waits and Esc / Enter come here:
-// Esc and a tap outside (a transparent full-screen scrim) are Later on an
-// offer, Close otherwise; Enter is Accept / Close / OK.
+//   160    buttons, 44 px: a job offer `Accept` (primary 120, x 6) ·
+//          `Decline` (72, at the right edge: x 214); the Golden Release
+//          offer `Accept` · `Later` (72, x 134) — no Decline (spec-core §8);
+//          active `Abandon` (red 96, x 6; a confirm Dialog) · `Close` (120,
+//          right); complete `OK`.
+// It sits on the modal stack while open, so the Newspaper waits and Esc /
+// Enter come here: Esc and a tap outside (a transparent full-screen scrim)
+// hide an offer (Later), Close otherwise; Enter is Accept / Close / OK.
+// Build 3 interim (M11, D-18 — the EventCard replaces it for jobs in M12): a
+// regular offer is a job card the sim holds on (B3 §3.2, §6), so it has no
+// Later and no expiry (`waiting for you`); Esc / outside only hide the card
+// (the sim stays held, the quest chip reopens it) and Accept / Decline go
+// through acceptQuest / declineQuest, which commands.ts routes to the card's
+// decideEvent. The Golden Release keeps its standing offer and Later.
 //
-// Callbacks: every user dismissal calls exactly one of them — Later (button,
-// Esc, outside) → onLater; Decline → onDecline(id); a confirmed Abandon →
+// Callbacks: every user dismissal calls exactly one of them — Later / hide
+// (button, Esc, outside) → onLater; Decline → onDecline(id); a confirmed Abandon →
 // onAbandon(id); Close / OK (button, Esc, outside, Enter) → onClose — and
 // the card closes itself first. Accept → onAccept(id) and the card STAYS
 // open: the caller closes it on success (`close()`) or calls `deny(text)`
@@ -58,6 +64,7 @@ import {
   formatCountdown,
   formatQuestDays,
   formatQuestTime,
+  JOB_WAITING_TEXT,
   objectiveText,
   questTicksLeftAt,
   rewardText,
@@ -177,7 +184,9 @@ export function questCardRect(
  * The button row (card-local x and width; y = QUEST_CARD_ROWS.buttons, h 44)
  * for a card `w` px wide: left to right from x 6 with 8-px gaps (Accept 6,
  * Later 134, Decline 214 at 300); a lone button is centred; Close sits at
- * the right edge (14 px in). A narrow card shrinks the first button.
+ * the right edge (14 px in), and so does Decline when there is no Later (a
+ * job offer: Accept 6, Decline 214 — the same tap as before). A narrow card
+ * shrinks the first button.
  */
 export function questCardButtonRects(
   w: number,
@@ -203,6 +212,9 @@ export function questCardButtonRects(
   })
   const close = out.find((r) => r.name === 'close')
   if (close) close.x = w - BTN_RIGHT - close.w
+  const decline = out.find((r) => r.name === 'decline')
+  if (decline && !buttons.includes('later'))
+    decline.x = w - BTN_RIGHT - decline.w
   return out
 }
 
@@ -238,10 +250,12 @@ export function questMasthead(
 }
 
 /**
- * The time row: an offer shows what the quest gives and when the offer
- * ends (`Time: 3 days · offer ends in 18h`; the magic parcel `Time: 2:00`;
- * the Golden Release never expires), an active quest its time left, a
- * completed one the day it was done.
+ * The time row: an offer shows what the quest gives and, while it has an
+ * expiry, when the offer ends (`Time: 3 days · offer ends in 18h`; the
+ * magic parcel `Time: 2:00`); build 3 job offers never expire — the sim
+ * waits on the card (`Time: 3 days · waiting for you`, D-18) — and the
+ * Golden Release's offer stands (`· the offer stays open`); an active quest
+ * shows its time left, a completed one the day it was done.
  */
 export function questTimeText(
   q: QuestView,
@@ -260,7 +274,10 @@ export function questTimeText(
   const allow = magic
     ? formatCountdown(q.limitTicks)
     : formatQuestDays(q.limitTicks)
-  if (left === null) return `Time: ${allow} · the offer stays open`
+  if (left === null)
+    return q.ultimate
+      ? `Time: ${allow} · the offer stays open`
+      : `Time: ${allow} · ${JOB_WAITING_TEXT}`
   return `Time: ${allow} · offer ends in ${formatQuestTime(left)}`
 }
 
@@ -273,14 +290,16 @@ export function questBarValue(q: QuestView, tick: number): number {
   return Math.min(1, Math.max(0, q.progress01))
 }
 
-/** The buttons of a mode, left to right (the Golden Release: no Decline). */
+/** The buttons of a mode, left to right (a job: no Later; the Golden Release: no Decline). */
 export function questCardButtons(
   q: Pick<QuestView, 'ultimate'>,
   mode: QuestCardMode,
 ): QuestCardButton[] {
   if (mode === 'complete') return ['ok']
   if (mode === 'active') return ['abandon', 'close']
-  return q.ultimate ? ['accept', 'later'] : ['accept', 'later', 'decline']
+  // Build 3 (D-18): a job offer is Accept / Decline only (no Later — the
+  // sim waits on the card); the Golden Release keeps Later, never Decline.
+  return q.ultimate ? ['accept', 'later'] : ['accept', 'decline']
 }
 
 /**
@@ -322,19 +341,24 @@ export function questCardModel(
   }
 }
 
-/** The Abandon confirm (design-m7 §6.3): no penalty, and when the next job comes. */
+/**
+ * The Abandon confirm (design-m7 §6.3): no penalty, and when another job
+ * can come (build 3: events.json schedule.jobCooldownDays after a quest
+ * ends — then a draw brings it, B3 §3.2) or the Golden Release comes back.
+ */
 export function abandonDialogText(
   data: GameData,
   q: Pick<QuestView, 'name' | 'ultimate'>,
 ): { title: string; text: string } {
-  const o = data.quests.offer
-  const days = q.ultimate ? o.declineCooldownDays : o.intervalDays
+  const days = q.ultimate
+    ? data.quests.offer.declineCooldownDays
+    : data.events.schedule.jobCooldownDays
   const when = formatQuestDays(Math.round(days * TICKS_PER_DAY))
   return {
     title: `Abandon ${q.name}?`,
     text: q.ultimate
       ? `No penalty — it comes back in ${when}.`
-      : `No penalty — the next job comes in ${when}.`,
+      : `No penalty — you can take another job in ${when}.`,
   }
 }
 
@@ -342,6 +366,7 @@ export function abandonDialogText(
 
 export interface QuestCardOptions {
   onAccept(id: string): void
+  /** Later on the Golden Release, or Esc / outside on any offer (it only hides). */
   onLater(): void
   onDecline(id: string): void
   onAbandon(id: string): void
@@ -821,10 +846,17 @@ export class QuestCard {
     })
   }
 
-  /** Esc / a tap outside: Later on an offer, OK when complete, Close otherwise. */
+  /**
+   * Esc / a tap outside: an offer hides (the Golden Release's Later; a job
+   * offer — no Later button — only hides too: the sim stays held on its card
+   * and the chip reopens it, D-18), OK when complete, Close otherwise.
+   */
   private outside(): void {
-    if (this.cardMode === 'offer') this.tap('later')
-    else this.tap(this.cardMode === 'complete' ? 'ok' : 'close')
+    if (this.cardMode === 'offer') {
+      if (!this.q) return
+      this.close()
+      this.opts.onLater()
+    } else this.tap(this.cardMode === 'complete' ? 'ok' : 'close')
   }
 
   /** Enter: Accept on an offer, Close / OK otherwise. */

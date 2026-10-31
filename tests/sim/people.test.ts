@@ -16,9 +16,13 @@ import {
   driverNumbers,
   effectiveP,
   FACE_LOOKS,
+  giftStarName,
   hireFeeOf,
+  hireStar,
   inspectorNumbers,
+  resyncDesks,
   salaryOf,
+  setPip,
   sorterNumbers,
 } from '../../src/sim/systems/people.ts'
 import { speedPerTick } from '../../src/sim/systems/vehicles.ts'
@@ -938,5 +942,64 @@ describe('roles of the ViewSim (design §3.4)', () => {
       kind: null,
       sorter: null,
     })
+  })
+})
+
+describe('build 3 event helpers (B3 §3.5; M11 stream C)', () => {
+  it('setPip: a permanent change clamped to 1–5 (charisma 0–2), the salary kept; a stat the role lacks is left alone', () => {
+    const sim = quietSim(1)
+    const e = sim.state.employees[0]!
+    const salary = e.salaryPerDay
+    setPip(e, 'eye', 4)
+    setPip(e, 'charisma', 5)
+    setPip(e, 'pace', -9)
+    expect(e.pips).toEqual({ eye: 5, pace: 1, charisma: 2 })
+    setPip(e, 'speed', 1)
+    expect(e.pips).toEqual({ eye: 5, pace: 1, charisma: 2 })
+    expect(e.salaryPerDay).toBe(salary)
+    resyncDesks(sim)
+    expect(auditState(sim.state, sim.data)).toEqual([])
+  })
+
+  it('hireStar: seated outside the pools — no pool change, fee 0, the normal salary, ★, the look one people-stream draw', () => {
+    const sim = fund(quietSim(1), 500)
+    const s = sim.state
+    const pools = structuredClone([
+      s.applicants.inspector,
+      s.applicants.sorter,
+      s.applicants.driver,
+    ])
+    const word = s.applicants.rng
+    const balance = s.economy.balance
+    const nextApplicant = s.nextId.applicant
+    const refreshed = collect(sim, 'applicants:refreshed')
+    const def = {
+      role: 'inspector' as const,
+      name: 'Audrey',
+      pips: { eye: 4, pace: 4, charisma: 1 },
+    }
+    expect(giftStarName(s, def)).toBe('Audrey 2') // Audrey is on the staff
+    const e = hireStar(sim, def, { nodeId: 'slot1' })
+    expect(e).toMatchObject({
+      name: 'Audrey 2',
+      role: 'inspector',
+      star: true,
+      nodeId: 'slot1',
+      pips: def.pips,
+      salaryPerDay: salaryOf(data, 'inspector', def.pips),
+    })
+    expect(e.look).toBeGreaterThanOrEqual(0)
+    expect(e.look).toBeLessThan(FACE_LOOKS)
+    expect(s.economy.balance).toBe(balance)
+    expect([
+      s.applicants.inspector,
+      s.applicants.sorter,
+      s.applicants.driver,
+    ]).toEqual(pools)
+    expect(refreshed).toEqual([])
+    expect(s.nextId.applicant).toBe(nextApplicant + 1)
+    expect(s.applicants.rng).not.toBe(word)
+    expect(laneNode(s.lane, 'slot1')!.stations).toHaveLength(2)
+    expect(auditState(s, sim.data)).toEqual([])
   })
 })

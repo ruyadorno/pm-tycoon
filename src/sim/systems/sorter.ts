@@ -5,8 +5,9 @@
 // player Clears (Q-B2-3, `roles.sorter.canClear: false` is schema-forced and
 // this module has no clear path).
 //
-// Sorter (an active, seated employee; nothing while walked out or after game
-// over): its candidate is the OLDEST held parcel (Hold Bay arrival order)
+// Sorter (an active, seated employee; nothing while walked out, while absent
+// — build 3, B3 §3.5 — or after game over): its candidate is the OLDEST held
+// parcel (Hold Bay arrival order)
 // that is not magic, not yet judged (`sorted`) and not touched by the player
 // in the last playerGraceS. The clock starts when a candidate waits
 // (nextDecisionTick = now + decisionS by pace — so a parcel never vanishes on
@@ -35,7 +36,7 @@
 import type { GameData } from '../../data/types.ts'
 import type { Sim } from '../sim.ts'
 import type { Parcel } from '../types.ts'
-import { ticksFromS } from '../types.ts'
+import { isAbsent, ticksFromS } from '../types.ts'
 import { tossParcel } from './holdbay.ts'
 import { holdNode } from './lane.ts'
 import { employeeById, sorterNumbers } from './people.ts'
@@ -99,7 +100,9 @@ function sorterStep(sim: Sim, employeeId: number): void {
   const s = sim.state
   const hs = s.lane.holdStation
   const e = employeeById(s, employeeId)
-  if (!e || !e.active) {
+  // Build 3 (B3 §3.5): an absent sorter (an event sent them home) calls
+  // nothing until effects.ts absenceStep brings them back.
+  if (!e || !e.active || isAbsent(e, s.tick)) {
     hs.nextDecisionTick = null
     return
   }

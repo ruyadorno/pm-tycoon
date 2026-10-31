@@ -1,63 +1,79 @@
 # Sim gate — PASS
 
-`vlr sim:gate -- --minutes 35` · seeds 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 × 35 min · policy `competent` · data `0af23d08`
+`vlr sim:gate -- --minutes 35` · seeds 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 × 35 min · policy `competent` · events off · data `65a18544`
+
+policy weights ($): money 1 · life 600 (the last −∞) · sat/pt 6 · vehicle gain ×0.5 · quit 200 · absent/day 60 · wanted 80 · cap 1 · chain -20 · parcels spawn ×1 lost 20 · pips eye 150 judgement 100 speed 120 pace 60 energy 60 charisma 40 · mod speed 500 stop 150 inspectorP 900 machineP 500 processS 150 payrollMult 120 payrollAdd 1 income 350 malwareShare 1500 decoyShare 150 spawn 300 tossBounty 40 wrongTossFee 20 vehiclePrice 150 machinePrice 120 onTimeMaxS 1 clearanceS 80 shelfCap 1 · evBand -20…40 · evMax 400 · nonDefault ≥ 0.4.
 
 Thresholds: `economy.pacingTargets` (spec §7, plan.md §6.9.2). Medians must pass; null = never happened.
 
-| seed | firstDel_s | catch_s | L2_min | truck+min | lives | shelfStall_s | hold/10m@L1 | hold/10m | script_s | wrong | mal@end | pay% | sorter d/w/m | qOff | qDone | q7-13 | L3_min | ovs+min | L4_min | L5_min | GR_min | result |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 54.3 | 150.5 | 11.19 | 1.70 | 0 | 0.0 | 8.94 | 25.43 | 150.5 | 43 | 13.0% | 20.6 | 0/0/0 | 7 | 4 | 1 | 17.10 | 1.82 | 22.33 | 28.39 | 28.39 | PASS |
-| 2 | 55.6 | 185.4 | 11.98 | 3.81 | 0 | 0.0 | 8.35 | 23.43 | 185.4 | 40 | 13.0% | 20.4 | 0/0/0 | 7 | 3 | 1 | 19.59 | 2.28 | 23.44 | 28.22 | 28.22 | PASS |
-| 3 | 52.0 | 201.3 | 12.05 | 2.30 | 1 | 0.0 | 9.13 | 23.43 | 201.3 | 39 | 13.0% | 20.7 | 0/0/0 | 6 | 3 | 1 | 18.00 | 1.93 | 22.38 | 26.56 | 26.56 | FAIL |
-| 4 | 48.8 | 163.6 | 10.63 | 0.38 | 0 | 0.0 | 2.82 | 28.57 | 163.6 | 39 | 13.0% | 19.8 | 0/0/0 | 8 | 6 | 1 | 16.01 | 2.11 | 19.63 | 24.93 | 24.93 | FAIL |
-| 5 | 60.8 | 176.5 | 12.36 | 2.20 | 0 | 0.0 | 10.52 | 18.00 | 176.5 | 31 | 13.0% | 23.0 | 0/0/0 | 6 | 3 | 1 | 19.52 | 3.48 | 24.89 | 31.50 | 31.50 | FAIL |
-| 6 | 36.0 | 181.5 | 11.48 | 0.20 | 0 | 0.0 | 4.36 | 23.14 | 181.5 | 39 | 13.0% | 22.6 | 0/0/0 | 7 | 5 | 1 | 17.01 | 1.74 | 21.12 | 27.72 | 27.72 | FAIL |
-| 7 | 31.5 | 180.1 | 11.89 | 0.41 | 0 | 0.0 | 6.73 | 23.71 | 180.1 | 44 | 13.0% | 22.3 | 0/0/0 | 7 | 3 | 1 | 17.96 | 2.26 | 22.72 | 27.88 | 27.88 | PASS |
-| 8 | 37.8 | 205.7 | 12.22 | 2.73 | 2 | 0.0 | 6.55 | 26.00 | 205.7 | 45 | 13.0% | 20.2 | 0/0/0 | 7 | 5 | 1 | 18.49 | 2.57 | 22.71 | 27.68 | 27.68 | FAIL |
-| 9 | 36.3 | 165.5 | 11.54 | 1.37 | 0 | 0.0 | 4.33 | 24.29 | 165.5 | 39 | 13.0% | 18.8 | 0/0/0 | 6 | 2 | 1 | 18.18 | 2.88 | 21.72 | 26.99 | 26.99 | FAIL |
-| 10 | 34.5 | 153.1 | 10.27 | 0.61 | 0 | 0.0 | 6.82 | 29.71 | 153.1 | 49 | 13.0% | 18.9 | 0/0/0 | 7 | 5 | 1 | 15.36 | 2.00 | 19.79 | 25.22 | 25.22 | FAIL |
-| **median** | 43.3 | 178.3 | 11.72 | 1.54 | 0 | 0.0 | 6.78 | 24.00 | 178.3 | 40 | 13.0% | 21.0 | 0/0/0 | 7 | 3.5 | 1 | 17.98 | 2.18 | 22.35 | 27.70 | 27.70 | **PASS** |
+| seed | firstDel_s | catch_s | L2_min | truck+min | lives | shelfStall_s | hold/10m@L1 | hold/10m | script_s | wrong | mal@end | pay% | sorter d/w/m | qOff | qDone | q7-13 | L3_min | ovs+min | L4_min | L5_min | GR_min | cards | L1dec | EV$ | nonDef | result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 54.3 | 150.5 | 10.06 | 2.58 | 0 | 0.0 | 8.94 | 22.86 | 150.5 | 41 | 11.0% | 23.2 | 0/0/0 | 6 | 3 | 1 | 15.30 | 2.66 | 20.12 | 25.50 | 25.50 | 5 | 0 | — | — | PASS |
+| 2 | 55.6 | 185.4 | 10.20 | 3.43 | 1 | 0.0 | 7.85 | 21.14 | 185.4 | 39 | 11.0% | 22.4 | 0/0/0 | 6 | 3 | 1 | 16.52 | 3.93 | 21.85 | 25.52 | 25.52 | 5 | 0 | — | — | FAIL |
+| 3 | 52.0 | 201.3 | 10.73 | 3.91 | 1 | 0.0 | 10.25 | 26.86 | 201.3 | 52 | 11.0% | 20.9 | 0/0/0 | 5 | 3 | 1 | 17.18 | 1.73 | 20.76 | 24.05 | 24.05 | 4 | 0 | — | — | FAIL |
+| 4 | 48.8 | 163.6 | 9.70 | 1.76 | 0 | 0.0 | 3.09 | 23.43 | 163.6 | 42 | 11.0% | 24.2 | 0/0/0 | 5 | 3 | 1 | 14.76 | 3.53 | 19.36 | 25.41 | 25.41 | 4 | 0 | — | — | FAIL |
+| 5 | 60.8 | 176.5 | 12.21 | 2.98 | 2 | 0.0 | 9.01 | 22.57 | 176.5 | 44 | 11.0% | 24.7 | 0/0/0 | 6 | 3 | 1 | 18.07 | 1.79 | 21.28 | 26.51 | 26.51 | 5 | 0 | — | — | FAIL |
+| 6 | 36.0 | 181.5 | 10.78 | 1.76 | 0 | 0.0 | 5.56 | 24.00 | 181.5 | 46 | 11.0% | 20.5 | 0/0/0 | 6 | 3 | 1 | 15.91 | 3.81 | 20.35 | 24.35 | 24.35 | 5 | 0 | — | — | FAIL |
+| 7 | 31.5 | 180.1 | 11.40 | 4.88 | 1 | 0.0 | 6.14 | 17.71 | 180.1 | 29 | 11.0% | 21.6 | 0/0/0 | 6 | 3 | 1 | 18.99 | 2.62 | 23.26 | 27.48 | 27.48 | 5 | 0 | — | — | FAIL |
+| 8 | 37.8 | 205.7 | 11.30 | 5.50 | 0 | 0.0 | 6.20 | 14.29 | 205.7 | 24 | 11.0% | 22.6 | 0/0/0 | 6 | 2 | 1 | 19.77 | 2.65 | 24.39 | 28.77 | 28.77 | 5 | 0 | — | — | FAIL |
+| 9 | 36.3 | 165.5 | 10.41 | 2.40 | 0 | 0.0 | 3.84 | 22.86 | 165.5 | 34 | 11.0% | 19.6 | 0/0/0 | 5 | 2 | 1 | 16.53 | 7.02 | 19.53 | 25.16 | 25.16 | 4 | 0 | — | — | FAIL |
+| 10 | 34.5 | 153.1 | 9.09 | 2.36 | 0 | 0.0 | 7.70 | 24.86 | 153.1 | 45 | 11.0% | 22.4 | 0/0/0 | 6 | 3 | 1 | 15.61 | 1.78 | 19.91 | 25.23 | 25.23 | 5 | 0 | — | — | PASS |
+| **median** | 43.3 | 178.3 | 10.57 | 2.78 | 0 | 0.0 | 6.95 | 22.86 | 178.3 | 42 | 11.0% | 22.0 | 0/0/0 | 6 | 3 | 1 | 16.52 | 2.66 | 20.56 | 25.46 | 25.46 | 5 | 0 | — | — | **PASS** |
 
 | window | median | target | result |
 | --- | --- | --- | --- |
 | `firstDeliveryS` | 43.30 | < 60 s | PASS |
 | `firstMalwareCaughtMaxS` | 178.30 | ≤ 300 s | PASS |
-| `level2Min` | 11.72 | 8-15 min | PASS |
-| `truckAfterLevel2MaxMin` | 1.54 | ≤ 4 min | PASS |
+| `level2Min` | 10.57 | 7-13.5 min | PASS |
+| `truckAfterLevel2MaxMin` | 2.78 | ≤ 4 min | PASS |
 | `maxLivesLost` | 0 | ≤ 0 | PASS |
 | `maxShelfStallS` | 0 | ≤ 0 s | PASS |
-| `holdBayEventsPer10MinMin` | 6.78 | ≥ 6 /10 min at L1 | PASS |
-| `questsOfferedBy30MinMin` | 7 | ≥ 4 by 30 min | PASS |
-| `questsCompletedBy30MinMin` | 3.50 | ≥ 2 by 30 min | PASS |
-| `level3Min` | 17.98 | 15-20 min | PASS |
-| `firstOverseasClearedAfterLevel3MaxMin` | 2.18 | ≤ 3 min after L3 | PASS |
-| `level4Min` | 22.35 | 20-25 min | PASS |
-| `level5Min` | 27.70 | 25-30 min | PASS |
-| `holdBayEventsPer10Min` | 24.000 | whole run | informational |
+| `holdBayEventsPer10MinMin` | 6.95 | ≥ 6 /10 min at L1 | PASS |
+| `questsOfferedBy30MinMin` | 6 | ≥ 4 by 30 min | PASS |
+| `questsCompletedBy30MinMin` | 3 | ≥ 2 by 30 min | PASS |
+| `level3Min` | 16.52 | 13.5-18 min | PASS |
+| `firstOverseasClearedAfterLevel3MaxMin` | 2.66 | ≤ 3 min after L3 | PASS |
+| `level4Min` | 20.56 | 18-22.5 min | PASS |
+| `level5Min` | 25.46 | 22.5-27 min | PASS |
+| `eventsOfferedBy30MinMin` | 5 | ≥ 15 cards by 30 min | informational (M12) |
+| `eventsOpenMaxTicks` | 0 | ≤ 1 tick open | informational (M12) |
+| `eventsL1PlateauMin` | 0 | ≥ 3 decision cards from min 3 to L2 | informational (M12) |
+| `policyEvPerCard` | — | -20 to 40 $/card (events.json policy.evBand) | informational (M12) |
+| `policyNonDefaultShare` | — | ≥ 0.4 (events.json policy.nonDefaultShareMin) | informational (M12) |
+| `holdBayEventsPer10Min` | 22.860 | whole run | informational |
 | `scriptedCaughtS` | 178.300 | flag time of the scripted malware | informational |
-| `wrongTosses` | 39.500 | clean parcels tossed (Toss-everything) | informational |
-| `malwareShareAt30Min` | 0.130 | share at 35 min | informational |
-| `payrollShareOfGross` | 0.210 | ≤ 0.25 (payroll paid ÷ gross income at 35 min) | informational |
+| `wrongTosses` | 41.500 | clean parcels tossed (Toss-everything) | informational |
+| `malwareShareAt30Min` | 0.110 | share at 35 min | informational |
+| `payrollShareOfGross` | 0.220 | ≤ 0.25 (payroll paid ÷ gross income at 35 min) | informational |
 | `sorterDecisions` | 0.000 | Hold Bay sorter calls | informational |
 | `sorterWrongToss` | 0.000 | clean parcels the sorter tossed | informational |
 | `sorterMissed` | 0.000 | malware the sorter left as looks clean | informational |
-| `hires` | 8.000 | hires (not re-hires) | informational |
-| `overseasCleared` | 25.000 | overseas clearances (parcel:cleared, malware included) | informational |
+| `hires` | 7.000 | hires (not re-hires) | informational |
+| `overseasCleared` | 24.500 | overseas clearances (parcel:cleared, malware included) | informational |
 | `overseasLivesLost` | 0.000 | lives lost at a clearance (the ship has sailed) | informational |
-| `dock2Min` | 20.480 | minute loading dock 2 is bought | informational |
-| `dock3Min` | 32.860 | minute loading dock 3 is bought | informational |
-| `armTosses` | 3.500 | Hold Bay parcels the Sorter Arm tossed (L4 plan) | informational |
-| `goldenReleaseOfferedMaxMin` | 27.700 | ≤ 32 min (seeds 1-10 × 35 min, --minutes 35) | informational |
-| `victoryMaxMin` | — | ≤ 45 min (seeds 1-3 × 45 min, the long test) | informational |
+| `dock2Min` | 20.260 | minute loading dock 2 is bought | informational |
+| `dock3Min` | 34.500 | minute loading dock 3 is bought | informational |
+| `armTosses` | 0.000 | Hold Bay parcels the Sorter Arm tossed (L4 plan) | informational |
+| `goldenReleaseOfferedMaxMin` | 25.460 | ≤ 29 min (seeds 1-10 × 35 min, --minutes 35) | informational |
+| `victoryMaxMin` | — | ≤ 40 min (seeds 1-3 × 45 min, the long test) | informational |
 | `questActive7to13` | 10/10 seeds | a quest active between minutes 7 and 13 on ≥ 8/10 seeds (plan-build2 §8.4) | informational |
-| `magicOnTime` | 8/9 | golden parcels delivered on time / spawned (all seeds) | informational |
-| `quest:magic_parcel` | offered 9 · completed 8 · failed 1 · declined 0 | per template, all seeds | informational |
-| `quest:on_time_day` | offered 8 · completed 3 · failed 5 · declined 0 | per template, all seeds | informational |
-| `quest:rush_district` | offered 16 · completed 12 · failed 4 · declined 0 | per template, all seeds | informational |
-| `quest:night_shift` | offered 5 · completed 5 · failed 0 · declined 0 | per template, all seeds | informational |
-| `quest:clean_sweep` | offered 2 · completed 1 · failed 1 · declined 0 | per template, all seeds | informational |
-| `quest:golden_release` | offered 17 · completed 0 · failed 8 · declined 0 | per template, all seeds | informational |
-| `quest:cheer_up` | offered 8 · completed 1 · failed 7 · declined 0 | per template, all seeds | informational |
+| `magicOnTime` | 7/7 | golden parcels delivered on time / spawned (all seeds) | informational |
+| `quest:magic_parcel` | offered 7 · completed 7 · failed 0 · declined 0 | per template, all seeds | informational |
+| `quest:on_time_day` | offered 7 · completed 1 · failed 6 · declined 0 | per template, all seeds | informational |
+| `quest:cheer_up` | offered 7 · completed 2 · failed 5 · declined 0 | per template, all seeds | informational |
 | `quest:big_haul` | offered 7 · completed 5 · failed 2 · declined 0 | per template, all seeds | informational |
-| `quest:customs_run` | offered 3 · completed 3 · failed 0 · declined 0 | per template, all seeds | informational |
-| `quest:inspector_general` | offered 1 · completed 1 · failed 0 · declined 0 | per template, all seeds | informational |
+| `quest:customs_run` | offered 4 · completed 2 · failed 2 · declined 0 | per template, all seeds | informational |
+| `quest:golden_release` | offered 18 · completed 0 · failed 9 · declined 0 | per template, all seeds | informational |
+| `quest:rush_district` | offered 9 · completed 8 · failed 1 · declined 0 | per template, all seeds | informational |
+| `quest:night_shift` | offered 5 · completed 3 · failed 2 · declined 0 | per template, all seeds | informational |
+| `quest:clean_sweep` | offered 1 · completed 1 · failed 0 · declined 0 | per template, all seeds | informational |
+| `livesLostShare` | 4/10 seeds | seeds that lost a life to malware (the 40-seed share: ≤ 35 %) | informational |
+| `eventsByCategory` | job 47 | cards offered per category, all seeds | informational (decisions off) |
+| `chainsStarted` | 0 / 0 | chains started / finished, all seeds | informational (decisions off) |
+| `modifiersActiveMax` | 0.000 | most modifiers live at once | informational (decisions off) |
+| `eventLivesLost` | median 0.0 (0) | lives events took (all seeds in brackets) | informational (decisions off) |
+| `eventLivesGained` | median 0.0 (0) | lives events gave (all seeds in brackets) | informational (decisions off) |
+| `eventVehiclesLost` | median 0.0 (0) | vehicles events took (all seeds in brackets) | informational (decisions off) |
+| `eventWorkersLost` | median 0.0 (0) | workers events took (all seeds in brackets) | informational (decisions off) |
+| `eventGameOvers` | 0/10 seeds | runs an event ended | informational (decisions off) |
+| `deckEvMean` | -62.830 | mean state-free score over every option of every card ($) | informational |

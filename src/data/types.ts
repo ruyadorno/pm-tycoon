@@ -406,10 +406,7 @@ export interface QuestTemplateDef {
 }
 
 export interface QuestOfferDef {
-  firstOfferDay: number
-  intervalDays: number
   declineCooldownDays: number
-  offerExpiresDays: number
   maxActive: number
 }
 

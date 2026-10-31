@@ -665,11 +665,6 @@ export interface QuestsState {
   offer: Quest | null
   /** The active quest (quests.offer.maxActive = 1). */
   active: Quest | null
-  /**
-   * Earliest regular offer (start: firstOfferDay days).
-   * @deprecated build 3 — removed in M11 wave 2
-   */
-  nextOfferTick: Tick
   /** B3 §3.2: earliest tick a job card may be offered (start 0; set on every quest end). */
   jobReadyTick: Tick
   /** Earliest (re-)offer of the ultimate quest (start 0). */

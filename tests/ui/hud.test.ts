@@ -130,7 +130,9 @@ describe('spec §8 / city-view §4.1: the level bar', () => {
     const p = levelProgress(capped, 2, 3410, 5000)
     expect(p.atCap).toBe(true)
     expect(p.text).toBe('$3,410 / $5,000 · Lv 3 coming soon')
-    expect(p.frac).toBeCloseTo((3410 - 2000) / (5000 - 2000), 6)
+    // Thresholds are §7.6 tuning levers (build 3: L2 $1,750): from levels.json.
+    const t2 = capped.levels.find((l) => l.level === 2)!.threshold
+    expect(p.frac).toBeCloseTo((3410 - t2) / (5000 - t2), 6)
     // Past the threshold the bar stays full and the text keeps counting.
     const over = levelProgress(capped, 2, 5400, 5000)
     expect(over.frac).toBe(1)

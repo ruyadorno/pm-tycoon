@@ -617,21 +617,32 @@ describe('configs (plan.md §6.6)', () => {
     },
   )
 
-  it('spicy.json: the late quest cadence — offers sooner and more often than the base tables, nothing else in quests moves', () => {
+  it('spicy.json: the build-3 events cadence (B3 §7) — the first card and every level band sooner than the base tables, nothing else in events moves', () => {
     const d = loadGameData('public/configs/spicy.json')
     const base = buildGameData(loadRawData())
-    const o = d.quests.offer
-    const b = base.quests.offer
-    expect(o.firstOfferDay).toBeLessThan(b.firstOfferDay)
-    expect(o.intervalDays).toBeLessThan(b.intervalDays)
-    expect(o.firstOfferDay).toBeGreaterThan(0)
-    expect(o.intervalDays).toBeGreaterThan(0)
-    expect({ ...o, firstOfferDay: 0, intervalDays: 0 }).toEqual({
-      ...b,
-      firstOfferDay: 0,
-      intervalDays: 0,
+    const s = d.events.schedule
+    const b = base.events.schedule
+    expect(s.firstEventS).toBeGreaterThan(0)
+    expect(s.firstEventS).toBeLessThan(b.firstEventS)
+    expect(Object.keys(s.intervalS)).toEqual(Object.keys(b.intervalS))
+    for (const [k, [lo, hi]] of Object.entries(b.intervalS)) {
+      const [slo, shi] = s.intervalS[k]!
+      expect(slo, `L${k} lo`).toBeGreaterThan(0)
+      expect(slo, `L${k} lo`).toBeLessThan(lo)
+      expect(shi, `L${k} hi`).toBeLessThan(hi)
+    }
+    const still = (e: typeof d.events) => ({
+      ...e,
+      schedule: { ...e.schedule, firstEventS: 0, intervalS: {} },
     })
-    expect(d.quests.templates).toEqual(base.quests.templates)
+    expect(still(d.events)).toEqual(still(base.events))
+  })
+
+  it('spicy.json: the quest tables untouched (job cards ride the events cadence, B3 §3.2) and no start recipe', () => {
+    const d = loadGameData('public/configs/spicy.json')
+    const base = buildGameData(loadRawData())
+    expect(patchOf('spicy.json')).not.toHaveProperty('quests')
+    expect(d.quests).toEqual(base.quests)
     expect(checkConfigStart(configStartOf(patchOf('spicy.json')), d)).toEqual({
       start: null,
       problems: [],

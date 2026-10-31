@@ -9,6 +9,10 @@
 // Decline / Esc / Enter, Accept left to the caller, deny, refresh, the
 // Abandon confirm and the complete state. Phaser is stubbed with chainable
 // no-op game objects (the card builds real kit Buttons).
+// Build 3 interim (M11, D-18): a job offer is Accept · Decline (Decline at
+// the right edge, x + 214 as before), no Later and no expiry (`waiting for
+// you`); Esc / outside only hide it; the abandon text names
+// events.schedule.jobCooldownDays.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -199,6 +203,11 @@ describe('design-m7 §6.3: the card rect, 8 px above the bottom bar', () => {
       { name: 'accept', x: 6, w: 120 },
       { name: 'later', x: 134, w: 72 },
     ])
+    // A job offer (D-18): no Later — Decline keeps its x + 214 tap.
+    expect(qc.questCardButtonRects(300, ['accept', 'decline'])).toEqual([
+      { name: 'accept', x: 6, w: 120 },
+      { name: 'decline', x: 214, w: 72 },
+    ])
     expect(qc.questCardButtonRects(300, ['abandon', 'close'])).toEqual([
       { name: 'abandon', x: 6, w: 96 },
       { name: 'close', x: 166, w: 120 },
@@ -213,6 +222,7 @@ describe('design-m7 §6.3: the card rect, 8 px above the bottom bar', () => {
       for (const set of [
         ['accept', 'later', 'decline'],
         ['accept', 'later'],
+        ['accept', 'decline'],
         ['abandon', 'close'],
         ['ok'],
       ] as const) {
@@ -252,7 +262,7 @@ describe('M5 atlas rule: the card binds world frames only', () => {
 // ---- model ------------------------------------------------------------------------------
 
 describe('design-m7 §6.3: the model per mode', () => {
-  it('a regular offer: JOB BOARD, Accept / Later / Decline, no bar, the time and the expiry', () => {
+  it('a job offer (build 3, D-18): JOB BOARD, Accept / Decline (no Later), no bar, the time, no expiry', () => {
     const q = at(offer('rush_district'), 'downtown')
     const m = qc.questCardModel(data, q, 'offer', OFFER_TICK + 150, names, null)
     expect(m).toEqual({
@@ -262,9 +272,9 @@ describe('design-m7 §6.3: the model per mode', () => {
       flavour: 'Registry Row is swamped — get their parcels moving',
       objective: 'Deliver 6 parcels sent from Registry Row',
       reward: 'Reward: $120',
-      time: 'Time: 3 days · offer ends in 18h',
+      time: 'Time: 3 days · waiting for you',
       bar: null,
-      buttons: ['accept', 'later', 'decline'],
+      buttons: ['accept', 'decline'],
       blocked: null,
       waiting: false,
     })
@@ -345,7 +355,7 @@ describe('design-m7 §6.3: the model per mode', () => {
     const o = offer('magic_parcel')
     expect(
       qc.questCardModel(data, o, 'offer', OFFER_TICK, names, null).time,
-    ).toBe('Time: 2:00 · offer ends in 1d 0h')
+    ).toBe('Time: 2:00 · waiting for you')
     const a = active('magic_parcel', {}, 1200, {
       route: { origin: 'dt_registry_tower', dest: 'dt_semver_bank' },
     })
@@ -384,12 +394,13 @@ describe('design-m7 §6.3: the model per mode', () => {
     }
   })
 
-  it('the Abandon confirm: no penalty, and when the next job (or the Golden Release) comes', () => {
+  it('the Abandon confirm: no penalty, and when another job can come (events.schedule.jobCooldownDays) or the Golden Release comes back', () => {
+    expect(data.events.schedule.jobCooldownDays).toBe(1)
     expect(
       qc.abandonDialogText(data, { name: 'Rush hour', ultimate: false }),
     ).toEqual({
       title: 'Abandon Rush hour?',
-      text: 'No penalty — the next job comes in 2 days.',
+      text: 'No penalty — you can take another job in 1 day.',
     })
     expect(
       qc.abandonDialogText(data, {
@@ -572,7 +583,7 @@ function onlyCalled(
 }
 
 describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
-  it('opens an offer on top of the modal stack; Later closes it and calls onLater only', () => {
+  it('opens a job offer on top of the modal stack: Accept / Decline, no Later (D-18); a tap outside only hides it (onLater only)', () => {
     const { card, cb } = makeCard()
     const q = offer('rush_district')
     const before = modalCount()
@@ -580,16 +591,28 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     expect(card.isOpen).toBe(true)
     expect(card.questId).toBe(q.id)
     expect(card.mode).toBe('offer')
-    expect(card.model?.buttons).toEqual(['accept', 'later', 'decline'])
+    expect(card.model?.buttons).toEqual(['accept', 'decline'])
     expect(modalCount()).toBe(before + 1)
     expect(topModal()).toBe(card)
+    // No Later button on a job: the tap does nothing.
     card.tap('later')
+    expect(card.isOpen).toBe(true)
+    ;(card as unknown as { outside(): void }).outside()
     expect(card.isOpen).toBe(false)
     expect(modalCount()).toBe(before)
     onlyCalled(cb, 'onLater')
   })
 
-  it('Esc is Later on an offer; Enter is Accept and leaves the card open for the caller', () => {
+  it('the Golden Release keeps Later: it closes the card and calls onLater only', () => {
+    const { card, cb } = makeCard()
+    card.open(offer('golden_release'), 'offer', OFFER_TICK, 4)
+    expect(card.model?.buttons).toEqual(['accept', 'later'])
+    card.tap('later')
+    expect(card.isOpen).toBe(false)
+    onlyCalled(cb, 'onLater')
+  })
+
+  it('Esc only hides a job offer (onLater; the sim stays held on its card); Enter is Accept and leaves the card open for the caller', () => {
     const { card, cb, scene } = makeCard()
     const q = offer('rush_district')
     card.open(q, 'offer', OFFER_TICK, 4)
@@ -666,7 +689,12 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     const { card, cb } = makeCard()
     const q = offer('rush_district')
     card.open(q, 'offer', OFFER_TICK, 4)
-    card.refresh({ ...q, ticksLeft: 300 }, OFFER_TICK + 300)
+    expect(card.model?.time).toBe('Time: 3 days · waiting for you')
+    // An offer that carries an expiry still shows its countdown.
+    card.refresh(
+      { ...q, expiresTick: OFFER_TICK + 600, ticksLeft: 300 },
+      OFFER_TICK + 300,
+    )
     expect(card.model?.time).toBe('Time: 3 days · offer ends in 12h')
     card.refresh(
       {

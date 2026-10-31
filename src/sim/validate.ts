@@ -17,7 +17,13 @@ import type { GameData } from '../data/types.ts'
 import { roadGraph } from './roads.ts'
 import { FACE_LOOKS, ROLES } from './systems/people.ts'
 import { QUEST_KINDS } from './systems/quests.ts'
-import { dockNumber, laneNode, STATE_VERSION, type SimState } from './types.ts'
+import {
+  dockNumber,
+  laneNode,
+  STATE_VERSION,
+  type OpenCard,
+  type SimState,
+} from './types.ts'
 
 type Add = (m: string) => void
 /** Checks `v` at `path`; returns false when it is not even the right kind. */
@@ -570,7 +576,6 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       rng: int(0, 0xffffffff),
       offer: nullable(quest),
       active: nullable(quest),
-      nextOfferTick: tick,
       jobReadyTick: tick,
       ultimateNextTick: tick,
       lastOfferDay: nullable(count),
@@ -792,6 +797,7 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
     ),
   )
   if (n.quest <= questMax) add(`state.nextId.quest: ${n.quest} ≤ q${questMax}`)
+  eventProblems(s, data, add)
   laneDockProblems(s, data, add)
   // M8: a parcel's destRegion is its dest's district (spawn.ts; hubs.ts and
   // dispatch.ts deliverAt read it), and a handed-off parcel waits for its
@@ -812,6 +818,69 @@ export function stateShapeProblems(state: unknown, data: GameData): string[] {
       add(`${at}.destRegion: ${p.destRegion} is not an overseas hub`)
   }
   return out
+}
+
+/**
+ * Build 3 (B3 §3, §6): the deck's references — the open card (and a queued
+ * one) names a deck card, or `job:<template>` holding the open offer; a
+ * scheduled link names deck cards (exactly one of eventId / branches) and a
+ * deck chain head; `seen` / `cooldownUntil` keys are deck ids; modifier ids
+ * 'm<n>' are unique and below nextId.modifier.
+ */
+function eventProblems(s: SimState, data: GameData, add: Add): void {
+  const ev = s.events
+  const deckIds = new Set(data.events.deck.map((d) => d.id))
+  const templates = new Set(data.quests.templates.map((t) => t.id))
+  const offerId = s.quests.offer?.id ?? null
+  const card = (c: OpenCard, at: string): void => {
+    if (!Object.hasOwn(data.events.categories, c.category))
+      add(`${at}.category: ${c.category} is not an events.json category`)
+    if (c.eventId.startsWith('job:')) {
+      const tpl = c.eventId.slice('job:'.length)
+      if (c.kind !== 'job') add(`${at}.kind: ${c.kind} on a job card`)
+      if (!templates.has(tpl))
+        add(`${at}.eventId: ${c.eventId} names no quests.json template`)
+      if (c.questId === null || c.questId !== offerId)
+        add(`${at}.questId: ${c.questId} ≠ the open offer ${offerId}`)
+      return
+    }
+    if (!deckIds.has(c.eventId))
+      add(`${at}.eventId: ${c.eventId} is not an events.json card`)
+    if (c.kind === 'job') add(`${at}.kind: job on a deck card`)
+    if (c.questId !== null) add(`${at}.questId: ${c.questId} on a deck card`)
+    if (c.chainHeadId !== null && !deckIds.has(c.chainHeadId))
+      add(`${at}.chainHeadId: ${c.chainHeadId} is not an events.json card`)
+  }
+  if (ev.open !== null) card(ev.open, 'state.events.open')
+  ev.queue.forEach((c, i) => card(c, `state.events.queue[${i}]`))
+  ev.scheduled.forEach((l, i) => {
+    const at = `state.events.scheduled[${i}]`
+    if ((l.eventId === null) === (l.branches === null))
+      add(`${at}: exactly one of eventId and branches`)
+    if (l.eventId !== null && !deckIds.has(l.eventId))
+      add(`${at}.eventId: ${l.eventId} is not an events.json card`)
+    for (const b of l.branches ?? []) {
+      if (!deckIds.has(b.id))
+        add(`${at}.branches: ${b.id} is not an events.json card`)
+    }
+    if (!deckIds.has(l.chainHeadId))
+      add(`${at}.chainHeadId: ${l.chainHeadId} is not an events.json card`)
+  })
+  for (const k of Object.keys(ev.seen)) {
+    if (!deckIds.has(k)) add(`state.events.seen.${k}: not an events.json card`)
+  }
+  for (const k of Object.keys(ev.cooldownUntil)) {
+    if (!deckIds.has(k))
+      add(`state.events.cooldownUntil.${k}: not an events.json card`)
+  }
+  const seen = new Set<string>()
+  for (const m of s.modifiers) {
+    const n = /^m([1-9]\d*)$/.exec(m.id)
+    if (n === null || Number(n[1]) >= s.nextId.modifier)
+      add(`state.modifiers.${m.id}: not an id m<n> below nextId.modifier`)
+    if (seen.has(m.id)) add(`state.modifiers.${m.id}: duplicate id`)
+    seen.add(m.id)
+  }
 }
 
 /**

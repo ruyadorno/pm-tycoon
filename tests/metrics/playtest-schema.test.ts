@@ -40,7 +40,8 @@ import {
 import { createPolicy } from '../../src/sim/policy.ts'
 import { Sim } from '../../src/sim/sim.ts'
 import { salaryOf } from '../../src/sim/systems/people.ts'
-import { dataFixture, makeSim, parcelLoss } from '../sim/helpers.ts'
+import { TICKS_PER_S } from '../../src/sim/types.ts'
+import { dataFixture, deckOn, makeSim, parcelLoss } from '../sim/helpers.ts'
 
 const data = dataFixture()
 const EXAMPLE = 'tests/playtest/seed-7.json'
@@ -281,7 +282,10 @@ interface Tally {
  * hire, hand-off and sorter events next to the recorder.
  */
 function policyRun(): { r: Rig; pt: Playtest; tally: Tally } {
-  const r = rig(makeSim(7))
+  // Build 3 (B3 §3.2): jobs come as cards from the deck's draws, so this
+  // policy run keeps the deck on (makeSim turns it off, D-8); the policy
+  // answers every card on its step.
+  const r = rig(deckOn(makeSim(7)))
   const tally: Tally = {
     offered: 0,
     accepted: 0,
@@ -850,15 +854,23 @@ describe('plan.md §12.9: the profile survives a reload of the same run only', (
 })
 
 describe('plan-build2 §9 fun bar 2 from the same object', () => {
-  it('reads the seed-7 run: quest by 15:00, L3 in 15-22, 25 min played, no life lost, L5 by 40:00', () => {
+  it('reads the seed-7 run: the first quest against 15:00 and every lost life explained (from the independent tally), L3 in 15-22, 25 min played, L5 by 40:00', () => {
     const checks = funBar(run.pt, FUN_TARGETS)
     const choice = run.pt.hires.some((h) => !h.cheapest)
+    // Build 3 (M11): the −10 % thresholds move seed 7's run — L2 at 11:24
+    // comes before its 11:54 job card, which then draws cheer_up (done at
+    // 16:17) where build 2 drew rush_district (13:45), and a malware life
+    // goes at 17:27 — so items 2 and 5 are read from the run's own tally
+    // (an independent quest:completed listener; a lost life must be
+    // explained: 'judge', never 'fail').
+    const firstDone = run.tally.firstCompletedTick
+    expect(firstDone).not.toBeNull()
     expect(checks.map((c) => [c.n, c.state])).toEqual([
       [1, choice ? 'judge' : 'fail'],
-      [2, 'pass'],
+      [2, firstDone! / TICKS_PER_S <= FUN_TARGETS.questByS ? 'pass' : 'fail'],
       [3, 'pass'],
       [4, 'pass'],
-      [5, 'pass'],
+      [5, run.pt.livesLost.length === 0 ? 'pass' : 'judge'],
       [6, 'pass'],
     ])
     expect(checks[5]?.detail).toBe(

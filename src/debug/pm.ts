@@ -7,7 +7,7 @@
 //   step(ms)  = loop.step(loop.now + ms): one update + render
 //   settle(n) = n x step(16)
 //   thaw()    = loop.smoothStep = true; loop.wake()
-//   advance(ms) = stepper.advance(ms): sim only, no render, uncapped
+//   advance(ms[, answer]) = stepper.advance(ms): sim only, no render, uncapped
 // `sim` is the ViewSim facade (what scenes use: rush, debug.*), `core` the
 // raw Sim (state, commandLog, dispatch). Both follow setSim() swaps.
 // `audio` is the AudioDirector's debug surface (audio.md §9.2: state(), log,
@@ -30,6 +30,12 @@
 // quests() (offer / active slots with their derived fields, history,
 // vouchers, victory) — a plain-data read for e2e; the debug offer is
 // `sim.debug.offerQuest(id)` (Boot's ?quest=<id> calls it).
+// Build 3 (B3 §3.4, §6; M11): events() is the ViewSim's events() (the open
+// card, the queue, links, history, live modifiers); a card holds a sim with
+// no policy, so answerCard() decides the open card's default (a logged
+// decideEvent — the replay still matches) and advance(ms, true) /
+// waitEvent(name, cap, true) answer every card they meet on the way, for
+// policy-less runs that must cross a draw (fixtures, long waits).
 import Phaser from 'phaser'
 import type { AudioDebugApi, AudioDirector } from '../audio/director.ts'
 import type { Stepper } from '../boot/stepper.ts'
@@ -45,7 +51,7 @@ import {
 import type { Command, CommandResult } from '../sim/commands.ts'
 import type { SimEventName, SimEventPayloads } from '../sim/events.ts'
 import { replay, Sim, stateHash, type SimSnapshot } from '../sim/sim.ts'
-import type { QuestsView, ViewSim } from '../sim/view-api.ts'
+import type { EventsView, QuestsView, ViewSim } from '../sim/view-api.ts'
 import { downloadJson } from '../ui/SummaryCard.ts'
 import { installDrawCallCounter, overlayStats, REG_OVERLAY } from './overlay.ts'
 import { type Params, worldSceneKey } from './params.ts'
@@ -108,13 +114,19 @@ export interface PmApi {
   freeze(): void
   thaw(): void
   step(ms?: number): void
-  advance(ms: number): number
+  /**
+   * Sim-only advance (no render); the ticks run. `answer`: decide every open
+   * card on the way with answerCard() (a held sim otherwise stays put).
+   */
+  advance(ms: number, answer?: boolean): number
   settle(frames?: number): void
   stamp(text: string): void
   goto(view: WorldView): void
+  /** Advance in 100-ms steps until `name` fires or `capMs`; `answer` as advance's. */
   waitEvent<K extends SimEventName>(
     name: K,
     capMs?: number,
+    answer?: boolean,
   ): Promise<WaitResult<K>>
   snapshot(): SimSnapshot
   load(json: string | SimSnapshot): void
@@ -138,6 +150,14 @@ export interface PmApi {
   debugLotCorners(on?: boolean): boolean
   /** M7: the current sim's quest slots, history, vouchers and victory (ViewSim.quests()). */
   quests(): QuestsView
+  /** Build 3: the current sim's event deck (ViewSim.events()). */
+  events(): EventsView
+  /**
+   * Build 3: decide the open card, if any — its default option when shown
+   * and affordable, else the first such one — through ViewSim.event.decide
+   * (a logged command). Returns the card's eventId, or null with none open.
+   */
+  answerCard(): string | null
 }
 
 declare global {
@@ -163,6 +183,15 @@ function playtestCounters(pt: Playtest | null): PmMetrics['playtest'] {
 
 export const WAIT_STEP_MS = 100
 export const WAIT_CAP_MS = 60_000
+
+/** The option answerCard() takes: the default when shown and affordable, else the first such one. */
+function answerOf(view: EventsView): { eventId: string; index: number } | null {
+  const open = view.open
+  if (!open) return null
+  const ok = open.options.filter((o) => o.affordable)
+  const pick = ok.find((o) => o.default) ?? ok[0]
+  return pick ? { eventId: open.eventId, index: pick.index } : null
+}
 
 type TweenClock = { getDelta(tick?: boolean): number }
 
@@ -199,6 +228,24 @@ export function installDebugApi(
   let audioApi: { of: AudioDirector; api: AudioDebugApi } | null = null
   const recorder = (): PlaytestRecorder | null =>
     (game.registry.get(REG_PLAYTEST) as PlaytestRecorder | undefined) ?? null
+  const viewSim = (): ViewSim => game.registry.get(REG.viewSim) as ViewSim
+  const answerCard = (): string | null => {
+    const vs = viewSim()
+    const a = answerOf(vs.events())
+    if (!a) return null
+    vs.event.decide(a.eventId, a.index)
+    return a.eventId
+  }
+  /** stepper.advance(ms), answering each card met (100-ms steps) when asked. */
+  const advanceBy = (ms: number, answer: boolean): number => {
+    if (!answer) return stepper.advance(ms)
+    let ticks = 0
+    for (let left = ms; left > 0; left -= WAIT_STEP_MS) {
+      answerCard()
+      ticks += stepper.advance(Math.min(WAIT_STEP_MS, left))
+    }
+    return ticks
+  }
 
   const pm: PmApi = {
     game,
@@ -244,8 +291,8 @@ export function installDebugApi(
     step(ms = 16) {
       loop.step(loop.now + ms)
     },
-    advance(ms: number) {
-      return stepper.advance(ms)
+    advance(ms: number, answer = false) {
+      return advanceBy(ms, answer)
     },
     settle(frames = 60) {
       for (let i = 0; i < frames; i++) loop.step(loop.now + 16)
@@ -256,7 +303,11 @@ export function installDebugApi(
     goto(view: WorldView) {
       game.events.emit(EV_GOTO, { view })
     },
-    waitEvent<K extends SimEventName>(name: K, capMs = WAIT_CAP_MS) {
+    waitEvent<K extends SimEventName>(
+      name: K,
+      capMs = WAIT_CAP_MS,
+      answer = false,
+    ) {
       const sim = core()
       const got: { fired: boolean; payload: SimEventPayloads[K] | null } = {
         fired: false,
@@ -275,7 +326,7 @@ export function installDebugApi(
       let waited = 0
       try {
         while (!got.fired && waited < capMs) {
-          stepper.advance(WAIT_STEP_MS)
+          advanceBy(WAIT_STEP_MS, answer)
           waited += WAIT_STEP_MS
         }
       } finally {
@@ -359,8 +410,12 @@ export function installDebugApi(
       return city?.setLotCorners?.(on) ?? false
     },
     quests() {
-      return (game.registry.get(REG.viewSim) as ViewSim).quests()
+      return viewSim().quests()
     },
+    events() {
+      return viewSim().events()
+    },
+    answerCard,
   }
   window.__pm = pm
 

@@ -27,7 +27,7 @@
     "hissLoopGain": 0.5,
     "paydayShortRate": 0.7
   },
-  "throttleMs": { "pickup": 150, "hiss": 4000, "honk": 3000, "stallAlarm": 8000, "grumble": 20000 },
+  "throttleMs": { "pickup": 150, "hiss": 4000, "honk": 3000, "stallAlarm": 8000, "grumble": 20000, "eventPing": 2000 },
   "throttleSlackMs": 250,
   "loopsMs": { "hiss": 4000, "stallAlarm": 8000, "grumble": 20000 },
   "lifeLost": { "rampS": 0.03, "pauseBeats": 1 },

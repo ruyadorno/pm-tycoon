@@ -8,8 +8,17 @@
 // fast path is the whole cost (D-3). Mutations (apply / end / expire) are
 // in systems/modifierOps.ts so this file imports types only (D-35).
 //
-// M11 wave 0: the stubs fold to the identity (no rows ever exist yet);
-// stream A implements the fold.
+// The read sites (B3 §3.6) each call modMult / modAdd once: vehicles.ts
+// speedPerTick (speed, by vehicle type), dispatch.ts stopTicks (stop),
+// people.ts syncDesk / effectiveP and detection.ts fiveEyeP (inspectorP),
+// effChecker below (machineP), lane.ts seat and detection.ts
+// laneRatePerMin (processS, by fixture kind), payroll.ts paydayStep /
+// payrollDuePerDay (payrollMult, payrollAdd), economy.ts deliverParcel and
+// hubs.ts handOff (income), spawn.ts (malwareShare via types.ts
+// malwareShare's `extra`, decoyShare, spawn by district), holdbay.ts
+// tossParcel (tossBounty, wrongTossFee), priceOf below (vehiclePrice,
+// machinePrice), economy.ts / hubs.ts isOnTime (onTimeMaxS), hubs.ts
+// handOff (clearanceS, by hub) and levels.ts syncShelfCap (shelfCap).
 
 import type { GameData, ModifierKey } from '../data/types.ts'
 import type { Checker, Modifier, SimState, Tick } from './types.ts'
@@ -44,36 +53,91 @@ export const ADD_KEYS = [
 export type MultKey = (typeof MULT_KEYS)[number]
 export type AddKey = (typeof ADD_KEYS)[number]
 
+/**
+ * The fold of `key`: the live rows (isLive) whose scope is null or `scope`,
+ * multiplied (`mult`) or summed (`add`), clamped to events.json
+ * modifiers.bounds[key] (D-24: the bound clamps the fold, not the result).
+ * No matching row → the identity, unclamped (so build 2's numbers are the
+ * exact mult 1 / add 0 case whatever the bounds say). A `mult` of 0 folds
+ * to 0 (payrollMult, tossBounty, wrongTossFee ×0) — never NaN.
+ */
+function fold(
+  ctx: ModCtx,
+  key: ModifierKey,
+  scope: string | null,
+  kind: 'mult' | 'add',
+): number {
+  const rows = ctx.state.modifiers
+  const identity = kind === 'mult' ? 1 : 0
+  if (rows.length === 0) return identity // fast path (D-3)
+  const tick = ctx.state.tick
+  let v = identity
+  let hit = false
+  for (const r of rows) {
+    if (r.key !== key || !isLive(r, tick)) continue
+    if (r.scope !== null && r.scope !== scope) continue
+    hit = true
+    if (kind === 'mult') v *= r.mult
+    else v += r.add
+  }
+  if (!hit) return identity
+  const [lo, hi] = ctx.data.events.modifiers.bounds[key]
+  return Math.min(hi, Math.max(lo, v))
+}
+
 /** Π mult of the live rows of `key` whose scope is null or `scope`, clamped to bounds; 1 with no rows. */
 export function modMult(
-  _ctx: ModCtx,
-  _key: MultKey,
-  _scope: string | null = null,
+  ctx: ModCtx,
+  key: MultKey,
+  scope: string | null = null,
 ): number {
-  return 1
+  return fold(ctx, key, scope, 'mult')
 }
 
 /** Σ add of those rows, clamped to bounds; 0 with no rows. */
 export function modAdd(
-  _ctx: ModCtx,
-  _key: AddKey,
-  _scope: string | null = null,
+  ctx: ModCtx,
+  key: AddKey,
+  scope: string | null = null,
 ): number {
-  return 0
+  return fold(ctx, key, scope, 'add')
 }
 
-/** round(listPrice × modMult(vehiclePrice | machinePrice)). */
+/**
+ * What a purchase costs now: round(listPrice × modMult(vehiclePrice |
+ * machinePrice)) — commands.ts buyVehicle / buyMachine debit and store it
+ * (Vehicle.purchasePrice, Checker.price), so the refunds follow the price
+ * paid; the BuySheet, the Garage and the policy read the same number. The
+ * Sorter Arm is not a machine here (D-21).
+ */
 export function priceOf(
-  _ctx: ModCtx,
-  _kind: 'vehicle' | 'machine',
+  ctx: ModCtx,
+  kind: 'vehicle' | 'machine',
   listPrice: number,
 ): number {
-  return listPrice
+  const m = modMult(ctx, kind === 'vehicle' ? 'vehiclePrice' : 'machinePrice')
+  return m === 1 ? listPrice : Math.round(listPrice * m)
 }
 
-/** A machine checker with pMatch/pOther + modAdd('machineP') clamped to modifiers.machinePClamp; desks unchanged. */
-export function effChecker(_ctx: ModCtx, c: Checker): Checker {
-  return c
+/**
+ * The checker a machine rolls with now (B3 §3.6, D-5): pMatch / pOther +
+ * modAdd('machineP'), each clamped to modifiers.machinePClamp and rounded to
+ * 4 dp (the desk p's precision, people.ts effectiveP) — a copy, the stored
+ * Checker is never touched. Desks are unchanged (they take inspectorP
+ * through syncDesk), and so is a machine while the fold is 0. Every reader
+ * of a machine's p goes through this — the roll (lane.ts), the catch rate
+ * (detection.ts laneCatchRate with a ctx: the readouts, the
+ * laneRateAtLeast condition, the policy) and the lost-life "what if" — so
+ * the dice and every number shown agree.
+ */
+export function effChecker(ctx: ModCtx, c: Checker): Checker {
+  if (c.kind !== 'machine') return c
+  const a = modAdd(ctx, 'machineP')
+  if (a === 0) return c
+  const [lo, hi] = ctx.data.events.modifiers.machinePClamp
+  const clamp = (p: number): number =>
+    Math.round(Math.min(hi, Math.max(lo, p + a)) * 1e4) / 1e4
+  return { ...c, pMatch: clamp(c.pMatch), pOther: clamp(c.pOther) }
 }
 
 /** Live = untilTick null or > state.tick. */

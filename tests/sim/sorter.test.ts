@@ -12,6 +12,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { auditState, type Sim } from '../../src/sim/sim.ts'
+import { applyEffect, effectSummary } from '../../src/sim/systems/effects.ts'
 import * as sorterModule from '../../src/sim/systems/sorter.ts'
 import type { Pips } from '../../src/sim/types.ts'
 import { laneNode } from '../../src/sim/types.ts'
@@ -576,4 +577,49 @@ describe('the Sorter Arm at the real L4 (M9: the shipped cap 5; design-m8-m9 §4
     }
     expect(auditState(sim.state, sim.data)).toEqual([])
   }, 30_000)
+})
+
+describe('build 3: an absent sorter (B3 §3.5 staff absent)', () => {
+  it('calls nothing while away (no draw, the held parcel stays), then resumes when the absence ends', () => {
+    const { sim, e } = sorterSim()
+    const hs = sim.state.lane.holdStation
+    const p = heldParcel(sim, { malware: true })
+    const effect = {
+      kind: 'staff',
+      absent: 'sorter',
+      pick: 'all',
+      days: 0.5,
+    } as const
+    const refs = { eventId: 'ev_test', title: 'Test', target: null, pick: null }
+    expect(effectSummary(sim, [effect], refs)).toEqual([
+      { text: `${e.name} off for 12h (unpaid)`, tone: 'cost' },
+    ])
+    applyEffect(
+      sim,
+      {
+        eventId: 'ev_test',
+        title: 'Test',
+        optionLabel: 'OK',
+        optionIndex: 0,
+        target: null,
+        pick: null,
+        chainHeadId: 'ev_test',
+        depth: 1,
+      },
+      effect,
+    )
+    expect(e.absentUntilTick).toBe(sim.state.tick + 300)
+    expect(e.active).toBe(true)
+    const decided = collect(sim, 'sorter:decided')
+    const word = sim.state.rng
+    runTicks(sim, 250)
+    expect(decided).toEqual([])
+    expect(hs.nextDecisionTick).toBeNull()
+    expect(sim.state.parcels[String(p.id)]?.state).toBe('held')
+    expect(sim.state.rng).toBe(word)
+    expect(auditState(sim.state, sim.data)).toEqual([])
+    runUntil(sim, () => decided.length > 0, 200)
+    expect(decided).toHaveLength(1)
+    expect(e.absentUntilTick).toBeUndefined()
+  })
 })

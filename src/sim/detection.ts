@@ -25,7 +25,7 @@
 // and (M6) the inspector who missed it and the 5-eye "what if".
 
 import type { CheckerDef, GameData, StrainId } from '../data/types.ts'
-import { effChecker, modAdd, type ModCtx } from './modifiers.ts'
+import { effChecker, modAdd, modMult, type ModCtx } from './modifiers.ts'
 import type { Sim } from './sim.ts'
 import { effectiveP } from './systems/people.ts'
 import type {
@@ -107,21 +107,44 @@ export function announcedStrains(state: SimState, data: GameData): Strain[] {
 }
 
 /**
+ * A station's process time now (B3 §3.6 processS): `ticks` (the station's
+ * own, else the checker's) × modMult('processS', the fixture kind —
+ * 'desk' | 'machine'), rounded, ≥ 1 tick. With no ctx (a pure readout) or
+ * the identity fold: `ticks` unchanged. lane.ts seat (the real process
+ * time) and laneRatePerMin share it, so the rate shown is the rate run.
+ */
+export function processTicksAt(
+  ctx: ModCtx | null,
+  kind: Checker['kind'],
+  ticks: number,
+): number {
+  if (ctx === null) return ticks
+  const m = modMult(ctx, 'processS', kind)
+  return m === 1 ? ticks : Math.max(1, Math.round(ticks * m))
+}
+
+/**
  * Lane rate in parcels/min (spec §6.3): min over active checkers of
  * Σ stations 1 / processS (each inspector at its own pace, spec-build2 §2.3),
- * capped by the loading docks (dockUnloadPerS each).
+ * capped by the loading docks (dockUnloadPerS each). Build 3 (D-5): with a
+ * ctx each station's process time is the processS-modded one (processTicksAt).
  */
 export function laneRatePerMin(
   lane: Lane,
   data: GameData,
-  _ctx: ModCtx | null,
+  ctx: ModCtx | null,
 ): number {
   const dockCap = lane.docks.length * data.vehicles.dockUnloadPerS * 60
   let rate = dockCap
   for (const { node, c } of activeCheckers(lane)) {
     let perMin = 0
     for (const st of node.stations) {
-      perMin += (60 * TICKS_PER_S) / (st.processTicks ?? c.processTicks)
+      const ticks = processTicksAt(
+        ctx,
+        c.kind,
+        st.processTicks ?? c.processTicks,
+      )
+      perMin += (60 * TICKS_PER_S) / ticks
     }
     rate = Math.min(rate, perMin)
   }

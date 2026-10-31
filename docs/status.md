@@ -18,7 +18,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 ## Milestone checklist (build 3)
 
-- [ ] M11 pacing pass 1 + the events engine: windows, the threshold scan, the modifier registry, `events.json`, deck/effects/policy, gate rows, save v6 (commit `M11: …`)
+- [x] M11 pacing pass 1 + the events engine: windows, the threshold scan, the modifier registry, `events.json`, deck/effects/policy, gate rows, save v6 (commit `M11: …`)
 - [ ] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
 - [ ] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
 - [ ] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
@@ -60,6 +60,49 @@ JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 an
 L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `level:up {3}` in any 30-min run).
 
 ## Checkpoint entries (newest first)
+
+## M11 — pacing pass 1 + events engine — 2026-10-31 06:30 UTC — DONE at (this commit; sha recorded in the M12 entry)
+
+Built: the events engine of B3 §3/§6 headless — `src/sim/systems/deck.ts` (one scheduler for decision cards and job
+cards: level bands, blank draws, two salted event streams, quiet rules, chains/routers/conditional next evaluated when
+due, link inheritance, the queue, the rescue draw, jobs via `quests.ts offerJob` with the old offer timer and expiry
+retired), `effects.ts` (every B3 §3.5 kind + the generated effect lines), `modifiers.ts` + `modifierOps.ts` (18 keys
+at every B3 §3.6 read site, bounds, expiry, the stored paid price, `handOffTick`, `Subscriptions`), the hold
+(`Sim.held`, `attachPolicy`; the stepper stops on it), `decideEvent` / `debugOfferEvent`, `policies/eventPolicy.ts`
+(B3 §3.8 scores, −∞ for the last life), `STATE_VERSION` 6; `src/data/events.json` (schedule, categories, bounds,
+weights, the 19-card seed deck + the audit router) + `checkEvents` (harsh-consequence rule, paid sibling, acyclic ≤ 5,
+copy-fit placeholder); gate rows `eventsOfferedBy30MinMin`, `eventsOpenMaxTicks`, `eventsL1PlateauMin`,
+`policyEvPerCard`, `policyNonDefaultShare` + informational rows, `--events on|off`; the interim job UI (QuestCard
+Accept / Decline) and an interim auto-answer for non-job cards until M12; `SIM_FEATURES.events` **off**. Pacing pass
+1: `newStrainDelayS` 90, thresholds L2 $1,750 / L3 $3,250 / L4 $4,650 / L5 $6,500, `perLevel` 0.015.
+Gate (seeds 1–10 × 30 min, decision deck off, job cards on — docs/gate/latest.md): PASS — first delivery 43.3 s,
+scripted malware caught 10/10, L2 **10.57** (−9.8 % vs build 2), truck +2.78, L3 **16.52** (−8.1 %), overseas +2.66, L4
+**20.56** (−8.0 %), L5 **25.46** (−8.1 %), lives 0 (4/10 seeds lose one), quests offered 6 / done 3, payroll 0.21;
+35-min gate PASS (Golden Release offered 25.46 ≤ 29); delegating PASS (informational: lives 1, payroll 0.28); 40 seeds ×
+30 min: 13/40 seeds lose a malware life (32.5 % ≤ 35 %). Deck on (informational): L2 10.43 / L3 15.90 / L4 20.52 / L5
+24.64 (−11.0 / −11.6 / −8.2 / −11.0 %), 21.5 cards by 30 min, 4 decision cards on the L1 plateau, EV $23.4 per card,
+non-default share 0.40, 14 chains started and finished, no life taken by a card. Step time at L5 p99 ≤ 0.15 ms.
+
+| median (min)        | build 2 | M11 (deck off) | Δ      | M11 (deck on, informational) |
+| ------------------- | ------- | -------------- | ------ | ---------------------------- |
+| L2                  | 11.72   | 10.57          | −9.8 % | 10.43                        |
+| L3                  | 17.98   | 16.52          | −8.1 % | 15.90                        |
+| L4                  | 22.35   | 20.56          | −8.0 % | 20.52                        |
+| L5                  | 27.70   | 25.46          | −8.1 % | 24.64                        |
+| truck after L2      | +1.54   | +2.78          |        | +2.30                        |
+| 40-seed lives share | —       | 13/40          |        |                              |
+
+Tests: 2,544 passing (vitest, 117 files; + stream isolation exact on seeds 1–10, save v6 mid-chain, v5 rejection);
+e2e smoke PASS; `vlr check` wall time 167 s
+Shots: `vlr shots` at this commit — 83 of 88 regenerated; `quest-offer` reads right (the job on the QuestCard with
+Accept / Decline, "waiting for you", the $1,750 bar); 5 fail on the regenerated fixtures and held job cards
+(`playtest-35min`, `docks-live`, `level-up-5`, `warehouse-tier5` ×2) — repaired with the shots of M12 (no card UI yet)
+Deviations from spec-build3.md: blank draws instead of "retry next tick" (D-1); a second event stream for content
+(D-2); no per-tick modifier cache (D-3); L5 threshold $100 under the plan's scan range (R26); a payday tick is quiet
+for the deck — all in docs/decisions.md "Run decisions and deviations (M11)"
+Open for the author: part A of the build-3 prompt never ran and the feel-check notes were empty — this run does
+M11 → M15 in one go (docs/decisions.md, run-start findings)
+Next: M12 the cards on screen (EventCard, EventChip, EffectsCard, HUD plumbing, the ~40-card deck, the flag on)
 
 ## M10 — playtest-2 build — 2026-10-30 17:20 UTC — DONE at 13245fd
 

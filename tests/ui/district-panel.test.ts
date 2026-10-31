@@ -169,9 +169,9 @@ describe('District panel (city-view §5.1)', () => {
     expect(dp.missingVehicleLine(district('highres'), data, [])).toBeNull()
   })
 
-  it('a locked region reads "Unlocks at Lv 2 — $2,000 lifetime earned" (levels.json threshold)', () => {
+  it('a locked region reads "Unlocks at Lv 2 — $1,750 lifetime earned" (levels.json threshold)', () => {
     expect(dp.lockedLine(district('industrial'), data)).toBe(
-      'Unlocks at Lv 2 — $2,000 lifetime earned',
+      'Unlocks at Lv 2 — $1,750 lifetime earned',
     )
     // M8: the L3 threshold is a §7.6 tuning lever — read it from levels.json.
     const l3 = data.levels.find((l) => l.level === 3)!

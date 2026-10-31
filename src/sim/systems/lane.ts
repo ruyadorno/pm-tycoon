@@ -64,6 +64,7 @@
 
 import {
   checkerName,
+  processTicksAt,
   rollChecker,
   rolledBy,
   slotLabel,
@@ -71,6 +72,7 @@ import {
   stationChecker,
 } from '../detection.ts'
 import type { StallReason } from '../events.ts'
+import { effChecker } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type {
   Checker,
@@ -331,7 +333,9 @@ function seat(sim: Sim, node: LaneNode, st: Station, id: number): void {
     })
     return
   }
-  st.doneTick = tick + (st.processTicks ?? c.processTicks)
+  // Build 3 (B3 §3.6): × the processS modifier for this fixture kind.
+  st.doneTick =
+    tick + processTicksAt(sim, c.kind, st.processTicks ?? c.processTicks)
   sim.emit('parcel:processing', { id, nodeId: node.id })
 }
 
@@ -384,7 +388,9 @@ function finishProcessing(
   if (!c) return
   const tick = sim.state.tick
   p.nodeDoneTick = tick
-  const sc = stationChecker(c, st)
+  // Build 3 (B3 §3.6, D-5): a machine rolls with the machineP modifier
+  // (effChecker; desks carry inspectorP in their station p already).
+  const sc = stationChecker(effChecker(sim, c), st)
   const strain = p.magic ? null : rollChecker(sim, sc, p)
   const e =
     st.employeeId === undefined ? null : employeeById(sim.state, st.employeeId)

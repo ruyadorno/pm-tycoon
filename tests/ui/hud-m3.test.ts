@@ -78,7 +78,9 @@ describe('city-view §4.1: the level bar against nextThreshold', () => {
     expect(capped.economy.playtestMaxLevel).toBe(2)
     const p = kit.levelProgress(capped, 2, 3410, 5000)
     expect(p.text).toBe('$3,410 / $5,000 · Lv 3 coming soon')
-    expect(p.frac).toBeCloseTo((3410 - 2000) / 3000)
+    // Thresholds are §7.6 tuning levers (build 3: L2 $1,750): from levels.json.
+    const t2 = capped.levels.find((l) => l.level === 2)!.threshold
+    expect(p.frac).toBeCloseTo((3410 - t2) / (5000 - t2))
     expect(p.text).not.toMatch(/build/i)
     expect(kit.nextUnlockLine(capped, 2)).toBe('Lv 3 coming soon')
   })
@@ -105,7 +107,8 @@ describe('city-view §4.1: the level bar against nextThreshold', () => {
   })
 
   it('§9.6 step 4: the bar starts again from 0 right at the threshold', () => {
-    expect(kit.levelProgress(data, 2, 2000, 5000).frac).toBe(0)
+    const t2 = data.levels.find((l) => l.level === 2)!.threshold
+    expect(kit.levelProgress(data, 2, t2, 5000).frac).toBe(0)
   })
 })
 

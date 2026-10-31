@@ -10,23 +10,26 @@
 // each counter reads one terminal event per parcel id, so nothing is counted
 // twice; only the ACTIVE quest counts (an offer never does).
 //
-// Scheduler (B2 §3.1): the first regular offer at firstOfferDay (state.day
-// semantics: tick 3 × 600 = 3:00, design Q3); after a completion or a fail
-// the next waits intervalDays, after a Decline or an expiry
-// declineCooldownDays (design Q8). An offer stays open offerExpiresDays. No
-// eligible template when due: retry every tick, no draw. The template is one
-// weighted draw on the QUEST stream (state.quests.rng, design Q21 — never
-// state.rng), the newest history entry's template left out when another is
-// eligible (no back-to-back repeat). The Golden Release (levels.json
-// ultimateQuest) is offered from its level on: it withdraws an open regular
-// offer, waits in the offer slot while a regular quest is active (Accept →
-// 'quest-active'), never expires, cannot be declined (Later only), and a
-// fail re-offers it after declineCooldownDays. While it is pending (its
-// level reached, no Victory yet) no regular template is offered, its
-// cooldown included (B2 §3.4 "while it is open or active no other template
-// is offered"); its end, Victory included, starts the regular interval like
-// any other end (`nextOfferTick` ≥ tick + intervalDays), so endless play
-// gets its first regular offer intervalDays after Victory.
+// Jobs (build 3, B3 §3.1–§3.2, §6; M11 contract §3B): regular quests are
+// offered as JOB CARDS by the event deck (systems/deck.ts — this module
+// never imports it, D-46): when a draw is due and `jobsOpen` (both slots
+// empty, the Golden Release not pending, tick ≥ quests.jobReadyTick) the
+// deck rolls `jobShare` on its cadence stream, draws the template from
+// `jobCandidates` with one weighted draw on the QUEST stream
+// (state.quests.rng, design Q21 — never state.rng; the newest history
+// entry's template left out when another is eligible) and calls `offerJob`
+// (no draw). A job offer never expires (expiresTick null, Q-B3-2): it lives
+// exactly as long as its card; the card's Accept / Decline are
+// `activateOffer` / `declineOffer`. The job cooldown: jobReadyTick = the end
+// of a regular quest (completed, failed, abandoned) + events.schedule
+// .jobCooldownDays, a Decline or an unavailable magic route +
+// quests.offer.declineCooldownDays; the Golden Release's end never pulls it
+// earlier (max). The Golden Release (levels.json ultimateQuest) keeps its
+// build-2 path: offered from its level on (it withdraws an open job offer and closes its card — `closeJobCard`,
+// the card's `withdrawn` record), waits in the offer slot while a regular
+// quest is active (Accept → 'quest-active'), never expires, cannot be
+// declined (Later only), and a fail re-offers it after declineCooldownDays;
+// while it is pending no job card is drawn.
 //
 // Rewards (B2 §3.1): cash → Sim.credit(…, 'quest', earned = true) (lifetime
 // earned, Q-B2-12); lives capped at economy.lives.cap (`life:gained`, design
@@ -57,6 +60,7 @@ import type { Sim } from '../sim.ts'
 import type { TickContext } from '../tick.ts'
 import type {
   DistrictId,
+  EventRecord,
   Quest,
   QuestFailReason,
   QuestGoalKind,
@@ -230,7 +234,7 @@ export function questValue(q: Quest): number {
 const clamp01 = (x: number): number =>
   Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0
 
-/** Ticks left: an offer until it expires (null: the ultimate), an active quest until its deadline. */
+/** Ticks left: an offer until it expires (null: never — the ultimate and, build 3, every job offer), an active quest until its deadline. */
 export function questTicksLeft(sim: Sim, q: Quest): number | null {
   const t = sim.state.tick
   if (q.status === 'offered') {
@@ -423,14 +427,13 @@ function newQuest(
   }
 }
 
+/** A regular quest offer (build 3: a job card's — it never expires, Q-B3-2). */
 function makeQuest(
   sim: Sim,
   t: QuestTemplateDef,
   target: DistrictId | null,
 ): Quest {
   const level = sim.state.level.level
-  const expires =
-    sim.state.tick + daysToTicks(sim.data.quests.offer.offerExpiresDays)
   return newQuest(
     sim,
     t.id,
@@ -439,7 +442,7 @@ function makeQuest(
     target,
     goalOf(t, level),
     rewardOf(sim.data, t, level),
-    expires,
+    null,
   )
 }
 
@@ -492,7 +495,10 @@ function record(
   if (h.length > QUEST_HISTORY_MAX) h.splice(0, h.length - QUEST_HISTORY_MAX)
 }
 
-/** Take the open offer down (record `withdrawn`, `quest:declined {withdrawn}`); no cooldown here. */
+/**
+ * Take the open offer down (record `withdrawn`, its job card closed as
+ * `withdrawn`, `quest:declined {withdrawn}`); no cooldown here.
+ */
 function withdrawOffer(
   sim: Sim,
   q: Quest,
@@ -500,11 +506,64 @@ function withdrawOffer(
 ): void {
   record(sim, q, 'withdrawn', reason)
   sim.state.quests.offer = null
+  closeJobCard(sim, q.id)
   sim.emit('quest:declined', {
     questId: q.id,
     templateId: q.templateId,
     reason: 'withdrawn',
   })
+}
+
+/** Debug (systems/deck.ts debugOfferJob): withdraw whatever offer is open (its card too). */
+export function withdrawOpenOffer(sim: Sim): void {
+  const o = sim.state.quests.offer
+  if (o !== null) withdrawOffer(sim, o, null)
+}
+
+/**
+ * Close the job card that holds quest `questId` as `withdrawn` (the Golden
+ * Release displaced it, its magic route failed, a debug offer replaced it —
+ * D-43/D-46: here, not in deck.ts): a history record, stats.withdrawn, the
+ * draw timer restarted when the card was drawn, the slot freed,
+ * `event:withdrawn`. A queued job card with that quest leaves the queue
+ * (critique 29). No card holds it: nothing happens.
+ */
+export function closeJobCard(sim: Sim, questId: string): void {
+  const s = sim.state
+  const ev = s.events
+  const queued = ev.queue.filter(
+    (c) => c.kind === 'job' && c.questId === questId,
+  )
+  if (queued.length > 0) {
+    ev.queue = ev.queue.filter((c) => !queued.includes(c))
+    for (const c of queued) {
+      if (c.drawn && c.gapTicks !== null) ev.nextDrawTick = s.tick + c.gapTicks
+    }
+  }
+  const card = ev.open
+  if (card === null || card.kind !== 'job' || card.questId !== questId) return
+  const rec: EventRecord = {
+    eventId: card.eventId,
+    kind: card.kind,
+    category: card.category,
+    openedTick: card.openedTick,
+    closedTick: s.tick,
+    option: null,
+    label: null,
+    default: false,
+    outcome: 'withdrawn',
+    chainHeadId: card.chainHeadId,
+    depth: card.depth,
+  }
+  ev.history.push(rec)
+  const max = sim.data.events.schedule.historyMax
+  if (ev.history.length > max) ev.history.splice(0, ev.history.length - max)
+  ev.stats.withdrawn += 1
+  if (card.drawn && card.gapTicks !== null) {
+    ev.nextDrawTick = s.tick + card.gapTicks
+  }
+  ev.open = null
+  sim.emit('event:withdrawn', { eventId: card.eventId })
 }
 
 // Targets, conditions, eligibility ------------------------------------------------------
@@ -639,8 +698,7 @@ export function ultimatePending(sim: Sim): boolean {
 /**
  * B3 §3.2: a job card may be drawn now — quests on, not game over, both
  * slots empty, the Golden Release not pending and the job cooldown
- * (quests.jobReadyTick) over. Build 3 M11: read by the event deck
- * (systems/deck.ts); the wave-0 build-2 scheduler does not use it.
+ * (quests.jobReadyTick) over. Read by the event deck (systems/deck.ts).
  */
 export function jobsOpen(sim: Sim): boolean {
   const s = sim.state
@@ -657,11 +715,10 @@ export function jobsOpen(sim: Sim): boolean {
 
 /**
  * Build 3 (B3 §3.1): put template `templateId` in the offer slot for a job
- * card — no draw; `quest:offered` + the quest ticker line (offerQuest).
- * `debug` resolves the target with the debug fallbacks. Null when the
- * template is unknown or its target does not resolve.
- * M11 wave 0: the offer keeps the build-2 expiry; stream B makes it
- * card-held (expiresTick null).
+ * card — no draw; `quest:offered` + the quest ticker line (offerQuest). The
+ * offer never expires (its card holds it). `debug` resolves the target with
+ * the debug fallbacks. Null when the template is unknown or its target does
+ * not resolve.
  */
 export function offerJob(
   sim: Sim,
@@ -789,28 +846,20 @@ function holdsUltimate(qs: QuestsState): boolean {
   return qs.offer?.ultimate === true || qs.active?.ultimate === true
 }
 
-/** Tick step 11 (after levels, before day). */
+/**
+ * Tick step 11 (after levels and the deck, before day): the active quest,
+ * then the Golden Release from its level on. Job offers are the deck's
+ * (build 3: no regular timer, no offer expiry).
+ */
 export function questsStep(sim: Sim, ctx: TickContext): void {
   if (!SIM_FEATURES.quests) return
   const s = sim.state
   if (s.economy.gameOver) return
   const qs = s.quests
-  const offer = sim.data.quests.offer
   // 1. the active quest
   if (qs.active !== null) stepActive(sim, qs.active, ctx)
-  // 2. offer expiry (as a Decline: declineCooldownDays, design Q8)
-  const o = qs.offer
-  if (o !== null && o.expiresTick !== null && s.tick >= o.expiresTick) {
-    record(sim, o, 'expired', null)
-    qs.offer = null
-    qs.nextOfferTick = s.tick + daysToTicks(offer.declineCooldownDays)
-    sim.emit('quest:declined', {
-      questId: o.id,
-      templateId: o.templateId,
-      reason: 'expired',
-    })
-  }
-  // 3. the ultimate quest from its level on (design Q15)
+  // 2. the ultimate quest from its level on (design Q15); an open job offer
+  //    is withdrawn and its card closed (D-43)
   const u = ultimateDef(sim.data)
   if (
     u !== null &&
@@ -821,19 +870,6 @@ export function questsStep(sim: Sim, ctx: TickContext): void {
   ) {
     if (qs.offer !== null) withdrawOffer(sim, qs.offer, null)
     offerQuest(sim, makeUltimate(sim, u.def))
-  }
-  // 4. a regular offer (one quest-stream draw; none when nothing is eligible)
-  //    — never while the ultimate is pending (its cooldown after a fail too)
-  if (
-    !ultimatePending(sim) &&
-    qs.offer === null &&
-    qs.active === null &&
-    s.tick >= qs.nextOfferTick
-  ) {
-    const pool = jobCandidates(sim)
-    if (pool.length === 0) return
-    const c = questRng(sim).weighted(pool, (x) => x.t.weight)
-    if (c) offerQuest(sim, makeQuest(sim, c.t, c.target))
   }
 }
 
@@ -868,7 +904,7 @@ function completeQuest(sim: Sim, q: Quest): void {
   const r = q.reward
   record(sim, q, 'completed', null)
   qs.active = null
-  scheduleAfterEnd(sim, q)
+  jobCooldownAfterEnd(sim, q)
   // The ★ applicant's name as the pool will hold it (a staff clash gives
   // "Vera 2"): the event and the ticker line carry that name.
   const shown: QuestReward = structuredClone(r)
@@ -923,18 +959,20 @@ function completeQuest(sim: Sim, q: Quest): void {
 }
 
 /**
- * After a quest ends (complete, fail, abandon): the next regular offer waits
- * intervalDays. The ultimate's end never pulls an offer earlier (max) — after
- * a fail it comes back first (ultimateNextTick, and step 4 waits while it is
- * pending), after Victory the regular scheduler resumes intervalDays later.
+ * After a quest ends (complete, fail, abandon): no job card for
+ * events.schedule.jobCooldownDays (B3 §3.2). The ultimate's end never pulls
+ * it earlier (max) — after a fail the Golden Release comes back first
+ * (ultimateNextTick; no job card while it is pending), after Victory jobs
+ * resume jobCooldownDays later.
  */
-function scheduleAfterEnd(sim: Sim, q: Quest): void {
+function jobCooldownAfterEnd(sim: Sim, q: Quest): void {
   const qs = sim.state.quests
-  const next = sim.state.tick + daysToTicks(sim.data.quests.offer.intervalDays)
-  qs.nextOfferTick = q.ultimate ? Math.max(qs.nextOfferTick, next) : next
+  const next =
+    sim.state.tick + daysToTicks(sim.data.events.schedule.jobCooldownDays)
+  qs.jobReadyTick = q.ultimate ? Math.max(qs.jobReadyTick, next) : next
 }
 
-/** Fail / abandon: no penalty (Q-B2-7); the next offer after the interval (ultimate: re-offered after the cooldown). */
+/** Fail / abandon: no penalty (Q-B2-7); the job cooldown (ultimate: re-offered after declineCooldownDays). */
 function failQuest(sim: Sim, q: Quest, reason: QuestFailReason): void {
   const s = sim.state
   const data = sim.data
@@ -945,7 +983,7 @@ function failQuest(sim: Sim, q: Quest, reason: QuestFailReason): void {
     qs.ultimateNextTick =
       s.tick + daysToTicks(data.quests.offer.declineCooldownDays)
   }
-  scheduleAfterEnd(sim, q)
+  jobCooldownAfterEnd(sim, q)
   sim.emit('quest:failed', {
     questId: q.id,
     templateId: q.templateId,
@@ -982,7 +1020,8 @@ export function acceptQuest(sim: Sim, questId: string): CommandResult {
 /**
  * Make the open offer `o` the active quest (acceptQuest after its checks;
  * build 3: a job card's Accept): the deadline, the satisfaction start, the
- * magic parcel. A magic quest with no route now is withdrawn instead
+ * magic parcel. A magic quest with no route now is withdrawn instead — its
+ * job card closed as `withdrawn`, the decline cooldown —
  * (`{ok: false, reason: 'quest-expired', applied: true}`, logged for replay).
  */
 export function activateOffer(sim: Sim, o: Quest): CommandResult {
@@ -1000,7 +1039,7 @@ export function activateOffer(sim: Sim, o: Quest): CommandResult {
     if (route === null) {
       // Nothing can carry it now: the offer is withdrawn (logged for replay).
       withdrawOffer(sim, o, 'unavailable')
-      qs.nextOfferTick =
+      qs.jobReadyTick =
         s.tick + daysToTicks(data.quests.offer.declineCooldownDays)
       return { ok: false, reason: 'quest-expired', applied: true }
     }
@@ -1047,15 +1086,15 @@ export function declineQuest(sim: Sim, questId: string): CommandResult {
 
 /**
  * Decline the open regular offer `o` (declineQuest after its checks; build
- * 3: a job card's Decline): history `declined`, the decline cooldown,
- * `quest:declined {declined}`.
+ * 3: a job card's Decline): history `declined`, the decline cooldown
+ * (jobReadyTick), `quest:declined {declined}`.
  */
 export function declineOffer(sim: Sim, o: Quest): CommandResult {
   const s = sim.state
   const qs = s.quests
   record(sim, o, 'declined', null)
   qs.offer = null
-  qs.nextOfferTick =
+  qs.jobReadyTick =
     s.tick + daysToTicks(sim.data.quests.offer.declineCooldownDays)
   sim.emit('quest:declined', {
     questId: o.id,
@@ -1079,8 +1118,10 @@ export function abandonQuest(sim: Sim): CommandResult {
 /**
  * Debug builds (ViewSim.debug.offerQuest, `?quest=`): offer `templateId` now,
  * ignoring unlockLevel, condition, requires and the scheduler (targets still
- * resolve, with the debug fallbacks); an open offer is withdrawn first; the
- * ultimate id offers the ultimate at any level.
+ * resolve, with the debug fallbacks); an open offer is withdrawn first (its
+ * job card closed); the ultimate id offers the ultimate at any level.
+ * Build 3: the command routes through deck.ts debugOfferJob — a template
+ * opens a job card there; only the ultimate reaches this card-less path.
  */
 export function debugOfferQuest(sim: Sim, templateId: string): CommandResult {
   if (!SIM_FEATURES.quests) return fail('locked')

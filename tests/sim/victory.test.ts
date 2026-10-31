@@ -18,6 +18,7 @@ import {
   acceptOffer,
   collect,
   dataFixture,
+  deckOn,
   eventLog,
   injectParcel,
   noOffers,
@@ -25,6 +26,7 @@ import {
   quiet,
   quietSim,
   runTicks,
+  runUntil,
   startQuest,
 } from './helpers.ts'
 
@@ -89,12 +91,16 @@ describe('the Golden Release offer (B2 §3.4; design Q15)', () => {
     expect(dataFixture().puns.ultimateQuestName).toBe('The Golden Release')
   })
 
-  it('offered on level:up {5} the same tick; an open regular offer is withdrawn (no cooldown); no expiry; Decline is refused', () => {
+  it('offered on level:up {5} the same tick; an open regular offer is withdrawn with its job card (no cooldown); no expiry; Decline is refused', () => {
     const sim = noOffers(quietSim(1))
-    const regular = offerQuest(sim, 'rush_district')
+    const regular = offerQuest(sim, 'rush_district') // a job card
     sim.state.economy.lifetimeEarned = 16_000
     const log = eventLog(sim)
+    // The job card would hold a policy-less sim (B3 §6); a policy decides it
+    // first, so this only happens in a debug state (D-43): tick through it.
+    const detach = sim.attachPolicy()
     runTicks(sim, 1)
+    detach()
     quiet(sim)
     expect(sim.state.level.level).toBe(5)
     const names = log.map((e) => e.name)
@@ -115,7 +121,13 @@ describe('the Golden Release offer (B2 §3.4; design Q15)', () => {
       tick: 1,
       p: { templateId: 'golden_release', target: null, ultimate: true },
     })
-    expect(sim.state.quests.nextOfferTick).toBe(1e12) // no cooldown from the withdrawal
+    expect(sim.state.quests.jobReadyTick).toBe(0) // no cooldown from the withdrawal
+    expect(names.indexOf('event:withdrawn')).toBeGreaterThan(up5)
+    expect(sim.state.events.open).toBeNull()
+    expect(sim.state.events.history.at(-1)).toMatchObject({
+      eventId: 'job:rush_district',
+      outcome: 'withdrawn',
+    })
     const q = sim.state.quests.offer!
     expect(q).toMatchObject({
       ultimate: true,
@@ -142,7 +154,6 @@ describe('the Golden Release offer (B2 §3.4; design Q15)', () => {
     const sim = noOffers(quietSim(2))
     startQuest(sim, 'rush_district')
     sim.state.economy.lifetimeEarned = 16_000
-    sim.state.quests.nextOfferTick = 0
     runTicks(sim, 1)
     quiet(sim)
     const q = sim.state.quests.offer!
@@ -273,18 +284,17 @@ describe('the Golden Release counters (design Q13)', () => {
   })
 })
 
-/** L5 with the regular scheduler live (nextOfferTick long past), the ultimate offered. */
+/** L5 with the deck live (every due draw a job while one is eligible), the ultimate offered. */
 function level5Live(seed: number): Sim {
-  const sim = quietSim(seed)
+  const sim = quietSim(seed, { events: { schedule: { jobShare: 1 } } })
   sim.state.economy.lifetimeEarned = dataFixture().levels.at(-1)!.threshold
   runTicks(sim, 1)
   quiet(sim)
-  sim.state.quests.nextOfferTick = 0
-  return sim
+  return deckOn(sim)
 }
 
-describe('the regular scheduler around the ultimate (B2 §3.1, §3.4; review M7)', () => {
-  it('a fail or an abandon: no regular offer during the cooldown; the ultimate comes back first, and nothing else while it waits', () => {
+describe('job cards around the ultimate (B2 §3.4; B3 §3.2: none while it is pending)', () => {
+  it('a fail or an abandon: no job card during the cooldown; the ultimate comes back first, and nothing else while it waits', () => {
     for (const how of ['malware', 'abandon'] as const) {
       const sim = level5Live(how === 'malware' ? 11 : 12)
       const q = acceptOffer(sim)
@@ -295,18 +305,22 @@ describe('the regular scheduler around the ultimate (B2 §3.1, §3.4; review M7)
       } else sim.dispatch({ kind: 'abandonQuest' })
       const t = sim.state.tick
       expect(sim.state.quests.history.at(-1)).toMatchObject({ id: q.id })
-      expect(sim.state.quests.nextOfferTick).toBeGreaterThanOrEqual(t + 2 * DAY)
+      expect(sim.state.quests.jobReadyTick).toBeGreaterThanOrEqual(
+        t + sim.data.events.schedule.jobCooldownDays * DAY,
+      )
       const offered = collect(sim, 'quest:offered')
       runTicks(sim, DAY - 1)
       expect(offered).toEqual([]) // on_time_day is eligible, yet nothing comes
       runTicks(sim, 1)
       expect(offered.map((o) => o.templateId)).toEqual(['golden_release'])
-      runTicks(sim, 4 * DAY) // Later: it stays, nothing else is drawn
+      runTicks(sim, 4 * DAY) // Later: it stays, no job card is drawn
       expect(offered).toHaveLength(1)
+      expect(sim.state.events.open).toBeNull()
+      expect(sim.state.tick).toBe(t + 5 * DAY)
     }
   })
 
-  it('Victory: the regular scheduler resumes intervalDays later, not on the victory tick', () => {
+  it('Victory: job cards resume jobCooldownDays later (at the first draw after), not on the victory tick', () => {
     const sim = level5Live(13)
     acceptOffer(sim)
     delivered(sim, u.deliveries)
@@ -314,12 +328,15 @@ describe('the regular scheduler around the ultimate (B2 §3.1, §3.4; review M7)
     runTicks(sim, 1)
     expect(sim.state.economy.victory).toBe(true)
     const t = sim.state.tick
-    const interval = sim.data.quests.offer.intervalDays * DAY
-    expect(sim.state.quests.nextOfferTick).toBe(t + interval)
-    runTicks(sim, interval - 1)
+    const cooldown = sim.data.events.schedule.jobCooldownDays * DAY
+    expect(sim.state.quests.jobReadyTick).toBe(t + cooldown)
+    runTicks(sim, cooldown - 1)
     expect(offered).toEqual([])
-    runTicks(sim, 1)
+    // The first draw is at firstEventS (200 s) at the earliest.
+    expect(runUntil(sim, () => offered.length > 0, 4 * DAY)).toBeGreaterThan(0)
+    expect(sim.state.tick).toBeGreaterThanOrEqual(t + cooldown)
     expect(offered).toHaveLength(1)
     expect(offered[0]?.ultimate).toBe(false)
+    expect(sim.state.events.open).toMatchObject({ kind: 'job', drawn: true })
   })
 })

@@ -10,7 +10,7 @@ import { createPolicy } from '../../src/sim/policy.ts'
 import { replay, Sim, stateHash } from '../../src/sim/sim.ts'
 import type { Command } from '../../src/sim/commands.ts'
 import { liveSlotIds, laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
-import { dataFixture, firstApplicant } from './helpers.ts'
+import { answerCards, dataFixture, firstApplicant } from './helpers.ts'
 
 const MINUTES = 30
 
@@ -94,6 +94,9 @@ describe('determinism (plan.md §6.4)', () => {
           run({ kind: 'buyMachine', defId: 'battery_checker', nodeId: empty })
         }
       }
+      // Build 3: a job card would hold this policy-less run (B3 §6) —
+      // decline it (a logged decideEvent, so the replay answers it too).
+      answerCards(sim, 'default')
       sim.tick()
     }
     expect(sim.state.lane.docks.map((d) => d.id)).toEqual(['dock1', 'dock2'])

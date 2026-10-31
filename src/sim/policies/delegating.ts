@@ -24,14 +24,22 @@
 import type { Sim } from '../sim.ts'
 import { employeeById, hireFeeOf } from '../systems/people.ts'
 import type { Applicant } from '../types.ts'
-import { laneNode } from '../types.ts'
+import { isAbsent, laneNode } from '../types.ts'
 
-/** True while an active sorter (not the Sorter Arm, not walked out) holds the station. */
+/**
+ * True while an active sorter (not the Sorter Arm, not walked out, not away
+ * on an event absence — B3 §3.5) holds the station.
+ */
 export function sorterOnDuty(sim: Sim): boolean {
   const f = sim.state.lane.holdStation.fixture
   if (typeof f !== 'number') return false
   const e = employeeById(sim.state, f)
-  return e !== null && e.role === 'sorter' && e.active
+  return (
+    e !== null &&
+    e.role === 'sorter' &&
+    e.active &&
+    !isAbsent(e, sim.state.tick)
+  )
 }
 
 /**

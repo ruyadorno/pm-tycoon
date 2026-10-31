@@ -40,16 +40,26 @@ export function paidValue(
   return Math.round(valueAt(data, p, tick))
 }
 
-/** On time ⇔ age ≤ onTimeMaxS (spec §5.3, §9.1). */
-export function isOnTime(data: GameData, age: number): boolean {
-  return age <= data.parcels.onTimeMaxS
+/**
+ * On time ⇔ age ≤ onTimeMaxS (spec §5.3, §9.1). Build 3 (B3 §3.6): `extraS`
+ * = the caller's modAdd('onTimeMaxS') fold (this file stays state-free).
+ */
+export function isOnTime(data: GameData, age: number, extraS = 0): boolean {
+  return age <= data.parcels.onTimeMaxS + extraS
 }
 
-/** The value an overseas hand-off locks (spec §5.6: f sampled at hand-off). */
+/**
+ * The value an overseas hand-off locks (spec §5.6: f sampled at hand-off).
+ * Build 3 (B3 §3.6): `mult` = the caller's modMult('income') fold, rounded
+ * once with the rest; clearance then pays the locked value untouched.
+ */
 export function lockValue(
   data: GameData,
   p: Pick<Parcel, 'spawnedTick' | 'baseValue' | 'mult'>,
   tick: Tick,
+  mult = 1,
 ): number {
-  return Math.round(p.baseValue * p.mult * decayFactor(data, ageS(p, tick)))
+  return Math.round(
+    p.baseValue * p.mult * decayFactor(data, ageS(p, tick)) * mult,
+  )
 }

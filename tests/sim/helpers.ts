@@ -537,7 +537,6 @@ export function feeder(
  * build 3: the deck too (job cards are its draws).
  */
 export function noOffers(sim: Sim): Sim {
-  sim.state.quests.nextOfferTick = 1e12
   sim.state.events.nextDrawTick = DECK_OFF_TICK
   return sim
 }

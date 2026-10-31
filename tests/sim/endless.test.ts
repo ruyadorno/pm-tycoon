@@ -8,8 +8,8 @@
 // rule; a debug Victory below the cap escalates from victoryTick (M7's
 // precedence). The sim-owned endless ticker line (puns.tickerQuest.endless,
 // kind 'level') fires once, at that first boundary, across a save / load;
-// the quest scheduler keeps offering regular templates, never the Golden
-// Release again.
+// job cards (build 3: the event deck, B3 §3.2) keep offering regular
+// templates, never the Golden Release again.
 
 import { describe, expect, it } from 'vitest'
 import { Sim } from '../../src/sim/sim.ts'
@@ -22,12 +22,14 @@ import {
   acceptOffer,
   collect,
   dataFixture,
+  deckOn,
   eventLog,
   injectParcel,
   noOffers,
   quiet,
   quietSim,
   runTicks,
+  runUntil,
   startQuest,
 } from './helpers.ts'
 
@@ -45,8 +47,8 @@ const levelShare = (level: number): number =>
   m.baseShare + m.perLevel * (level - 1)
 
 /** A quiet game at L5 the levels.json way (lifetime earned, the shipped cap), the Golden Release offered. */
-function atL5(seed: number): Sim {
-  const sim = noOffers(quietSim(seed))
+function atL5(seed: number, overrides?: unknown): Sim {
+  const sim = noOffers(quietSim(seed, overrides))
   sim.state.economy.lifetimeEarned = L5.threshold
   runTicks(sim, 1)
   expect(sim.state.level.level).toBe(5)
@@ -187,18 +189,21 @@ describe('escalation from Victory (B2 §3.4 "from the next day boundary")', () =
     expect(news.some((n) => n.text === ENDLESS)).toBe(false)
   }, 30_000)
 
-  it('quests continue after Victory: a regular template intervalDays later, never the Golden Release again', () => {
-    const sim = atL5(4)
-    sim.state.quests.nextOfferTick = 0 // the regular scheduler live
+  it('quests continue after Victory: a job card jobCooldownDays later (at the next draw), never the Golden Release again', () => {
+    // Every due draw a job while one is eligible.
+    const sim = deckOn(atL5(4, { events: { schedule: { jobShare: 1 } } }))
     acceptOffer(sim)
     const offered = collect(sim, 'quest:offered')
     const vt = winNow(sim)
-    const interval = sim.data.quests.offer.intervalDays * DAY
-    runTicks(sim, interval)
-    expect(sim.state.tick).toBe(vt + interval)
+    const cooldown = sim.data.events.schedule.jobCooldownDays * DAY
+    expect(sim.state.quests.jobReadyTick).toBe(vt + cooldown)
+    runTicks(sim, cooldown - 1)
+    expect(offered).toEqual([])
+    expect(runUntil(sim, () => offered.length > 0, 3 * DAY)).toBeGreaterThan(0)
+    expect(sim.state.tick).toBeGreaterThanOrEqual(vt + cooldown)
     expect(offered).toHaveLength(1)
     expect(offered[0]?.ultimate).toBe(false)
-    // Decline every regular offer for ten days: still never the ultimate.
+    // Decline every job card for ten days: still never the ultimate.
     for (let d = 0; d < 10 * DAY; d++) {
       const o = sim.state.quests.offer
       if (o && !o.ultimate) {

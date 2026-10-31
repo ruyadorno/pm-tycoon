@@ -67,10 +67,17 @@
 // ultimate as soon as no quest is active); the plan holds the 3rd truck;
 // COUNTERS fills slot 6 once it is bought.
 //
+// Build 3 (B3 §3.6; M11 contract §3 stream D): a machine or vehicle step's
+// price is priceOf (the machinePrice / vehiclePrice modifiers — what
+// buyMachine / buyVehicle debit), so levelPlanDone and planMachinePending
+// (stepStatus at buffer 0) see the same number; docks and the Sorter Arm
+// keep their list prices (D-21: the Arm is no machine for priceOf).
+//
 // Pure sim code (tools/check-sim-purity.mjs): reads sim.state, acts only
 // through sim.dispatch. No import of policy.ts (no import cycle).
 
 import { SIM_FEATURES } from '../features.ts'
+import { priceOf } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import { SORTER_ARM_ID } from '../systems/sorter.ts'
 import type { VehicleType } from '../types.ts'
@@ -215,8 +222,10 @@ export function stepStatus(
       if (ownsMachine(sim, def.id)) return 'done'
       const pick = slotForPurchase(sim)
       if (!pick) return 'impossible'
-      // buyMachine spends a quest voucher before money.
-      const price = s.quests.vouchers.includes(def.id) ? 0 : def.price
+      // buyMachine spends a quest voucher before money; else priceOf (B3 §3.6).
+      const price = s.quests.vouchers.includes(def.id)
+        ? 0
+        : priceOf(sim, 'machine', def.price)
       return balance + pick.refund >= price + buffer ? 'ready' : 'waiting'
     }
     case 'dock': {
@@ -231,7 +240,8 @@ export function stepStatus(
       const owned = s.vehicles.filter((v) => v.type === def.id).length
       if (owned >= step.count) return 'done'
       if (!bestApplicant(sim, 'driver', def.id)) return 'waiting'
-      return balance >= def.price + buffer ? 'ready' : 'waiting'
+      const price = priceOf(sim, 'vehicle', def.price)
+      return balance >= price + buffer ? 'ready' : 'waiting'
     }
     case 'sorterArm': {
       const up = sim.data.machines.upgrades.find((u) => u.id === SORTER_ARM_ID)

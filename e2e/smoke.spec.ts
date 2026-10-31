@@ -23,7 +23,7 @@
 //      taps) sends it to the Quarantine Bin, and a pm:goto highlight while
 //      in the room opens the BuySheet — no console errors.
 //   M3 (§12.6 task 12) — L2 for real: the chips-at-360 check loads
-//      tests/fixtures/level-up.json (lifetime $1,996 under ?policy=1) and
+//      tests/fixtures/level-up.json (lifetime just under L2, ?policy=1) and
 //      waits for the sim's own level:up {2}: Industrial live, its chip
 //      unlocked, the row still ≤ W − 12. Audio boot (?audio=1, the Title):
 //      the AudioDirector exists, nothing plays before a tap (not unlocked,
@@ -51,12 +51,16 @@
 //      game driven by the delegating policy (the attract sim untouched).
 //      The save is version 5 (types.ts STATE_VERSION since M8).
 //   M7 (plan-build2 §8.4 tasks 4-6; design-m7 §3.4, §6.4, §6.10) — quests:
-//      under ?policy=1 the first offer comes at 3:00 (tick 1800, state.day 3)
-//      and the policy accepts it on that step — __pm.quests().active, the
-//      QuestChip in row B, the replay still matches (offers draw on the quest
-//      stream); the Title's New game with ?level=2&quest=rush_district is a
-//      fresh L2 game whose log starts debugForceLevel, debugOfferQuest (the
-//      L2 goal: 10 deliveries), the attract sim untouched.
+//      build 3 (M11, B3 §3.2): jobs come as event cards from the deck's
+//      draws — the first draw at 3:20 (firstEventS 200 s), a job with
+//      probability jobShare, else a blank (decisions off) and the next draw
+//      60–100 s on; under ?policy=1 the policy accepts the first job card on
+//      the step it opens (the decideEvent is logged) — __pm.quests().active,
+//      no card left open, the QuestChip in row B, the replay still matches;
+//      the Title's New game with ?level=2&quest=rush_district is a fresh L2
+//      game whose log starts debugForceLevel, debugOfferQuest (the L2 goal:
+//      10 deliveries — a job card the policy-less sim holds on), the attract
+//      sim untouched.
 //      e2e/quests.spec.ts has the card / chip / magic / victory flows.
 //   M8 (plan-build2 §8.5 tasks 3, 6; design-m8-m9 §6.1, §6.3) — L3 docks:
 //      a fresh ?level=3 game in the room: dock 3's door gives its unlock
@@ -1482,44 +1486,117 @@ test.describe('M6 people smoke', () => {
   })
 })
 
+/** events.json schedule.firstEventS 200 s → the deck's first draw at tick 2000 (B3 §3.2). */
+const FIRST_DRAW_TICK = 2000
+
 test.describe('M7 quests smoke', () => {
-  test('the policy accepts the 3:00 offer: __pm.quests().active, the chip; the replay matches', async ({
+  test('the policy accepts the first job card (3:20 or a later draw): __pm.quests().active, the chip; the replay matches', async ({
     page,
     pm,
     consoleErrors,
   }) => {
     await pm.open(M1_URL)
     await pm.freeze()
-    // quests.json offer.firstOfferDay 3 → tick 1800 (design-m7 Q3).
-    await pm.advance(179_000)
+    // Nothing before the deck's first draw (firstEventS 200 s).
+    await pm.advance(199_000)
     let qs = await page.evaluate(() => window.__pm!.quests())
-    expect(qs.offer, 'no offer before 3:00').toBeNull()
+    expect(qs.offer, 'no job before 3:20').toBeNull()
     expect(qs.active).toBeNull()
     expect(qs.history).toEqual([])
     expect(qs.nextOfferInTicks).toBeGreaterThan(0)
-    await pm.advance(2_000)
+    // A draw is a job with probability jobShare (else a blank and the next
+    // draw 60–100 s on): poll in 10-s steps until the policy took one.
+    await pm.advance(1_000)
+    for (let i = 0; i < 30; i++) {
+      qs = await page.evaluate(() => window.__pm!.quests())
+      if (qs.active !== null) break
+      await pm.advance(10_000)
+    }
     await pm.settle(10)
     qs = await page.evaluate(() => window.__pm!.quests())
     const st = await page.evaluate(() => {
       const api = window.__pm!
-      const acc = api.core.commandLog.find((e) => e.cmd.kind === 'acceptQuest')
+      const log = api.core.commandLog
+      const decide = log.find((e) => e.cmd.kind === 'decideEvent')
       const hud = api.game.scene.getScene('HUD') as unknown as {
         questChip: { current: { visible: boolean; barText: string } }
       }
       return {
-        acceptTick: acc?.tick ?? null,
+        decide: decide ? { tick: decide.tick, cmd: decide.cmd } : null,
+        open: api.events().open?.eventId ?? null,
         chip: hud.questChip.current,
       }
     })
     console.log(
-      `smoke: 3:00 quest ${qs.active?.templateId ?? '-'} ${JSON.stringify(st)}`,
+      `smoke: first job ${qs.active?.templateId ?? '-'} offered ${qs.active?.offeredTick ?? '-'} ${JSON.stringify(st)}`,
     )
-    expect(qs.active, 'the policy accepted the 3:00 offer').not.toBeNull()
-    expect(qs.active!.offeredTick).toBe(1800)
+    expect(qs.active, 'the policy accepted the first job card').not.toBeNull()
+    expect(qs.active!.offeredTick).toBeGreaterThanOrEqual(FIRST_DRAW_TICK)
     expect(qs.offer).toBeNull()
-    expect(st.acceptTick).toBeGreaterThanOrEqual(1800)
-    expect(st.acceptTick).toBeLessThanOrEqual(1801)
+    expect(st.open, 'no card left open under the policy').toBeNull()
+    // The policy answers on the step after the tick that opened the card.
+    expect(st.decide?.cmd).toEqual({
+      kind: 'decideEvent',
+      eventId: `job:${qs.active!.templateId}`,
+      option: 0,
+    })
+    expect(st.decide!.tick).toBeGreaterThanOrEqual(qs.active!.offeredTick)
+    expect(st.decide!.tick).toBeLessThanOrEqual(qs.active!.offeredTick + 1)
     expect(st.chip.visible, 'the QuestChip shows in row B').toBe(true)
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('no policy: a non-job card (the loaner, debug.offerEvent) holds the sim and the stepper, then the interim HUD answers it with its default (review deck-1/deck-2)', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open('/?seed=7&debug=1&skipTitle=1&audio=0')
+    await pm.freeze()
+    await pm.settle(5)
+    const before = await page.evaluate(() => {
+      const api = window.__pm!
+      const r = api.sim.debug!.offerEvent('ev_luck_loaner')
+      return {
+        ok: r.ok,
+        open: api.events().open?.eventId ?? null,
+        held: api.core.held,
+        vehicles: api.sim.vehicles.length,
+      }
+    })
+    expect(before).toMatchObject({
+      ok: true,
+      open: 'ev_luck_loaner',
+      held: true,
+    })
+    // Held, the stepper runs nothing (no no-op ticks): advance() reports 0.
+    expect(await page.evaluate(() => window.__pm!.advance(1_000))).toBe(0)
+    await pm.settle(5)
+    const after = await page.evaluate(() => {
+      const api = window.__pm!
+      const log = api.core.commandLog
+      const decide = log.findLast((e) => e.cmd.kind === 'decideEvent')
+      return {
+        open: api.events().open?.eventId ?? null,
+        held: api.core.held,
+        vehicles: api.sim.vehicles.length,
+        decide: decide?.cmd ?? null,
+        tick: api.sim.tick,
+      }
+    })
+    expect(after.open, 'the interim HUD answered the loaner').toBeNull()
+    expect(after.held).toBe(false)
+    expect(after.vehicles).toBe(before.vehicles + 1)
+    expect(after.decide).toEqual({
+      kind: 'decideEvent',
+      eventId: 'ev_luck_loaner',
+      option: 0,
+    })
+    await pm.settle(30)
+    expect(await page.evaluate(() => window.__pm!.sim.tick)).toBeGreaterThan(
+      after.tick,
+    )
     expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
@@ -1667,7 +1744,8 @@ test.describe('M8 docks smoke', () => {
       'the dialog closed',
     ).toBeNull()
 
-    // level-up-3.json without the policy: sim-only to L3 with $800.
+    // level-up-3.json without the policy: sim-only to L3 with $800 (build 3:
+    // answering any card a draw opens on the way — a held sim stays put).
     const fx = readFileSync(LEVEL_UP_3_FIXTURE, 'utf8')
     expect(
       (JSON.parse(fx) as { dataHash: string }).dataHash,
@@ -1678,7 +1756,7 @@ test.describe('M8 docks smoke', () => {
       api.load(json)
       let ms = 0
       while (!(api.sim.level >= 3 && api.sim.money >= 800) && ms < 180_000) {
-        api.advance(100)
+        api.advance(100, true)
         ms += 100
       }
       return { ms, level: api.sim.level, money: api.sim.money }
@@ -1706,9 +1784,14 @@ test.describe('M8 docks smoke', () => {
     expect(after.docks).toEqual(['dock1', 'dock2'])
     expect(after.last).toEqual({ kind: 'buyDock', index: 2 })
     expect(await dockSlots(page)).toEqual(['1:owned', '2:owned', '3:locked'])
+    // Build 3 (M11): the regenerated level-up-3 run can leave the first-flag
+    // hint toast up in the lane; the dock toast queues behind it.
     expect(
-      await settleUntil(page, pm, async () =>
-        (await toastText(page)).startsWith('Loading dock 2 open'),
+      await settleUntil(
+        page,
+        pm,
+        async () => (await toastText(page)).startsWith('Loading dock 2 open'),
+        600,
       ),
       'the dock toast',
     ).toBe(true)

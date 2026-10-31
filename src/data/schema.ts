@@ -9,12 +9,17 @@ import type {
   BuildingDef,
   DataFileName,
   EventCategory,
+  EventCond,
+  EventDef,
+  EventEffect,
+  EventOptionDef,
   GameData,
   MapBlockDef,
   MapData,
   MapSegment,
   ModifierKey,
   Rect,
+  StarApplicantDef,
   ThemedRoadDef,
   XY,
 } from './types.ts'
@@ -563,10 +568,7 @@ const questReward = obj(
 
 const quests = obj({
   offer: obj({
-    firstOfferDay: nonNeg,
-    intervalDays: nonNeg,
     declineCooldownDays: nonNeg,
-    offerExpiresDays: pos,
     // The engine runs one quest slot: more is a schema error, not a clamp.
     maxActive: int(1, 1),
   }),
@@ -667,6 +669,24 @@ export const MODIFIER_KEYS = [
   'onTimeMaxS',
   'clearanceS',
   'shelfCap',
+] as const satisfies readonly ModifierKey[]
+/**
+ * The multiplicative keys (a `mod` effect takes `mult`); every other key is
+ * additive (`add`). Must equal src/sim/modifiers.ts MULT_KEYS (pinned by
+ * tests/data/events.test.ts — src/data never imports the sim).
+ */
+export const MULT_MODIFIER_KEYS = [
+  'speed',
+  'stop',
+  'processS',
+  'payrollMult',
+  'income',
+  'spawn',
+  'tossBounty',
+  'wrongTossFee',
+  'vehiclePrice',
+  'machinePrice',
+  'clearanceS',
 ] as const satisfies readonly ModifierKey[]
 type UnlistedCategory = Exclude<
   EventCategory,
@@ -868,13 +888,12 @@ const intervalBand: Check = (v, p, out) =>
   ((v as number[])[0]! <= (v as number[])[1]! ||
     fail(out, p, `range ${show(v)} is not ascending`))
 const intervalS: Check = (v, p, out) => {
-  if (!rec(null, intervalBand)(v, p, out)) return false
-  let ok = true
-  for (const k of Object.keys(v as Record<string, unknown>))
+  let ok = rec(null, intervalBand)(v, p, out)
+  if (!isRecord(v)) return false
+  for (const k of Object.keys(v))
     if (!/^[1-9]\d*$/.test(k))
       ok = fail(out, `${p}.${k}`, 'expected a level number key ("1", "2", …)')
-  if (!('1' in (v as Record<string, unknown>)))
-    ok = fail(out, `${p}.1`, 'missing (the level-1 band)')
+  if (!('1' in v)) ok = fail(out, `${p}.1`, 'missing (the level-1 band)')
   return ok
 }
 
@@ -926,7 +945,7 @@ const eventsShape = obj({
     }),
     evBand: range(),
     evMax: num(0),
-    nonDefaultShareMin: num(0),
+    nonDefaultShareMin: prob,
   }),
   deck: arr(eventCard, 1),
 })
@@ -1427,12 +1446,599 @@ function crossCheck(d: Tables, out: Problems): void {
   checkMap(d, districtIds, buildingIds, out)
 }
 
+/** Placeholders the card copy may use (deck.ts fillCardText fills them). */
+const EVENT_PLACEHOLDERS = [
+  'district',
+  'inspector',
+  'driver',
+  'sorter',
+  'vehicle',
+] as const
+/** The puns lines the deck fills, with the placeholders each must carry. */
+const EVENT_PUN_PLACEHOLDERS: readonly [
+  group: 'tickerEvent' | 'eventWords',
+  key: string,
+  need: readonly string[],
+][] = [
+  ['tickerEvent', 'offered', ['{category}', '{title}']],
+  ['tickerEvent', 'modifierEnded', ['{label}']],
+  ['tickerEvent', 'chainDone', ['{title}']],
+  ['eventWords', 'then', ['{title}', '{days}']],
+  ['eventWords', 'thenNow', ['{title}']],
+  ['eventWords', 'outcome', ['{hint}']],
+  ['eventWords', 'youChose', ['{option}']],
+]
+
+/** B3 §3.5: an effect that can take a life, a vehicle or a worker. */
+export function isHarshEffect(e: EventEffect): boolean {
+  if (e.kind === 'lives') return e.delta < 0
+  if (e.kind === 'vehicle') return 'lose' in e
+  if (e.kind === 'staff')
+    return 'quit' in e || ('absent' in e && e.pick === 'all')
+  return false
+}
+
+/** The card ids an effect list books (plain nexts and every branch). */
+function nextTargetsOf(effects: readonly EventEffect[]): string[] {
+  const out: string[] = []
+  for (const e of effects) {
+    if (e.kind !== 'next') continue
+    if ('branches' in e) out.push(...e.branches.map((b) => b.id))
+    else out.push(e.eventId)
+  }
+  return out
+}
+
+/** A card's chain edges: its options' nexts and a router's branches. */
+function edgesOf(c: EventDef): string[] {
+  return [
+    ...(c.options ?? []).flatMap((o) => nextTargetsOf(o.effects)),
+    ...(c.next?.branches.map((b) => b.id) ?? []),
+  ]
+}
+
+/** The `{name}` placeholders of a copy line. */
+function placeholders(text: string): string[] {
+  return [...text.matchAll(/\{([^}]*)\}/g)].map((m) => m[1] as string)
+}
+
+/** Every key of a condition, `anyOf` entries included (depth first). */
+function condParts(c: EventCond | undefined): EventCond[] {
+  if (!c) return []
+  return [c, ...(c.anyOf ?? []).flatMap((x) => condParts(x))]
+}
+
 /**
- * events.json relations (spec-build3 §3, §7): ids, the next graph, defaults,
- * the harsh-consequence rule, targets and picks. M11 wave 1 (stream E) fills
- * it; the shape check above already holds the seed deck.
+ * events.json relations (spec-build3 §3, §7; M11 contract §3 stream E +
+ * critique 21-23): ids, the next graph (targets, cycles, depth, links
+ * undrawable), defaults, routers and branch lists, the harsh-consequence
+ * rule (with the way out on the card, affordable by its cond, or on every
+ * path from a drawable head), paid options, danger, targets and picks
+ * (on the card or on every head that reaches a link), district / hub
+ * scopes, `mod` mult / add / scope, pips stats, ★ defs, flags, categories,
+ * placeholders and the puns lines the deck fills.
  */
-function checkEvents(_d: Tables, _out: Problems): void {}
+function checkEvents(d: Tables, out: Problems): void {
+  const bad = (path: string, msg: string): void => {
+    out.push(`${path}: ${msg}`)
+  }
+  const ev = d.events
+  const sch = ev.schedule
+  const deck = ev.deck
+  const nLevels = d.levels.length
+  uniqueIds(deck, 'events.deck', out)
+  const byId = new Map<string, EventDef>()
+  const indexOf = new Map<string, number>()
+  deck.forEach((c, i) => {
+    if (!byId.has(c.id)) {
+      byId.set(c.id, c)
+      indexOf.set(c.id, i)
+    }
+  })
+  const spawning = new Set(
+    d.districts.filter((x) => x.kind === 'district').map((x) => x.id),
+  )
+  const overseas = new Set(
+    d.districts.filter((x) => x.kind === 'overseas').map((x) => x.id),
+  )
+  const districtWord = (id: string): string =>
+    overseas.has(id)
+      ? `"${id}" is an overseas hub, not a spawning district`
+      : `unknown district "${id}"`
+  const isSatScope = (s: string): boolean =>
+    ['all', 'target', 'busiest', 'lowest'].includes(s) || spawning.has(s)
+  const multKeys: readonly string[] = MULT_MODIFIER_KEYS
+
+  // ---- the next graph: edges, reachability, cycles, depth ----------------------
+  const edges = new Map<string, string[]>()
+  for (const c of byId.values())
+    edges.set(
+      c.id,
+      edgesOf(c).filter((t) => byId.has(t)),
+    )
+  const reachMemo = new Map<string, Set<string>>()
+  /** Every card reachable from `id` through nexts and branches (not `id` itself unless on a cycle). */
+  const reach = (id: string): Set<string> => {
+    const hit = reachMemo.get(id)
+    if (hit) return hit
+    const seen = new Set<string>()
+    const stack = [...(edges.get(id) ?? [])]
+    while (stack.length > 0) {
+      const n = stack.pop() as string
+      if (seen.has(n)) continue
+      seen.add(n)
+      stack.push(...(edges.get(n) ?? []))
+    }
+    reachMemo.set(id, seen)
+    return seen
+  }
+  const booked = new Set<string>()
+  for (const ts of edges.values()) for (const t of ts) booked.add(t)
+  // Cycles (each reported once, at its first card in data order).
+  let cyclic = false
+  const onCycle = new Set<string>()
+  for (const c of deck) {
+    if (onCycle.has(c.id) || !reach(c.id).has(c.id)) continue
+    cyclic = true
+    const loop = [...reach(c.id)].filter((x) => reach(x).has(c.id))
+    for (const x of loop) onCycle.add(x)
+    bad(
+      `events.deck[${indexOf.get(c.id)}].id`,
+      `the next graph has a cycle through "${c.id}" (${loop.map((x) => `"${x}"`).join(', ')})`,
+    )
+  }
+  if (!cyclic) {
+    const depth = new Map<string, number>()
+    const longest = (id: string): number => {
+      const k = depth.get(id)
+      if (k !== undefined) return k
+      const v = 1 + Math.max(0, ...(edges.get(id) ?? []).map((t) => longest(t)))
+      depth.set(id, v)
+      return v
+    }
+    for (const c of deck) {
+      if (booked.has(c.id)) continue
+      const n = longest(c.id)
+      if (n > sch.chainMaxLinks)
+        bad(
+          `events.deck[${indexOf.get(c.id)}]`,
+          `a chain from "${c.id}" runs ${n} cards, more than schedule.chainMaxLinks ${sch.chainMaxLinks}`,
+        )
+    }
+  }
+  /** The drawable cards whose chains reach `id` (its heads; none for a head). */
+  const headsOf = (id: string): EventDef[] =>
+    deck.filter(
+      (h) => h.drawable !== false && h.id !== id && reach(h.id).has(id),
+    )
+  /** `target` on the card (a head, the rescue, an orphan) or on every head that reaches it. */
+  const hasTarget = (c: EventDef): boolean => {
+    const heads = headsOf(c.id)
+    return heads.length === 0
+      ? c.target !== undefined
+      : heads.every((h) => h.target !== undefined)
+  }
+  const hasPick = (c: EventDef, role: string): boolean => {
+    const heads = headsOf(c.id)
+    return heads.length === 0
+      ? c.pick === role
+      : heads.every((h) => h.pick === role)
+  }
+  /**
+   * A way out of a harsh option on card `h` (critique 21, review policy-2):
+   * always shown (no `if`), free of harsh effects, and free or covered by
+   * the card's cond balanceAtLeast (a link's cond is re-checked when due).
+   */
+  const safeExit = (h: EventDef, x: EventOptionDef): boolean =>
+    x.if === undefined &&
+    !x.effects.some((e) => isHarshEffect(e)) &&
+    (x.cost === undefined || (h.cond?.balanceAtLeast ?? 0) >= x.cost)
+  const flagsSet = new Set<string>()
+  for (const c of deck)
+    for (const o of c.options ?? [])
+      for (const e of o.effects)
+        if (e.kind === 'flag' && 'set' in e) flagsSet.add(e.set)
+
+  // ---- conditions ----------------------------------------------------------------
+  const checkCond = (
+    c: EventDef,
+    cnd: EventCond | undefined,
+    path: string,
+    card: boolean,
+  ): void => {
+    for (const part of condParts(cnd)) {
+      if (part.hubLive !== undefined && !overseas.has(part.hubLive))
+        bad(`${path}.hubLive`, `"${part.hubLive}" is not an overseas district`)
+      for (const k of ['satBelow', 'satAtLeast'] as const) {
+        const sat = part[k]
+        if (!sat) continue
+        if (!isSatScope(sat.scope))
+          bad(
+            `${path}.${k}.scope`,
+            `expected all | target | busiest | lowest | a spawning district id, got "${sat.scope}"`,
+          )
+        else if (sat.scope === 'target') {
+          if (card && c.target === 'random')
+            bad(
+              `${path}.${k}`,
+              'a target: "random" card cannot be eligible on its target (D-28): the target is drawn after the card',
+            )
+          if (!hasTarget(c))
+            bad(
+              `${path}.${k}`,
+              'scope "target" needs `target` on the card or on its chain head',
+            )
+        }
+      }
+      for (const k of ['flag', 'notFlag'] as const) {
+        const f = part[k]
+        if (f !== undefined && !flagsSet.has(f))
+          bad(`${path}.${k}`, `no option sets the flag "${f}"`)
+      }
+    }
+  }
+
+  // ---- effects ---------------------------------------------------------------------
+  /** A branch list: every entry but the last has an `if`; the last (the else) has none. */
+  const branchListOf = (
+    c: EventDef,
+    branches: readonly { if?: EventCond; id: string }[],
+    bp: string,
+  ): void => {
+    branches.forEach((b, j) => {
+      const last = j === branches.length - 1
+      if (last && b.if !== undefined)
+        bad(`${bp}[${j}].if`, 'the last branch is the else: it has no `if`')
+      if (!last && b.if === undefined)
+        bad(
+          `${bp}[${j}]`,
+          'only the last branch may omit `if` (exactly one else, at the end)',
+        )
+      if (!byId.has(b.id)) bad(`${bp}[${j}].id`, `unknown event "${b.id}"`)
+      checkCond(c, b.if, `${bp}[${j}].if`, false)
+    })
+  }
+
+  /** One effect's cross-references (scopes, stats, picks, targets, ★ defs). */
+  const checkEffect = (c: EventDef, e: EventEffect, ep: string): void => {
+    switch (e.kind) {
+      case 'satisfaction':
+        if (!isSatScope(e.scope))
+          bad(
+            `${ep}.scope`,
+            `expected all | target | busiest | lowest | a spawning district id, got "${e.scope}"`,
+          )
+        else if (e.scope === 'target' && !hasTarget(c))
+          bad(
+            `${ep}.scope`,
+            'scope "target" needs `target` on the card or on its chain head',
+          )
+        return
+      case 'mod': {
+        const isMult = multKeys.includes(e.key)
+        if ((e.mult === undefined) === (e.add === undefined))
+          bad(ep, 'a mod has exactly one of mult and add')
+        else if (isMult && e.mult === undefined)
+          bad(`${ep}.add`, `"${e.key}" is multiplicative: use mult`)
+        else if (!isMult && e.add === undefined)
+          bad(`${ep}.mult`, `"${e.key}" is additive: use add`)
+        if (!(e.key in ev.modifiers.bounds))
+          bad(`${ep}.key`, `"${e.key}" has no modifiers.bounds row`)
+        const s = e.scope
+        if (s === undefined) return
+        if (e.key === 'speed') {
+          if (!d.vehicles.types.some((t) => t.id === s))
+            bad(`${ep}.scope`, `speed scopes a vehicle type, got "${s}"`)
+        } else if (e.key === 'spawn') {
+          if (s === 'target') {
+            if (!hasTarget(c))
+              bad(
+                `${ep}.scope`,
+                'scope "target" needs `target` on the card or on its chain head',
+              )
+          } else if (!spawning.has(s)) bad(`${ep}.scope`, districtWord(s))
+        } else if (e.key === 'processS') {
+          if (s !== 'desk' && s !== 'machine')
+            bad(`${ep}.scope`, `processS scopes desk | machine, got "${s}"`)
+        } else if (e.key === 'clearanceS') {
+          if (!overseas.has(s))
+            bad(`${ep}.scope`, `clearanceS scopes an overseas hub, got "${s}"`)
+        } else
+          bad(
+            `${ep}.scope`,
+            `"${e.key}" takes no scope (only speed, spawn, processS, clearanceS)`,
+          )
+        return
+      }
+      case 'pips': {
+        const stats: readonly string[] = d.employees.roles[e.role].stats
+        if (!stats.includes(e.stat))
+          bad(
+            `${ep}.stat`,
+            `"${e.stat}" is not a ${e.role} stat (${stats.join(', ')})`,
+          )
+        if (e.scope === 'one' && !hasPick(c, e.role))
+          bad(
+            `${ep}.scope`,
+            `"one" needs \`pick: "${e.role}"\` on the card or on its chain head`,
+          )
+        return
+      }
+      case 'vehicle':
+        if ('gain' in e && e.withDriver) {
+          if (e.withDriver.role !== 'driver')
+            bad(`${ep}.withDriver.role`, 'the volunteer is a driver')
+          checkStar(d, `${ep}.withDriver`, e.withDriver, out)
+        }
+        return
+      case 'staff':
+        if ('star' in e) checkStar(d, `${ep}.star`, e.star, out)
+        else if ('quit' in e) {
+          if (e.pick === 'one' && !hasPick(c, e.quit))
+            bad(
+              `${ep}.pick`,
+              `"one" needs \`pick: "${e.quit}"\` on the card or on its chain head`,
+            )
+        } else {
+          if (e.absent === 'driver')
+            bad(
+              `${ep}.absent`,
+              'a driver is away with the vehicle: use absent "vehicles"',
+            )
+          const role = e.absent === 'vehicles' ? 'vehicle' : e.absent
+          if (e.pick === 'one' && !hasPick(c, role))
+            bad(
+              `${ep}.pick`,
+              `"one" needs \`pick: "${role}"\` on the card or on its chain head`,
+            )
+        }
+        return
+      case 'parcels':
+        if ('spawn' in e) {
+          const at = e.spawn.at
+          if (at === 'target') {
+            if (!hasTarget(c))
+              bad(
+                `${ep}.spawn.at`,
+                '"target" needs `target` on the card or on its chain head',
+              )
+          } else if (at !== 'busiest' && !spawning.has(at))
+            bad(
+              `${ep}.spawn.at`,
+              d.districts.some((x) => x.id === at)
+                ? districtWord(at)
+                : `expected target | busiest | a spawning district id, got "${at}"`,
+            )
+        }
+        return
+      case 'end': {
+        const t = byId.get(e.eventId)
+        if (!t) bad(`${ep}.eventId`, `unknown event "${e.eventId}"`)
+        else if (
+          !(t.options ?? []).some((o) =>
+            o.effects.some((x) => x.kind === 'mod' || x.kind === 'cap'),
+          )
+        )
+          bad(
+            `${ep}.eventId`,
+            `"${e.eventId}" applies no modifier (mod or cap) to end`,
+          )
+        return
+      }
+      case 'next':
+        if (e.days > sch.linkMaxDays)
+          bad(
+            `${ep}.days`,
+            `${e.days} is more than schedule.linkMaxDays ${sch.linkMaxDays}`,
+          )
+        if ('branches' in e) branchListOf(c, e.branches, `${ep}.branches`)
+        else if (!byId.has(e.eventId))
+          bad(`${ep}.eventId`, `unknown event "${e.eventId}"`)
+        return
+      default:
+        return
+    }
+  }
+
+  // ---- the cards -------------------------------------------------------------------
+  for (const [k, cat] of Object.entries(ev.categories)) {
+    if (cat.picture !== `ev_pic_${k}`)
+      bad(
+        `events.categories.${k}.picture`,
+        `expected "ev_pic_${k}", got "${cat.picture}"`,
+      )
+  }
+
+  deck.forEach((c, i) => {
+    const p = `events.deck[${i}]`
+    const opts = c.options ?? []
+    if ((c.minLevel ?? 1) > nLevels)
+      bad(`${p}.minLevel`, `level ${c.minLevel} does not exist`)
+    if (booked.has(c.id) && c.drawable !== false)
+      bad(
+        `${p}.drawable`,
+        'a chain link (booked by a next or a router) must be `drawable: false`',
+      )
+    if (c.router) {
+      if (c.drawable !== false)
+        bad(`${p}.drawable`, 'a router must be `drawable: false`')
+      if (!c.next) bad(`${p}.next`, 'a router needs `next`')
+      else if (c.next.days !== 0)
+        bad(
+          `${p}.next.days`,
+          `a router resolves at once (0), got ${c.next.days}`,
+        )
+      if (c.body !== undefined) bad(`${p}.body`, 'a router has no body')
+      if (c.options !== undefined)
+        bad(`${p}.options`, 'a router has no options')
+    } else {
+      if (c.next !== undefined)
+        bad(`${p}.next`, 'only a router has `next` (an option books its own)')
+      if (c.body === undefined) bad(`${p}.body`, 'missing')
+      if (opts.length === 0) bad(`${p}.options`, 'missing (1–3 options)')
+    }
+    if (c.rescue) {
+      if (c.drawable !== false)
+        bad(`${p}.drawable`, 'a rescue card must be `drawable: false`')
+      if (opts.length !== 1)
+        bad(`${p}.options`, `a rescue card has one option, got ${opts.length}`)
+    }
+    if (c.router && c.rescue) bad(p, 'a router cannot be a rescue card')
+    if (c.target !== undefined) {
+      const t = c.target
+      if (!['busiest', 'lowest', 'random'].includes(t) && !spawning.has(t))
+        bad(
+          `${p}.target`,
+          spawning.has(t) ||
+            overseas.has(t) ||
+            d.districts.some((x) => x.id === t)
+            ? districtWord(t)
+            : `expected busiest | lowest | random | a spawning district id, got "${t}"`,
+        )
+    }
+    if (c.next) branchListOf(c, c.next.branches, `${p}.next.branches`)
+    checkCond(c, c.cond, `${p}.cond`, true)
+
+    // Copy: known placeholders; `{district}` needs a target, a person a pick.
+    const texts: [string, string][] = [[`${p}.title`, c.title]]
+    if (c.body !== undefined) texts.push([`${p}.body`, c.body])
+    opts.forEach((o, j) => {
+      texts.push([`${p}.options[${j}].label`, o.label])
+      o.effects.forEach((e, k) => {
+        if (e.kind === 'next' && 'hint' in e)
+          texts.push([`${p}.options[${j}].effects[${k}].hint`, e.hint])
+      })
+    })
+    for (const [tp, text] of texts) {
+      for (const ph of placeholders(text)) {
+        if (!(EVENT_PLACEHOLDERS as readonly string[]).includes(ph))
+          bad(
+            tp,
+            `unknown placeholder {${ph}} (expected ${EVENT_PLACEHOLDERS.map((x) => `{${x}}`).join(' ')})`,
+          )
+        else if (ph === 'district') {
+          if (!hasTarget(c))
+            bad(
+              tp,
+              '{district} needs `target` on the card or on its chain head',
+            )
+        } else if (!hasPick(c, ph))
+          bad(
+            tp,
+            `{${ph}} needs \`pick: "${ph}"\` on the card or on its chain head`,
+          )
+      }
+    }
+
+    // Options.
+    let defaults = 0
+    opts.forEach((o, j) => {
+      const op = `${p}.options[${j}]`
+      if (o.default) defaults += 1
+      checkCond(c, o.if, `${op}.if`, false)
+      const harsh = o.effects.some((e) => isHarshEffect(e))
+      if (o.effects.some((e) => e.kind === 'lives' && e.delta < 0) && !o.danger)
+        bad(`${op}.danger`, 'an option that can take a life is `danger: true`')
+      if (o.cost !== undefined) {
+        const free = opts.some(
+          (x, k) => k !== j && x.cost === undefined && x.if === undefined,
+        )
+        if (!free)
+          bad(
+            `${op}.cost`,
+            'a paid option needs an unpaid sibling with no `if` (a card never greys out every option)',
+          )
+      }
+      if (o.default) {
+        if (o.if !== undefined)
+          bad(`${op}.if`, 'the default option is always shown (no `if`)')
+        if (o.cost !== undefined && (c.cond?.balanceAtLeast ?? 0) < o.cost)
+          bad(
+            `${op}.cost`,
+            `a paid default needs the card's cond balanceAtLeast ≥ ${o.cost} (the default must be affordable)`,
+          )
+      }
+      if (harsh) {
+        if (opts.length === 1)
+          bad(
+            op,
+            'a harsh effect (a life, a vehicle, a worker) never sits on a one-option card',
+          )
+        else {
+          // The way out on the card: another always-shown option free of
+          // harsh effects that the card's cond keeps affordable (critique 21).
+          const wayOut = opts.some((x, k) => k !== j && safeExit(c, x))
+          if (!wayOut && c.drawable !== false)
+            bad(
+              op,
+              "a harsh effect needs a way out on a drawn card: another option with no `if`, free of harsh effects, and free or covered by the card's cond balanceAtLeast",
+            )
+          else if (!wayOut && !cyclic) {
+            // A link: every path from a drawable head runs through a card
+            // with a way out (an always-shown option, free of harsh effects,
+            // free or covered by that card's cond balanceAtLeast — as on a
+            // drawn card) that never reaches this link (critique 22; review
+            // policy-2: a harsh or unaffordable option is no escape).
+            const reaches = (x: EventOptionDef): boolean =>
+              nextTargetsOf(x.effects).some(
+                (t) => t === c.id || reach(t).has(c.id),
+              )
+            const escape = (id: string): boolean => {
+              if (id === c.id) return false
+              const h = byId.get(id)
+              if (h === undefined) return false
+              return (h.options ?? []).some(
+                (x) => safeExit(h, x) && !reaches(x),
+              )
+            }
+            const trapped = deck.filter((h) => {
+              if (h.drawable === false || escape(h.id)) return false
+              const seen = new Set<string>()
+              const stack = [h.id]
+              while (stack.length > 0) {
+                const n = stack.pop() as string
+                if (n === c.id) return true
+                if (seen.has(n)) continue
+                seen.add(n)
+                for (const t of edges.get(n) ?? [])
+                  if (!escape(t)) stack.push(t)
+              }
+              return false
+            })
+            if (trapped.length > 0)
+              bad(
+                op,
+                `a harsh effect with no way out on this link, and none on the way from ${trapped.map((h) => `"${h.id}"`).join(', ')} (every path from a head needs an always-shown option that avoids it)`,
+              )
+          }
+        }
+      }
+      o.effects.forEach((e, k) => checkEffect(c, e, `${op}.effects[${k}]`))
+    })
+    if (!c.router && defaults !== 1)
+      bad(`${p}.options`, `exactly one option is the default, got ${defaults}`)
+    if (!c.router && opts.length > 0 && opts.every((o) => o.if !== undefined))
+      bad(`${p}.options`, 'at least one option has no `if` (always shown)')
+  })
+
+  // ---- tables ----------------------------------------------------------------------
+  for (const [k, [lo, hi]] of Object.entries(ev.modifiers.bounds)) {
+    const id = multKeys.includes(k) ? 1 : 0
+    if (id < lo || id > hi)
+      bad(
+        `events.modifiers.bounds.${k}`,
+        `[${lo}, ${hi}] excludes ${id} (no modifier must fold to the identity)`,
+      )
+  }
+  for (const k of Object.keys(ev.policy.weights.pips))
+    if (!STATS.includes(k))
+      bad(`events.policy.weights.pips.${k}`, `unknown stat "${k}"`)
+  for (const [group, k, need] of EVENT_PUN_PLACEHOLDERS) {
+    const line = (d.puns[group] as Record<string, string>)[k] ?? ''
+    for (const ph of need)
+      if (!line.includes(ph)) bad(`puns.${group}.${k}`, `must contain ${ph}`)
+  }
+}
 
 /**
  * quests.json relations (spec-build2 §3.2, §9; design-m7 §1.5): ids, levels,
@@ -1520,26 +2126,7 @@ function checkQuests(
       if (r.voucher !== undefined && !checkerIds.has(r.voucher))
         bad(`${p}.reward.voucher`, `unknown checker "${r.voucher}"`)
       const star = r.starApplicant
-      if (star) {
-        const sp = `${p}.reward.starApplicant`
-        const stats: readonly string[] = d.employees.roles[star.role].stats
-        const keys = Object.keys(star.pips)
-        if (
-          keys.length !== stats.length ||
-          stats.some((s) => !keys.includes(s))
-        )
-          bad(
-            `${sp}.pips`,
-            `expected the ${star.role} stats ${JSON.stringify(stats)}, got ${JSON.stringify(keys)}`,
-          )
-        for (const [k, v] of Object.entries(star.pips)) {
-          const [lo, hi] = k === 'charisma' ? [0, 2] : [1, 5]
-          if (v < lo || v > hi)
-            bad(`${sp}.pips.${k}`, `${v} is outside ${lo}..${hi}`)
-        }
-        if (star.affinity !== undefined && star.role !== 'driver')
-          bad(`${sp}.affinity`, 'only drivers have an affinity')
-      }
+      if (star) checkStar(d, `${p}.reward.starApplicant`, star, out)
     }
   })
   for (const id of [...ids, ...ultimateIds])
@@ -1552,6 +2139,32 @@ function checkQuests(
     if (!line.includes(need))
       bad(`puns.tickerQuest.${k}`, `must contain ${need}`)
   }
+}
+
+/**
+ * A ★ applicant def (a quest reward, an event's `staff star` or the
+ * `vehicle gain` volunteer driver): exactly its role's stats, pips 1–5
+ * (charisma 0–2), an affinity only on a driver.
+ */
+function checkStar(
+  d: Tables,
+  path: string,
+  star: StarApplicantDef,
+  out: Problems,
+): void {
+  const stats: readonly string[] = d.employees.roles[star.role].stats
+  const keys = Object.keys(star.pips)
+  if (keys.length !== stats.length || stats.some((s) => !keys.includes(s)))
+    out.push(
+      `${path}.pips: expected the ${star.role} stats ${JSON.stringify(stats)}, got ${JSON.stringify(keys)}`,
+    )
+  for (const [k, v] of Object.entries(star.pips)) {
+    const [lo, hi] = k === 'charisma' ? [0, 2] : [1, 5]
+    if (v < lo || v > hi)
+      out.push(`${path}.pips.${k}: ${v} is outside ${lo}..${hi}`)
+  }
+  if (star.affinity !== undefined && star.role !== 'driver')
+    out.push(`${path}.affinity: only drivers have an affinity`)
 }
 
 /** employees.json relations (spec-build2 §2, §9) and puns.peopleNames. */

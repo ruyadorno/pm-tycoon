@@ -130,7 +130,12 @@ describe('spawn and the lane (spec §5.5)', () => {
     expect(spawned).toEqual([
       { id: p.id, origin: p.origin, dest: p.dest, size: 'S', label: p.label },
     ])
-    expect(log.slice(-2)).toEqual(['parcel:spawned', 'quest:accepted'])
+    // Build 3: the job card's Accept closes it last (event:decided).
+    expect(log.slice(-3)).toEqual([
+      'parcel:spawned',
+      'quest:accepted',
+      'event:decided',
+    ])
     expect(p).toMatchObject({
       size: 'S',
       baseValue: data.parcels.sizes.S.value,

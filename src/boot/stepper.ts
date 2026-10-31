@@ -10,6 +10,11 @@
 // With ?policy=1 the policy's step() runs before every tick on both paths;
 // the Title's attract sim (B2 §5) gets the competent policy the same way
 // (setSim's `policy` option), at speed 1, whatever ?policy says.
+// Build 3 (B3 §3.2, §6; review deck-2): while the sim is `held` (a card open,
+// no policy) the stepper runs no tick — frame() leaves the accumulator and
+// 'alpha' untouched (vehicles stand still instead of replaying their last
+// 100 ms step at 10 Hz) and a frame or an advance stops at the tick that
+// opened the card; `ticks` and `simMsPerTick` count only the ticks that ran.
 import Phaser from 'phaser'
 
 export const TICK_MS = 100
@@ -18,9 +23,11 @@ export const MAX_FRAME_DELTA_MS = 500
 export type Speed = 0 | 1 | 2 | 4
 export const SPEEDS: readonly Speed[] = [0, 1, 2, 4]
 
-/** What the stepper drives: the Sim (only tick() is needed). */
+/** What the stepper drives: the Sim (tick(), and `held` when it can hold). */
 export interface Tickable {
   tick(): void
+  /** B3 §6: true while tick() would do nothing (Sim.held: a card open, no policy). */
+  readonly held?: boolean
 }
 
 /** The ?policy=1 scripted player: step() runs once before every tick(). */
@@ -63,16 +70,22 @@ export function installStepper(game: Phaser.Game, sim: Tickable): Stepper {
   let ticks = 0
   let msPerTick = 0
 
-  const runTicks = (n: number): void => {
-    if (n <= 0) return
+  /** Up to n ticks, stopping at a hold; returns the ticks that ran. */
+  const runTicks = (n: number): number => {
+    if (n <= 0) return 0
     const t0 = clock()
+    let ran = 0
     for (let i = 0; i < n; i++) {
       stepper.policy?.step()
+      if (stepper.sim.held === true) break
       stepper.sim.tick()
+      ran++
     }
-    ticks += n
-    const per = (clock() - t0) / n
+    if (ran === 0) return 0
+    ticks += ran
+    const per = (clock() - t0) / ran
     msPerTick = msPerTick === 0 ? per : msPerTick * 0.9 + per * 0.1
+    return ran
   }
 
   const stepper: Stepper = {
@@ -90,6 +103,8 @@ export function installStepper(game: Phaser.Game, sim: Tickable): Stepper {
       return msPerTick
     },
     frame(delta: number): number {
+      // Held: the frame is skipped whole (acc and alpha as they were).
+      if (this.sim.held === true) return 0
       const d = Math.max(0, Math.min(delta, MAX_FRAME_DELTA_MS))
       acc = Math.min(acc + d * this.speed, MAX_TICKS_PER_FRAME * TICK_MS)
       let n = 0
@@ -97,15 +112,14 @@ export function installStepper(game: Phaser.Game, sim: Tickable): Stepper {
         acc -= TICK_MS
         n++
       }
-      runTicks(n)
+      const ran = runTicks(n)
       game.registry.set(REG_ALPHA, acc / TICK_MS)
-      return n
+      return ran
     },
     advance(ms: number): number {
-      const n = Math.max(0, Math.floor(ms / TICK_MS))
-      runTicks(n)
+      const ran = runTicks(Math.max(0, Math.floor(ms / TICK_MS)))
       game.registry.set(REG_ALPHA, acc / TICK_MS)
-      return n
+      return ran
     },
     resetAccumulator(): void {
       acc = 0

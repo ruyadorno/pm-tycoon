@@ -27,7 +27,8 @@
 //                  the "!" badges; a second $0 payday would walk them out.
 //   l2-lane        A PLAIN run past L2 until the policy has placed the
 //                  Shaky shaker (slot 4, warehouse-view §7.5 "after level:up 2
-//                  with 4 slots"), snapshot L2_SETTLE_S later: tier 2, the
+//                  with 4 slots"), snapshot L2_SETTLE_S later (or
+//                  L2_QUIET_S before L3, if sooner): tier 2, the
 //                  truck on the road, rattle parcels on the lane. Load WITH
 //                  ?policy=1 (the `warehouse-l2` shot); no level:up or
 //                  region:unlocked event fires after the load, so no paper.
@@ -48,6 +49,11 @@ const PAYDAY_DAY = 4
 const LEAD_TICKS = 20
 /** l2-lane: the shaker has worked this long when the snapshot is taken. */
 const L2_SETTLE_S = 40
+/**
+ * l2-lane: no level:up for at least this long after the snapshot
+ * (tests/data/shot-fixtures.test.ts watches 30 s under ?policy=1).
+ */
+const L2_QUIET_S = 45
 /** Give up past this (sim seconds). */
 const CAP_S = 1800
 const OUT_DIR = new URL('../../tests/fixtures/', import.meta.url)
@@ -107,7 +113,11 @@ function levelUp(): void {
   const probe = runPolicy((s) => {
     if (s.state.economy.lifetimeEarned !== earned) {
       earned = s.state.economy.lifetimeEarned
-      if (s.state.level.level < 2) lastEarnTick = s.state.tick
+      // Build 3: a quest reward is paid after `levels` in the tick, so the
+      // crossing payout's own tick can still read the old level — only a
+      // payout that leaves the lifetime under the threshold counts.
+      if (s.state.level.level < 2 && earned < row.threshold)
+        lastEarnTick = s.state.tick
     }
     return s.state.level.level >= 2
   })
@@ -177,8 +187,26 @@ function slotWith(sim: Sim, defId: string): string | null {
 function l2Lane(): void {
   const shaker = data.machines.checkers.find((m) => m.strain === 'rattle')
   if (!shaker) throw new Error('l2-lane: no rattle counter in machines.json')
-  const placed = runPolicy((s) => slotWith(s, shaker.id) !== null)
-  const at = placed.state.tick + L2_SETTLE_S * TICKS_PER_S
+  // One probe run to L3 (deterministic) for the shaker's tick and L3's.
+  const seen: { placed: number | null } = { placed: null }
+  const probe = runPolicy((s) => {
+    if (seen.placed === null && slotWith(s, shaker.id) !== null)
+      seen.placed = s.state.tick
+    return s.state.level.level >= 3
+  })
+  const placedTick = seen.placed
+  if (placedTick === null) throw new Error('l2-lane: the shaker never placed')
+  const l3Tick = probe.state.stats.levelTick['3'] ?? Infinity
+  // L2_SETTLE_S after the shaker — earlier when L3 would land inside the
+  // shot's quiet window (build 3: seed 7 places it ≈ 60 s before L3).
+  const at = Math.min(
+    placedTick + L2_SETTLE_S * TICKS_PER_S,
+    l3Tick - L2_QUIET_S * TICKS_PER_S,
+  )
+  if (at <= placedTick)
+    throw new Error(
+      `l2-lane: L3 lands ${(l3Tick - placedTick) / TICKS_PER_S} s after the shaker`,
+    )
   const sim = runPolicy((s) => s.state.tick >= at)
   const slot = slotWith(sim, shaker.id)
   if (sim.state.level.level !== 2 || slot === null)
@@ -186,7 +214,7 @@ function l2Lane(): void {
   write('l2-lane', sim, {
     level: 2,
     shakerSlot: slot,
-    shakerPlacedTick: placed.state.tick,
+    shakerPlacedTick: placedTick,
     slots: sim.state.lane.nodes
       .filter((n) => n.kind === 'slot' && !n.locked)
       .map((n) => n.id),

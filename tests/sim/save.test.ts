@@ -9,7 +9,20 @@
 // clock + day boundary, and the "handlers never dispatch" rule.
 
 import { describe, expect, it } from 'vitest'
-import { auditState, Sim, SimLoadError, stateHash } from '../../src/sim/sim.ts'
+import type { EventDef, GameData } from '../../src/data/types.ts'
+import { checkSave } from '../../src/boot/autosave.ts'
+import { SIM_FEATURES } from '../../src/sim/features.ts'
+import {
+  auditState,
+  Sim,
+  SimLoadError,
+  snapshotProblems,
+  stateHash,
+} from '../../src/sim/sim.ts'
+import type { SimSnapshot } from '../../src/sim/sim.ts'
+import { pickCandidates } from '../../src/sim/systems/deck.ts'
+import { applyEffect } from '../../src/sim/systems/effects.ts'
+import type { EffectCtx } from '../../src/sim/systems/effects.ts'
 import {
   deserialise,
   isCompatible,
@@ -26,6 +39,9 @@ import { createViewSim } from '../../src/sim/view-api.ts'
 import {
   collect,
   dataFixture,
+  decideOpen,
+  deckOn,
+  fund,
   makeSim,
   openingA,
   replayOf,
@@ -565,6 +581,205 @@ describe('save round trip (plan.md §6.4)', () => {
     const again = replayOf(sim)
     expect(stateHash(again.state)).toBe(stateHash(sim.state))
   }, 30_000)
+})
+
+// Build 3 (M11 contract §4.4; B3 §6, §3.6): the v6 state carries the deck —
+// an open card, scheduled chain links, modifiers, absences — and resumes them.
+
+/** A deck option with a plain `next` booked days ahead (a chain head's way into its link). */
+function linkOption(data: GameData): { def: EventDef; option: number } {
+  for (const def of data.events.deck) {
+    if (def.router || def.rescue || !def.options) continue
+    const option = def.options.findIndex(
+      (o) =>
+        o.if === undefined &&
+        o.effects.some(
+          (e) => e.kind === 'next' && 'eventId' in e && e.days > 0,
+        ),
+    )
+    if (option >= 0) return { def, option }
+  }
+  throw new Error('no deck option books a plain next')
+}
+
+/** A decision card (2–3 options) with no pick or target, other than `not`. */
+function plainDecision(data: GameData, not: string): EventDef {
+  const def = data.events.deck.find(
+    (d) =>
+      d.id !== not &&
+      !d.router &&
+      !d.rescue &&
+      d.pick === undefined &&
+      d.target === undefined &&
+      (d.options?.length ?? 0) >= 2,
+  )
+  if (!def) throw new Error('no plain decision card')
+  return def
+}
+
+const effectCtx = (
+  title: string,
+  pick: EffectCtx['pick'] = null,
+): EffectCtx => ({
+  eventId: 'ev_save_test',
+  title,
+  optionLabel: 'OK',
+  optionIndex: 0,
+  target: null,
+  pick,
+  chainHeadId: 'ev_save_test',
+  depth: 1,
+})
+
+describe('build 3 v6 saves (M11 contract §4.4)', () => {
+  it('a v6 round trip at minute 12 of a deck-on policy run — an open card, a scheduled link, a modifier and an absent employee — then 3 days under the same policy = the uninterrupted run', () => {
+    const flag = SIM_FEATURES.events
+    SIM_FEATURES.events = true
+    try {
+      const live = deckOn(makeSim(4))
+      const policy = createPolicy(live, 'competent')
+      for (let i = 0; i < 12 * TICKS_PER_DAY; i++) {
+        policy.step()
+        live.tick()
+      }
+      expect(live.state.tick).toBe(12 * TICKS_PER_DAY)
+      expect(live.state.events.stats.offered).toBeGreaterThan(0)
+      policy.step() // the card the last tick opened, if any
+      expect(live.state.events.open).toBeNull()
+      // A chain link: a head's plain next, decided (logged).
+      const link = linkOption(live.data)
+      fund(live, 10_000)
+      expect(
+        live.dispatch({ kind: 'debugOfferEvent', eventId: link.def.id }),
+      ).toEqual({ ok: true })
+      decideOpen(live, link.option)
+      const s = live.state
+      expect(s.events.scheduled.length).toBeGreaterThanOrEqual(1)
+      const due = Math.min(...s.events.scheduled.map((l) => l.dueTick))
+      // A timed modifier (direct applyEffect: the machines roll with it).
+      applyEffect(live, effectCtx('Save-test tune-up'), {
+        kind: 'mod',
+        key: 'machineP',
+        add: 0.05,
+        days: 2,
+      })
+      const mod = s.modifiers.at(-1)!
+      expect(mod).toMatchObject({ key: 'machineP', add: 0.05 })
+      // An absent inspector (direct applyEffect: off the desk, unpaid).
+      const inspector = pickCandidates(live, 'inspector')[0]
+      expect(inspector).toBeDefined()
+      applyEffect(live, effectCtx('Save-test day off', inspector), {
+        kind: 'staff',
+        absent: 'inspector',
+        pick: 'one',
+        days: 1,
+      })
+      const away = s.employees.find((e) => e.id === inspector!.id)!
+      expect(away.absentUntilTick).toBe(s.tick + TICKS_PER_DAY)
+      // The open card, left for the policy's next step.
+      const open = plainDecision(live.data, link.def.id)
+      expect(
+        live.dispatch({ kind: 'debugOfferEvent', eventId: open.id }),
+      ).toEqual({ ok: true })
+      expect(s.events.open?.eventId).toBe(open.id)
+      expect(auditState(s, live.data)).toEqual([])
+
+      const snap = JSON.parse(JSON.stringify(live.snapshot())) as SimSnapshot
+      expect(snap.version).toBe(6)
+      expect(snapshotProblems(dataFixture(), snap)).toEqual([])
+      const loaded = Sim.load(dataFixture(), snap)
+      expect(loaded.state).toEqual(live.state)
+      expect(loaded.state.events.open).toEqual(live.state.events.open)
+      expect(loaded.state.events.scheduled).toEqual(s.events.scheduled)
+      expect(loaded.state.modifiers).toEqual(s.modifiers)
+      expect(loaded.state.events.picks.rng).toBe(s.events.picks.rng)
+      expect(loaded.state.events.rng).toBe(s.events.rng)
+
+      const policy2 = createPolicy(loaded, 'competent')
+      for (let i = 0; i < 3 * TICKS_PER_DAY; i++) {
+        policy.step()
+        live.tick()
+        policy2.step()
+        loaded.tick()
+      }
+      policy.dispose?.()
+      policy2.dispose?.()
+      expect(loaded.state.tick).toBe(live.state.tick)
+      expect(stateHash(loaded.state)).toBe(stateHash(live.state))
+      expect(loaded.commandLog).toEqual(live.commandLog)
+      expect(auditState(loaded.state, loaded.data)).toEqual([])
+      // What the save carried played out after the load: the card was
+      // decided, the link opened when due, the absence and the modifier ran
+      // out.
+      const ls = loaded.state
+      expect(
+        ls.events.history.some(
+          (h) => h.eventId === open.id && h.openedTick === snap.state.tick,
+        ),
+      ).toBe(true)
+      expect(
+        ls.events.history.some(
+          (h) =>
+            h.chainHeadId === link.def.id &&
+            h.depth >= 2 &&
+            h.openedTick >= due,
+        ),
+      ).toBe(true)
+      expect(
+        ls.employees.find((e) => e.id === inspector!.id)?.absentUntilTick,
+      ).toBeUndefined()
+      expect(ls.modifiers.some((m) => m.id === mod.id)).toBe(false)
+    } finally {
+      SIM_FEATURES.events = flag
+    }
+  }, 30_000)
+
+  it('v5 rejection: a build-2 snapshot (version 5, state.version 5, no deck state) is refused by Sim.load and the save check reads it stale', () => {
+    const sim = playedSim()
+    const v5 = structuredClone(sim.snapshot()) as unknown as {
+      version: number
+      state: Record<string, unknown> & {
+        version: number
+        nextId: Record<string, number>
+        stats: Record<string, unknown>
+      }
+    }
+    v5.version = 5
+    v5.state.version = 5
+    // The M8 (v5) shape: no events, modifiers, modifier ids or lost parcels.
+    delete v5.state.events
+    delete v5.state.modifiers
+    delete v5.state.nextId.modifier
+    delete v5.state.stats.lost
+    const problems = snapshotProblems(dataFixture(), v5)
+    expect(problems).toContain('version: 5 ≠ 6')
+    expect(problems).toContain('state.version: 5 ≠ 6')
+    expect(() => Sim.load(dataFixture(), v5)).toThrow(SimLoadError)
+    // Only the version differs (the v6 state inside a v5 envelope): refused too.
+    const relabelled = { ...sim.snapshot(), version: 5 }
+    expect(snapshotProblems(dataFixture(), relabelled)).toContain(
+      'version: 5 ≠ 6',
+    )
+    // The stored payload: Title's save check classifies it stale (discarded
+    // with the "older build" toast, never loaded — R9).
+    const payload = JSON.parse(
+      serialise(sim, { savedAt: 0, build: 'build-2' }),
+    ) as {
+      version: number
+      state: Record<string, unknown> & { version: number }
+    }
+    payload.version = 5
+    payload.state.version = 5
+    delete payload.state.events
+    delete payload.state.modifiers
+    expect(checkSave(JSON.stringify(payload), dataFixture()).kind).toBe('stale')
+    expect(isCompatible(payload, dataFixture())).toBe(false)
+    // The same run's v6 payload is fine.
+    expect(
+      checkSave(serialise(sim, { savedAt: 0, build: 'build-3' }), dataFixture())
+        .kind,
+    ).toBe('ok')
+  })
 })
 
 describe('sim skeleton the save rests on (spec §7.1, plan.md §6.4)', () => {

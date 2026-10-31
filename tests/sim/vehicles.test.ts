@@ -9,7 +9,11 @@ import { describe, expect, it } from 'vitest'
 import type { SimEventName } from '../../src/sim/events.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import { auditState } from '../../src/sim/sim.ts'
-import { MILLI } from '../../src/sim/systems/vehicles.ts'
+import {
+  hasDriver,
+  MILLI,
+  removeVehicle,
+} from '../../src/sim/systems/vehicles.ts'
 import { laneNode } from '../../src/sim/types.ts'
 import type { VehicleState } from '../../src/sim/types.ts'
 import {
@@ -336,4 +340,45 @@ describe('buy / sell (spec §4.1)', () => {
   it.todo(
     'inactive after the next unload once the driver walked out (spec §4.6, §7.4 — M3 payroll)',
   )
+})
+
+describe('build 3: absence and removeVehicle (B3 §3.5)', () => {
+  it('hasDriver is false while the vehicle is away (absentUntilTick > tick), true again at the tick it ends', () => {
+    const sim = quietSim(1)
+    const bike = buy(sim, 'bike')
+    expect(hasDriver(sim, bike)).toBe(true)
+    bike.absentUntilTick = sim.state.tick + 5
+    expect(hasDriver(sim, bike)).toBe(false)
+    runTicks(sim, 5)
+    expect(hasDriver(sim, bike)).toBe(true)
+  })
+
+  it('removeVehicle: sold = the drivers leave silently with the refund; lost = worker:fired {event}, no refund; neither emits vehicle:sold', () => {
+    const sim = quietSim(1)
+    const a = buy(sim, 'bike')
+    const b = buy(sim, 'bike')
+    const fired = collect(sim, 'worker:fired')
+    const sold = collect(sim, 'vehicle:sold')
+    const money = collect(sim, 'money:changed')
+    const goneA = removeVehicle(sim, a, { refund: true, why: 'sold' })
+    expect(goneA.map((e) => e.vehicleId)).toEqual([a.id])
+    expect(fired).toEqual([])
+    expect(money).toEqual([
+      {
+        delta: Math.round(a.purchasePrice * data.economy.sellRefund),
+        reason: 'refund',
+        balance: sim.state.economy.balance,
+      },
+    ])
+    const before = sim.state.economy.balance
+    const goneB = removeVehicle(sim, b, { refund: false, why: 'lost' })
+    expect(fired.map((f) => [f.employeeId, f.reason])).toEqual([
+      [goneB[0]!.id, 'event'],
+    ])
+    expect(sim.state.economy.balance).toBe(before)
+    expect(sold).toEqual([])
+    expect(sim.state.vehicles).toEqual([])
+    expect(sim.state.employees.some((e) => e.role === 'driver')).toBe(false)
+    expect(auditState(sim.state, data)).toEqual([])
+  })
 })

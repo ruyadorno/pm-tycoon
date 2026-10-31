@@ -780,3 +780,165 @@ M7 review fixes (rules the M7 contract did not state, or stated against the spec
 - [Q-B3-14] `spicy.json` cadence halves (first card at 60 s, bands 30–70 s) — `public/configs/spicy.json`.
 - [Q-B3-15] The job offer moves to the EventCard (Accept / Decline); the QuestCard keeps active / complete and the gold
   Golden Release offer — `src/ui/EventCard.ts`, `src/ui/QuestCard.ts`.
+
+## Run decisions and deviations (M11 — pacing pass 1 + the events engine)
+
+### Engine (B3 §3, §6; the M11 design contract's D-numbers in brackets)
+
+- **Blank draws** [D-1]: B3 §3.2's "no candidate → retry next tick" is replaced by a blank: a draw that yields no card
+  (decisions off, or no eligible decision) consumes the slot and the next draw is due a full band gap later. The job
+  roll and the gap are always drawn in the same order, so pass 1 (decisions off) sees exactly pass 2's job cadence and
+  the stream-isolation acceptance (plan-build3 §8.2) holds exactly.
+- **Two event streams** [D-2]: `events.rng` draws the cadence (the job roll and the gap), `events.picks.rng` the
+  content (decision picks, random targets, `one` picks, every draw an effect makes). Job templates stay on the quest
+  stream. With one word, a decision answered or not would shift every later job.
+- **No per-tick modifier cache** [D-3]: B3 §3.6 / plan §8.2 task 4 ask for a fold cache keyed by tick, but decisions
+  are commands between ticks, so a tick-keyed cache goes stale on the very tick a card is answered. The fold is a
+  plain O(rows) loop with an empty fast path (≤ ~12 rows); R23's dirty flag stays the fallback if the step time
+  passes 1 ms at tick 18,000.
+- **`machineP` only on machines** [D-5]: desks get `inspectorP` through `syncDesk`; `checkerP`'s callers read a
+  modified checker through `effChecker`, and `laneCatchRate` / `laneRatePerMin` take the sim context, so the
+  StationCard, the SlotCard, the `laneRateAtLeast` condition and the roll agree (R31).
+- **`malwareShare` add inside `malwareShare()`** [D-6]: a fourth `extra` parameter applied before `overseasMult`, as
+  B3 §3.6 intends (adding at the callers would land after it).
+- **The hold and headless runs** [D-8, D-9]: `Sim.attachPolicy()` tells the sim a policy decides cards on the step;
+  test sims built through `makeSim` start with the deck off, `--policy none` answers the default option, `replay`
+  stops on a held tick instead of spinning.
+- **Inspector absence** [D-10]: an absent inspector keeps their seat and contract (unpaid for the days away); stations
+  exist only for on-duty inspectors. A vehicle's absence also marks its driver absent.
+- **`parcels lose`** [D-11]: a new terminal parcel state `lost` (with its conservation term and `parcel:lost`); only
+  unreserved, non-magic shelf parcels.
+- **The Golden Release quiet window** [D-14, critique 30]: Later is UI-only, so the sim's quiet window is
+  `afterLevelUpS` after the gold offer or after the last regular quest ended, whichever is later; the HUD queues
+  decision cards behind the gold card (M12).
+- **Job cards in M11** [D-18]: until the EventCard lands in M12, the QuestCard's offer mode answers job cards with
+  Accept / Decline (no Later), routed through `acceptQuest` / `declineQuest` → `decideEvent`.
+- **The seed deck** [D-19]: "14 cards: one single per category + the gang chain + the audit router" does not add
+  up; the seed is 10 singles + the 4-card gang chain + the audit chain (4 cards + its router) + the rescue loaner =
+  19 cards + 1 router.
+- **No `≥` in card copy** [D-20]: m5x7 has no `≥` glyph; copy says "95 % or better" / "at least" (a glyph test
+  enforces it).
+- **Forced harsh options** [critique 21]: a card whose only harsh-free option is paid carries a `balanceAtLeast` of
+  that price in its `cond` (the recall at $250, the double fine at $400), so the policy and the player are never left
+  with a strike as the only affordable answer. The harsh-consequence schema rule checks it.
+- **The lives rows measure malware** [critique 26]: `maxLivesLost` and the 40-seed share count `cause !== 'event'`;
+  lives taken by a card go to the informational `eventLivesLost` row (B3 §3.5: "the gate's lives row still measures
+  malware").
+- **`evMax` excludes life gains** [critique 20]: any `+1 life` option scores ≥ 600 > `evMax` 400; the static check
+  leaves lives out (they are rewards, not cash); `deckEvMean` keeps them.
+- **Policy scores** [D-37, D-38, critique 24]: a job's Accept scores `max(1, reward value)` and Decline 0 (the policy
+  always accepts, plan-build3 §7); a ★ applicant scores Σ pip weight × (pip − 3); `parcels` effects score through
+  data weights; a conditional `next` is scored on the branch its condition picks now, with the option's own `flag`
+  effects applied virtually (the audit's consultant scores the pass branch).
+- **Subscriptions are not payroll** [D-34]: the `payrollAdd` line is a separate `subscriptions` debit paid after every
+  employee, skipped when short (ticker `Subscriptions unpaid`), never counted in `payrollPaid`.
+- **The Sorter Arm has no stored price** [D-21]: `machinePrice` modifiers do not apply to it.
+- **Fixture tooling** (wave 0): fixtures answer an open card through a logged `decideEvent` (default option) instead
+  of patching `nextDrawTick`, so every fixture still replays to its state hash; `tools/fixtures/cards.ts`.
+
+### Wave 1 deviations (the stream reports; recorded at the merge)
+
+- **The hold ends at game over**: `Sim.tick()` does not hold while `economy.gameOver` — a card the deck opened on the
+  tick the last life went cannot be decided then (`decideEvent` → `invalid`), and a headless loop would spin forever.
+  The HUD pauses the stepper at game over anyway; `continueWithOneLife` brings the hold back with the card still open.
+- **Bit-identical identity** (modifiers): every fold helper (`processTicksAt`, `clearanceTicks`, the payday `due`)
+  returns its input untouched when the fold is exactly 1; a key with no matching row folds to the identity unclamped
+  (a test pins every shipped bound to contain it). `effChecker` rounds a modified machine p to 4 decimals (the desk
+  precision) so `laneRateAtLeast` boundaries are free of float noise.
+- **Displayed value follows the income fold**: `ViewSim.parcelValue` = the locked value, else `round(valueAt ×
+  income)` (what a delivery pays); the hub readout's `clearanceS` = `clearanceTicks / 10` (the rounded timer).
+- **The deck** (stream B): the rescue checks the balance against the cheapest vehicle type, not `bike` by name; a
+  queued card is counted (`offered`, `seen`, cooldown, `event:offered`, `openedTick`) when it opens, not when queued;
+  a link inherits its head's target and pick, and resolves its own rule at open only when it inherited none (or its
+  pick names another role); `debugOfferJob` withdraws any open offer first (build 2's `debugOfferQuest` rule); an
+  Accept while a quest is active returns `quest-active` and leaves the card open (unreachable in play); the chain-end
+  ticker line uses the chain head's title.
+- **Effects** (stream C): `hireStar` draws the look on the people stream (critique 10 over D-44's "picks"); the gift
+  driver's name avoids both staff and waiting applicants (`Mo 2`), so no pool applicant is re-rolled; the applier
+  parks the vehicle for `absent: "driver"`, but the schema rejects that value (use `"vehicles"`), so shipped data never
+  reaches it; effects lines carry state-aware suffixes beyond the contract table (`(room for N)`, `(no room)`,
+  `(shelf empty)`, `(N there)`, `(max 5)`, `(not running)`, `— Bike 1 has no driver`, `— no one sorts the Hold Bay`).
+- **Policy scores** (stream D): scores round to cents so float noise never breaks a tie (the radio ad is an exact tie,
+  so the default "No" wins); a vehicle voucher is valued at `vehicleGainShare` × list price; the investor chain head
+  scores +255, not B3 §3.8's +275 (the chain weight); in the state-free score `vehicle lose any` prices the first
+  vehicle type (bike); the baseline line reads "baseline rows within band (±5 %; level rows −12…−8 %)".
+- **Schema rules beyond B3 §7** (stream E): the default option is always shown, and a paid default needs
+  `cond.balanceAtLeast` ≥ its cost (so `--policy none` and fixture answers never stall); every card keeps one option
+  with no `if`; `end` must name a card that applies a `mod` or `cap`; a `cond` may only read a flag some option sets;
+  `bounds` must contain the identity; `scope` only on speed / spawn / processS / clearanceS; only the five known
+  placeholders.
+- **Interim job UI** (stream E, D-18): a job card that holds the sim auto-opens its QuestCard in either view and
+  through the onboarding tour (else the game would sit frozen with nothing on screen); `__pm.answerCard()` and an
+  `answer` flag on `__pm.advance` / `__pm.waitEvent` answer cards with the default through logged commands (e2e); the
+  copy-fit placeholder test joins an option's effects lines with " · " into ≤ 2 lines at 276 px (stricter than one
+  line per effect — M12's EventCard layout may relax it).
+
+### Wave 1 review fixes (confirmed findings; no balance value changed)
+
+- **The interim answer to a non-job card** (review deck-1, D-18): the rescue's loaner opens whatever
+  `SIM_FEATURES.events` says (critique 16), and it — like any debug card — held a policy-less sim with nothing on
+  screen. Until M12's EventCard, the HUD answers an open non-job card with its default option (else the first
+  affordable one) through a logged `decideEvent` once no HUD hold is up, and tickers `<title>: <effects lines>`
+  (`interimCardAnswer`, `src/ui/questText.ts`); never under a policy or at game over.
+- **The stepper stops through the hold** (review deck-2, B3 §3.2 / §6): `Sim.held` (a card open, no policy, not game
+  over) is what `tick()` checks, and the browser stepper reads it — a held frame leaves the accumulator and the
+  render alpha untouched (vehicles stood replaying their last 100 ms step at 10 Hz), a frame or an advance stops at
+  the tick that opened the card, and `ticks` / `__pm.advance` count only the ticks that ran. M12's `holds.event`
+  builds on it.
+- **No card on a payday tick** (review policy-1): the deck step runs before the day step, so a card opened on a
+  payday had its cond `balanceAtLeast` and its options' affordability checked against a balance payroll was about to
+  cut — the recall's paid way out greyed, the strike forced at the last life. A payday tick is now a quiet tick
+  (`deckQuiet`): a due draw, link or rescue opens one tick later, against the paid balance.
+- **A way out must be one** (review policy-2, critique 21–22): on the way to a link with no harsh-free answer, an
+  option counts as the chain's escape only when it is always shown, free of harsh effects, and free or covered by its
+  card's cond `balanceAtLeast` — the rule a drawn card's own way out already had. (The gang's "Accept ($300)" is an
+  escape for its watch link only while the head's cond covers it; the shipped watch keeps its own way out, "Yes".)
+- **[Q-B3-8] refined — the policy sees a fatal link** (review policy-2): a plain `next` still scores the chain weight
+  (B3 §3.8's default, so the hand-checked values stand), except when every shown, affordable option of the card it
+  books takes the last life now — then the option is −∞, and the policy takes the chain's way out instead of walking
+  into a link that ends its run (B3 §3.8 "the policy never ends its own run").
+- **A vehicle pick is a driven vehicle** (review effects-3, B3 §3.5 "a driver's vehicle parked"): `pick: "vehicle"`
+  candidates are the vehicles not absent with an active, present driver at the wheel — the population the absence's
+  `all` parks; a picked vehicle whose driver left since parks nothing (`(no vehicle to park)`, no tone) and the policy
+  scores it 0.
+- **The long victory test is never vacuous** (review deck-4): `RUN_MINUTES` = max(victoryMaxMin, 50 — the latest victory
+  seen) + the longer of the 3 endless days and the job window (cooldown + 4 × L5's longest gap) + 1 = 62, and the
+  endless test asserts the "job cards come back" check ran on at least one winning seed.
+
+### Pacing pass 1 — the threshold scan (B3 §2.2, plan-build3 §8.2 task 3; decision deck off, job cards on)
+
+Build-2 medians (docs/gate/baseline-build2.json): L2 11.72, L3 17.98, L4 22.35, L5 27.70 min. The job scheduler alone
+(wave 1, build-2 data) moved them to 11.75 / 17.80 / 21.99 / 27.58 and quests offered 7 → 6. Every gate below is
+seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts seeds losing a malware life.
+
+- `parcels.json malware.newStrainDelayS` 60 → **90** (B3 §2.2 lever 1, applied first by design; rows `maxLivesLost`
+  and the 40-seed share): 40-seed share 11/40 → 9/40, seeds losing a life 3/10 → 2/10, lives median 0 → 0; L5
+  27.58 → 27.55.
+- `levels.json` L2 threshold $2,000 → **$1,750** (row `level2Min`): 11.75 → **10.57** min (−9.8 % vs build 2);
+  `truckAfterLevel2MaxMin` +1.53 → +2.78 (≤ 4). $1,700 is a cliff (truck +3.55 and L3–L5 back to −1…−2 %).
+- `levels.json` L3 $3,700 → **$3,250** (row `level3Min`): 17.80 → **16.52** (−8.1 %);
+  `firstOverseasClearedAfterLevel3MaxMin` +2.24 → +2.66 (≤ 3). $3,200 fails the overseas row, $3,400+ the lives row.
+- `levels.json` L4 $5,200 → **$4,650** (row `level4Min`): 21.99 → **20.56** (−8.0 %).
+- `levels.json` L5 $7,400 → **$6,500** (rows `level5Min`, `goldenReleaseOfferedMaxMin`): 27.58 → **25.46** (−8.1 %);
+  the Golden Release offered 27.58 → 25.46 (≤ 29). **$100 below plan-build3 §8.2's $6,600–6,800 range**: the best
+  in-range set gave 25.57–25.64 (−7.7…−7.4 %) with a 35-min lives median of 0.5; stepping down by $50, $6,500 is the
+  first in band (R26).
+- `parcels.json malware.perLevel` 0.02 → **0.015** (B3 §2.2 lever 3, R26): triggered by the 40-seed share 15/40 at the
+  first-guess thresholds; at the final thresholds 14/40 → **13/40** (32.5 % ≤ 35 %), the overseas row +3.10 (FAIL) →
+  +2.66, L5 25.52 → 25.46. Lever 2 (start money, bike price) was not needed (L2 and truck rows pass), nor `jobShare`
+  (quests offered 6 ≥ 4).
+- Not taken: an all-−10 % alternative (1750/3150/4450/6300) — green with the deck off, but with the deck on its L3
+  falls to −13.2 %, outside the band, so M14 would have to raise it again. With the deck on, the shipped set gives
+  −11.0 / −11.6 / −8.2 / −11.0 % (in band) — the starting point of pass 2.
+
+### Wave 2 (fixtures and tests)
+
+- The fixture generators count only payouts that leave lifetime earned under a threshold (a quest reward paid after
+  `levels` in the same tick made level-up-5 cross it); `l2-lane` is taken 40 s after the shaker or 45 s before L3,
+  whichever is sooner (`L2_QUIET_S`). The widened fixture windows of wave 1 went back to build 2's (600 s, 34 min).
+- `levels3.long` "the plan at L3": the Battery checker is checked on or after the L3 tick (the cheaper L3 leaves
+  $233–$390 at L3, so the $500 checker lands 21–96 s later), and dock 2 only when it was bought (L4 may come first,
+  and the plan buys the new strain's X-ray before the dock by design, Q-RUN8).
+- `quests-policy.long`: a Golden Release failed by a malware life on the same tick is allowed when the median of such
+  failures stays within `maxLivesLost` (the gate's own semantics); no seed fails on the shipped data.
+- Step time at L5 (R23): `sim.tick` mean 0.03 ms, p99 ≤ 0.15 ms, max 0.40 ms — far under 1 ms; no dirty flag needed.

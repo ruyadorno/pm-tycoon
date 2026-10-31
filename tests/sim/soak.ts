@@ -13,6 +13,7 @@
 
 import { auditState } from '../../src/sim/sim.ts'
 import type { Sim } from '../../src/sim/sim.ts'
+import { cardOptions } from '../../src/sim/systems/deck.ts'
 import { outboundEligible } from '../../src/sim/systems/dispatch.ts'
 import { addDock } from '../../src/sim/systems/docks.ts'
 import type {
@@ -196,11 +197,26 @@ export function soakScenario(
     injectParcel(sim, x.o, x.d, { size: x.size, malware: r() < 0.05 })
   }
 
-  // The player Tosses every flag on the tick it is held.
+  // The player Tosses every flag on the tick it is held (and, build 3,
+  // answers any open event card at random on its own stream — the deck is
+  // off in this quiet sim, so none opens; D-8).
   const step = (): void => {
     const hold = laneNode(sim.state.lane, 'hold')
     for (const id of hold?.queue.slice() ?? []) {
       sim.dispatch({ kind: 'toss', parcelId: id })
+    }
+    const open = sim.state.events.open
+    if (open !== null) {
+      const answers = cardOptions(sim, open).filter(
+        (o) => o.visible && o.affordable,
+      )
+      const o = answers[Math.floor(r() * answers.length)]
+      if (o)
+        sim.dispatch({
+          kind: 'decideEvent',
+          eventId: open.eventId,
+          option: o.index,
+        })
     }
     sim.tick()
   }

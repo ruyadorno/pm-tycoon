@@ -47,14 +47,34 @@
 // the gate table gains GR_min (the Golden Release offer); the narrative
 // names the Sorter Arm purchase, its first Toss and an Airport loss as "the
 // plane has left" (design R11).
+//
+// Build 3, M11 (spec-build3 §3.8-§3.9, §7; plan-build3 §8.2 tasks 2 + 7; M11
+// contract §3 stream D): the five event rows — eventsOfferedBy30MinMin (≥ 15
+// cards by 30 min: decision + news + job + links), eventsOpenMaxTicks (≤ 1:
+// no card stays open past the step after the tick that offered it),
+// eventsL1PlateauMin (≥ 3 decision cards between minute 3 and the L2 tick),
+// policyEvPerCard (the policy's mean chosen score inside events.json
+// policy.evBand) and policyNonDefaultShare (≥ policy.nonDefaultShareMin) —
+// are gated behind SIM_FEATURES.events (informational "(M12)" before); the
+// policy band is read from data.events.policy (checkMetrics' `policyBand`,
+// D-42). Printed: the cards per category, chains started / finished, the
+// modifiers' peak, the lives / vehicles / workers events took and gave, the
+// event game overs, the deck's state-free mean score (deckEvMean) and the
+// share of seeds that lost a life to malware. The lives row and that share
+// count `cause !== 'event'` only (critique 26: the gate's lives row measures
+// malware, B3 §3.5); an event's life is eventLivesLost. The --baseline now
+// compares the playtest-1 rows plus L3-L5: the level rows (L2-L5) are meant
+// to move −8…−12 % (B3 §2.1), so their `within` is that band (informational,
+// like the rest of the baseline). The gate header prints the policy weights.
 
-import type { PacingTargets } from '../../src/data/types.ts'
+import type { EventPolicyDef, PacingTargets } from '../../src/data/types.ts'
 import type { SimEventName } from '../../src/sim/events.ts'
 import type { SimFeature } from '../../src/sim/features.ts'
 import { FEATURE_MILESTONE, SIM_FEATURES } from '../../src/sim/features.ts'
+import type { PolicyTally } from '../../src/sim/policies/eventPolicy.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import { SORTER_ARM_ID } from '../../src/sim/systems/sorter.ts'
-import type { MinuteRow, RunStats } from '../../src/sim/types.ts'
+import type { EventStats, MinuteRow, RunStats } from '../../src/sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../../src/sim/types.ts'
 
 /** The hub whose malware clearance reads "the plane has left" (design R11). */
@@ -264,10 +284,20 @@ export class Highlights {
       case 'ticker:news':
         return e.kind === 'strain' ? `${at} ${String(e.text)}` : null
       case 'life:lost': {
+        if (e.cause === 'event') {
+          return `${at} LIFE LOST to an event: ${String(e.title)} — "${String(e.option)}" (lives ${String(e.lives)})`
+        }
         const via = (e.report as { viaClearance?: boolean } | undefined)
           ?.viaClearance
         return `${at} LIFE LOST${via === true ? ' at clearance' : ''}: #${e.parcelId} ${e.label} → ${e.destBuildingId} (lives ${s.economy.lives})`
       }
+      case 'event:decided':
+        // Job cards: the quest lines tell the story.
+        return e.kind === 'job'
+          ? null
+          : `${at} card ${String(e.eventId)}: "${String(e.label)}"${e.default === true ? '' : ' (not the default)'}`
+      case 'vehicle:lost':
+        return `${at} ${String(e.type)} ${String(e.id)} lost to ${String(e.eventId)}${e.last === true ? ' — the last vehicle' : ''}`
       case 'dock:bought':
         return `${at} bought loading dock ${e.index}`
       case 'parcel:handedOff':
@@ -340,7 +370,7 @@ export class Highlights {
       case 'game:victory':
         return `${at} VICTORY on day ${e.day}`
       case 'game:over':
-        return `${at} GAME OVER`
+        return `${at} GAME OVER${e.cause === 'event' ? ' (an event took the last life)' : ''}`
       default:
         return null
     }
@@ -411,6 +441,33 @@ export interface RunMetrics {
   magicOnTime: number
   /** M7: per template id — offers, completions, fails (timeout / abandon / malware), declines (expired / withdrawn). */
   questsByTemplate: Record<string, QuestTally>
+  /** B3 §3.9: event:offered by EVENT_WINDOW_MIN (decision + news + job + links). */
+  eventsOffered30: number
+  /** B3 §3.9: the longest a card stayed open, in ticks (decided / withdrawn − offered; the run's end while open). */
+  eventsOpenMaxTicks: number
+  /** B3 §3.9: decision cards offered from EVENT_PLATEAU_FROM_MIN to the L2 tick (the run's end without L2). */
+  eventsL1Decisions: number
+  /** B3 §3.8: the policy tally's evSum ÷ decisions (2 dp); null with no decision or no policy. */
+  policyEvPerCard: number | null
+  /** B3 §3.8: decided decision cards whose option was not the default ÷ decided decision cards (3 dp); null with none. */
+  policyNonDefaultShare: number | null
+  /** B3 §3.9 (informational): event:offered per category (jobs: `job`). */
+  eventsByCategory: Record<string, number>
+  /** B3 §3.9 (informational): events.stats at the end; null when not given. */
+  chainsStarted: number | null
+  chainsFinished: number | null
+  /** B3 §3.9 (informational): the most modifier rows live at once (modifier:applied − modifier:expired). */
+  modifiersActiveMax: number
+  /** B3 §3.9 (informational): life:lost with cause 'event' (never in livesLost). */
+  eventLivesLost: number
+  /** B3 §3.9 (informational): lives an event gave (life:gained reason 'event', Σ delta). */
+  eventLivesGained: number
+  /** B3 §3.9 (informational): vehicle:lost. */
+  eventVehiclesLost: number
+  /** B3 §3.9 (informational): worker:fired with reason 'event' (a quit, a lost vehicle's driver). */
+  eventWorkersLost: number
+  /** B3 §3.9 (informational): 1 when an event took the last life (game:over cause 'event'), else 0. */
+  eventGameOvers: number
 }
 
 /** One template's quest counts over a run (or summed over seeds). */
@@ -433,9 +490,21 @@ export const QUEST_PLATEAU = { fromMin: 7, toMin: 13, seedsMin: 8 } as const
 /** The magic_parcel template id (quests.json; its offers / completions are the magic rows). */
 const MAGIC_TEMPLATE = 'magic_parcel'
 
+/** A gate row: an economy.pacingTargets key, or one of the two policy rows read from events.json policy (D-42). */
+export type GateKey =
+  | keyof PacingTargets
+  | 'policyEvPerCard'
+  | 'policyNonDefaultShare'
+
+/** The window of eventsOfferedBy30MinMin (named in the key). */
+export const EVENT_WINDOW_MIN = 30
+
+/** B3 §3.9 eventsL1PlateauMin: decision cards counted from this minute to the L2 tick. */
+export const EVENT_PLATEAU_FROM_MIN = 3
+
 export interface GateCheck {
-  /** The economy.pacingTargets key. */
-  key: keyof PacingTargets
+  /** The economy.pacingTargets key (or a policy row, D-42). */
+  key: GateKey
   metric: keyof RunMetrics
   target: string
   value: number | null
@@ -446,21 +515,25 @@ export interface GateCheck {
 }
 
 /** Sim systems each playtest-1 window needs (none listed = active from M1). */
-export const WINDOW_NEEDS: Partial<Record<keyof PacingTargets, SimFeature[]>> =
-  {
-    firstMalwareCaughtMaxS: ['lane'],
-    maxLivesLost: ['lives'],
-    holdBayEventsPer10MinMin: ['lane'],
-    level2Min: ['levels'],
-    truckAfterLevel2MaxMin: ['levels'],
-    payrollShareOfGrossMax: ['people'],
-    questsOfferedBy30MinMin: ['quests'],
-    questsCompletedBy30MinMin: ['quests'],
-    level3Min: ['levels3plus'],
-    firstOverseasClearedAfterLevel3MaxMin: ['levels3plus'],
-    level4Min: ['levels45'],
-    level5Min: ['levels45'],
-  }
+export const WINDOW_NEEDS: Partial<Record<GateKey, SimFeature[]>> = {
+  firstMalwareCaughtMaxS: ['lane'],
+  maxLivesLost: ['lives'],
+  holdBayEventsPer10MinMin: ['lane'],
+  level2Min: ['levels'],
+  truckAfterLevel2MaxMin: ['levels'],
+  payrollShareOfGrossMax: ['people'],
+  questsOfferedBy30MinMin: ['quests'],
+  questsCompletedBy30MinMin: ['quests'],
+  level3Min: ['levels3plus'],
+  firstOverseasClearedAfterLevel3MaxMin: ['levels3plus'],
+  level4Min: ['levels45'],
+  level5Min: ['levels45'],
+  eventsOfferedBy30MinMin: ['events'],
+  eventsOpenMaxTicks: ['events'],
+  eventsL1PlateauMin: ['events'],
+  policyEvPerCard: ['events'],
+  policyNonDefaultShare: ['events'],
+}
 
 /** The level windows (M8-M9): informational in --quick and on a run shorter than their upper bound. */
 export const LEVEL_KEYS: readonly (keyof PacingTargets)[] = [
@@ -476,7 +549,7 @@ export const LEVEL_KEYS: readonly (keyof PacingTargets)[] = [
  * clearance the L3 window's end + its own maximum. Null for any other key.
  */
 export function levelWindowMinutes(
-  key: keyof PacingTargets,
+  key: GateKey,
   t: PacingTargets,
 ): number | null {
   if (key === 'level3Min') return t.level3Min[1]
@@ -488,10 +561,11 @@ export function levelWindowMinutes(
   return null
 }
 
-/** The windows read over the first QUEST_WINDOW_MIN minutes (informational on a shorter run). */
-const WINDOW_MIN_MINUTES: Partial<Record<keyof PacingTargets, number>> = {
+/** The windows read over the first QUEST_WINDOW_MIN / EVENT_WINDOW_MIN minutes (informational on a shorter run). */
+const WINDOW_MIN_MINUTES: Partial<Record<GateKey, number>> = {
   questsOfferedBy30MinMin: QUEST_WINDOW_MIN,
   questsCompletedBy30MinMin: QUEST_WINDOW_MIN,
+  eventsOfferedBy30MinMin: EVENT_WINDOW_MIN,
 }
 
 /** The seven playtest-1 windows (the --baseline Δ compares these only). */
@@ -523,7 +597,7 @@ export interface WindowContext {
  * min)" on a run shorter than its upper bound (given `ctx.targets`).
  */
 export function windowNote(
-  key: keyof PacingTargets,
+  key: GateKey,
   features: SimFeatures = SIM_FEATURES,
   minutes: number | null = null,
   ctx: WindowContext = {},
@@ -531,7 +605,7 @@ export function windowNote(
   const missing = (WINDOW_NEEDS[key] ?? []).filter((f) => !features[f])
   const first = missing[0]
   if (first !== undefined) return `informational (${FEATURE_MILESTONE[first]})`
-  if (LEVEL_KEYS.includes(key)) {
+  if ((LEVEL_KEYS as readonly GateKey[]).includes(key)) {
     if (ctx.quick === true) return 'informational (quick)'
     const lvl = ctx.targets ? levelWindowMinutes(key, ctx.targets) : null
     return lvl !== null && minutes !== null && minutes < lvl
@@ -551,7 +625,9 @@ const round = (x: number, d = 1): number => Math.round(x * 10 ** d) / 10 ** d
 
 /**
  * Metrics from the recorded events (+ the final stats for the truck tick,
- * set by the buyVehicle command, and levelTick as a fallback).
+ * set by the buyVehicle command, and levelTick as a fallback). Build 3:
+ * `tally` is the policy's metrics() (the EV row), `eventStats` the final
+ * state.events.stats (the chain counts); both optional.
  */
 export function computeMetrics(
   seed: number,
@@ -559,6 +635,11 @@ export function computeMetrics(
   events: readonly RecordedEvent[],
   rows: readonly MinuteRow[],
   stats: RunStats,
+  tally: Partial<PolicyTally> | null = null,
+  eventStats: Pick<
+    EventStats,
+    'chainsStarted' | 'chainsFinished'
+  > | null = null,
 ): RunMetrics {
   const endTick = minutes * TICKS_PER_DAY
   const firstTick = (pred: (e: RecordedEvent) => boolean): number | null =>
@@ -622,7 +703,10 @@ export function computeMetrics(
     level2Min: toMin(l2),
     truckAfterLevel2Min:
       l2 === null || truck === null ? null : toMin(Math.max(0, truck - l2)),
-    livesLost: events.filter((e) => e.name === 'life:lost').length,
+    // Critique 26: the lives row measures malware; an event's life is eventLivesLost.
+    livesLost: events.filter(
+      (e) => e.name === 'life:lost' && e.cause !== 'event',
+    ).length,
     shelfStallS: shelfStallTicks / TICKS_PER_S,
     holdBayEventsPer10MinL1:
       l1End <= 0 ? null : round((heldL1 * 10 * TICKS_PER_DAY) / l1End, 2),
@@ -661,7 +745,153 @@ export function computeMetrics(
     hires: events.filter((e) => e.name === 'worker:hired' && e.rehire !== true)
       .length,
     ...quests,
+    ...eventMetrics(events, endTick, l2, tally, eventStats),
   }
+}
+
+type EventMetrics = Pick<
+  RunMetrics,
+  | 'eventsOffered30'
+  | 'eventsOpenMaxTicks'
+  | 'eventsL1Decisions'
+  | 'policyEvPerCard'
+  | 'policyNonDefaultShare'
+  | 'eventsByCategory'
+  | 'chainsStarted'
+  | 'chainsFinished'
+  | 'modifiersActiveMax'
+  | 'eventLivesLost'
+  | 'eventLivesGained'
+  | 'eventVehiclesLost'
+  | 'eventWorkersLost'
+  | 'eventGameOvers'
+>
+
+/**
+ * The build-3 event rows from the recorded events (B3 §3.9; M11 contract
+ * §3 D task 6): cards offered by EVENT_WINDOW_MIN; the longest open span
+ * (each event:offered matched in order with the next event:decided /
+ * event:withdrawn of its eventId — the run's end while still open); the
+ * decision cards from EVENT_PLATEAU_FROM_MIN to the L2 tick (`l2Tick ??
+ * endTick`); the non-default share of decided decision cards; the tally's
+ * mean score; and the informational counts.
+ */
+export function eventMetrics(
+  events: readonly RecordedEvent[],
+  endTick: number,
+  l2Tick: number | null,
+  tally: Partial<PolicyTally> | null = null,
+  eventStats: Pick<
+    EventStats,
+    'chainsStarted' | 'chainsFinished'
+  > | null = null,
+): EventMetrics {
+  const windowEnd = EVENT_WINDOW_MIN * TICKS_PER_DAY
+  const plateauFrom = EVENT_PLATEAU_FROM_MIN * TICKS_PER_DAY
+  const plateauTo = l2Tick ?? endTick
+  const byCategory: Record<string, number> = {}
+  /** eventId → the offered ticks not yet closed (in order). */
+  const open = new Map<string, number[]>()
+  let offered30 = 0
+  let l1Decisions = 0
+  let openMax = 0
+  let decided = 0
+  let nonDefault = 0
+  let live = 0
+  let liveMax = 0
+  let livesLost = 0
+  let livesGained = 0
+  let vehiclesLost = 0
+  let workersLost = 0
+  let gameOvers = 0
+  for (const e of events) {
+    switch (e.name) {
+      case 'event:offered': {
+        const id = String(e.eventId)
+        if (e.tick <= windowEnd) offered30 += 1
+        if (
+          e.kind === 'decision' &&
+          e.tick >= plateauFrom &&
+          e.tick < plateauTo
+        ) {
+          l1Decisions += 1
+        }
+        const cat = String(e.category)
+        byCategory[cat] = (byCategory[cat] ?? 0) + 1
+        const list = open.get(id) ?? []
+        list.push(e.tick)
+        open.set(id, list)
+        break
+      }
+      case 'event:decided':
+      case 'event:withdrawn': {
+        const from = open.get(String(e.eventId))?.shift()
+        if (from !== undefined) openMax = Math.max(openMax, e.tick - from)
+        if (e.name === 'event:decided' && e.kind === 'decision') {
+          decided += 1
+          if (e.default !== true) nonDefault += 1
+        }
+        break
+      }
+      case 'modifier:applied':
+        live += 1
+        liveMax = Math.max(liveMax, live)
+        break
+      case 'modifier:expired':
+        live = Math.max(0, live - 1)
+        break
+      case 'life:lost':
+        if (e.cause === 'event') livesLost += 1
+        break
+      case 'life:gained':
+        if (e.reason === 'event') livesGained += Number(e.delta ?? 0)
+        break
+      case 'vehicle:lost':
+        vehiclesLost += 1
+        break
+      case 'worker:fired':
+        if (e.reason === 'event') workersLost += 1
+        break
+      case 'game:over':
+        if (e.cause === 'event') gameOvers += 1
+        break
+      default:
+        break
+    }
+  }
+  for (const ticks of open.values()) {
+    for (const from of ticks) openMax = Math.max(openMax, endTick - from)
+  }
+  const n = tally?.decisions ?? 0
+  return {
+    eventsOffered30: offered30,
+    eventsOpenMaxTicks: openMax,
+    eventsL1Decisions: l1Decisions,
+    policyEvPerCard: n > 0 ? round((tally?.evSum ?? 0) / n, 2) : null,
+    policyNonDefaultShare: decided > 0 ? round(nonDefault / decided, 3) : null,
+    eventsByCategory: byCategory,
+    chainsStarted: eventStats?.chainsStarted ?? null,
+    chainsFinished: eventStats?.chainsFinished ?? null,
+    modifiersActiveMax: liveMax,
+    eventLivesLost: livesLost,
+    eventLivesGained: livesGained,
+    eventVehiclesLost: vehiclesLost,
+    eventWorkersLost: workersLost,
+    eventGameOvers: gameOvers,
+  }
+}
+
+/** Cards per category summed over runs, most first (ties in first-seen order). */
+export function categoryTallies(
+  runs: readonly Pick<RunMetrics, 'eventsByCategory'>[],
+): [string, number][] {
+  const out = new Map<string, number>()
+  for (const r of runs) {
+    for (const [k, n] of Object.entries(r.eventsByCategory ?? {})) {
+      out.set(k, (out.get(k) ?? 0) + n)
+    }
+  }
+  return [...out.entries()].toSorted((a, b) => b[1] - a[1])
 }
 
 type QuestMetrics = Pick<
@@ -798,6 +1028,12 @@ export interface GateInputs {
   firstOverseasClearedAfterLevel3Min?: number | null
   level4Min?: number | null
   level5Min?: number | null
+  /** Build 3 (gated behind SIM_FEATURES.events). Absent = never / none. */
+  eventsOffered30?: number | null
+  eventsOpenMaxTicks?: number | null
+  eventsL1Decisions?: number | null
+  policyEvPerCard?: number | null
+  policyNonDefaultShare?: number | null
   /** Run length; a quest window on a run shorter than QUEST_WINDOW_MIN is informational. Absent = full. */
   minutes?: number
   /** M8: the quick gate — every level window is informational. */
@@ -812,18 +1048,35 @@ const inRange = (
   [lo, hi]: readonly [number, number],
 ): boolean => v !== null && v !== undefined && v >= lo && v <= hi
 
+/** The note of a policy row when no band was given (D-42: the band is events.json policy). */
+export const NO_POLICY_BAND_NOTE = 'informational (no policy band)'
+
+const policyRow = (k: GateKey): boolean =>
+  k === 'policyEvPerCard' || k === 'policyNonDefaultShare'
+
 /**
  * The seven playtest-1 windows (spec §7, plan.md §6.9.2), the two M7
  * quest rows and the M8-M9 level rows (spec-build2 §7.3) against
- * economy.pacingTargets. `override` (e.g. "informational (delegating)")
- * notes every window, so none gates.
+ * economy.pacingTargets; build 3 (B3 §3.9): the three event rows and the two
+ * policy rows, whose band comes from events.json policy (`policyBand`, D-42;
+ * without one they are NO_POLICY_BAND_NOTE). `override` (e.g.
+ * "informational (delegating)") notes every window, so none gates.
  */
 export function checkMetrics(
   m: GateInputs,
   t: PacingTargets,
   features: SimFeatures = SIM_FEATURES,
   override: string | null = null,
+  policyBand: Pick<
+    EventPolicyDef,
+    'evBand' | 'nonDefaultShareMin'
+  > | null = null,
 ): GateCheck[] {
+  const evOffered = m.eventsOffered30 ?? null
+  const evOpen = m.eventsOpenMaxTicks ?? null
+  const evL1 = m.eventsL1Decisions ?? null
+  const ev = m.policyEvPerCard ?? null
+  const nonDefault = m.policyNonDefaultShare ?? null
   const [lo, hi] = t.level2Min
   const checks: Omit<GateCheck, 'note'>[] = [
     {
@@ -926,11 +1179,56 @@ export function checkMetrics(
       value: m.level5Min ?? null,
       pass: inRange(m.level5Min, t.level5Min),
     },
+    {
+      key: 'eventsOfferedBy30MinMin',
+      metric: 'eventsOffered30',
+      target: `≥ ${t.eventsOfferedBy30MinMin} cards by ${EVENT_WINDOW_MIN} min`,
+      value: evOffered,
+      pass: evOffered !== null && evOffered >= t.eventsOfferedBy30MinMin,
+    },
+    {
+      key: 'eventsOpenMaxTicks',
+      metric: 'eventsOpenMaxTicks',
+      target: `≤ ${t.eventsOpenMaxTicks} tick open`,
+      value: evOpen,
+      pass: le(evOpen, t.eventsOpenMaxTicks),
+    },
+    {
+      key: 'eventsL1PlateauMin',
+      metric: 'eventsL1Decisions',
+      target: `≥ ${t.eventsL1PlateauMin} decision cards from min ${EVENT_PLATEAU_FROM_MIN} to L2`,
+      value: evL1,
+      pass: evL1 !== null && evL1 >= t.eventsL1PlateauMin,
+    },
+    {
+      key: 'policyEvPerCard',
+      metric: 'policyEvPerCard',
+      target: policyBand
+        ? `${policyBand.evBand[0]} to ${policyBand.evBand[1]} $/card (events.json policy.evBand)`
+        : 'events.json policy.evBand',
+      value: ev,
+      pass: policyBand !== null && inRange(ev, policyBand.evBand),
+    },
+    {
+      key: 'policyNonDefaultShare',
+      metric: 'policyNonDefaultShare',
+      target: policyBand
+        ? `≥ ${policyBand.nonDefaultShareMin} (events.json policy.nonDefaultShareMin)`
+        : 'events.json policy.nonDefaultShareMin',
+      value: nonDefault,
+      pass:
+        policyBand !== null &&
+        nonDefault !== null &&
+        nonDefault >= policyBand.nonDefaultShareMin,
+    },
   ]
   const ctx: WindowContext = { quick: m.quick === true, targets: t }
   return checks.map((c) => ({
     ...c,
-    note: override ?? windowNote(c.key, features, m.minutes ?? null, ctx),
+    note:
+      override ??
+      windowNote(c.key, features, m.minutes ?? null, ctx) ??
+      (policyBand === null && policyRow(c.key) ? NO_POLICY_BAND_NOTE : null),
   }))
 }
 
@@ -972,6 +1270,19 @@ export interface MedianMetrics extends GateInputs {
   victoryMin: number | null
   magicSpawned: number | null
   magicOnTime: number | null
+  eventsOffered30: number | null
+  eventsOpenMaxTicks: number | null
+  eventsL1Decisions: number | null
+  policyEvPerCard: number | null
+  policyNonDefaultShare: number | null
+  chainsStarted: number | null
+  chainsFinished: number | null
+  modifiersActiveMax: number | null
+  eventLivesLost: number | null
+  eventLivesGained: number | null
+  eventVehiclesLost: number | null
+  eventWorkersLost: number | null
+  eventGameOvers: number | null
 }
 
 /** Medians of the gated metrics + the informational ones. */
@@ -1013,6 +1324,19 @@ export function medianMetrics(runs: readonly RunMetrics[]): MedianMetrics {
     victoryMin: pick('victoryMin'),
     magicSpawned: pick('magicSpawned'),
     magicOnTime: pick('magicOnTime'),
+    eventsOffered30: pick('eventsOffered30'),
+    eventsOpenMaxTicks: pick('eventsOpenMaxTicks'),
+    eventsL1Decisions: pick('eventsL1Decisions'),
+    policyEvPerCard: pick('policyEvPerCard'),
+    policyNonDefaultShare: pick('policyNonDefaultShare'),
+    chainsStarted: pick('chainsStarted'),
+    chainsFinished: pick('chainsFinished'),
+    modifiersActiveMax: pick('modifiersActiveMax'),
+    eventLivesLost: pick('eventLivesLost'),
+    eventLivesGained: pick('eventLivesGained'),
+    eventVehiclesLost: pick('eventVehiclesLost'),
+    eventWorkersLost: pick('eventWorkersLost'),
+    eventGameOvers: pick('eventGameOvers'),
   }
 }
 
@@ -1041,6 +1365,8 @@ export interface GateSummary {
   informational: InfoRow[]
   /** M6: the seven medians against a previous gate JSON (`--baseline`); absent without one. */
   baseline?: BaselineCompare
+  /** Build 3: events.json policy (its weights print in the header, its band gates the policy rows). */
+  eventPolicy?: EventPolicyDef
   pass: boolean
 }
 
@@ -1060,12 +1386,17 @@ export function seedResult(
   features: SimFeatures = SIM_FEATURES,
   override: string | null = null,
   quick = false,
+  policyBand: Pick<
+    EventPolicyDef,
+    'evBand' | 'nonDefaultShareMin'
+  > | null = null,
 ): SeedResult {
   const checks = checkMetrics(
     { ...metrics, quick },
     targets,
     features,
     override,
+    policyBand,
   )
   return {
     metrics,
@@ -1094,6 +1425,10 @@ export function summarise(
     features?: SimFeatures
     /** M8: the quick gate (every level window informational). */
     quick?: boolean
+    /** Build 3: events.json policy (the policy rows' band, the weights in the header; D-42). */
+    eventPolicy?: EventPolicyDef | null
+    /** Build 3: the deck's state-free mean option score (eventPolicy.ts deckEvMean). */
+    deckEvMean?: number | null
   },
 ): GateSummary {
   const features = meta.features ?? SIM_FEATURES
@@ -1104,6 +1439,7 @@ export function summarise(
     meta.targets,
     features,
     delegating ? DELEGATING_NOTE : null,
+    meta.eventPolicy ?? null,
   )
   const t = meta.targets
   const build2 = 'build 2 — informational'
@@ -1117,6 +1453,13 @@ export function summarise(
   const plateau = metrics.filter((m) => m.questActive7to13 === 1).length
   const magicOffered = metrics.reduce((n, m) => n + (m.magicSpawned ?? 0), 0)
   const magicOnTime = metrics.reduce((n, m) => n + (m.magicOnTime ?? 0), 0)
+  const events = features.events
+    ? 'informational'
+    : 'informational (decisions off)'
+  const sum = (f: (m: RunMetrics) => number | null): number =>
+    metrics.reduce((n, m) => n + (f(m) ?? 0), 0)
+  const malwareLost = metrics.filter((m) => m.livesLost > 0).length
+  const eventOvers = metrics.filter((m) => (m.eventGameOvers ?? 0) > 0).length
   const informational: InfoRow[] = [
     {
       key: 'holdBayEventsPer10Min',
@@ -1249,6 +1592,77 @@ export function summarise(
           })),
         ]
       : []),
+    {
+      key: 'livesLostShare',
+      target: 'seeds that lost a life to malware (the 40-seed share: ≤ 35 %)',
+      median: null,
+      note: 'informational',
+      text: `${malwareLost}/${metrics.length} seeds`,
+    },
+    {
+      key: 'eventsByCategory',
+      target: 'cards offered per category, all seeds',
+      median: null,
+      note: events,
+      text:
+        categoryTallies(metrics)
+          .map(([k, n]) => `${k} ${n}`)
+          .join(' · ') || 'none',
+    },
+    {
+      key: 'chainsStarted',
+      target: 'chains started / finished, all seeds',
+      median: medians.chainsStarted,
+      note: events,
+      text: `${sum((m) => m.chainsStarted)} / ${sum((m) => m.chainsFinished)}`,
+    },
+    {
+      key: 'modifiersActiveMax',
+      target: 'most modifiers live at once',
+      median: medians.modifiersActiveMax,
+      note: events,
+    },
+    {
+      key: 'eventLivesLost',
+      target: 'lives events took (all seeds in brackets)',
+      median: medians.eventLivesLost,
+      note: events,
+      text: `median ${num(medians.eventLivesLost, 1)} (${sum((m) => m.eventLivesLost)})`,
+    },
+    {
+      key: 'eventLivesGained',
+      target: 'lives events gave (all seeds in brackets)',
+      median: medians.eventLivesGained,
+      note: events,
+      text: `median ${num(medians.eventLivesGained, 1)} (${sum((m) => m.eventLivesGained)})`,
+    },
+    {
+      key: 'eventVehiclesLost',
+      target: 'vehicles events took (all seeds in brackets)',
+      median: medians.eventVehiclesLost,
+      note: events,
+      text: `median ${num(medians.eventVehiclesLost, 1)} (${sum((m) => m.eventVehiclesLost)})`,
+    },
+    {
+      key: 'eventWorkersLost',
+      target: 'workers events took (all seeds in brackets)',
+      median: medians.eventWorkersLost,
+      note: events,
+      text: `median ${num(medians.eventWorkersLost, 1)} (${sum((m) => m.eventWorkersLost)})`,
+    },
+    {
+      key: 'eventGameOvers',
+      target: 'runs an event ended',
+      median: medians.eventGameOvers,
+      note: events,
+      text: `${eventOvers}/${metrics.length} seeds`,
+    },
+    {
+      key: 'deckEvMean',
+      target: 'mean state-free score over every option of every card ($)',
+      median: meta.deckEvMean ?? null,
+      note: 'informational',
+    },
   ]
   return {
     version: 1,
@@ -1263,6 +1677,7 @@ export function summarise(
     checks,
     features: { ...features },
     informational,
+    ...(meta.eventPolicy ? { eventPolicy: meta.eventPolicy } : {}),
     pass: runs.every((r) => r.asserts.length === 0) && checks.every(checkOk),
   }
 }
@@ -1276,12 +1691,40 @@ export function summarise(
  */
 export const BASELINE_TOLERANCE = 0.05
 
+/**
+ * Build 3 (B3 §2.1, M11 contract §3 D task 6): the --baseline rows — the
+ * seven playtest-1 windows plus L3-L5 (the build-2 baseline,
+ * docs/gate/baseline-build2.json, D-41).
+ */
+export const BASELINE_KEYS: readonly (keyof PacingTargets)[] = [
+  ...PLAYTEST1_KEYS,
+  'level3Min',
+  'level4Min',
+  'level5Min',
+]
+
+/**
+ * The level rows are meant to move: B3 §2.1's −10 % target, accepted in
+ * −12…−8 % of the baseline (plan-build3 §8.2 task 3). A comparison band of
+ * the report (informational, like the whole baseline), not a balance number.
+ */
+export const LEVEL_BASELINE_BAND: Readonly<
+  Partial<Record<keyof PacingTargets, readonly [number, number]>>
+> = {
+  level2Min: [-0.12, -0.08],
+  level3Min: [-0.12, -0.08],
+  level4Min: [-0.12, -0.08],
+  level5Min: [-0.12, -0.08],
+}
+
 export interface BaselineRow {
-  key: keyof PacingTargets
+  key: GateKey
   base: number | null
   value: number | null
   /** (value − base) ÷ |base| × 100, 1 dp; null when either never happened or base is 0. */
   deltaPct: number | null
+  /** A level row's band (fractions of base, LEVEL_BASELINE_BAND); null = ±tolerance. */
+  band?: readonly [number, number] | null
   within: boolean
 }
 
@@ -1304,10 +1747,22 @@ export function withinBand(
   return Math.abs(value - base) <= tol * Math.abs(base) + 1e-9
 }
 
+/** Is `value` inside [base × (1 + lo), base × (1 + hi)]? Never-happened on both sides counts as within. */
+export function withinShift(
+  base: number | null,
+  value: number | null,
+  [lo, hi]: readonly [number, number],
+): boolean {
+  if (base === null || value === null) return base === value
+  const d = (value - base) / Math.abs(base || 1)
+  return d >= lo - 1e-9 && d <= hi + 1e-9
+}
+
 /**
- * The seven playtest-1 windows' medians of `g` against those of `base` (a
- * previous GateSummary JSON); later gated rows (the M7 quest rows) are not
- * compared.
+ * The BASELINE_KEYS medians of `g` against those of `base` (a previous
+ * GateSummary JSON): the playtest-1 rows within ±tol, the level rows
+ * (LEVEL_BASELINE_BAND) inside their −12…−8 % band; later gated rows (the
+ * quest and event rows) are not compared.
  */
 export function compareBaseline(
   g: Pick<GateSummary, 'checks'>,
@@ -1315,7 +1770,8 @@ export function compareBaseline(
   file: string,
   tol: number = BASELINE_TOLERANCE,
 ): BaselineCompare {
-  const p1 = g.checks.filter((c) => PLAYTEST1_KEYS.includes(c.key))
+  const keys = BASELINE_KEYS as readonly GateKey[]
+  const p1 = g.checks.filter((c) => keys.includes(c.key))
   const rows = p1.map((c): BaselineRow => {
     const b = base.checks.find((x) => x.key === c.key)?.value ?? null
     const v = c.value
@@ -1323,12 +1779,14 @@ export function compareBaseline(
       b === null || v === null || b === 0
         ? null
         : round(((v - b) / Math.abs(b)) * 100, 1)
+    const band = LEVEL_BASELINE_BAND[c.key as keyof PacingTargets] ?? null
     return {
       key: c.key,
       base: b,
       value: v,
       deltaPct,
-      within: withinBand(b, v, tol),
+      band,
+      within: band ? withinShift(b, v, band) : withinBand(b, v, tol),
     }
   })
   return {
@@ -1353,11 +1811,22 @@ export function deltaCell(r: BaselineRow): string {
   return '—'
 }
 
-/** `playtest-1 rows within ±5 %: yes` / `no (rows: level2Min −6.1%, …)`. */
+/** A signed whole percent of a fraction (−0.12 → `−12`). */
+const pctText = (x: number): string =>
+  `${x < 0 ? '−' : x > 0 ? '+' : ''}${Math.round(Math.abs(x) * 100)}`
+
+/** `−12…−8 %` (a level band in percent). */
+function bandText([lo, hi]: readonly [number, number]): string {
+  return `${pctText(lo)}…${pctText(hi)} %`
+}
+
+/** `baseline rows within band (±5 %; level rows −12…−8 %): yes` / `no (rows: level2Min −6.1%, …)`. */
 export function baselineLine(b: BaselineCompare): string {
   const pct = Math.round(b.tolerance * 100)
   const out = b.rows.filter((r) => !r.within)
-  return `playtest-1 rows within ±${pct} %: ${b.within ? 'yes' : `no (rows: ${out.map((r) => `${r.key} ${deltaCell(r)}`).join(', ')})`}`
+  const band = b.rows.find((r) => r.band)?.band
+  const bands = band ? `±${pct} %; level rows ${bandText(band)}` : `±${pct} %`
+  return `baseline rows within band (${bands}): ${b.within ? 'yes' : `no (rows: ${out.map((r) => `${r.key} ${deltaCell(r)}`).join(', ')})`}`
 }
 
 // Gate tables ------------------------------------------------------------------------
@@ -1417,6 +1886,10 @@ const GATE_COLS: readonly {
   { head: 'L4_min', w: 7, cell: (m) => num(m.level4Min, 2) },
   { head: 'L5_min', w: 7, cell: (m) => num(m.level5Min, 2) },
   { head: 'GR_min', w: 7, cell: (m) => num(m.goldenReleaseOfferedMin, 2) },
+  { head: 'cards', w: 5, cell: (m) => count(m.eventsOffered30) },
+  { head: 'L1dec', w: 5, cell: (m) => count(m.eventsL1Decisions) },
+  { head: 'EV$', w: 6, cell: (m) => num(m.policyEvPerCard, 1) },
+  { head: 'nonDef', w: 6, cell: (m) => num(m.policyNonDefaultShare, 2) },
 ]
 
 /** An integer count (a median of counts may end in .5). */
@@ -1437,12 +1910,28 @@ function val(v: number | null): string {
 
 const passWord = (p: boolean): string => (p ? 'PASS' : 'FAIL')
 
+/**
+ * `policy weights ($): money 1 · life 600 · sat/pt 6 · … · mod speed 500 …`
+ * — the event policy's taste, printed in the gate header (B3 §3.8).
+ */
+export function policyWeightsLine(p: EventPolicyDef): string {
+  const w = p.weights
+  const pips = Object.entries(w.pips)
+    .map(([k, v]) => `${k} ${v}`)
+    .join(' ')
+  const mod = Object.entries(w.mod)
+    .map(([k, v]) => `${k} ${v}`)
+    .join(' ')
+  return `policy weights ($): money ${w.money} · life ${w.life} (the last −∞) · sat/pt ${w.satisfactionPerPoint} · vehicle gain ×${w.vehicleGainShare} · quit ${w.staffQuit} · absent/day ${w.absentPerDay} · wanted ${w.wantedPerLabel} · cap ${w.capPerUnit} · chain ${w.chain} · parcels spawn ×${w.parcelSpawnShare} lost ${w.parcelLostEach} · pips ${pips} · mod ${mod} · evBand ${p.evBand[0]}…${p.evBand[1]} · evMax ${p.evMax} · nonDefault ≥ ${p.nonDefaultShareMin}`
+}
+
 /** The terminal gate table: per-seed PASS/FAIL, medians vs targets, build-2 rows. */
 export function formatGate(g: GateSummary): string[] {
   const lines: string[] = []
   lines.push(
-    `GATE seeds ${g.seeds.join(',')} × ${g.minutes} min · policy ${g.policy} · data ${g.dataHash}${g.config ? ` · config ${g.config}` : ''}`,
+    `GATE seeds ${g.seeds.join(',')} × ${g.minutes} min · policy ${g.policy} · events ${g.features.events ? 'on' : 'off'} · data ${g.dataHash}${g.config ? ` · config ${g.config}` : ''}`,
   )
+  if (g.eventPolicy) lines.push(`# ${policyWeightsLine(g.eventPolicy)}`)
   lines.push(
     [
       'seed'.padStart(6),
@@ -1521,8 +2010,9 @@ export function gateMarkdown(g: GateSummary, cmd: string): string {
   const lines = [
     `# Sim gate — ${passWord(g.pass)}`,
     '',
-    `\`${cmd}\` · seeds ${g.seeds.join(', ')} × ${g.minutes} min · policy \`${g.policy}\` · data \`${g.dataHash}\`${g.config ? ` · config \`${g.config}\`` : ''}`,
+    `\`${cmd}\` · seeds ${g.seeds.join(', ')} × ${g.minutes} min · policy \`${g.policy}\` · events ${g.features.events ? 'on' : 'off'} · data \`${g.dataHash}\`${g.config ? ` · config \`${g.config}\`` : ''}`,
     '',
+    ...(g.eventPolicy ? [`${policyWeightsLine(g.eventPolicy)}.`, ''] : []),
     g.policy === 'delegating'
       ? 'Thresholds: `economy.pacingTargets` (spec §7, plan.md §6.9.2). The `delegating` policy (spec-build2 §7.2) is informational: only an invariant fails it; null = never happened.'
       : 'Thresholds: `economy.pacingTargets` (spec §7, plan.md §6.9.2). Medians must pass; null = never happened.',
@@ -1575,7 +2065,7 @@ export function gateMarkdown(g: GateSummary, cmd: string): string {
     '',
     ...(b
       ? [
-          `${baselineLine(b)} — baseline \`${b.file}\` (data \`${b.dataHash}\`, tolerance ±${Math.round(b.tolerance * 100)} %, informational).`,
+          `${baselineLine(b)} — baseline \`${b.file}\` (data \`${b.dataHash}\`, informational).`,
           '',
         ]
       : []),

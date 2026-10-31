@@ -52,6 +52,7 @@ import {
   vehicleTypeDef,
   zonePermits,
 } from '../map.ts'
+import { modMult } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type { BuildingId, Parcel, Stop, TileXY, Vehicle } from '../types.ts'
 import { ticksFromS } from '../types.ts'
@@ -430,9 +431,16 @@ function rushStep(sim: Sim, pass: boolean): void {
 
 // Leg transitions (§4.6) ----------------------------------------------------------------
 
-/** A building stop: vehicles.stopS × the driver's stopMult (energy pip, M6). */
+/**
+ * A building stop: vehicles.stopS × the driver's stopMult (energy pip, M6)
+ * × the stop modifier fold (build 3, B3 §3.6).
+ */
 export function stopTicks(sim: Sim, v: Vehicle): number {
-  return ticksFromS(sim.data.vehicles.stopS * driverMults(sim, v).stopMult)
+  return ticksFromS(
+    sim.data.vehicles.stopS *
+      driverMults(sim, v).stopMult *
+      modMult(sim, 'stop'),
+  )
 }
 
 /** Make `buildingId` the current collect stop (reserving its parcels) and drive there. */

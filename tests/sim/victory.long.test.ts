@@ -21,11 +21,17 @@
 //     (deliveries ≥ goal, malware delivered ≤ max, on-time rate ≥ min);
 //     quest:completed {reward.victory} → game:victory on the same tick,
 //     economy.victory and stats.victoryTick set;
-//   - endless (B2 §3.4): no re-offer of the ultimate; regular offers come
-//     back (intervalDays after the victory) and are accepted; the malware
+//   - endless (B2 §3.4): no re-offer of the ultimate; job cards come back
+//     (build 3: at a deck draw after the job cooldown, B3 §3.2) and are
+//     accepted on the step after they open; the malware
 //     share climbs by malware.postVictoryPerDay at every day boundary from
 //     the first one after the victory (capped), and the endless ticker line
 //     fires once, on that boundary.
+//
+// Review deck-4: the "job cards come back" check needs the job cooldown plus
+// four of L5's longest gaps after the victory (ENDLESS_WINDOW); RUN_MINUTES
+// leaves that much after the latest victory seen (~50 min), and the endless
+// test asserts the check ran on at least one winning seed (never vacuous).
 //
 // Tagged [long]: excluded from `vlr check:quick` (tools/check.mjs), run by
 // the full `vlr check`.
@@ -34,7 +40,7 @@ import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
 import type { Sim } from '../../src/sim/sim.ts'
 import type { QuestProgress } from '../../src/sim/types.ts'
-import { TICKS_PER_DAY } from '../../src/sim/types.ts'
+import { TICKS_PER_DAY, ticksFromS } from '../../src/sim/types.ts'
 import { runSeed } from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
 import type { RecordedEvent } from '../../tools/sim/report.ts'
@@ -43,12 +49,30 @@ import { dataFixture } from './helpers.ts'
 const data = dataFixture()
 const targets = data.economy.pacingTargets
 const SEEDS = [1, 2, 3]
-/** Days of endless play checked after a victory (design §7 M9 item 7). */
-const ENDLESS_DAYS = 3
-/** max(victoryMaxMin, a victory at victoryMaxMin + 3 days) (design: ≤ 48). */
-const RUN_MINUTES = targets.victoryMaxMin + ENDLESS_DAYS
 const ultimateRow = data.levels.find((l) => l.ultimateQuest)!
 const ultimate = ultimateRow.ultimateQuest!
+/** Days of endless play checked after a victory (design §7 M9 item 7). */
+const ENDLESS_DAYS = 3
+/** The latest victory minute seen on seeds 1-3 (M11: 47.6 / 49.5 / none by 50). */
+const VICTORY_SEEN_MIN = 50
+/**
+ * Build 3 (B3 §3.2): after a victory a job card comes at a deck draw once the
+ * job cooldown is over (jobShare per draw) — checked when the run lasts the
+ * cooldown plus four of L5's longest gaps past the victory (review deck-4).
+ */
+const ENDLESS_WINDOW =
+  data.events.schedule.jobCooldownDays * TICKS_PER_DAY +
+  4 * ticksFromS(data.events.schedule.intervalS[String(ultimateRow.level)]![1])
+/**
+ * Long enough for a victory plus the endless checks whatever the
+ * (informational) victoryMaxMin target: build 3 moved it to 40 (B3 §7) while
+ * the runs still win at ~47–50 min — the later of the target and the latest
+ * victory seen, + the longer of the endless days and the job window, + 1.
+ */
+const RUN_MINUTES =
+  Math.max(targets.victoryMaxMin, VICTORY_SEEN_MIN) +
+  Math.max(ENDLESS_DAYS, Math.ceil(ENDLESS_WINDOW / TICKS_PER_DAY)) +
+  1
 
 interface VictoryRun {
   run: RunResult
@@ -184,15 +208,19 @@ describe('the Golden Release and Victory under the competent policy (seeds 1-3) 
       expect(c.onTime / c.delivered, why).toBeGreaterThanOrEqual(
         ultimate.minOnTimeRate,
       )
-      expect(run.result.metrics.victoryMin, why).toBeCloseTo(
-        win[0]!.tick / TICKS_PER_DAY,
-        2,
-      )
+      // The metric is the minute rounded to 2 places (report.ts minutesOf):
+      // within half a hundredth of the exact minute (49.485 → 49.49).
+      expect(
+        Math.abs(run.result.metrics.victoryMin! - win[0]!.tick / TICKS_PER_DAY),
+        why,
+      ).toBeLessThanOrEqual(0.005 + 1e-9)
     }
   }, 120_000)
 
   it('endless after a victory: the ultimate is never re-offered; regular offers return and are accepted; the malware share climbs postVictoryPerDay per day boundary from the first one after the victory (capped); the endless ticker fires once on that boundary', () => {
     const m = data.parcels.malware
+    /** Winning seeds whose run lasted ENDLESS_WINDOW past the victory. */
+    const jobsChecked: number[] = []
     for (const { run, victoryTick } of runs()) {
       if (victoryTick === null) continue
       const why = `seed ${run.seed}`
@@ -201,8 +229,8 @@ describe('the Golden Release and Victory under the competent policy (seeds 1-3) 
         (e) => e.ultimate === true && e.tick > victoryTick,
       )
       expect(ultimateAfter, why).toEqual([])
-      const interval = data.quests.offer.intervalDays * TICKS_PER_DAY
-      if (end - victoryTick > interval) {
+      if (end - victoryTick > ENDLESS_WINDOW) {
+        jobsChecked.push(run.seed)
         const regular = named(run, 'quest:offered').filter(
           (e) => e.ultimate !== true && e.tick > victoryTick,
         )
@@ -247,6 +275,14 @@ describe('the Golden Release and Victory under the competent policy (seeds 1-3) 
         expect(endless[0]!.kind, why).toBe('level')
       }
     }
+    // Never vacuous (review deck-4): a winning seed ran the job check.
+    console.log(
+      `[victory] endless job check ran on seed(s) ${jobsChecked.join(', ') || 'none'} (window ${ENDLESS_WINDOW} ticks, run ${RUN_MINUTES} min)`,
+    )
+    expect(
+      jobsChecked.length,
+      `a winning seed lasting ${ENDLESS_WINDOW} ticks past its victory within ${RUN_MINUTES} min`,
+    ).toBeGreaterThan(0)
   }, 120_000)
 
   it('every seed: the CLI invariants hold (conservation incl. cleared, no stuck vehicle, balance ≥ 0)', () => {

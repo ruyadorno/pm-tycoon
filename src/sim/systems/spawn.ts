@@ -49,6 +49,7 @@ import {
   vehicleTypeDef,
   zonePermits,
 } from '../map.ts'
+import { modAdd, modMult } from '../modifiers.ts'
 import type { Rng } from '../rng.ts'
 import type { Sim } from '../sim.ts'
 import type { Parcel, Strain } from '../types.ts'
@@ -59,13 +60,20 @@ import { spawnMultiplier } from './satisfaction.ts'
 
 const SIZES: readonly SizeId[] = ['S', 'M', 'L', 'XL']
 
-/** Ticks until the district's next spawn: spawnIntervalS × m(s) (§5.2, §9.3). */
+/**
+ * Ticks until the district's next spawn: spawnIntervalS × m(s) (§5.2, §9.3)
+ * × the spawn modifier fold for this district (build 3, B3 §3.6; it takes
+ * effect at the next timer).
+ */
 export function spawnIntervalTicks(
   sim: Sim,
   def: LiveDistrictDef,
   satisfaction: number,
 ): number {
-  const s = def.spawnIntervalS * spawnMultiplier(sim, satisfaction)
+  const s =
+    def.spawnIntervalS *
+    spawnMultiplier(sim, satisfaction) *
+    modMult(sim, 'spawn', def.id)
   return Math.max(1, Math.round(s * TICKS_PER_S))
 }
 
@@ -288,7 +296,10 @@ function spawnOne(sim: Sim, district: LiveDistrictDef): void {
     s.spawn.spawnedCount >= m.graceCount
   ) {
     const strains = availableStrains(sim)
-    if (strains.length > 0 && rng.chance(malwareShare(s, data, overseas))) {
+    // Build 3 (B3 §3.6, D-6): the malwareShare modifier, folded inside
+    // types.ts malwareShare before the overseas multiply and the cap.
+    const share = malwareShare(s, data, overseas, modAdd(sim, 'malwareShare'))
+    if (strains.length > 0 && rng.chance(share)) {
       malware = true
       strain = rng.pick(strains)
     }
@@ -296,7 +307,12 @@ function spawnOne(sim: Sim, district: LiveDistrictDef): void {
 
   // 5. decoy trait (clean parcels only)
   let decoy: StrainId | null = null
-  if (!malware && rng.chance(data.parcels.decoyShare)) {
+  // Build 3 (B3 §3.6): + the decoyShare modifier, clamped to 0 … 1.
+  const decoyShare = Math.min(
+    1,
+    Math.max(0, data.parcels.decoyShare + modAdd(sim, 'decoyShare')),
+  )
+  if (!malware && rng.chance(decoyShare)) {
     decoy = rng.pick(m.strains.map((x) => x.id))
   }
 

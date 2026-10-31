@@ -6,8 +6,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Sim } from '../../src/sim/sim.ts'
 import {
+  busiestDistrict,
   changeSatisfaction,
+  liveSpawningDistricts,
+  lowestDistrict,
   spawnMultiplier,
+  waitingInDistrict,
 } from '../../src/sim/systems/satisfaction.ts'
 import { meanSatisfaction, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { createViewSim } from '../../src/sim/view-api.ts'
@@ -20,6 +24,7 @@ import {
   quietSim,
   runTicks,
   runUntil,
+  unlockDistrict,
 } from './helpers.ts'
 
 const data = dataFixture()
@@ -195,5 +200,32 @@ describe('drift, trend, m(s), mean (spec §9.1-§9.4)', () => {
     sim.state.districts.industrial!.satisfaction = 0 // locked: ignored
     expect(meanSatisfaction(sim.state, data)).toBe(56)
     expect(createViewSim(sim).meanSatisfaction()).toBe(56)
+  })
+})
+
+describe('build 3 event targets (B3 §3.5: pure reads, no draw)', () => {
+  it('live spawning districts in file order (never a hub); busiest by waiting parcels, ties and none → file order; lowest by satisfaction', () => {
+    const sim = quietSim(1)
+    expect(liveSpawningDistricts(sim)).toEqual(['highres', 'downtown'])
+    unlockDistrict(sim, 'docks') // a hub never counts
+    unlockDistrict(sim, 'industrial')
+    expect(liveSpawningDistricts(sim)).toEqual([
+      'highres',
+      'downtown',
+      'industrial',
+    ])
+    expect(busiestDistrict(sim)).toBe('highres') // nothing waiting: the first
+    injectParcel(sim, 'dt_cache_cafe', 'hr_towers_a')
+    expect(waitingInDistrict(sim, 'downtown')).toBe(1)
+    expect(busiestDistrict(sim)).toBe('downtown')
+    injectParcel(sim, 'hr_towers_a', 'dt_cache_cafe')
+    expect(busiestDistrict(sim)).toBe('highres') // a tie: file order
+    const d = sim.state.districts
+    expect(lowestDistrict(sim)).toBe('highres') // all equal: file order
+    d.industrial!.satisfaction = 40
+    d.downtown!.satisfaction = 40
+    expect(lowestDistrict(sim)).toBe('downtown')
+    d.docks!.satisfaction = 0 // hubs have no satisfaction
+    expect(lowestDistrict(sim)).toBe('downtown')
   })
 })

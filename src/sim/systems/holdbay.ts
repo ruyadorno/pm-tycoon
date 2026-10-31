@@ -21,6 +21,7 @@
 
 import { checkerName, slotLabel } from '../detection.ts'
 import type { TossSource } from '../events.ts'
+import { modMult } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type { BuildingId, Parcel, Strain } from '../types.ts'
 import { laneNode, liveSlotIds } from '../types.ts'
@@ -82,14 +83,18 @@ export function tossParcel(
   if (p.malware) {
     q.malware += 1
     addWanted(s, p.label)
+    // Build 3 (B3 §3.6): the tossBounty modifier, read once so the event,
+    // the credit and the return agree (still earned: it moves the level
+    // clock, Q-B3-3 covers event cash only).
+    const bounty = Math.round(eco.tossBounty * modMult(sim, 'tossBounty'))
     sim.emit('parcel:tossed', {
       id: p.id,
       wasMalware: true,
-      bounty: eco.tossBounty,
+      bounty,
       ...source,
     })
-    sim.credit(eco.tossBounty, 'bounty', true)
-    return eco.tossBounty
+    sim.credit(bounty, 'bounty', true)
+    return bounty
   }
   q.clean += 1
   s.stats.wrongToss += 1
@@ -99,7 +104,11 @@ export function tossParcel(
     bounty: 0,
     ...source,
   })
-  const fee = Math.min(eco.wrongTossFee, s.economy.balance)
+  // Build 3 (B3 §3.6): × the wrongTossFee modifier, clamped to the balance.
+  const fee = Math.min(
+    Math.round(eco.wrongTossFee * modMult(sim, 'wrongTossFee')),
+    s.economy.balance,
+  )
   if (fee > 0) sim.debit(fee, 'wrongToss')
   const origin = mapIndex(sim.data).buildingIdx[p.origin]
   const originDistrict =

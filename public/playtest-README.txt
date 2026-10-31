@@ -101,9 +101,9 @@ Stop the server with Ctrl-C.
     http://<host>:4173/?debug=1&config=tycoon
 
   configs/spicy.json: more malware (9% at level 1 instead of 5%) and
-  decoys (30% instead of 22%), a Hold Bay of 2 at levels 1-2, and a job
-  board from day 2 (1:00) that offers again one day after each job ends, so a
-  Hold Bay stall, the lost-life card and a quest show up within a few
+  decoys (30% instead of 22%), a Hold Bay of 2 at levels 1-2, and the card
+  deck from 1:00 with a draw every 30-60 s (40-70 s from level 3), so a
+  Hold Bay stall, the lost-life card and a job card show up within a few
   minutes.
 
   configs/tycoon.json: every New game starts at level 5 with the lane

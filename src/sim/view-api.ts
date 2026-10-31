@@ -8,6 +8,7 @@
 import type {
   BuildingDef,
   EventCategoryId,
+  EventEffect,
   EventKind,
   GameData,
   MapData,
@@ -21,19 +22,33 @@ import {
   machineChecker,
 } from './detection.ts'
 import type { StallReason } from './events.ts'
+import { SIM_FEATURES } from './features.ts'
+import { isLive, modMult, priceOf } from './modifiers.ts'
 import type { Sim } from './sim.ts'
+import {
+  cardOptions,
+  cardTitle,
+  DECK_OFF_TICK,
+  eventDef,
+  fillCardText,
+  optionLines,
+} from './systems/deck.ts'
 import type { EffectLine } from './systems/effects.ts'
+import { effectSummary, modifierLine } from './systems/effects.ts'
 import type {
   Affinity,
   Applicant,
   Building,
   BuildingId,
+  CardRefs,
   DistrictId,
   Employee,
   EventRecord,
   HireTarget,
   LaneNode,
   LoadingDock,
+  Modifier,
+  OpenCard,
   Parcel,
   Pips,
   Quest,
@@ -56,10 +71,10 @@ import {
   TICKS_PER_S,
   ticksFromS,
 } from './types.ts'
-import { clearingParcels, hubDef } from './systems/hubs.ts'
+import { clearanceTicks, clearingParcels, hubDef } from './systems/hubs.ts'
 import { holdBays } from './systems/lane.ts'
 import { liveMagicParcel } from './systems/magic.ts'
-import { ticksToPayday } from './systems/payroll.ts'
+import { payrollDuePerDay, ticksToPayday } from './systems/payroll.ts'
 import {
   deskNodeOf,
   driverNumbers,
@@ -76,8 +91,9 @@ import {
   questName,
   questProgress01,
   questTicksLeft,
+  ultimatePending,
 } from './systems/quests.ts'
-import { paidValue } from './value.ts'
+import { valueAt } from './value.ts'
 
 export {
   activeCheckers,
@@ -351,6 +367,12 @@ export interface LaneView {
   /** Parcels per minute (spec §6.3). */
   rate(): number
   detection(): StrainDetection[]
+  /**
+   * Build 3 (critique 27): the lane's compounded catch rate vs `strain` —
+   * announced or not — with the machineP modifier folded in (the number
+   * detection(), the laneRateAtLeast condition and the roll agree on).
+   */
+  catchRate(strain: Strain): number
   readonly stalled: { reason: StallReason; nodeId: string } | null
   /** A checker into a slot, or (M6) 'sorter_arm' into the Hold Bay node ('hold'). */
   buyMachine(defId: string, nodeId: string): CommandResult
@@ -392,7 +414,13 @@ export interface QuestsView {
   active: QuestView | null
   history: readonly QuestRecord[]
   vouchers: readonly string[]
-  /** Ticks until the next regular offer is due; null while an offer / active quest exists. */
+  /**
+   * Build 3 (D-17, critique 19): ticks until the next draw that may bring a
+   * job card — max(quests.jobReadyTick, events.nextDrawTick) − tick — while
+   * jobs can come (quests on, not game over, both slots empty, the Golden
+   * Release not pending) and the deck draws; null otherwise. A draw is a job
+   * with probability jobShare, so a job comes at that draw or a later one.
+   */
   nextOfferInTicks: number | null
   victory: boolean
   /** stats.victoryTick (the VictoryCard input). */
@@ -431,13 +459,20 @@ export interface OpenCardView {
   eventId: string
   kind: EventKind
   category: EventCategoryId
+  /** events.json categories: the masthead word (`STAFF`, `JOB BOARD`). */
   word: string
+  /** The category picture frame (`ev_pic_staff`). */
   picture: string
+  /** Filled; a job card: its quest's name. */
   title: string
+  /** Filled; a job card: its quest's flavour (puns.quests, `{district}` filled). */
   body: string
+  /** The HUD's `Day N` the card opened on (completed days + 1). */
   day: number
+  /** A link: `You chose: {option}` (eventWords.youChose) of its parent; else null. */
   parentChoice: string | null
   questId: string | null
+  /** The visible options only (an `if` that fails hides one), in data order. */
   options: readonly EventOptionView[]
 }
 
@@ -445,21 +480,35 @@ export interface OpenCardView {
 export interface ModifierView {
   id: string
   key: ModifierKey
+  /** The sim's words for it, no duration (effects.ts modifierLine: `bikes ×0.85 speed`). */
   line: string
+  /** null = permanent. */
   untilTick: Tick | null
   ticksLeft: number | null
   eventId: string
+  /** The setting card's title. */
   label: string
 }
 
 /** The deck as the HUD reads it (ViewSim.events()). */
 export interface EventsView {
   open: OpenCardView | null
+  /** Cards waiting behind the open one (events.queue). */
   queue: number
+  /** Chain links booked and not yet due. */
   scheduledCount: number
+  /** Ticks to the next automatic card: the earliest due link or the next draw (null: none). */
   nextDueTicks: number | null
+  /** Newest last. */
   history: readonly EventRecord[]
+  /** The live modifiers, newest first. */
   modifiers: readonly ModifierView[]
+}
+
+/** B3 §6: the card actions (one command each). */
+export interface EventActions {
+  /** decideEvent {eventId, option} — `option` is the index in the card's data order (EventOptionView.index). */
+  decide(eventId: string, option: number): CommandResult
 }
 
 /**
@@ -479,6 +528,8 @@ export interface ViewSimDebug {
   offerQuest(templateId: string): CommandResult
   /** M8: hand a malware parcel off at a live hub now (a life at clearance). */
   forceOverseasMalware(hub: DistrictId): CommandResult
+  /** Build 3: open (or queue) this deck card now, ignoring its rules (`?event=`). */
+  offerEvent(eventId: string): CommandResult
 }
 
 export interface ViewSim {
@@ -507,10 +558,20 @@ export interface ViewSim {
   readonly daysSinceIncident: number
   /**
    * Build 3 (B3 §6): the open card, the queue, links, history and live
-   * modifiers. M11 wave 0: always empty; stream E fills it (cached per
-   * revision).
+   * modifiers (cached per sim revision).
    */
   events(): EventsView
+  /** Build 3: answer the open card. */
+  readonly event: EventActions
+  /** Build 3: the sim's words for a list of effects (what an option does now). */
+  effectSummary(
+    effects: readonly EventEffect[],
+    card: CardRefs & { eventId: string; title: string },
+  ): readonly EffectLine[]
+  /** Build 3: a live modifier in the sim's words (`bikes ×0.85 speed`). */
+  modifierSummary(m: Modifier): string
+  /** Build 3: what a vehicle / machine costs now (list price × vehiclePrice / machinePrice modifiers). */
+  priceOf(kind: 'vehicle' | 'machine', listPrice: number): number
   regionState(id: string): 'locked' | 'live'
   buildingAt(tx: number, ty: number): BuildingInfo | null
   waitingAt(buildingId: BuildingId): readonly Parcel[]
@@ -695,13 +756,105 @@ function questsView(sim: Sim): QuestsView {
     active: qs.active === null ? null : questView(sim, qs.active),
     history: qs.history,
     vouchers: qs.vouchers,
-    nextOfferInTicks:
-      qs.offer !== null || qs.active !== null
-        ? null
-        : Math.max(0, qs.nextOfferTick - s.tick),
+    nextOfferInTicks: nextOfferIn(sim),
     victory: s.economy.victory,
     victoryTick: s.stats.victoryTick,
     magic: magicOf(s),
+  }
+}
+
+/**
+ * QuestsView.nextOfferInTicks (D-17, critique 19): while a job may come —
+ * quests on, not game over, both slots empty, the Golden Release not
+ * pending — and the deck draws, the ticks to the first draw at or after
+ * quests.jobReadyTick; null otherwise.
+ */
+function nextOfferIn(sim: Sim): number | null {
+  const s = sim.state
+  const qs = s.quests
+  const ev = s.events
+  const open =
+    SIM_FEATURES.quests &&
+    !s.economy.gameOver &&
+    qs.offer === null &&
+    qs.active === null &&
+    !ultimatePending(sim)
+  if (!open || ev.nextDrawTick >= DECK_OFF_TICK) return null
+  return Math.max(0, Math.max(qs.jobReadyTick, ev.nextDrawTick) - s.tick)
+}
+
+/** The open card as the EventCard reads it (B3 §3.4, §6). */
+function openCardView(sim: Sim, card: OpenCard): OpenCardView {
+  const data = sim.data
+  const words = data.puns.eventWords
+  const cat = data.events.categories[card.category]
+  const offer = sim.state.quests.offer
+  const job =
+    card.kind === 'job' && offer !== null && offer.id === card.questId
+      ? offer
+      : null
+  const def = job === null ? eventDef(data, card.eventId) : null
+  return {
+    eventId: card.eventId,
+    kind: card.kind,
+    category: card.category,
+    word: cat?.word ?? card.category.toUpperCase(),
+    picture: cat?.picture ?? '',
+    title: cardTitle(data, card),
+    body:
+      job !== null
+        ? questFlavour(data, job)
+        : fillCardText(data, def?.body ?? '', card),
+    day: Math.floor(Math.max(0, card.openedTick) / TICKS_PER_DAY) + 1,
+    parentChoice:
+      card.parentChoice === null
+        ? null
+        : words.youChose.replaceAll('{option}', card.parentChoice),
+    questId: card.questId,
+    options: cardOptions(sim, card)
+      .filter((o) => o.visible)
+      .map((o) => ({
+        index: o.index,
+        label: o.label,
+        lines: optionLines(sim, card, o),
+        cost: o.cost,
+        default: o.default,
+        danger: o.danger,
+        affordable: o.affordable,
+        reason: o.affordable ? null : words.cantAfford,
+      })),
+  }
+}
+
+/** ViewSim.events(): the open card, the queue, links, history, live modifiers (newest first). */
+function eventsView(sim: Sim): EventsView {
+  const s = sim.state
+  const ev = s.events
+  let due = Infinity
+  for (const l of ev.scheduled) due = Math.min(due, l.dueTick)
+  if (ev.nextDrawTick < DECK_OFF_TICK) due = Math.min(due, ev.nextDrawTick)
+  const modifiers: ModifierView[] = []
+  for (let i = s.modifiers.length - 1; i >= 0; i--) {
+    const m = s.modifiers[i] as Modifier
+    if (!isLive(m, s.tick)) continue
+    modifiers.push({
+      id: m.id,
+      key: m.key,
+      line: modifierLine(sim, m),
+      untilTick: m.untilTick,
+      ticksLeft:
+        m.untilTick === null ? null : Math.max(0, m.untilTick - s.tick),
+      eventId: m.eventId,
+      label: m.label,
+    })
+  }
+  return {
+    open: ev.open === null ? null : openCardView(sim, ev.open),
+    queue: ev.queue.length,
+    scheduledCount: ev.scheduled.length,
+    nextDueTicks: Number.isFinite(due) ? Math.max(0, due - s.tick) : null,
+    history: ev.history,
+    modifiers,
   }
 }
 
@@ -722,14 +875,17 @@ function hubViews(sim: Sim): HubView[] {
       id: def.id,
       live: s.districts[def.id]?.live ?? false,
       office: h.office,
-      clearanceS: def.clearanceS,
+      // B3 §3.6: the readout follows a clearanceS modifier (scope: this hub).
+      clearanceS: clearanceTicks(sim, def) / TICKS_PER_S,
       valueMult: def.valueMult,
       sizes: [...def.sizes],
       clearing: clearingParcels(s, def.id).map((p) => ({
         parcelId: p.id,
         buildingId: p.dest,
         size: p.size,
-        handOffTick: (p.clearTick ?? 0) - ticks,
+        // Stored at the hand-off since build 3 (a clearanceS modifier makes
+        // `clearTick − clearanceS` lie); derived for older parcels.
+        handOffTick: p.handOffTick ?? (p.clearTick ?? 0) - ticks,
         clearTick: p.clearTick ?? 0,
         lockedValue: p.lockedValue ?? 0,
       })),
@@ -893,6 +1049,7 @@ export function createViewSim(
     nodes: () => st().lane.nodes,
     rate: () => laneRatePerMin(st().lane, get().data, get()),
     detection,
+    catchRate: (strain) => laneCatchRate(st().lane, strain, [], get()),
     get stalled() {
       return stalled()
     },
@@ -915,8 +1072,14 @@ export function createViewSim(
           run({ kind: 'debugOfferQuest', templateId }),
         forceOverseasMalware: (hub) =>
           run({ kind: 'debugOverseasMalware', hub }),
+        offerEvent: (eventId) => run({ kind: 'debugOfferEvent', eventId }),
       }
     : null
+
+  const event: EventActions = {
+    decide: (eventId, option) => run({ kind: 'decideEvent', eventId, option }),
+  }
+  let eCache: { sim: Sim; rev: number; view: EventsView } | null = null
 
   const quest: QuestActions = {
     accept: (questId) => run({ kind: 'acceptQuest', questId }),
@@ -1002,15 +1165,16 @@ export function createViewSim(
       return st().economy.daysSinceIncident
     },
     events(): EventsView {
-      return {
-        open: null,
-        queue: 0,
-        scheduledCount: 0,
-        nextDueTicks: null,
-        history: [],
-        modifiers: [],
+      const sim = get()
+      if (!eCache || eCache.sim !== sim || eCache.rev !== sim.revision) {
+        eCache = { sim, rev: sim.revision, view: eventsView(sim) }
       }
+      return eCache.view
     },
+    event,
+    effectSummary: (effects, card) => effectSummary(get(), effects, card),
+    modifierSummary: (m) => modifierLine(get(), m),
+    priceOf: (kind, listPrice) => priceOf(get(), kind, listPrice),
 
     regionState(id) {
       if (id === 'warehouse') return 'live'
@@ -1048,7 +1212,15 @@ export function createViewSim(
     parcelValue(id) {
       const sim = get()
       const p = sim.state.parcels[String(id)]
-      return p ? paidValue(sim.data, p, sim.state.tick) : null
+      if (!p) return null
+      // B3 §3.6: what a delivery would pay now (the income fold); an
+      // overseas parcel's value is locked at the hand-off (income included).
+      return (
+        p.lockedValue ??
+        Math.round(
+          valueAt(sim.data, p, sim.state.tick) * modMult(sim, 'income'),
+        )
+      )
     },
     get dockQueue() {
       return st().lane.dockQueue
@@ -1148,7 +1320,9 @@ export function createViewSim(
       const s = st()
       const active = s.employees.filter((e) => e.active)
       return {
-        perDay: active.reduce((sum, e) => sum + e.salaryPerDay, 0),
+        // B3 §3.6 (D-4): what payday debits — present workers × payrollMult
+        // + the subscriptions (payroll.ts, the same numbers).
+        perDay: payrollDuePerDay(get()),
         // Short while someone the last payday missed is still owed: a
         // re-hire (unpaidPaydays = 0) or the next paid payday clears it, so
         // the Garage `!` and the red payroll line do not outlive the problem

@@ -12,11 +12,21 @@
 // still pass on these runs (vitest files share no cache, so this file runs
 // its own). Tagged [long]: excluded from `vlr check:quick` like
 // policy.test.ts (tools/check.mjs), run by the full `vlr check`.
+//
+// Build 3, M11 (spec-build3 §3.1, §3.8; M11 contract §1 "Jobs", §3 stream
+// D task 4): regular quests arrive as job cards drawn by the deck; the
+// competent policy answers them first in its step (eventPolicyStep: Accept
+// always outscores Decline, D-37) through decideEvent, so the quest goes
+// offered → active on the step after the tick that drew the card, and a
+// magic parcel's accept and its origin rush still land in one step.
+// questPolicyStep itself accepts only the Golden Release (no card holds
+// it). acceptQuest never appears in the policy's log for a regular quest.
 
 import { describe, expect, it } from 'vitest'
 import { createPolicy, questPolicyStep } from '../../src/sim/policy.ts'
+import { JOB_ACCEPT } from '../../src/sim/systems/deck.ts'
 import { isRushed } from '../../src/sim/systems/dispatch.ts'
-import { TICKS_PER_DAY } from '../../src/sim/types.ts'
+import { TICKS_PER_DAY, ticksFromS } from '../../src/sim/types.ts'
 import { runSeed } from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
 import {
@@ -28,6 +38,7 @@ import {
 } from '../../tools/sim/report.ts'
 import {
   dataFixture,
+  deckOn,
   makeSim,
   noOffers,
   offerQuest,
@@ -51,27 +62,39 @@ const kinds = (sim: ReturnType<typeof makeSim>, from: number): string[] =>
   sim.commandLog.slice(from).map((e) => e.cmd.kind)
 
 describe('questPolicyStep (B2 §7.2 quests row; design §5.1)', () => {
-  it('the first regular offer (3:00) is accepted on the policy step after the tick that offered it — the same sim tick', () => {
-    const sim = makeSim(2)
+  it('the first job card (a deck draw, never before firstEventS) is accepted through decideEvent on the policy step after the tick that drew it — the same sim tick', () => {
+    const sim = deckOn(makeSim(2))
     const policy = createPolicy(sim, 'competent')
-    while (sim.state.quests.offer === null) {
+    while (sim.state.events.open?.kind !== 'job') {
       policy.step()
       sim.tick()
     }
-    const offer = sim.state.quests.offer
+    const card = sim.state.events.open
+    const offer = sim.state.quests.offer!
+    expect(card.questId).toBe(offer.id)
+    expect(card.openedTick).toBe(sim.state.tick)
     expect(offer.offeredTick).toBe(sim.state.tick)
-    expect(offer.offeredTick).toBe(
-      data.quests.offer.firstOfferDay * TICKS_PER_DAY,
+    expect(offer.offeredTick).toBeGreaterThanOrEqual(
+      ticksFromS(data.events.schedule.firstEventS),
     )
     const n = sim.commandLog.length
     policy.step()
     const cmds = sim.commandLog.slice(n)
     expect(cmds[0]).toMatchObject({
       tick: offer.offeredTick,
-      cmd: { kind: 'acceptQuest', questId: offer.id },
+      cmd: { kind: 'decideEvent', eventId: card.eventId, option: JOB_ACCEPT },
     })
+    expect(sim.state.events.open).toBeNull()
     expect(sim.state.quests.offer).toBeNull()
     expect(sim.state.quests.active?.id).toBe(offer.id)
+  })
+
+  it('questPolicyStep alone never accepts a regular offer: a job card holds it (the Golden Release, below, has no card)', () => {
+    const sim = noOffers(makeSim(1))
+    offerQuest(sim, 'rush_district')
+    questPolicyStep(sim)
+    expect(sim.commandLog.map((e) => e.cmd.kind)).toEqual(['debugOfferQuest'])
+    expect(sim.state.quests.active).toBeNull()
   })
 
   it('nothing to do with no offer and no active quest; an active non-magic quest is left alone', () => {
@@ -84,20 +107,21 @@ describe('questPolicyStep (B2 §7.2 quests row; design §5.1)', () => {
     expect(sim.commandLog.length).toBe(n)
   })
 
-  it('magic parcel: accept and rush the origin in the same step; no second rush while the flag is up; rushed again if the flag drops while it still waits; never once picked up; never the destination', () => {
+  it('magic parcel: the job card accepted (decideEvent) and the origin rushed in the same step; no second rush while the flag is up; rushed again if the flag drops while it still waits; never once picked up; never the destination', () => {
     const sim = makeSim(1)
     const policy = createPolicy(sim, 'competent')
     policy.step() // opening A: a bike (with a driver) + the Metal detector
     runTicks(sim, 10)
     noOffers(sim)
     const offer = offerQuest(sim, 'magic_parcel')
+    expect(sim.state.events.open?.questId).toBe(offer.id)
     const n = sim.commandLog.length
     policy.step()
     const pr = sim.state.quests.active?.progress
     if (pr?.kind !== 'magicParcel') throw new Error('no active magic quest')
     const origin = pr.origin!
     expect(sim.commandLog.slice(n).map((e) => e.cmd)).toEqual([
-      { kind: 'acceptQuest', questId: offer.id },
+      { kind: 'decideEvent', eventId: 'job:magic_parcel', option: JOB_ACCEPT },
       { kind: 'rush', buildingId: origin },
     ])
     const p = sim.state.parcels[String(pr.parcelId)]!
@@ -163,20 +187,22 @@ describe('questPolicyStep (B2 §7.2 quests row; design §5.1)', () => {
     const offer = offerQuest(sim, 'rush_district')
     policy.step()
     expect(sim.state.quests.active?.id).toBe(offer.id)
-    expect(sim.commandLog.map((e) => e.cmd.kind)).toContain('acceptQuest')
+    expect(sim.commandLog.map((e) => e.cmd.kind)).toContain('decideEvent')
   })
 
-  it('game over: no quest command (the policy stops)', () => {
+  it('game over: no quest accepted (decideEvent refuses after a game over; the policy stops)', () => {
     const sim = noOffers(makeSim(1))
     offerQuest(sim, 'rush_district')
     sim.state.economy.gameOver = true
     createPolicy(sim, 'competent').step()
-    expect(sim.commandLog.map((e) => e.cmd.kind)).not.toContain('acceptQuest')
+    expect(sim.commandLog.map((e) => e.cmd.kind)).toEqual(['debugOfferQuest'])
+    expect(sim.state.quests.active).toBeNull()
   })
 })
 
 describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-build2 §8.4 acceptance)', () => {
-  it('every regular offer is accepted on the tick it was offered; nothing expires, is declined or abandoned; every accept succeeds', () => {
+  it("every regular offer (a job card) is accepted on the tick it was offered, through decideEvent; nothing expires, is declined or abandoned; every accept succeeds; the only other fail is the Golden Release on a malware delivery — that seed's lost life — judged by median like the gate's lives row", () => {
+    const malwareFails: number[] = []
     for (const r of runs()) {
       const offered = r.events.filter((e) => e.name === 'quest:offered')
       expect(offered.length, `seed ${r.seed}`).toBeGreaterThan(0)
@@ -198,14 +224,48 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
           continue
         }
         expect(a?.tick, `seed ${r.seed} ${String(o.questId)}`).toBe(o.tick)
+        const d = r.events.find(
+          (e) =>
+            e.name === 'event:decided' &&
+            e.kind === 'job' &&
+            e.tick === o.tick &&
+            e.eventId === `job:${String(o.templateId)}`,
+        )
+        expect(d?.label, `seed ${r.seed} ${String(o.questId)}`).toBe('Accept')
       }
       const declined = r.events.filter((e) => e.name === 'quest:declined')
       expect(declined, `seed ${r.seed}`).toEqual([])
+      // Build 3 (M11): a malware delivery while the Golden Release runs
+      // fails it (maxMalwareDelivered 0) on the tick it costs the life. That
+      // life is the gate's lives row (median ≤ maxLivesLost, the 40-seed
+      // share ≤ 35 %), so one seed may show it (seed 5 did at the build-2
+      // thresholds): the fail is judged by median over the seeds, never per
+      // seed. Any other non-timeout fail is a policy bug.
       const failed = r.events.filter(
         (e) => e.name === 'quest:failed' && e.reason !== 'timeout',
       )
-      expect(failed, `seed ${r.seed}`).toEqual([])
+      for (const f of failed) {
+        const what = `seed ${r.seed} ${String(f.questId)} ${String(f.reason)}`
+        expect([f.templateId, f.reason], what).toEqual([
+          'golden_release',
+          'malware',
+        ])
+        expect(
+          r.events.some(
+            (e) =>
+              e.name === 'life:lost' &&
+              e.cause !== 'event' &&
+              e.tick === f.tick,
+          ),
+          `${what}: a malware life lost on its tick`,
+        ).toBe(true)
+      }
+      malwareFails.push(failed.length)
     }
+    console.log(
+      `[quests] Golden Release failed on malware by seed: ${malwareFails.join(',')}`,
+    )
+    expect(median(malwareFails)!).toBeLessThanOrEqual(targets.maxLivesLost)
   }, 120_000)
 
   it('every magic parcel: its origin is rushed on its spawn tick (accept + rush in one step)', () => {
@@ -257,7 +317,7 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
     expect(n).toBeGreaterThanOrEqual(0)
   }, 120_000)
 
-  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows; M9: + the L4-L5 rows) passes by median on these runs; no seed breaks an invariant', () => {
+  it('the full gate (seven playtest-1 windows + the two quest rows; M8: + the L3 rows; M9: + the L4-L5 rows; build 3: the event rows informational until M12) passes by median on these runs; no seed breaks an invariant', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -266,11 +326,20 @@ describe('[long] quests under the competent policy, seeds 1-10 × 30 min (plan-b
         policy: 'competent',
         minutes: 30,
         targets,
+        eventPolicy: data.events.policy,
       },
     )
     expect(
       g.checks.filter((c) => c.note !== null).map((c) => [c.key, c.note]),
-    ).toEqual([])
+    ).toEqual(
+      [
+        'eventsOfferedBy30MinMin',
+        'eventsOpenMaxTicks',
+        'eventsL1PlateauMin',
+        'policyEvPerCard',
+        'policyNonDefaultShare',
+      ].map((k) => [k, 'informational (M12)']),
+    )
     expect(
       g.checks
         .filter((c) => c.note === null && !c.pass)

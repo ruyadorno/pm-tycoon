@@ -10,8 +10,9 @@
 //     game saves under pm.save.v2:cfg:tycoon only, and Continue resumes it
 //     without playing the recipe again; the attract sim never gets it.
 //   - ?debug=1&config=spicy still boots: its playtest-1 levers (malware,
-//     decoys, Hold Bay cap 2 on L1-L2) and the build-2 late quest cadence
-//     (the first offer at firstOfferDay, not the base day) apply, and it has
+//     decoys, Hold Bay cap 2 on L1-L2) and the build-3 events cadence (B3 §7:
+//     the first draw at firstEventS 60 s, not the base 200 s — the first job
+//     card no sooner, and the policy-less sim holds on it) apply, and it has
 //     no start recipe (a plain L1 game).
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
@@ -25,8 +26,8 @@ const SPICY_PATH = 'public/configs/spicy.json'
 /** src/boot/autosave.ts: SAVE_KEY + CONFIG_KEY_INFIX + the config name. */
 const SAVE_KEY = 'pm.save.v2'
 const TYCOON_SAVE_KEY = `${SAVE_KEY}:cfg:tycoon`
-/** sim/types.ts TICKS_PER_DAY (one in-game day = 60 s at 10 ticks/s). */
-const TICKS_PER_DAY = 600
+/** sim/types.ts TICKS_PER_S. */
+const TICKS_PER_S = 10
 /** What a player can dispatch (the recipe's steps after debugForceLevel). */
 const PLAYER_KINDS = [
   'placeDesk',
@@ -205,7 +206,7 @@ test.describe('data configs (?config=, plan-build2 §8.7 task 3)', () => {
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
-  test('?config=spicy still boots: its levers and the late quest cadence apply, no start recipe', async ({
+  test('?config=spicy still boots: its levers and the events cadence apply, no start recipe', async ({
     page,
     pm,
     consoleErrors,
@@ -213,7 +214,9 @@ test.describe('data configs (?config=, plan-build2 §8.7 task 3)', () => {
     const spicy = JSON.parse(readFileSync(SPICY_PATH, 'utf8')) as {
       parcels: { malware: { baseShare: number }; decoyShare: number }
       levels: { holdBayCap: number }[]
-      quests: { offer: { firstOfferDay: number; intervalDays: number } }
+      events: {
+        schedule: { firstEventS: number; intervalS: Record<string, number[]> }
+      }
     }
     await pm.open(SPICY_URL)
     await pm.freeze()
@@ -223,13 +226,13 @@ test.describe('data configs (?config=, plan-build2 §8.7 task 3)', () => {
         baseShare: api.data.parcels.malware.baseShare,
         decoyShare: api.data.parcels.decoyShare,
         holdBayCaps: api.data.levels.map((l) => l.holdBayCap),
-        offer: api.data.quests.offer,
+        schedule: api.data.events.schedule,
         holdBayCap: api.sim.holdBay.cap,
         level: api.sim.level,
         vehicles: api.sim.vehicles.length,
         log: api.core.commandLog.length,
         tick: api.sim.tick,
-        nextOfferTick: api.core.state.quests.nextOfferTick,
+        nextDrawTick: api.core.state.events.nextDrawTick,
         stamp: String(api.game.registry.get('buildStamp') ?? ''),
       }
     })
@@ -241,24 +244,41 @@ test.describe('data configs (?config=, plan-build2 §8.7 task 3)', () => {
       spicy.levels.map((l) => l.holdBayCap),
     )
     expect(got.holdBayCap).toBe(spicy.levels[0]!.holdBayCap)
-    expect(got.offer.firstOfferDay).toBe(spicy.quests.offer.firstOfferDay)
-    expect(got.offer.intervalDays).toBe(spicy.quests.offer.intervalDays)
+    expect(got.schedule.firstEventS).toBe(spicy.events.schedule.firstEventS)
+    expect(got.schedule.intervalS).toEqual(spicy.events.schedule.intervalS)
     expect(got.level).toBe(1)
     expect(got.vehicles).toBe(0)
     expect(got.log).toBe(0)
-    const firstOfferTick = spicy.quests.offer.firstOfferDay * TICKS_PER_DAY
-    expect(got.nextOfferTick).toBe(firstOfferTick)
+    const firstDrawTick = spicy.events.schedule.firstEventS * TICKS_PER_S
+    expect(got.nextDrawTick).toBe(firstDrawTick)
 
-    // The first regular offer comes at firstOfferDay (1:00), not the base 3:00.
-    await pm.advance((firstOfferTick - got.tick) * 100 + 200)
-    const q = await page.evaluate(() => {
-      const qs = window.__pm!.quests()
-      return {
-        tick: window.__pm!.sim.tick,
-        offer: qs.offer ? qs.offer.offeredTick : null,
-      }
-    })
-    expect(q.offer, 'an offer at firstOfferDay').toBe(firstOfferTick)
+    // The first draw comes at firstEventS (1:00), not the base 3:20; a draw
+    // is a job with probability jobShare (else a blank, the next 30–60 s
+    // on). No policy: the sim holds once the job card opens.
+    let q = {
+      tick: 0,
+      offered: null as number | null,
+      open: null as string | null,
+    }
+    for (let i = 0; i < 40 && q.offered === null; i++) {
+      await pm.advance(5_000)
+      q = await page.evaluate(() => {
+        const api = window.__pm!
+        return {
+          tick: api.sim.tick,
+          offered: api.quests().offer?.offeredTick ?? null,
+          open: api.events().open?.eventId ?? null,
+        }
+      })
+    }
+    console.log(`configs: spicy first job ${JSON.stringify(q)}`)
+    expect(q.offered, 'a job card came').not.toBeNull()
+    expect(q.offered!).toBeGreaterThanOrEqual(firstDrawTick)
+    expect(q.open).toMatch(/^job:/)
+    // Held on the card: another advance moves nothing.
+    await pm.advance(5_000)
+    expect(await page.evaluate(() => window.__pm!.sim.tick)).toBe(q.tick)
+    expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

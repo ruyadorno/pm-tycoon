@@ -7,6 +7,11 @@
 // `pm.save.v2` — it names the build-2 save) and its dataHash
 // matches the running data tables (isCompatible); otherwise the Title
 // discards it — a build-1 save (`pm.save.v1`, version 1) included.
+// Build 3 (B3 §6): the event deck lives in SimState (state.events: the open
+// card, the queue, the scheduled chain links, flags, cooldowns, both rng
+// words, nextDrawTick; state.modifiers), so a save made with a card open
+// reloads with the card open and the sim held — nothing here or in Sim.load
+// is deck-specific.
 
 import type { GameData } from '../data/types.ts'
 import type { CommandLogEntry } from './commands.ts'

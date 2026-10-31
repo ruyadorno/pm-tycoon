@@ -6,7 +6,16 @@
 //   --policy competent|delegating|none  default: competent when
 //                      src/sim/policy.ts exists; `delegating` (build 2, M6 —
 //                      SIM_FEATURES.people) hires a sorter at L2 and Clears
-//                      what it tags `looks clean` (spec-build2 §7.2)
+//                      what it tags `looks clean` (spec-build2 §7.2);
+//                      `none` (build 3, D-8) answers every open card with
+//                      its default option before each tick, so the hold
+//                      (B3 §6) never freezes the run
+//   --events on|off    build 3 (M11): SIM_FEATURES.events — the deck's
+//                      decision draw (job cards come regardless) — set
+//                      before the runs (default: the build's flag); echoed
+//                      in the headers and the gate .md command line; a gate
+//                      with the non-default value writes
+//                      <base>-events-<on|off>.* (never latest.*)
 //   --config path      JSON partial deep-merged over src/data (load.node.ts);
 //                      its `start` recipe (src/data/configStart.ts, e.g.
 //                      public/configs/tycoon.json's L5 lane) is played at
@@ -23,11 +32,13 @@
 //                      (M8: every level window informational — "quick")
 //   --out dir          write the gate files there instead of docs/gate/
 //   --baseline path    (--gate) a previous gate JSON, e.g. the committed
-//                      docs/gate/latest.json: adds the Δ% of the seven
-//                      playtest-1 medians and "playtest-1 rows within ±5 %"
-//                      (plan-build2 §8.3 task 11); informational — the exit
-//                      code is unchanged. Read before the gate files are
-//                      written, so it may name the file being replaced.
+//                      docs/gate/baseline-build2.json (D-41): adds the Δ% of
+//                      the seven playtest-1 medians and L3-L5, and "baseline
+//                      rows within band" — ±5 % (plan-build2 §8.3 task 11),
+//                      the level rows L2-L5 −12…−8 % (B3 §2.1, build 3);
+//                      informational — the exit code is unchanged. Read
+//                      before the gate files are written, so it may name the
+//                      file being replaced.
 //
 // A gate (not --quick) with --minutes other than 30 writes
 // latest-<N>min.{json,md} (delegating-<N>min.*) and never replaces latest.*
@@ -49,7 +60,13 @@
 // tossed). An assertion failure ends that seed and exits 1. Gate windows
 // whose sim system is not built yet (src/sim/features.ts) are informational.
 // --json: one seed (no --gate) → {seed, rows, events, gate, conservation,
-// pass}; otherwise {runs: [{…the same}], summary?, pass}.
+// pass}; otherwise {runs: [{…the same}], summary?, pass}. Build 3: the gate
+// carries the event rows (gate.metrics: eventsOffered30, eventsOpenMaxTicks,
+// eventsL1Decisions, policyEvPerCard from the policy's metrics() tally read
+// before dispose, policyNonDefaultShare and the informational counts), the
+// policy band comes from events.json policy and its weights print in the
+// gate header; a '!' line names every decided decision / news card, an
+// event's life and a vehicle lost to an event.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -62,6 +79,10 @@ import {
 import { DataError, type ConfigStart } from '../../src/data/index.ts'
 import type { GameData } from '../../src/data/types.ts'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
+import {
+  answerWithDefault,
+  deckEvMean,
+} from '../../src/sim/policies/eventPolicy.ts'
 import type { PolicyFactory, PolicyKind } from '../../src/sim/sim.ts'
 import {
   auditState,
@@ -113,6 +134,8 @@ const POLICY_URL = new URL('../../src/sim/policy.ts', import.meta.url)
 const GATE_DIR = new URL('../../docs/gate/', import.meta.url)
 const QUICK = { seeds: [1, 2, 3], minutes: 20 }
 const FULL = { seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], minutes: 30 }
+/** The build's SIM_FEATURES.events (a gate run with the other value writes its own files). */
+export const BUILD_EVENTS: boolean = SIM_FEATURES.events
 
 export class UsageError extends Error {}
 
@@ -129,10 +152,12 @@ export interface CliOptions {
   out: string | null
   /** A previous gate JSON to compare the medians with (--gate only). */
   baseline: string | null
+  /** --events on|off: SIM_FEATURES.events for the runs; null = the build's flag. */
+  events: boolean | null
 }
 
 const USAGE =
-  'usage: node tools/sim/cli.ts [--minutes N] [--seed N | --seeds a-b] [--policy competent|delegating|none] [--config path] [--json] [--every N] [--gate] [--quick] [--out dir] [--baseline gate.json]'
+  'usage: node tools/sim/cli.ts [--minutes N] [--seed N | --seeds a-b] [--policy competent|delegating|none] [--events on|off] [--config path] [--json] [--every N] [--gate] [--quick] [--out dir] [--baseline gate.json]'
 
 const POLICIES: readonly (PolicyKind | 'none')[] = [
   'competent',
@@ -171,6 +196,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         quick: { type: 'boolean' },
         out: { type: 'string' },
         baseline: { type: 'string' },
+        events: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
     })
@@ -216,6 +242,9 @@ export function parseCli(argv: readonly string[]): CliOptions {
   }
   const every = v.every === undefined ? 1 : posInt('every', v.every)
   if (every < 1) throw new UsageError('--every: at least 1')
+  if (v.events !== undefined && v.events !== 'on' && v.events !== 'off') {
+    throw new UsageError(`--events: on or off; got "${v.events}"`)
+  }
   return {
     minutes,
     seeds,
@@ -227,6 +256,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
     quick,
     out: v.out ?? null,
     baseline: v.baseline ?? null,
+    events: v.events === undefined ? null : v.events === 'on',
   }
 }
 
@@ -234,10 +264,14 @@ export function parseCli(argv: readonly string[]): CliOptions {
  * The gate files' base name: `delegating` (the delegating rows never
  * replace latest.* / quick.*, B2 §7.2), `quick` (--quick), else `latest`; a
  * non-quick run of other than 30 minutes appends `-<N>min` (M8), so only
- * the 30-minute gate writes latest.*.
+ * the 30-minute gate writes latest.*; build 3: `--events` with the value
+ * the build does not ship appends `-events-<on|off>` (M11 pass 1 / pass 2
+ * gates side by side).
  */
 export function gateFileBase(
-  opts: Pick<CliOptions, 'quick' | 'policy' | 'minutes'>,
+  opts: Pick<CliOptions, 'quick' | 'policy' | 'minutes'> & {
+    events?: boolean | null
+  },
 ): string {
   const base =
     opts.policy === 'delegating'
@@ -245,9 +279,14 @@ export function gateFileBase(
       : opts.quick
         ? 'quick'
         : 'latest'
-  return opts.quick || opts.minutes === FULL.minutes
-    ? base
-    : `${base}-${opts.minutes}min`
+  const sized =
+    opts.quick || opts.minutes === FULL.minutes
+      ? base
+      : `${base}-${opts.minutes}min`
+  const ev = opts.events ?? null
+  return ev === null || ev === BUILD_EVENTS
+    ? sized
+    : `${sized}-events-${ev ? 'on' : 'off'}`
 }
 
 /** A previous gate summary (docs/gate/*.json) for --baseline. */
@@ -334,12 +373,23 @@ export function runSeed(
   let rowsSeen = 0
   let ran = 0
   for (let i = 0; i < total && asserts.length === 0; i++) {
-    policy?.step()
+    // D-8: with no policy every open card takes its default option (the
+    // hold, B3 §6, would freeze the run otherwise).
+    if (policy) policy.step()
+    else answerWithDefault(sim)
+    const before = sim.state.tick
     const t0 = performance.now()
     sim.tick()
     times[i] = performance.now() - t0
     ran += 1
     const s = sim.state
+    if (s.tick === before) {
+      // (Sim.tick never holds at game over.)
+      asserts.push(
+        `${s.tick}: held by card ${s.events.open?.eventId ?? '?'} (no answerable option)`,
+      )
+      break
+    }
     const bal = s.economy.balance
     if (!Number.isFinite(bal) || bal < 0) {
       asserts.push(`${s.tick}: balance ${bal}`)
@@ -369,6 +419,8 @@ export function runSeed(
       for (const p of auditState(s, data)) asserts.push(`${s.tick}: ${p}`)
     }
   }
+  // The EV tally is read before dispose (B3 §3.8; metrics only).
+  const tally = policy?.metrics?.() ?? null
   policy?.dispose?.()
   recorder.detach()
   const sorted = Array.from(times.subarray(0, ran)).toSorted((a, b) => a - b)
@@ -384,6 +436,8 @@ export function runSeed(
     recorder.events,
     rows,
     sim.state.stats,
+    tally,
+    sim.state.events.stats,
   )
   return {
     seed,
@@ -396,6 +450,7 @@ export function runSeed(
       SIM_FEATURES,
       policy && kind === 'delegating' ? DELEGATING_NOTE : null,
       hooks.quick === true,
+      data.events.policy,
     ),
     conservation: conservation(sim.state),
     start,
@@ -421,6 +476,9 @@ export function questsLine(run: RunResult): string {
 
 async function main(argv: readonly string[]): Promise<number> {
   const opts = parseCli(argv)
+  // Build 3: --events sets the deck's decision draw for every run below.
+  if (opts.events !== null) SIM_FEATURES.events = opts.events
+  const eventsWord = SIM_FEATURES.events ? 'on' : 'off'
   const { data, start } = loadConfigured(opts.config)
   const factory = opts.policy === 'none' ? null : await loadPolicyFactory()
   const kind: PolicyKind =
@@ -446,7 +504,7 @@ async function main(argv: readonly string[]): Promise<number> {
     const lights = new Highlights()
     if (!opts.gate || opts.seeds.length === 1) {
       out(
-        `# vlr sim · seed ${seed} · ${opts.minutes} min · policy ${policyName} · data ${data.hash}${opts.config ? ` · config ${opts.config}` : ''}${start ? ` · start recipe Lv ${start.level}` : ''}`,
+        `# vlr sim · seed ${seed} · ${opts.minutes} min · policy ${policyName} · events ${eventsWord} · data ${data.hash}${opts.config ? ` · config ${opts.config}` : ''}${start ? ` · start recipe Lv ${start.level}` : ''}`,
       )
       out(formatHeader())
     }
@@ -498,6 +556,8 @@ async function main(argv: readonly string[]): Promise<number> {
         minutes: opts.minutes,
         targets: data.economy.pacingTargets,
         quick: opts.quick,
+        eventPolicy: data.events.policy,
+        deckEvMean: deckEvMean(data),
       },
     )
     if (baseline && opts.baseline) {
@@ -512,6 +572,7 @@ async function main(argv: readonly string[]): Promise<number> {
         ? ['--minutes', String(opts.minutes)]
         : []),
       ...(opts.baseline ? ['--baseline', opts.baseline] : []),
+      ...(opts.events !== null ? ['--events', eventsWord] : []),
     ]
     const cmd = delegating
       ? `vlr sim:delegating${extra.length > 0 ? ` -- ${extra.join(' ')}` : ''}`

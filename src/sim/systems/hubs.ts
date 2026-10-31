@@ -7,8 +7,10 @@
 //
 // Hand-off (vehicles step 4, dispatch.ts deliverAt on a 'handoff' stop — the
 // usual 1.5 s stop at the pier anchor): the parcel leaves the vehicle,
-// `handed_off`, its value LOCKED at f(age now) × mult (value.ts lockValue),
-// the clearance timer set clearanceS out, trace 'handedOff', then
+// `handed_off`, its value LOCKED at f(age now) × mult (value.ts lockValue;
+// build 3: × the income modifier), the clearance timer set clearanceS out
+// (× the clearanceS modifier for that hub) and Parcel.handOffTick stored,
+// trace 'handedOff', then
 // `parcel:handedOff`. No satisfaction (hubs have none, SC §9.1), no
 // delivery stats, no money.
 //
@@ -32,6 +34,7 @@
 import type { GameData, OverseasDistrictDef } from '../../data/types.ts'
 import type { CommandResult } from '../commands.ts'
 import { buildingDef, mapIndex } from '../map.ts'
+import { modAdd, modMult } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type {
   DistrictId,
@@ -55,11 +58,27 @@ export function hubDef(
   return d?.kind === 'overseas' ? d : null
 }
 
-/** The tick a handed-off parcel was handed off: clearTick − clearanceS. */
+/**
+ * The tick a handed-off parcel was handed off: the stored Parcel.handOffTick
+ * (build 3: under a clearanceS modifier clearTick − clearanceS lies), else —
+ * an older parcel — clearTick − clearanceS.
+ */
 export function handOffTick(data: GameData, p: Parcel): Tick | null {
+  if (p.handOffTick !== undefined) return p.handOffTick
   const hub = hubDef(data, p.destRegion)
   if (!hub || p.clearTick === null) return null
   return p.clearTick - ticksFromS(hub.clearanceS)
+}
+
+/**
+ * The clearance time of a hand-off at `hub` now (B3 §3.6): clearanceS ×
+ * modMult('clearanceS', hub id), rounded, ≥ 1 tick; exactly
+ * ticksFromS(clearanceS) under the identity fold.
+ */
+export function clearanceTicks(sim: Sim, hub: OverseasDistrictDef): number {
+  const ticks = ticksFromS(hub.clearanceS)
+  const m = modMult(sim, 'clearanceS', hub.id)
+  return m === 1 ? ticks : Math.max(1, Math.round(ticks * m))
 }
 
 /**
@@ -84,8 +103,12 @@ export function handOff(sim: Sim, v: Vehicle | null, p: Parcel): void {
   p.nodeId = null
   p.nodeEnterTick = null
   p.nodeDoneTick = null
-  p.lockedValue = lockValue(data, p, s.tick)
-  p.clearTick = s.tick + ticksFromS(hub.clearanceS)
+  // Build 3 (B3 §3.6): the income modifier locks in at hand-off (not at
+  // clearance); the clearanceS modifier sets the timer, and the hand-off
+  // tick is stored (the progress ring no longer derives it).
+  p.lockedValue = lockValue(data, p, s.tick, modMult(sim, 'income'))
+  p.clearTick = s.tick + clearanceTicks(sim, hub)
+  p.handOffTick = s.tick
   p.trace.push({
     tick: s.tick,
     what: 'handedOff',
@@ -151,7 +174,9 @@ export function clearanceStep(sim: Sim): void {
       malware: p.malware,
       hub: hub.id,
       buildingId: p.dest,
-      onTime: isOnTime(data, ageS(p, at)),
+      // The hand-off was on time — read with the onTimeMaxS modifier at
+      // clearance (D-32: the drift is accepted).
+      onTime: isOnTime(data, ageS(p, at), modAdd(sim, 'onTimeMaxS')),
     })
     if (p.malware) {
       // The ship has sailed (§5.6): no payout, a life at clearance.

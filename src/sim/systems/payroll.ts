@@ -4,6 +4,11 @@
 // so: every day), before `day:ended`, so the HUD's daily line counts the day's
 // payroll. SIM_FEATURES.payroll.
 //
+// Build 3 (B3 §3.6): each salary × the payrollMult modifier (rounded), then
+// the payrollAdd modifier as one 'subscriptions' debit after every employee
+// (skipped with a ticker line when short; D-34); a worker away on an event's
+// absence is unpaid and unmarked.
+//
 // Payday: active workers in employees.json payOrder — inspectors by hire time
 // (hiredTick, then id), then sorters by hire time (M6), then drivers by their
 // vehicle's purchase (boughtTick, then vehicle id; a pending Replace driver
@@ -81,10 +86,15 @@ export function vehicleOf(sim: Sim, e: Employee): Vehicle | null {
 const byHire = (a: Employee, b: Employee): number =>
   a.hiredTick - b.hiredTick || a.id - b.id
 
-/** Active workers in payOrder (§7.4: inspectors by hire time, then sorters, then drivers by vehicle purchase). */
+/**
+ * Active workers in payOrder (§7.4: inspectors by hire time, then sorters,
+ * then drivers by vehicle purchase). Build 3 (B3 §3.5): a worker away on an
+ * event's absence is unpaid for the days away — left out, their unpaid mark
+ * untouched.
+ */
 export function payOrder(sim: Sim): Employee[] {
   const s = sim.state
-  const active = s.employees.filter((e) => e.active)
+  const active = s.employees.filter((e) => e.active && !isAbsent(e, s.tick))
   const inspectors = active
     .filter((e) => e.role === 'inspector')
     .toSorted(byHire)
@@ -113,7 +123,7 @@ export function payOrder(sim: Sim): Employee[] {
  * What the next payday debits per day (the Garage "Payroll $28/day"; build 3
  * B3 §3.6, D-4): Σ over the active, present workers of round(salary ×
  * payrollMult) + round(payrollAdd) — the subscriptions, debited apart
- * (D-34). M11 wave 0: both folds are the identity; stream A wires payday.
+ * (D-34) — the same numbers paydayStep debits when the balance covers them.
  */
 export function payrollDuePerDay(ctx: ModCtx): number {
   const tick = ctx.state.tick
@@ -134,10 +144,14 @@ export function paydayStep(sim: Sim): void {
   let paid = 0
   const short: number[] = []
   const walkouts: Employee[] = []
+  // Build 3 (B3 §3.6): the payrollMult modifier per salary, rounded (×0:
+  // everyone is paid $0, so every unpaid mark clears).
+  const mult = modMult(sim, 'payrollMult')
   for (const e of payOrder(sim)) {
-    if (left >= e.salaryPerDay) {
-      left -= e.salaryPerDay
-      paid += e.salaryPerDay
+    const due = mult === 1 ? e.salaryPerDay : Math.round(e.salaryPerDay * mult)
+    if (left >= due) {
+      left -= due
+      paid += due
       e.unpaidPaydays = 0
       continue
     }
@@ -149,6 +163,19 @@ export function paydayStep(sim: Sim): void {
   s.stats.payrollPaid += paid
   s.economy.lastPayroll = { tick: s.tick, paid, shortEmployeeIds: [...short] }
   if (paid > 0) sim.emit('payroll:paid', { amount: paid })
+  // Build 3 (B3 §3.6, D-34): the payrollAdd modifier — one 'subscriptions'
+  // line after every employee, skipped when short (a ticker line, never an
+  // unpaid mark or a walkout); not payroll (payrollPaid, lastPayroll and
+  // payroll:paid leave it out).
+  const add = Math.round(modAdd(sim, 'payrollAdd'))
+  if (add > 0 && s.economy.balance >= add) {
+    sim.debit(add, 'subscriptions')
+  } else if (add > 0) {
+    sim.emit('ticker:news', {
+      text: sim.data.puns.tickerEvent.subscriptionsUnpaid,
+      kind: 'payroll',
+    })
+  }
   if (short.length > 0) sim.emit('payroll:short', { employeeIds: [...short] })
   for (const e of walkouts) walkOut(sim, e)
 }

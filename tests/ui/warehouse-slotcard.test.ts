@@ -52,6 +52,42 @@ describe('§6.3 the lane line: Lane vs metal', () => {
     expect(sc.laneRateFor(sim.state.lane.nodes, 'rattle')).toBeCloseTo(0.85)
   })
 
+  it('build 3 (critique 27): under a machineP modifier the line is the sim’s number — laneCatchRate, lane.catchRate and the readout agree', async () => {
+    const { applyModifier } =
+      await import('../../src/sim/systems/modifierOps.ts')
+    const { laneCatchRate } = await import('../../src/sim/detection.ts')
+    const sim = makeSim(1)
+    openingA(sim)
+    const raw = sc.laneRateFor(sim.state.lane.nodes, 'metal')
+    applyModifier(sim, {
+      key: 'machineP',
+      mult: 1,
+      add: 0.05,
+      scope: null,
+      untilTick: null,
+      eventId: 'ev_test',
+      label: 'Test',
+    })
+    const vs = createViewSim(sim)
+    const modded = sc.laneRateFor(sim.state.lane.nodes, 'metal', sim)
+    // Inspector 0.85 + detector 0.80 + 0.05: 1 − 0.15 × 0.15 = 0.9775.
+    expect(modded).toBeCloseTo(0.9775, 10)
+    expect(modded).toBeGreaterThan(raw)
+    expect(vs.lane.catchRate('metal')).toBeCloseTo(modded, 10)
+    expect(laneCatchRate(sim.state.lane, 'metal', [], sim)).toBeCloseTo(
+      modded,
+      10,
+    )
+    expect(
+      vs.lane.detection().find((x) => x.strain === 'metal')?.d,
+    ).toBeCloseTo(modded, 10)
+    // A strain not announced yet reads the same way (no raw fallback).
+    expect(vs.lane.catchRate('battery')).toBeCloseTo(
+      sc.laneRateFor(sim.state.lane.nodes, 'battery', sim),
+      10,
+    )
+  })
+
   it('a desk with no inspector passes parcels through (D = 0)', () => {
     const sim = makeSim(1)
     const n = laneNode(sim.state.lane, 'slot1')

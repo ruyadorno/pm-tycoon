@@ -75,13 +75,25 @@
 // the Arm Tosses each held parcel 3 s after it arrives) and hand-Tosses only
 // while every bay is taken (policy extension, docs/decisions.md).
 //
+// Build 3, M11 (spec-build3 §3.1, §3.8; plan-build3 §7; M11 contract §3
+// stream D): every step starts with eventPolicyStep
+// (src/sim/policies/eventPolicy.ts) — the open card, if any, is answered
+// with its best-scoring visible, affordable option (ties → the default)
+// before anything else, even after a game over, so a card never stays open
+// past the step after the tick that offered it. Regular quests arrive as job
+// cards whose Accept always outscores Decline (D-37), so "accept every
+// offer" now goes through decideEvent; questPolicyStep keeps the Golden
+// Release (no card holds it) and the magic rush, which lands in the same
+// step as the job card's Accept. Every purchase trigger reads priceOf (the
+// vehiclePrice / machinePrice modifiers; the list price with none).
+//
 // Prices come from src/data; the buffer, the counts and dockBlockedHireS are
 // the policy's own parameters (spec §7 wording), not balance numbers.
 
 import type { CheckerDef, VehicleTypeDef } from '../data/types.ts'
 import { laneCatchRate } from './detection.ts'
 import { bestApplicant } from './policies/applicants.ts'
-import { newTally } from './policies/eventPolicy.ts'
+import { eventPolicyStep, newTally } from './policies/eventPolicy.ts'
 import {
   delegatingHireSorter,
   delegatingHoldBay,
@@ -92,6 +104,7 @@ import {
   levelPlanStep,
   placeNextDesk,
 } from './policies/levelPlan.ts'
+import { priceOf } from './modifiers.ts'
 import { isRushed } from './systems/dispatch.ts'
 import { rehireFee } from './systems/payroll.ts'
 import { hireFeeOf } from './systems/people.ts'
@@ -170,16 +183,19 @@ export function weakestCounter(sim: Sim): CheckerDef | null {
 }
 
 /**
- * B2 §7.2 quests: accept every offer at once (the ultimate as soon as no
- * quest is active); while the active magic parcel waits at its origin and
- * the origin is not rushed, rush it (on its spawn tick — accept and rush
- * happen in the same step). Nothing else changes: never declines, abandons
- * or rushes the destination. Shared by the competent and the delegating
- * policy (design-m7 §5.1).
+ * B2 §7.2 quests, build 3 (B3 §3.1, M11 contract §1): regular jobs come as
+ * job cards, answered by eventPolicyStep (Accept always outscores Decline,
+ * D-37) through decideEvent; this rule accepts only the Golden Release (no
+ * card holds it), as soon as no quest is active. While the active magic
+ * parcel waits at its origin and the origin is not rushed, rush it (on its
+ * spawn tick — the job card's Accept runs first in the same step, so accept
+ * and rush land together). Never declines, abandons or rushes the
+ * destination. Shared by the competent and the delegating policy
+ * (design-m7 §5.1).
  */
 export function questPolicyStep(sim: Sim): void {
   const qs = sim.state.quests
-  if (qs.offer !== null && qs.active === null) {
+  if (qs.offer?.ultimate === true && qs.active === null) {
     sim.dispatch({ kind: 'acceptQuest', questId: qs.offer.id })
   }
   const pr = qs.active?.progress
@@ -222,6 +238,8 @@ class CompetentPolicy implements Policy {
 
   step(): void {
     const sim = this.#sim
+    // B3 §3.8: the open card first, on the step after the tick that offered it.
+    eventPolicyStep(sim, this.#tally)
     if (sim.state.economy.gameOver) return
     if (SIM_FEATURES.payroll) this.#rehire()
     if (this.#delegating) {
@@ -248,6 +266,11 @@ class CompetentPolicy implements Policy {
 
   #balance(): number {
     return this.#sim.state.economy.balance
+  }
+
+  /** What a vehicle / machine costs now (B3 §3.6 vehiclePrice / machinePrice; the list price with no modifier). */
+  #price(kind: 'vehicle' | 'machine', def: { price: number }): number {
+    return priceOf(this.#sim, kind, def.price)
   }
 
   #affords(price: number): boolean {
@@ -323,7 +346,7 @@ class CompetentPolicy implements Policy {
     if (
       bike &&
       sim.state.vehicles.length === 0 &&
-      this.#balance() >= bike.price + this.#driverFee(bike.id)
+      this.#balance() >= this.#price('vehicle', bike) + this.#driverFee(bike.id)
     ) {
       this.#buyVehicle('bike')
     }
@@ -332,7 +355,7 @@ class CompetentPolicy implements Policy {
       md &&
       md.unlockLevel <= sim.state.level.level &&
       !ownsMachine(sim, md.id) &&
-      this.#balance() >= md.price
+      this.#balance() >= this.#price('machine', md)
     ) {
       this.#buyMachine(md.id)
     }
@@ -345,7 +368,7 @@ class CompetentPolicy implements Policy {
     if (!bike) return
     const bikes = bikeCount(sim)
     if (bikes === 0 || bikes >= POLICY_PARAMS.maxBikes) return
-    if (this.#affords(bike.price)) this.#buyVehicle('bike')
+    if (this.#affords(this.#price('vehicle', bike))) this.#buyVehicle('bike')
   }
 
   /** At L2: the truck at price + buffer, then the Shaky shaker (spec §7). */
@@ -354,7 +377,9 @@ class CompetentPolicy implements Policy {
     const truck = typeDef(sim, POLICY_PARAMS.level2Vehicle)
     if (!truck || sim.state.level.level < truck.unlockLevel) return
     if (!ownsVehicle(sim, truck.id)) {
-      if (this.#affords(truck.price)) this.#buyVehicle(truck.id)
+      if (this.#affords(this.#price('vehicle', truck))) {
+        this.#buyVehicle(truck.id)
+      }
       return
     }
     const shaker = machineDef(sim, POLICY_PARAMS.level2Machine)
@@ -362,7 +387,7 @@ class CompetentPolicy implements Policy {
       shaker &&
       shaker.unlockLevel <= sim.state.level.level &&
       !ownsMachine(sim, shaker.id) &&
-      this.#affords(shaker.price)
+      this.#affords(this.#price('machine', shaker))
     ) {
       this.#buyMachine(shaker.id)
     }
@@ -392,7 +417,7 @@ class CompetentPolicy implements Policy {
     if (!SIM_FEATURES.lane || !firstEmptySlot(sim) || !this.#specDone()) return
     const def = weakestCounter(sim)
     if (!def || def.unlockLevel > sim.state.level.level) return
-    if (this.#affords(def.price)) this.#buyMachine(def.id)
+    if (this.#affords(this.#price('machine', def))) this.#buyMachine(def.id)
   }
 
   /** The first desk (by desks.rows index) with a free seat (walked-out inspectors keep theirs). */

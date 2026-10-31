@@ -24,6 +24,11 @@
 // The players read the state and act only through dispatch, so a run is
 // replayable from seed + data + command log. Their own randomness is a
 // private mulberry32 stream (never the sim's).
+// Build 3 (B3 §6, D-8): an open event card holds a policy-less sim, so the
+// runners (runPlayer, recordRun) answer whatever card is still open after
+// the player's step with a random visible, affordable option drawn on a
+// stream of their own (answerCard) — a logged decideEvent, so replays and
+// continuations stay exact; a policy player decides its cards itself first.
 
 import type {
   Command,
@@ -34,6 +39,7 @@ import { createPolicy } from '../../src/sim/policy.ts'
 import { auditState, Sim, stateHash } from '../../src/sim/sim.ts'
 import type { SimSnapshot } from '../../src/sim/sim.ts'
 import { unitsOf } from '../../src/sim/map.ts'
+import { cardOptions } from '../../src/sim/systems/deck.ts'
 import { outboundEligible } from '../../src/sim/systems/dispatch.ts'
 import { salaryOf } from '../../src/sim/systems/people.ts'
 import { stuckKey } from '../../tools/sim/cli.ts'
@@ -527,6 +533,7 @@ function placeMatches(p: Parcel, where: string | undefined): boolean {
     case 'delivered':
     case 'tossed':
     case 'cleared':
+    case 'lost':
     case 'handed_off':
     case 'clearing':
       return where === undefined
@@ -544,6 +551,37 @@ export interface Player {
   readonly name: string
   /** Called once before every tick (like the policy). */
   step(m: Monitor): void
+}
+
+/** A stream for answering cards (a scenario's own, never the sim's). */
+export function cardRng(seed: number): () => number {
+  return scenarioRng((seed ^ 0xca7d5) >>> 0)
+}
+
+/**
+ * Answer the open event card, if any, with a random visible, affordable
+ * option drawn on `r` (build 3, D-8): a logged decideEvent through the
+ * monitor. Returns how many cards it answered (a promoted queue card too).
+ */
+export function answerCard(m: Monitor, r: () => number): number {
+  let n = 0
+  for (let guard = 0; guard < 4; guard++) {
+    const open = m.sim.state.events.open
+    if (open === null) return n
+    const opts = cardOptions(m.sim, open).filter(
+      (o) => o.visible && o.affordable,
+    )
+    const o = opts[Math.floor(r() * opts.length)]
+    if (o === undefined) return n
+    const res = m.dispatch({
+      kind: 'decideEvent',
+      eventId: open.eventId,
+      option: o.index,
+    })
+    if (!res.ok && res.applied !== true) return n
+    n += 1
+  }
+  return n
 }
 
 /** The §7 competent policy as a Player. */
@@ -675,8 +713,10 @@ export function runPlayer(
   each?: (m: Monitor) => void,
 ): void {
   const end = m.sim.state.tick + minutes * TICKS_PER_DAY
+  const r = cardRng(m.sim.state.seed)
   while (m.sim.state.tick < end) {
     player.step(m)
+    answerCard(m, r)
     m.tick()
     each?.(m)
   }
@@ -737,8 +777,10 @@ export function recordRun(
   }
   const minuteHashes = new Map<number, string>()
   const end = sim.state.tick + minutes * TICKS_PER_DAY
+  const r = cardRng(sim.state.seed)
   while (sim.state.tick < end) {
     player.step(monitor)
+    answerCard(monitor, r)
     monitor.tick()
     const t = sim.state.tick
     for (const name of pending) {

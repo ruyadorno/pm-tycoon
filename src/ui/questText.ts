@@ -13,7 +13,7 @@
 import type { GameData } from '../data/types.ts'
 import type { BuildingId, DistrictId, QuestReward } from '../sim/types.ts'
 import { TICKS_PER_DAY, TICKS_PER_S } from '../sim/types.ts'
-import type { QuestsView, QuestView } from '../sim/view-api.ts'
+import type { OpenCardView, QuestsView, QuestView } from '../sim/view-api.ts'
 import { rewardSummary } from '../sim/view-api.ts'
 import { formatClock, formatMoney } from './text.ts'
 
@@ -24,8 +24,39 @@ const TICKS_PER_HOUR = TICKS_PER_DAY / HOURS_PER_DAY
 export const MAGIC_DANGER_S = 30
 /** U+2715: the malware cross of the Golden Release chip (m5x7 has no ✗). */
 export const CROSS = '✕'
+/**
+ * Build 3 (B3 §3.2, D-18): a job offer never expires — the sim waits on its
+ * card — so where the offer's countdown was, the card says so.
+ */
+export const JOB_WAITING_TEXT = 'waiting for you'
 
 export type QuestTone = 'light' | 'warn' | 'danger'
+
+/**
+ * Build 3 interim (M11, D-18 + review deck-1): the M11 HUD has no EventCard,
+ * so an open deck card that is not a job card (the rescue's loaner, a
+ * `?event=` / debug.offerEvent card — the sim holds on it, B3 §6) is answered
+ * by the HUD with its default option when shown and affordable, else the
+ * first affordable one, through ViewSim.event.decide (a logged command, so
+ * the replay stays exact), and told on the ticker as `<title>: <lines>`.
+ * Null for no card, a job card (the QuestCard answers those) or a card with
+ * no answerable option. M12's EventCard replaces it.
+ */
+export function interimCardAnswer(
+  open: OpenCardView | null,
+): { eventId: string; index: number; line: string } | null {
+  if (open === null || open.kind === 'job') return null
+  const ok = open.options.filter((o) => o.affordable)
+  const pick = ok.find((o) => o.default) ?? ok[0]
+  if (pick === undefined) return null
+  const what = pick.lines.map((l) => l.text).filter((t) => t !== '')
+  const said = what.length > 0 ? what.join(', ') : pick.label
+  return {
+    eventId: open.eventId,
+    index: pick.index,
+    line: `${open.title}: ${said}`,
+  }
+}
 
 const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`
@@ -62,9 +93,10 @@ export function formatQuestDays(ticks: number): string {
 }
 
 /**
- * Ticks left at `tick`: an offer until it expires (null: the ultimate never
- * expires), an active quest until its deadline. Falls back to the view's
- * own `ticksLeft` (computed at the view's revision) without a tick.
+ * Ticks left at `tick`: an offer until it expires (null: the ultimate and,
+ * since build 3, every job offer never expire — JOB_WAITING_TEXT), an active
+ * quest until its deadline. Falls back to the view's own `ticksLeft`
+ * (computed at the view's revision) without a tick.
  */
 export function questTicksLeftAt(q: QuestView, tick?: number): number | null {
   if (tick === undefined || !Number.isFinite(tick)) return q.ticksLeft

@@ -782,7 +782,7 @@ describe('l5-tycoon: L5 on its level-up tick, the Golden Release offered (B2 §3
 })
 
 describe('victory: 3 s before the Golden Release ships (B2 §3.4, plan-build2 §8.6 task 3)', () => {
-  it('is at L5 with the Golden Release active and one delivery short, no victory yet', () => {
+  it('is at L5 with the Golden Release active and a few deliveries short, no victory yet', () => {
     const { sim, fx } = load('victory')
     const st = sim.state
     expect(st.level.level).toBe(5)
@@ -796,7 +796,11 @@ describe('victory: 3 s before the Golden Release ships (B2 §3.4, plan-build2 §
       onTime: fx.fixture.onTime,
       malware: fx.fixture.malware,
     })
-    expect(fx.fixture.delivered).toBe((fx.fixture.goal as number) - 1)
+    // Build 3 (M11): the last 3 s may land a multi-parcel drop (seed 7: 58
+    // of 60), so "short of the goal", no longer exactly one delivery.
+    const goal = fx.fixture.goal as number
+    expect(fx.fixture.delivered).toBeLessThan(goal)
+    expect(fx.fixture.delivered).toBeGreaterThanOrEqual(goal - 5)
     expect(st.economy.victory).toBe(false)
     expect(st.stats.victoryTick).toBeNull()
     expect(st.economy.gameOver).toBe(false)

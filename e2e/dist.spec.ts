@@ -246,6 +246,7 @@ test.describe('dist build (vite preview of dist/)', () => {
     const spicy = JSON.parse(readFileSync(SPICY_PATH, 'utf8')) as {
       parcels: { malware: { baseShare: number }; decoyShare: number }
       levels: { holdBayCap: number }[]
+      events: { schedule: { firstEventS: number } }
     }
     const configs = countRequests(page, '/configs/')
     const samples = countRequests(page, '/audio/sf/')
@@ -262,10 +263,13 @@ test.describe('dist build (vite preview of dist/)', () => {
         baseShare: api.data.parcels.malware.baseShare,
         decoyShare: api.data.parcels.decoyShare,
         holdBayCaps: api.data.levels.map((l) => l.holdBayCap),
+        firstEventS: api.data.events.schedule.firstEventS,
         stamp: String(api.game.registry.get('buildStamp') ?? ''),
       }
     })
     expect(got.baseShare).toBe(spicy.parcels.malware.baseShare)
+    // Build 3 (B3 §7): spicy's quicker events cadence rides in the same file.
+    expect(got.firstEventS).toBe(spicy.events.schedule.firstEventS)
     expect(got.decoyShare).toBe(spicy.parcels.decoyShare)
     expect(got.holdBayCaps.slice(0, spicy.levels.length)).toEqual(
       spicy.levels.map((l) => l.holdBayCap),

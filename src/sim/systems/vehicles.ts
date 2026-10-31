@@ -18,12 +18,12 @@
 import type { VehicleTypeDef } from '../../data/types.ts'
 import { sellRefund } from './economy.ts'
 import { returnToConveyor, returnToShelf } from './lane.ts'
-import { driverNumbers, driverOf } from './people.ts'
+import { driverNumbers, driverOf, dropEmployee } from './people.ts'
 import { mapIndex, sameTile, unitsOf, vehicleTypeDef } from '../map.ts'
 import { modMult } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
-import type { Heading, TileXY, Vehicle } from '../types.ts'
-import { dockNumber, TICKS_PER_S } from '../types.ts'
+import type { Employee, Heading, TileXY, Vehicle } from '../types.ts'
+import { dockNumber, isAbsent, TICKS_PER_S } from '../types.ts'
 
 /** Edge progress units per tile. */
 export const MILLI = 1000
@@ -140,12 +140,14 @@ export function freeUnits(sim: Sim, v: Vehicle): number {
 /**
  * The vehicle has a driver who keeps working (spec §7.4, spec-build2 §2.5):
  * false with no driver (bought with "Hire later", or fired), once the driver
- * walked out (Employee.active false) and until re-hire, and while a Replace
- * waits (`nextDriverId`, heading home for the swap) — the vehicle then
- * finishes its trip and parks (`inactive`, or swaps drivers: dispatch.ts
- * goInactive).
+ * walked out (Employee.active false) and until re-hire, while a Replace
+ * waits (`nextDriverId`, heading home for the swap), and (build 3, B3 §3.5)
+ * while the vehicle is parked by an event (`absentUntilTick`) — the vehicle
+ * then finishes its trip and parks (`inactive`, or swaps drivers:
+ * dispatch.ts goInactive); effects.ts absenceStep brings it back.
  */
 export function hasDriver(sim: Sim, v: Vehicle): boolean {
+  if (isAbsent(v, sim.state.tick)) return false
   if (v.driverId === null || v.nextDriverId !== null) return false
   const e = sim.state.employees.find((x) => x.id === v.driverId)
   return e?.active ?? false
@@ -373,21 +375,32 @@ export function leaveDockBay(sim: Sim, v: Vehicle): void {
 const INBOUND = new Set(['picked_up', 'in_transit_in', 'unloading'])
 
 /**
- * §4.1 Sell, from any state: carried parcels return to the warehouse past
- * cap — outbound ones (§11 loaded / in_transit_out) to the shelf, inbound
- * ones to the dock conveyor so they still pass every checker (§6.4, M2
- * review: the shelf would wave a malware parcel through) — reservations and
- * its rush go back to the pool, a docked vehicle frees its dock at once, a
- * queued one leaves the queue, the driver (and a pending Replace) leave the
- * payroll silently, then the sellRefund × price refund and vehicle:sold.
+ * A vehicle leaves the fleet, from any state (§4.1 Sell; build 3 B3 §3.5
+ * `vehicle {lose}`): carried parcels return to the warehouse past cap —
+ * outbound ones (§11 loaded / in_transit_out) to the shelf, inbound ones to
+ * the dock conveyor so they still pass every checker (§6.4, M2 review: the
+ * shelf would wave a malware parcel through; the trace names `why`) —
+ * reservations and its rush go back to the pool, a docked vehicle frees its
+ * dock at once, a queued one leaves the queue; its driver and a pending
+ * Replace driver leave: silently when sold, through `worker:fired {reason:
+ * 'event'}` when lost (M11 critique 31); then, with `refund`, the
+ * sellRefund × paid price. Returns the drivers who left. The caller emits
+ * `vehicle:sold` / `vehicle:lost`.
  */
-export function sellVehicle(sim: Sim, v: Vehicle): void {
+export function removeVehicle(
+  sim: Sim,
+  v: Vehicle,
+  opts: { refund: boolean; why: 'sold' | 'lost' },
+): Employee[] {
   const s = sim.state
   for (const id of v.cargo) {
     const p = s.parcels[String(id)]
     if (!p) continue
-    if (INBOUND.has(p.state)) returnToConveyor(sim, p, v.dockId, v.name)
-    else returnToShelf(sim, p)
+    if (INBOUND.has(p.state)) {
+      returnToConveyor(sim, p, v.dockId, v.name, opts.why)
+    } else {
+      returnToShelf(sim, p)
+    }
   }
   v.cargo = []
   v.unitsUsed = 0
@@ -399,11 +412,25 @@ export function sellVehicle(sim: Sim, v: Vehicle): void {
     s.lane.dockQueue.splice(qi, 1)
     emitQueueLength(sim)
   }
-  s.employees = s.employees.filter(
-    (e) => !(e.role === 'driver' && e.vehicleId === v.id),
+  const drivers = s.employees.filter(
+    (e) => e.role === 'driver' && e.vehicleId === v.id,
   )
+  if (opts.why === 'lost') {
+    for (const e of drivers) dropEmployee(sim, e, 'event')
+  } else {
+    s.employees = s.employees.filter((e) => !drivers.includes(e))
+  }
   s.vehicles = s.vehicles.filter((x) => x.id !== v.id)
   if (qi >= 0) repositionQueue(sim)
-  sim.credit(sellRefund(sim, v), 'refund', false)
+  if (opts.refund) sim.credit(sellRefund(sim, v), 'refund', false)
+  return drivers
+}
+
+/**
+ * §4.1 Sell (removeVehicle with the refund — sellRefund × the price paid —
+ * the drivers leaving the payroll silently), then vehicle:sold.
+ */
+export function sellVehicle(sim: Sim, v: Vehicle): void {
+  removeVehicle(sim, v, { refund: true, why: 'sold' })
   sim.emit('vehicle:sold', { id: v.id })
 }

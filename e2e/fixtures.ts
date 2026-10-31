@@ -12,7 +12,9 @@
 //     Title gone, no attract sim);
 //   - questUi(page) (M7, design-m7 §6.3-§6.6): the quest slots as
 //     __pm.quests() reads them and the HUD's QuestCard / QuestChip /
-//     VictoryCard / QUEST COMPLETE stamp, its modal depth and holds.
+//     VictoryCard / QUEST COMPLETE stamp, its modal depth and holds; build 3
+//     (M11): the open event card (__pm.events().open — a job card holds a
+//     policy-less sim) and the sim tick.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -117,6 +119,10 @@ export interface QuestUi {
   modalDepth: number
   holds: string[]
   paused: boolean
+  /** Build 3: the open event card (a job card holds a policy-less sim, B3 §6). */
+  openCard: { eventId: string; kind: string; questId: string | null } | null
+  /** The sim tick (a held sim does not move). */
+  tick: number
 }
 
 export function questUi(page: Page): Promise<QuestUi> {
@@ -166,6 +172,7 @@ export function questUi(page: Page): Promise<QuestUi> {
     const m = card.model
     const c = hud.questChip.current
     const last = qs.history[qs.history.length - 1] ?? null
+    const open = api.events().open
     return {
       offer: slot(qs.offer),
       active: slot(qs.active),
@@ -195,14 +202,20 @@ export function questUi(page: Page): Promise<QuestUi> {
       modalDepth: hud.modalDepth(),
       holds: [...hud.holds].toSorted(),
       paused: api.stepper.paused,
+      openCard: open
+        ? { eventId: open.eventId, kind: open.kind, questId: open.questId }
+        : null,
+      tick: api.sim.tick,
     }
   })
 }
 
 /**
- * M7: `sim.debug.offerQuest(templateId)` (the `?quest=` command), then —
- * unless `accept` is false — `sim.quest.accept` on that offer: the sim's own
- * logged commands. Returns the quest id (asserts both succeeded).
+ * M7: `sim.debug.offerQuest(templateId)` (the `?quest=` command — build 3: a
+ * job card, which a policy-less sim holds on), then — unless `accept` is
+ * false — `sim.quest.accept` on that offer (routed to the card's decideEvent):
+ * the sim's own logged commands. Returns the quest id (asserts both
+ * succeeded).
  */
 export async function debugQuest(
   page: Page,

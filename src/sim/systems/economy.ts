@@ -12,10 +12,11 @@
 import { lostLifeReport, slotResultEntry } from '../detection.ts'
 import { SIM_FEATURES } from '../features.ts'
 import { districtDef } from '../map.ts'
+import { effChecker, modAdd, modMult } from '../modifiers.ts'
 import type { Sim } from '../sim.ts'
 import type { EventLostLifeReport, Parcel, Strain, Vehicle } from '../types.ts'
 import { laneNode, liveSlotIds, TICKS_PER_S } from '../types.ts'
-import { ageS, isOnTime, paidValue } from '../value.ts'
+import { ageS, isOnTime, valueAt } from '../value.ts'
 import { debugParcel } from './holdbay.ts'
 import { isActiveSlot } from './lane.ts'
 import { addWanted, driverNumbers, driverOf } from './people.ts'
@@ -34,8 +35,12 @@ export function deliverParcel(sim: Sim, v: Vehicle | null, p: Parcel): void {
   const s = sim.state
   const data = sim.data
   const sat = data.economy.satisfaction
-  const onTime = isOnTime(data, ageS(p, s.tick))
-  const paid = p.malware ? 0 : paidValue(data, p, s.tick)
+  // Build 3 (B3 §3.6): the onTimeMaxS and income modifier folds (the
+  // payout rounded once; lifetime earned follows the paid amount).
+  const onTime = isOnTime(data, ageS(p, s.tick), modAdd(sim, 'onTimeMaxS'))
+  const paid = p.malware
+    ? 0
+    : Math.round(valueAt(data, p, s.tick) * modMult(sim, 'income'))
   p.state = 'delivered'
   p.vehicleId = null
   p.reservedBy = null
@@ -216,7 +221,9 @@ export function appendDebugRoute(sim: Sim, p: Parcel, v: Vehicle | null): void {
     const node = laneNode(s.lane, id)
     if (!node) continue
     const c = isActiveSlot(node) ? (node.fixture?.checker ?? null) : null
-    p.trace.push(slotResultEntry(data, at(28), node, c, p, null))
+    // The p this checker would roll with now (the machineP modifier, D-5).
+    const eff = c === null ? null : effChecker(sim, c)
+    p.trace.push(slotResultEntry(data, at(28), node, eff, p, null))
   }
   p.trace.push({ tick: at(25), what: 'shelved', ref: s.lane.shelfNodeId })
   p.trace.push({

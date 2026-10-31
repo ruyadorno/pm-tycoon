@@ -38,6 +38,7 @@ import {
   stateHash,
   type SimSnapshot,
 } from '../../src/sim/sim.ts'
+import { DECK_OFF_TICK } from '../../src/sim/systems/deck.ts'
 import { walkOut } from '../../src/sim/systems/payroll.ts'
 import { laneNode, TICKS_PER_DAY } from '../../src/sim/types.ts'
 import type { Role, Strain, Vehicle, VehicleType } from '../../src/sim/types.ts'
@@ -56,7 +57,9 @@ import {
   unlockDistrict,
 } from './helpers.ts'
 import {
+  answerCard,
   badPlayer,
+  cardRng,
   chaosPlayer,
   continuationProblems,
   hostileRun,
@@ -441,9 +444,12 @@ describe('ViewSim facade (plan.md §5): every command returns its documented fai
 
 describe('the idle run: nothing bought for 30 min (seeds 1-3)', () => {
   it.each([1, 2, 3])(
-    'seed %i: parcels pile up to the building cap, the inspector is paid until the money runs out and then walks out, and every invariant holds',
+    'seed %i (the deck off): parcels pile up to the building cap, the inspector is paid until the money runs out and then walks out, and every invariant holds',
     (seed) => {
       const sim = new Sim(dataFixture(), seed)
+      // Build 3: with the deck on, the rescue's loaner bike ends the idle
+      // run's premise (B3 §3.5) — the deck-on case is the next test.
+      sim.state.events.nextDrawTick = DECK_OFF_TICK
       const walked = collect(sim, 'worker:walkedOut')
       const run = hostileRun(sim, idlePlayer, 30, seed)
       expect(run.monitor.problems).toEqual([])
@@ -465,6 +471,18 @@ describe('the idle run: nothing bought for 30 min (seeds 1-3)', () => {
     },
     20_000,
   )
+
+  it('seed 1 (the deck on, build 3): job cards are answered at random, the rescue loaner comes once the balance is below a bike, and every invariant holds', () => {
+    const sim = new Sim(dataFixture(), 1)
+    // The loaner delivers; the idle player never Tosses, so a full Hold Bay
+    // is its own stall (as for the bad player).
+    const run = hostileRun(sim, idlePlayer, 30, 1, { allowPlayerStall: true })
+    expect(run.monitor.problems).toEqual([])
+    const h = sim.state.events.history
+    expect(h.some((r) => r.kind === 'job')).toBe(true)
+    expect(h.some((r) => r.eventId === 'ev_luck_loaner')).toBe(true)
+    expect(continuationProblems(run)).toEqual([])
+  }, 20_000)
 })
 
 describe('the bad player (seeds 1-3 × 30 min; 20 seeds in robustness-players.long.test.ts)', () => {
@@ -535,9 +553,11 @@ describe('save → load → save chains (plan.md §6.4; __pm.replay after loads)
     let hop = 0
     const hops = [4, 9, 17].map((min) => min * TICKS_PER_DAY + 137)
     const end = 24 * TICKS_PER_DAY
+    const cards = cardRng(11)
     while (live.state.tick < end) {
       const before = live.commandLog.length
       player.step(lm)
+      answerCard(lm, cards) // build 3: an open card holds a policy-less sim
       // The resumed copy gets the same commands at the same ticks.
       for (const e of live.commandLog.slice(before)) rm?.dispatch(e.cmd)
       lm.tick()

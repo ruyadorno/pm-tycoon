@@ -49,7 +49,7 @@ const cap = data.economy.playtestMaxLevel
 const CAP2 = { economy: { playtestMaxLevel: 2 } }
 
 describe('level-ups (spec §8)', () => {
-  it('level:up fires at lifetime $2,000 — not a dollar before — on the tick it is crossed', () => {
+  it('level:up fires at the L2 threshold (levels.json, $1,750 since build 3) — not a dollar before — on the tick it is crossed', () => {
     const sim = quietSim(1)
     const ups = collect(sim, 'level:up')
     sim.state.economy.lifetimeEarned = L2.threshold - 1
@@ -343,7 +343,8 @@ describe('L2 unlocks (spec §8, §3.5, §6.2)', () => {
     const loaded = Sim.load(data, snap)
     const lines = collect(loaded, 'ticker:news')
     const ups = collect(loaded, 'level:up')
-    runTicks(loaded, 600)
+    // Past the announcement + newStrainDelayS (90 s since build 3).
+    runTicks(loaded, data.parcels.malware.newStrainDelayS * TICKS_PER_S)
     expect(ups).toEqual([])
     expect(lines).toEqual([
       { text: strainSpottedText('rattle'), kind: 'strain' },
@@ -374,7 +375,7 @@ describe('L2 unlocks (spec §8, §3.5, §6.2)', () => {
 })
 
 describe('L3 "Regional" unlocks (spec-build2 §4.1; design-m8-m9 §4.5, §7 M8 1)', () => {
-  it('the L3 row applies: Docks live without a spawn timer, Hold Bay 5, shelf 60, tier 3, slots stay 4, battery announced now and spawnable 60 s later; level:up → ticker → region:unlocked', () => {
+  it('the L3 row applies: Docks live without a spawn timer, Hold Bay 5, shelf 60, tier 3, slots stay 4, battery announced now and spawnable newStrainDelayS (90 s) later; level:up → ticker → region:unlocked', () => {
     const sim = quietSim(1)
     fund(sim)
     sim.state.economy.lifetimeEarned = L2.threshold
@@ -451,7 +452,7 @@ describe('L3 "Regional" unlocks (spec-build2 §4.1; design-m8-m9 §4.5, §7 M8 1
         .byStrain.map((x) => x.strain),
     ).toEqual(['metal', 'rattle', 'battery'])
     const delay = data.parcels.malware.newStrainDelayS * TICKS_PER_S
-    expect(delay).toBe(600)
+    expect(delay).toBe(900) // B3 §2.2 lever 1 (R26): 60 → 90 s
     runTicks(sim, delay - 1)
     expect(availableStrains(sim)).not.toContain('battery')
     runTicks(sim, 1)

@@ -9,8 +9,9 @@
 // view per sim vehicle, no camera fade running, no console error.
 //   - City ↔ Warehouse 50 times with 1–4 frames between switches, and a
 //     camera pan request (a chip tap) during the City's exit pan;
-//   - a storm across the first quest offer (3:00) under the policy: no
-//     QuestCard opens by itself (design-m7 §6.5);
+//   - a storm across the first job card (build 3: the deck's first draw at
+//     3:20 or a later one) under the policy: no QuestCard opens by itself
+//     (design-m7 §6.5);
 //   - the same storms during a level-up (fixture level-up.json), a catch
 //     moment (forced flag), the lost-life card (malware-cleared.json) and
 //     with the Garage open;
@@ -340,33 +341,46 @@ test.describe('lifecycle', () => {
     expect(consoleErrors).toEqual([])
   })
 
-  test('the first quest offer (3:00) lands mid-storm under the policy: no card opens', async ({
+  test('the first job card (3:20 or a later draw) lands mid-storm under the policy: no card opens', async ({
     page,
     consoleErrors,
   }) => {
     await openGame(page)
-    // Two seconds short of the first offer (quests.json offer.firstOfferDay),
-    // then storm across it: the policy accepts the offer on its tick, and the
-    // HUD never auto-opens the QuestCard while a policy drives the stepper
-    // (design-m7 §6.5), so the modal stack stays empty.
-    const left = await page.evaluate(() => {
-      const api = window.__pm!
-      const n = api.quests().nextOfferInTicks
-      if (n !== null && n > 20) api.advance((n - 20) * 100)
-      return api.quests().nextOfferInTicks
-    })
-    expect(left, 'the first offer is still ahead').not.toBeNull()
+    // Build 3 (B3 §3.2): jobs come as cards from the deck's draws. Jump to
+    // two seconds before the next draw that may bring one
+    // (QuestsView.nextOfferInTicks), then storm across it: the policy
+    // answers the card on the step it opens, and the HUD never auto-opens the
+    // QuestCard while a policy drives the stepper (design-m7 §6.5), so the
+    // modal stack stays empty. A draw is a job with probability jobShare —
+    // after a blank the timer moves on 60–100 s and the test jumps again.
     let answered = false
-    for (let i = 0; i < 120 && !answered; i++) {
-      await storm(page, 1)
-      answered = await page.evaluate(() => {
-        const qs = window.__pm!.quests()
-        return qs.active !== null || qs.history.length > 0
+    for (let draw = 0; draw < 10 && !answered; draw++) {
+      const left = await page.evaluate(() => {
+        const api = window.__pm!
+        const n = api.quests().nextOfferInTicks
+        if (n !== null && n > 20) api.advance((n - 20) * 100)
+        return api.quests().nextOfferInTicks
       })
+      expect(left, 'a job can still come').not.toBeNull()
+      for (let i = 0; i < 80 && !answered; i++) {
+        await storm(page, 1)
+        const st = await page.evaluate(() => {
+          const qs = window.__pm!.quests()
+          return {
+            taken: qs.active !== null || qs.history.length > 0,
+            next: qs.nextOfferInTicks,
+          }
+        })
+        answered = st.taken
+        // A blank draw: the timer moved on — jump to the next one.
+        if (!answered && st.next !== null && st.next > 40) break
+      }
     }
-    expect(answered, 'the first offer came and the policy took it').toBe(true)
+    expect(answered, 'the first job card came and the policy took it').toBe(
+      true,
+    )
     await restInCity(page)
-    expectAtRest(await invariants(page), 'after the first offer')
+    expectAtRest(await invariants(page), 'after the first job card')
     expect(
       await page.evaluate(
         () =>

@@ -151,7 +151,11 @@ function levelUp3(): void {
   const { sim: probe } = runPolicy((s) => {
     if (s.state.economy.lifetimeEarned !== earned) {
       earned = s.state.economy.lifetimeEarned
-      if (s.state.level.level < LEVEL) lastEarnTick = s.state.tick
+      // Build 3: a quest reward is paid after `levels` in the tick, so the
+      // crossing payout's own tick can still read the old level — only a
+      // payout that leaves the lifetime under the threshold counts.
+      if (s.state.level.level < LEVEL && earned < row.threshold)
+        lastEarnTick = s.state.tick
     }
     return s.state.level.level >= LEVEL
   })

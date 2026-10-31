@@ -42,6 +42,7 @@ import type Phaser from 'phaser'
 import type { GameData } from '../../data/types.ts'
 import type { FrameName } from '../../render/frames.ts'
 import { SIM_FEATURES } from '../../sim/features.ts'
+import { effChecker, type ModCtx } from '../../sim/modifiers.ts'
 import type {
   Checker,
   Fixture,
@@ -123,16 +124,23 @@ export function deskCardHeight(rows: number): number {
   return DESK_CARD_BASE_H + PERSON_ROW_H * Math.max(0, rows)
 }
 
-/** D(s) = 1 − Π(1 − p_i(s)) over the live slots with ≥ 1 station (spec §6.3). */
+/**
+ * D(s) = 1 − Π(1 − p_i(s)) over the live slots with ≥ 1 station (spec §6.3).
+ * With a `ctx` (build 3, critique 27) every machine rolls with the machineP
+ * modifier (effChecker), so the line agrees with ViewSim.lane.catchRate and
+ * the laneRateAtLeast condition; the card itself reads the ViewSim's rate.
+ */
 export function laneRateFor(
   nodes: readonly LaneNode[],
   strain: Strain,
+  ctx: ModCtx | null = null,
 ): number {
   let miss = 1
   for (const n of nodes) {
     if (n.kind !== 'slot' || n.locked || !n.fixture) continue
     if (n.stations.length === 0) continue
-    miss *= 1 - checkerP(n.fixture.checker, strain)
+    const c = n.fixture.checker
+    miss *= 1 - checkerP(ctx === null ? c : effChecker(ctx, c), strain)
   }
   return 1 - miss
 }
@@ -521,8 +529,8 @@ export class SlotCard extends WarehouseSheet {
     const t = this.laneText
     const s = this.laneStrain
     if (!t || !s) return
-    const det = this.vs.lane.detection().find((x) => x.strain === s)
-    const d = det ? det.d : laneRateFor(this.vs.lane.nodes(), s)
+    // The sim's modifier-aware number (machineP folded in), announced or not.
+    const d = this.vs.lane.catchRate(s)
     const line = laneVsLine(s, d)
     if (t.text !== line) t.setText(line)
     t.setTint(TONE_TEXT[detectionTone(Math.round(d * 100))])

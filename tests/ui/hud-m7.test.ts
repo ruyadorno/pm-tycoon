@@ -64,7 +64,7 @@ describe('the quest chip (design-m7 §6.4)', () => {
     expect(chip(sim).visible).toBe(false)
   })
 
-  it('an offer pulses at 1 Hz with `New job` in place of the bar and its expiry as the label', () => {
+  it('an offer pulses at 1 Hz with `New job` in place of the bar and no label (build 3: a job offer never expires)', () => {
     const sim = noOffers(makeSim(1))
     offerQuest(sim, 'rush_district')
     const m = chip(sim)
@@ -74,13 +74,14 @@ describe('the quest chip (design-m7 §6.4)', () => {
       pulse: true,
       bar: null,
       barText: QUEST_OFFER_TEXT,
-      // offerExpiresDays 1 → one in-game day left
-      label: '1d 0h',
+      // B3 §3.2 / D-18: the sim waits on the job card — no countdown.
+      label: '',
       tone: 'light',
       gold: false,
     })
+    // Held on the card: no time passes, the chip still reads the same.
     runTicks(sim, 300)
-    expect(chip(sim).label).toBe('12h')
+    expect(chip(sim)).toMatchObject({ pulse: true, label: '' })
     expect(questPulseAlpha(true, 0)).toBe(1)
     expect(questPulseAlpha(true, 499)).toBe(1)
     expect(questPulseAlpha(true, 500)).toBe(QUEST_PULSE_ALPHA)

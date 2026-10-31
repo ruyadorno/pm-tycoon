@@ -55,6 +55,7 @@ const MAGIC_GONE: readonly Parcel['state'][] = [
   'delivered',
   'tossed',
   'cleared',
+  'lost',
 ]
 
 /**

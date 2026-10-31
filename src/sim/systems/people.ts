@@ -3,7 +3,10 @@
 // employees.json `roles`, the per-role applicant pools, salaries and hire
 // fees, star applicants with their expiry, hire / fire, the desk crews
 // (per-inspector p with the same-desk charisma bonus), the driver Replace
-// that lands after the trip, and the wanted list.
+// that lands after the trip, and the wanted list. Build 3 (B3 §3.5) adds
+// the event helpers: setPip (a permanent pip change), hireStar / giftStarName
+// (an event's volunteer seated outside the pools) and absent inspectors
+// (Employee.absentUntilTick: no station while away, syncDesk).
 //
 // Determinism: applicants roll on their OWN mulberry32 stream
 // (`state.applicants.rng`, seeded from the run seed ^ PEOPLE_RNG_SALT, saved
@@ -453,6 +456,69 @@ export function addStarApplicant(sim: Sim, def: StarApplicantDef): Applicant {
   }
   sim.emit('applicants:refreshed', { role, reason: 'star' })
   return star
+}
+
+/**
+ * Build 3 (B3 §3.5 `vehicle {gain, withDriver}`): the name an event's
+ * volunteer of `def` takes — the def's name, or freshName ("Mo 2") when an
+ * employee or ANY waiting applicant already holds it (a gift never shares a
+ * name and never re-rolls a pool applicant). Pure: the effects line names
+ * them before hireStar seats them.
+ */
+export function giftStarName(
+  s: SimState,
+  def: Pick<StarApplicantDef, 'name'>,
+): string {
+  return freshName([def.name], takenNames(s))
+}
+
+/**
+ * Build 3 (B3 §3.5; M11 critique 10, D-44): an event's volunteer (the
+ * loaner's driver) hired straight into `target` — a ★ applicant built
+ * OUTSIDE the pools (id from nextId.applicant, giftStarName, the look one
+ * draw on the people stream, `star`, no expiry) seated through
+ * hireApplicant with fee 0 and no pool top-up, so no pool applicant is
+ * evicted, no fee is debited (never an overdraft — the rescue fires when the
+ * balance is short) and the people stream moves by the look draw only. The
+ * salary is the normal one for its pips.
+ */
+export function hireStar(
+  sim: Sim,
+  def: StarApplicantDef,
+  target: HireTarget,
+  vehicle?: Vehicle,
+): Employee {
+  const s = sim.state
+  const data = sim.data
+  const role = def.role
+  const pips: Pips = {}
+  for (const stat of data.employees.roles[role].stats) {
+    pips[stat] = pip(def.pips, stat)
+  }
+  const a: Applicant = {
+    id: s.nextId.applicant,
+    role,
+    name: giftStarName(s, def),
+    pips,
+    affinity: role === 'driver' ? (def.affinity ?? 'none') : 'none',
+    look: sim.peopleRng.int(FACE_LOOKS),
+    star: true,
+    leavesOnDay: null,
+    starKey: def.name,
+  }
+  s.nextId.applicant += 1
+  return hireApplicant(sim, a, target, vehicle, { fee: 0, topUp: false })
+}
+
+/**
+ * Build 3 (B3 §3.5 `pips`): a permanent pip change on an employee, clamped
+ * to 1–5 (charisma 0–2). The salary stays (the player keeps the contract);
+ * a stat the role does not have is left alone. The caller re-syncs the
+ * desks after an inspector's change (people.ts resyncDesks).
+ */
+export function setPip(e: Employee, stat: StatId, delta: number): void {
+  if (e.pips[stat] === undefined) return
+  e.pips[stat] = pip({ [stat]: pip(e.pips, stat) + delta }, stat)
 }
 
 // Hire / fire ------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 {
-  "offer": {"firstOfferDay":3,"intervalDays":2,"declineCooldownDays":1,"offerExpiresDays":1,"maxActive":1},
+  "offer": {"declineCooldownDays":1,"maxActive":1},
   "templates": [
     {"id":"rush_district","name":"Rush hour","unlockLevel":1,"target":"district:mostWaiting","goal":{"kind":"deliveriesFrom","count":[6,10,14,18,22]},"limitDays":3,"reward":{"cash":[120,200,300,400,500]},"weight":3},
     {"id":"cheer_up","name":"Cheer up","unlockLevel":1,"target":"district:satisfactionBelow","targetArg":50,"goal":{"kind":"satisfactionAtLeast","value":52},"limitDays":5,"reward":{"cash":150,"satisfaction":5},"weight":2},

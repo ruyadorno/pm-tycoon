@@ -44,7 +44,6 @@ import type {
   Tick,
 } from './types.ts'
 import {
-  daysToTicks,
   isAbsent,
   laneNode,
   STATE_VERSION,
@@ -156,6 +155,17 @@ export class Sim {
     return this.#policies > 0
   }
 
+  /**
+   * B3 §6 the hold: a card is open, no policy is attached and the game is
+   * not over — tick() does nothing until the card is decided. The browser
+   * stepper reads it to stop consuming frames (no no-op ticks, the render
+   * alpha frozen — review deck-2).
+   */
+  get held(): boolean {
+    const s = this.state
+    return s.events.open !== null && this.#policies === 0 && !s.economy.gameOver
+  }
+
   /** Resume a snapshot (validated: version, data hash, ids, locations). */
   static load(data: GameData, snap: unknown, opts: LoadOptions = {}): Sim {
     const problems = snapshotProblems(data, snap, opts)
@@ -191,10 +201,14 @@ export class Sim {
   /**
    * One 100 ms step in the fixed order of tick.ts. B3 §6 the hold: while a
    * card is open and no policy is attached, tick() returns at once (no
-   * step, no revision bump) until the card is decided.
+   * step, no revision bump) until the card is decided. Not at game over:
+   * a card the deck opened on the tick the last life went cannot be decided
+   * then (decideEvent → invalid; the deck is quiet while gameOver), so a
+   * headless loop keeps ticking as in build 2 (the HUD pauses the stepper at
+   * game over anyway); continueWithOneLife brings the hold back.
    */
   tick(): void {
-    if (this.state.events.open !== null && this.#policies === 0) return // B3 §6 the hold
+    if (this.held) return // B3 §6 the hold
     if (this.#ticking) throw new Error('Sim.tick() re-entered')
     this.#ticking = true
     try {
@@ -375,7 +389,6 @@ export function createStartState(data: GameData, seed: number): SimState {
       rng: (seedWord(seed) ^ QUEST_RNG_SALT) >>> 0,
       offer: null,
       active: null,
-      nextOfferTick: daysToTicks(data.quests.offer.firstOfferDay),
       jobReadyTick: 0,
       ultimateNextTick: 0,
       lastOfferDay: null,
@@ -797,6 +810,13 @@ export function auditState(state: SimState, data: GameData): string[] {
     !state.parcels[String(pr.parcelId)]
   ) {
     add(`quests.active: magic parcel ${pr.parcelId} does not exist`)
+  }
+  // Build 3: the deck's history keeps the last schedule.historyMax records.
+  const history = state.events.history.length
+  if (history > data.events.schedule.historyMax) {
+    add(
+      `events.history: ${history} records > historyMax ${data.events.schedule.historyMax}`,
+    )
   }
   return out
 }

@@ -117,11 +117,17 @@ describe('design-m7 §6.2: the quest clock (a 60-s day reads as 24 h)', () => {
     expect(qt.formatQuestDays(899)).toBe('1d 11h')
   })
 
-  it('questTicksLeftAt: an offer until it expires, an active quest until its deadline, the Golden Release offer never', () => {
+  it('questTicksLeftAt: an offer until it expires (build 3: job offers and the Golden Release never), an active quest until its deadline', () => {
     const o = offer('rush_district')
-    expect(qt.questTicksLeftAt(o, OFFER_TICK + 150)).toBe(450)
+    // B3 §3.2 / D-18: a job offer lives as long as its card.
+    expect(o.expiresTick).toBeNull()
+    expect(qt.questTicksLeftAt(o, OFFER_TICK + 150)).toBeNull()
     expect(qt.questTicksLeftAt(o)).toBe(o.ticksLeft)
-    expect(qt.questTicksLeftAt(o, o.expiresTick! + 10)).toBe(0)
+    expect(qt.JOB_WAITING_TEXT).toBe('waiting for you')
+    // An offer that carries an expiry still counts down to it.
+    const timed = { ...o, expiresTick: OFFER_TICK + 600 }
+    expect(qt.questTicksLeftAt(timed, OFFER_TICK + 150)).toBe(450)
+    expect(qt.questTicksLeftAt(timed, timed.expiresTick + 10)).toBe(0)
     const a = active('rush_district', {}, 900)
     expect(qt.questTicksLeftAt(a, OFFER_TICK + 100)).toBe(800)
     expect(qt.questTicksLeftAt(offer('golden_release'), 999)).toBeNull()

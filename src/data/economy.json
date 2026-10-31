@@ -14,5 +14,5 @@
   "lives":{"start":3,"cap":5},
   "continueWithOneLife":false,
   "playtestMaxLevel":5,
-  "pacingTargets":{"firstDeliveryS":60,"firstMalwareCaughtMaxS":300,"level2Min":[8,15],"truckAfterLevel2MaxMin":4,"maxLivesLost":0,"maxShelfStallS":0,"holdBayEventsPer10MinMin":6,"level3Min":[15,20],"level4Min":[20,25],"level5Min":[25,30],"firstOverseasClearedAfterLevel3MaxMin":3,"questsOfferedBy30MinMin":4,"questsCompletedBy30MinMin":2,"payrollShareOfGrossMax":0.25,"goldenReleaseOfferedMaxMin":32,"victoryMaxMin":45,"eventsOfferedBy30MinMin":15,"eventsOpenMaxTicks":1,"eventsL1PlateauMin":3}
+  "pacingTargets":{"firstDeliveryS":60,"firstMalwareCaughtMaxS":300,"level2Min":[7,13.5],"truckAfterLevel2MaxMin":4,"maxLivesLost":0,"maxShelfStallS":0,"holdBayEventsPer10MinMin":6,"level3Min":[13.5,18],"level4Min":[18,22.5],"level5Min":[22.5,27],"firstOverseasClearedAfterLevel3MaxMin":3,"questsOfferedBy30MinMin":4,"questsCompletedBy30MinMin":2,"payrollShareOfGrossMax":0.25,"goldenReleaseOfferedMaxMin":29,"victoryMaxMin":40,"eventsOfferedBy30MinMin":15,"eventsOpenMaxTicks":1,"eventsL1PlateauMin":3}
 }

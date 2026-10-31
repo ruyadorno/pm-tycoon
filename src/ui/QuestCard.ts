@@ -28,12 +28,14 @@
 // Build 3 M12 (B3 §3.4, §6 "one path for jobs"): a regular job offer is an
 // EventCard (`JOB BOARD`, Accept / Decline, a decideEvent), so the only offer
 // this card shows is the Golden Release's standing one; it keeps the active
-// and complete states of every quest. (`Decline` stays in the button set,
-// the build-2 three-button row, but no mode shows it any more.)
+// and complete states of every quest. M13 (plan-build3 §8.4 task 2, Q-B3-15):
+// the build-2 job-offer leftovers are gone — no `Decline` button, and no
+// offer countdown (no offer expires since build 3: the time row of an offer
+// is always `· the offer stays open`).
 //
 // Callbacks: every user dismissal calls exactly one of them — Later (button,
-// Esc, outside) → onLater; Decline → onDecline(id); a confirmed Abandon →
-// onAbandon(id); Close / OK (button, Esc, outside, Enter) → onClose — and
+// Esc, outside) → onLater; a confirmed Abandon → onAbandon(id); Close / OK
+// (button, Esc, outside, Enter) → onClose — and
 // the card closes itself first. Accept → onAccept(id) and the card STAYS
 // open: the caller closes it on success (`close()`) or calls `deny(text)`
 // on a refusal (the Golden Release while a quest is active → quest-active).
@@ -63,7 +65,6 @@ import {
   formatCountdown,
   formatQuestDays,
   formatQuestTime,
-  JOB_WAITING_TEXT,
   objectiveText,
   questTicksLeftAt,
   rewardText,
@@ -118,18 +119,11 @@ const GOLD_TEXT = PALETTE.gold0
 const EV_TOOLTIP = 'pm:tooltip'
 
 export type QuestCardMode = 'offer' | 'active' | 'complete'
-export type QuestCardButton =
-  | 'accept'
-  | 'later'
-  | 'decline'
-  | 'abandon'
-  | 'close'
-  | 'ok'
+export type QuestCardButton = 'accept' | 'later' | 'abandon' | 'close' | 'ok'
 
 export const QUEST_BUTTON_LABEL: Readonly<Record<QuestCardButton, string>> = {
   accept: 'Accept',
   later: 'Later',
-  decline: 'Decline',
   abandon: 'Abandon',
   close: 'Close',
   ok: 'OK',
@@ -138,7 +132,6 @@ export const QUEST_BUTTON_LABEL: Readonly<Record<QuestCardButton, string>> = {
 const BUTTON_W: Readonly<Record<QuestCardButton, number>> = {
   accept: 120,
   later: 72,
-  decline: 72,
   abandon: 96,
   close: 120,
   ok: 120,
@@ -149,7 +142,6 @@ const BUTTON_FACE: Readonly<
 > = {
   accept: 'primary',
   later: 'secondary',
-  decline: 'secondary',
   abandon: 'red',
   close: 'secondary',
   ok: 'primary',
@@ -158,7 +150,6 @@ const BUTTON_FACE: Readonly<
 const ALL_BUTTONS: readonly QuestCardButton[] = [
   'accept',
   'later',
-  'decline',
   'abandon',
   'close',
   'ok',
@@ -182,7 +173,7 @@ export function questCardRect(
 /**
  * The button row (card-local x and width; y = QUEST_CARD_ROWS.buttons, h 44)
  * for a card `w` px wide: left to right from x 6 with 8-px gaps (Accept 6,
- * Later 134, Decline 214 at 300); a lone button is centred; Close sits at
+ * Later 134 at 300); a lone button is centred; Close sits at
  * the right edge (14 px in). A narrow card shrinks the first button.
  */
 export function questCardButtonRects(
@@ -244,13 +235,11 @@ export function questMasthead(
 }
 
 /**
- * The time row: an offer shows what the quest gives and, while it has an
- * expiry, when the offer ends (`Time: 3 days · offer ends in 18h`; the
- * magic parcel `Time: 2:00`); the Golden Release's offer stands (`· the
- * offer stays open`); an active quest shows its time left, a completed one
- * the day it was done. (A build-3 job offer never expires — `· waiting for
- * you`, D-18 — but since M12 its card is the EventCard, so that branch only
- * answers a direct call.)
+ * The time row: an offer shows what the quest gives and that it stands
+ * (`Time: 5 days · the offer stays open`; the magic parcel `Time: 2:00 · …`
+ * — no offer expires since build 3, B3 §3.2, and the Golden Release's is the
+ * only one this card shows); an active quest shows its time left, a
+ * completed one the day it was done.
  */
 export function questTimeText(
   q: QuestView,
@@ -261,19 +250,14 @@ export function questTimeText(
   if (mode === 'complete') {
     return `Completed on Day ${Math.floor(Math.max(0, tick) / TICKS_PER_DAY) + 1}`
   }
-  const left = questTicksLeftAt(q, tick)
   if (mode === 'active') {
-    const t = left ?? 0
+    const t = questTicksLeftAt(q, tick) ?? 0
     return `Time left: ${magic ? formatCountdown(t) : formatQuestTime(t)}`
   }
   const allow = magic
     ? formatCountdown(q.limitTicks)
     : formatQuestDays(q.limitTicks)
-  if (left === null)
-    return q.ultimate
-      ? `Time: ${allow} · the offer stays open`
-      : `Time: ${allow} · ${JOB_WAITING_TEXT}`
-  return `Time: ${allow} · offer ends in ${formatQuestTime(left)}`
+  return `Time: ${allow} · the offer stays open`
 }
 
 /** The gold bar: the magic clock drains, every other kind fills (progress01). */
@@ -290,10 +274,7 @@ export function questBarValue(q: QuestView, tick: number): number {
  * only the Golden Release reaches the offer mode (a job offer is an
  * EventCard), and it never has a Decline (spec-core §8).
  */
-export function questCardButtons(
-  _q: Pick<QuestView, 'ultimate'>,
-  mode: QuestCardMode,
-): QuestCardButton[] {
+export function questCardButtons(mode: QuestCardMode): QuestCardButton[] {
   if (mode === 'complete') return ['ok']
   if (mode === 'active') return ['abandon', 'close']
   return ['accept', 'later']
@@ -330,7 +311,7 @@ export function questCardModel(
         : mode === 'complete'
           ? 1
           : null,
-    buttons: questCardButtons(q, mode),
+    buttons: questCardButtons(mode),
     blocked:
       mode === 'offer' && blockedBy !== null
         ? `Finish "${blockedBy}" first`
@@ -365,7 +346,6 @@ export interface QuestCardOptions {
   onAccept(id: string): void
   /** Later on the Golden Release's offer (the button, Esc or a tap outside). */
   onLater(): void
-  onDecline(id: string): void
   onAbandon(id: string): void
   onClose(): void
   /**
@@ -505,7 +485,6 @@ export class QuestCard {
     this.buttons = {
       accept: make('accept'),
       later: make('later'),
-      decline: make('decline'),
       abandon: make('abandon'),
       close: make('close'),
       ok: make('ok'),
@@ -622,7 +601,7 @@ export class QuestCard {
     const mode = this.cardMode
     const b =
       q && mode
-        ? questCardButtonRects(this.rect.w, questCardButtons(q, mode)).find(
+        ? questCardButtonRects(this.rect.w, questCardButtons(mode)).find(
             (r) => r.name === 'accept',
           )
         : undefined
@@ -792,7 +771,7 @@ export class QuestCard {
   tap(name: QuestCardButton): void {
     const q = this.q
     const mode = this.cardMode
-    if (!q || !mode || !questCardButtons(q, mode).includes(name)) return
+    if (!q || !mode || !questCardButtons(mode).includes(name)) return
     const id = q.id
     switch (name) {
       case 'accept':
@@ -801,10 +780,6 @@ export class QuestCard {
       case 'later':
         this.close()
         this.opts.onLater()
-        return
-      case 'decline':
-        this.close()
-        this.opts.onDecline(id)
         return
       case 'abandon':
         this.confirmAbandon(q)

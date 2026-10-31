@@ -917,7 +917,6 @@ export class HudScene extends Phaser.Scene {
     this.questCard = new QuestCard(this, this.L, this.gd, {
       onAccept: (id) => this.onQuestAccept(id),
       onLater: () => this.closeQuestCard(),
-      onDecline: (id) => this.onQuestDecline(id),
       onAbandon: (id) => this.onQuestAbandon(id),
       onClose: () => this.closeQuestCard(),
       // The Golden Release offered while a regular quest runs (design-m7 §4):
@@ -1792,12 +1791,6 @@ export class HudScene extends Phaser.Scene {
       return
     }
     this.questCard.deny(text)
-  }
-
-  private onQuestDecline(id: string): void {
-    this.vs.quest.decline(id)
-    this.questDirty = true
-    this.closeQuestCard()
   }
 
   /** Abandon (the card confirmed it): no penalty (Q-B2-7), the card closes. */

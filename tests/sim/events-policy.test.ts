@@ -1096,7 +1096,7 @@ describe('M12 review: per-vehicle prices, driverless vehicles, the poach tie', (
     )
   })
 
-  it('deck-2: a driver a card took (the poach) and a driverless gift (the buy-out van) each get the best driver applicant on the next policy step', () => {
+  it('deck-2: a driver a card took (the poach) and a driverless gift (the auction van — the buy-out van comes with Skein since M13) each get the best driver applicant on the next policy step', () => {
     const sim = makeSim(1)
     buy(sim, 'bike')
     buy(sim, 'bike')
@@ -1110,9 +1110,9 @@ describe('M12 review: per-vehicle prices, driverless vehicles, the poach tie', (
     ).toBe(true)
     expect(bike.driverId).toBeNull()
     expect(bike.state).toBe('inactive')
-    const trouble = open(sim, 'ev_cust_rival_trouble')
+    const auction = open(sim, 'ev_cust_rival_auction')
     expect(
-      sim.dispatch({ kind: 'decideEvent', eventId: trouble.eventId, option: 0 })
+      sim.dispatch({ kind: 'decideEvent', eventId: auction.eventId, option: 0 })
         .ok,
     ).toBe(true)
     const van = sim.state.vehicles.find((v) => v.type === 'van')!

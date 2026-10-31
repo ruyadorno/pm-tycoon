@@ -123,7 +123,6 @@ describe('design-m7 §6.2: the quest clock (a 60-s day reads as 24 h)', () => {
     expect(o.expiresTick).toBeNull()
     expect(qt.questTicksLeftAt(o, OFFER_TICK + 150)).toBeNull()
     expect(qt.questTicksLeftAt(o)).toBe(o.ticksLeft)
-    expect(qt.JOB_WAITING_TEXT).toBe('waiting for you')
     // An offer that carries an expiry still counts down to it.
     const timed = { ...o, expiresTick: OFFER_TICK + 600 }
     expect(qt.questTicksLeftAt(timed, OFFER_TICK + 150)).toBe(450)

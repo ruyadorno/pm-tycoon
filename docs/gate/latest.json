@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "dataHash": "6c7f8631",
+  "dataHash": "687a5002",
   "config": null,
   "policy": "competent",
   "seeds": [
@@ -56,40 +56,40 @@
         "minutes": 30,
         "firstDeliveryS": 54.3,
         "firstMalwareCaughtS": 150.5,
-        "level2Min": 10.06,
-        "truckAfterLevel2Min": 1.74,
-        "livesLost": 0,
+        "level2Min": 10,
+        "truckAfterLevel2Min": 1.96,
+        "livesLost": 1,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 8.94,
-        "holdBayEventsPer10Min": 19.33,
+        "holdBayEventsPer10MinL1": 8,
+        "holdBayEventsPer10Min": 19.67,
         "scriptedCaughtS": 150.5,
         "wrongTosses": 33,
         "malwareShareAtEnd": 0.11,
-        "level3Min": 16.49,
-        "level4Min": 20.08,
-        "level5Min": 25.29,
-        "firstOverseasClearedAfterLevel3Min": 3.16,
-        "overseasCleared": 15,
+        "level3Min": 15.7,
+        "level4Min": 19.49,
+        "level5Min": 25.33,
+        "firstOverseasClearedAfterLevel3Min": 3.37,
+        "overseasCleared": 16,
         "overseasLivesLost": 0,
-        "dock2Min": 18.8,
+        "dock2Min": 19.49,
         "dock3Min": null,
         "armTosses": 0,
-        "payrollShareOfGross": 0.226,
+        "payrollShareOfGross": 0.2,
         "sorterDecisions": 0,
         "sorterWrongToss": 0,
         "sorterMissed": 0,
-        "hires": 8,
-        "questsOffered30": 7,
-        "questsCompleted30": 4,
+        "hires": 6,
+        "questsOffered30": 6,
+        "questsCompleted30": 3,
         "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 25.29,
+        "goldenReleaseOfferedMin": 25.33,
         "victoryMin": null,
-        "magicSpawned": 2,
-        "magicOnTime": 2,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
         "questsByTemplate": {
           "magic_parcel": {
-            "offered": 2,
-            "completed": 2,
+            "offered": 1,
+            "completed": 1,
             "failed": 0,
             "declined": 0
           },
@@ -124,25 +124,26 @@
             "declined": 0
           }
         },
-        "eventsOffered30": 21,
+        "eventsOffered30": 20,
         "eventsOpenMaxTicks": 0,
         "eventsL1Decisions": 3,
-        "policyEvPerCard": 22.3,
-        "policyNonDefaultShare": 0.467,
+        "policyEvPerCard": 22.21,
+        "policyNonDefaultShare": 0.5,
         "eventsByCategory": {
-          "job": 6,
-          "underworld": 3,
-          "weather": 1,
-          "money": 4,
-          "customers": 2,
+          "job": 5,
+          "tech": 1,
+          "press": 1,
+          "weather": 2,
+          "money": 1,
           "staff": 1,
           "fleet": 2,
-          "port": 1,
-          "luck": 1
+          "security": 1,
+          "port": 5,
+          "underworld": 1
         },
-        "chainsStarted": 2,
-        "chainsFinished": 0,
-        "modifiersActiveMax": 3,
+        "chainsStarted": 1,
+        "chainsFinished": 1,
+        "modifiersActiveMax": 4,
         "eventLivesLost": 0,
         "eventLivesGained": 0,
         "eventVehiclesLost": 0,
@@ -170,7 +171,7 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "7-13.5 min",
-          "value": 10.06,
+          "value": 10,
           "pass": true,
           "note": null
         },
@@ -178,7 +179,7 @@
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": 1.74,
+          "value": 1.96,
           "pass": true,
           "note": null
         },
@@ -186,8 +187,8 @@
           "key": "maxLivesLost",
           "metric": "livesLost",
           "target": "≤ 0",
-          "value": 0,
-          "pass": true,
+          "value": 1,
+          "pass": false,
           "note": null
         },
         {
@@ -202,7 +203,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 8.94,
+          "value": 8,
           "pass": true,
           "note": null
         },
@@ -210,7 +211,7 @@
           "key": "questsOfferedBy30MinMin",
           "metric": "questsOffered30",
           "target": "≥ 4 by 30 min",
-          "value": 7,
+          "value": 6,
           "pass": true,
           "note": null
         },
@@ -218,7 +219,7 @@
           "key": "questsCompletedBy30MinMin",
           "metric": "questsCompleted30",
           "target": "≥ 2 by 30 min",
-          "value": 4,
+          "value": 3,
           "pass": true,
           "note": null
         },
@@ -226,7 +227,7 @@
           "key": "level3Min",
           "metric": "level3Min",
           "target": "13.5-18 min",
-          "value": 16.49,
+          "value": 15.7,
           "pass": true,
           "note": null
         },
@@ -234,7 +235,7 @@
           "key": "firstOverseasClearedAfterLevel3MaxMin",
           "metric": "firstOverseasClearedAfterLevel3Min",
           "target": "≤ 3 min after L3",
-          "value": 3.16,
+          "value": 3.37,
           "pass": false,
           "note": null
         },
@@ -242,7 +243,7 @@
           "key": "level4Min",
           "metric": "level4Min",
           "target": "18-22.5 min",
-          "value": 20.08,
+          "value": 19.49,
           "pass": true,
           "note": null
         },
@@ -250,7 +251,7 @@
           "key": "level5Min",
           "metric": "level5Min",
           "target": "22.5-27 min",
-          "value": 25.29,
+          "value": 25.33,
           "pass": true,
           "note": null
         },
@@ -258,7 +259,7 @@
           "key": "eventsOfferedBy30MinMin",
           "metric": "eventsOffered30",
           "target": "≥ 15 cards by 30 min",
-          "value": 21,
+          "value": 20,
           "pass": true,
           "note": null
         },
@@ -282,7 +283,7 @@
           "key": "policyEvPerCard",
           "metric": "policyEvPerCard",
           "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 22.3,
+          "value": 22.21,
           "pass": true,
           "note": null
         },
@@ -290,7 +291,7 @@
           "key": "policyNonDefaultShare",
           "metric": "policyNonDefaultShare",
           "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.467,
+          "value": 0.5,
           "pass": true,
           "note": null
         }
@@ -304,47 +305,47 @@
         "minutes": 30,
         "firstDeliveryS": 55.6,
         "firstMalwareCaughtS": 185.4,
-        "level2Min": 10.06,
-        "truckAfterLevel2Min": 1.81,
-        "livesLost": 1,
+        "level2Min": 10.45,
+        "truckAfterLevel2Min": 6.72,
+        "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 9.94,
-        "holdBayEventsPer10Min": 19,
+        "holdBayEventsPer10MinL1": 9.57,
+        "holdBayEventsPer10Min": 16.67,
         "scriptedCaughtS": 185.4,
-        "wrongTosses": 29,
+        "wrongTosses": 23,
         "malwareShareAtEnd": 0.11,
-        "level3Min": 15.52,
-        "level4Min": 19.41,
-        "level5Min": 24.78,
-        "firstOverseasClearedAfterLevel3Min": 2.31,
-        "overseasCleared": 14,
+        "level3Min": 19.16,
+        "level4Min": 23.09,
+        "level5Min": 26.87,
+        "firstOverseasClearedAfterLevel3Min": 2.28,
+        "overseasCleared": 11,
         "overseasLivesLost": 0,
-        "dock2Min": 18.71,
+        "dock2Min": 25.29,
         "dock3Min": null,
         "armTosses": 0,
-        "payrollShareOfGross": 0.218,
+        "payrollShareOfGross": 0.205,
         "sorterDecisions": 0,
         "sorterWrongToss": 0,
         "sorterMissed": 0,
-        "hires": 6,
-        "questsOffered30": 6,
-        "questsCompleted30": 4,
+        "hires": 5,
+        "questsOffered30": 7,
+        "questsCompleted30": 3,
         "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 24.78,
+        "goldenReleaseOfferedMin": 26.87,
         "victoryMin": null,
         "magicSpawned": 1,
         "magicOnTime": 1,
         "questsByTemplate": {
           "rush_district": {
-            "offered": 2,
+            "offered": 3,
             "completed": 1,
-            "failed": 1,
+            "failed": 2,
             "declined": 0
           },
           "cheer_up": {
             "offered": 1,
-            "completed": 1,
-            "failed": 0,
+            "completed": 0,
+            "failed": 1,
             "declined": 0
           },
           "magic_parcel": {
@@ -366,24 +367,24 @@
             "declined": 0
           }
         },
-        "eventsOffered30": 19,
+        "eventsOffered30": 22,
         "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 4,
-        "policyEvPerCard": 41.18,
-        "policyNonDefaultShare": 0.636,
+        "eventsL1Decisions": 5,
+        "policyEvPerCard": -15.86,
+        "policyNonDefaultShare": 0.5,
         "eventsByCategory": {
-          "job": 5,
+          "job": 6,
+          "weather": 4,
           "money": 2,
-          "customers": 4,
-          "fleet": 1,
-          "staff": 2,
+          "security": 1,
+          "fleet": 3,
+          "cityhall": 3,
           "tech": 1,
           "underworld": 1,
-          "cityhall": 2,
-          "security": 1
+          "port": 1
         },
-        "chainsStarted": 1,
-        "chainsFinished": 1,
+        "chainsStarted": 3,
+        "chainsFinished": 3,
         "modifiersActiveMax": 2,
         "eventLivesLost": 0,
         "eventLivesGained": 0,
@@ -412,7 +413,7 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "7-13.5 min",
-          "value": 10.06,
+          "value": 10.45,
           "pass": true,
           "note": null
         },
@@ -420,16 +421,16 @@
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": 1.81,
-          "pass": true,
+          "value": 6.72,
+          "pass": false,
           "note": null
         },
         {
           "key": "maxLivesLost",
           "metric": "livesLost",
           "target": "≤ 0",
-          "value": 1,
-          "pass": false,
+          "value": 0,
+          "pass": true,
           "note": null
         },
         {
@@ -444,7 +445,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 9.94,
+          "value": 9.57,
           "pass": true,
           "note": null
         },
@@ -452,7 +453,7 @@
           "key": "questsOfferedBy30MinMin",
           "metric": "questsOffered30",
           "target": "≥ 4 by 30 min",
-          "value": 6,
+          "value": 7,
           "pass": true,
           "note": null
         },
@@ -460,7 +461,7 @@
           "key": "questsCompletedBy30MinMin",
           "metric": "questsCompleted30",
           "target": "≥ 2 by 30 min",
-          "value": 4,
+          "value": 3,
           "pass": true,
           "note": null
         },
@@ -468,15 +469,15 @@
           "key": "level3Min",
           "metric": "level3Min",
           "target": "13.5-18 min",
-          "value": 15.52,
-          "pass": true,
+          "value": 19.16,
+          "pass": false,
           "note": null
         },
         {
           "key": "firstOverseasClearedAfterLevel3MaxMin",
           "metric": "firstOverseasClearedAfterLevel3Min",
           "target": "≤ 3 min after L3",
-          "value": 2.31,
+          "value": 2.28,
           "pass": true,
           "note": null
         },
@@ -484,15 +485,15 @@
           "key": "level4Min",
           "metric": "level4Min",
           "target": "18-22.5 min",
-          "value": 19.41,
-          "pass": true,
+          "value": 23.09,
+          "pass": false,
           "note": null
         },
         {
           "key": "level5Min",
           "metric": "level5Min",
           "target": "22.5-27 min",
-          "value": 24.78,
+          "value": 26.87,
           "pass": true,
           "note": null
         },
@@ -500,7 +501,7 @@
           "key": "eventsOfferedBy30MinMin",
           "metric": "eventsOffered30",
           "target": "≥ 15 cards by 30 min",
-          "value": 19,
+          "value": 22,
           "pass": true,
           "note": null
         },
@@ -516,7 +517,7 @@
           "key": "eventsL1PlateauMin",
           "metric": "eventsL1Decisions",
           "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 4,
+          "value": 5,
           "pass": true,
           "note": null
         },
@@ -524,15 +525,15 @@
           "key": "policyEvPerCard",
           "metric": "policyEvPerCard",
           "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 41.18,
-          "pass": false,
+          "value": -15.86,
+          "pass": true,
           "note": null
         },
         {
           "key": "policyNonDefaultShare",
           "metric": "policyNonDefaultShare",
           "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.636,
+          "value": 0.5,
           "pass": true,
           "note": null
         }
@@ -546,33 +547,33 @@
         "minutes": 30,
         "firstDeliveryS": 52,
         "firstMalwareCaughtS": 201.3,
-        "level2Min": 10.16,
-        "truckAfterLevel2Min": 3.62,
-        "livesLost": 1,
+        "level2Min": 10.83,
+        "truckAfterLevel2Min": 2.28,
+        "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 12.8,
-        "holdBayEventsPer10Min": 18,
+        "holdBayEventsPer10MinL1": 11.08,
+        "holdBayEventsPer10Min": 22,
         "scriptedCaughtS": 201.3,
-        "wrongTosses": 30,
+        "wrongTosses": 35,
         "malwareShareAtEnd": 0.11,
-        "level3Min": 16.81,
-        "level4Min": 20.07,
-        "level5Min": 25.62,
-        "firstOverseasClearedAfterLevel3Min": 1.9,
-        "overseasCleared": 15,
+        "level3Min": 16.21,
+        "level4Min": 19.67,
+        "level5Min": 25.32,
+        "firstOverseasClearedAfterLevel3Min": 2.52,
+        "overseasCleared": 14,
         "overseasLivesLost": 0,
-        "dock2Min": 19.83,
+        "dock2Min": 17.97,
         "dock3Min": null,
         "armTosses": 0,
-        "payrollShareOfGross": 0.231,
+        "payrollShareOfGross": 0.226,
         "sorterDecisions": 0,
         "sorterWrongToss": 0,
         "sorterMissed": 0,
-        "hires": 6,
+        "hires": 7,
         "questsOffered30": 5,
         "questsCompleted30": 4,
         "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 25.62,
+        "goldenReleaseOfferedMin": 25.32,
         "victoryMin": null,
         "magicSpawned": 0,
         "magicOnTime": 0,
@@ -608,22 +609,23 @@
             "declined": 0
           }
         },
-        "eventsOffered30": 17,
+        "eventsOffered30": 23,
         "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 3,
-        "policyEvPerCard": 17.42,
-        "policyNonDefaultShare": 0.667,
+        "eventsL1Decisions": 4,
+        "policyEvPerCard": -20.94,
+        "policyNonDefaultShare": 0.353,
         "eventsByCategory": {
           "job": 4,
+          "customers": 7,
           "fleet": 2,
-          "staff": 2,
+          "press": 1,
           "underworld": 5,
-          "customers": 1,
-          "security": 2,
-          "money": 1
+          "money": 1,
+          "weather": 2,
+          "staff": 1
         },
-        "chainsStarted": 1,
-        "chainsFinished": 0,
+        "chainsStarted": 3,
+        "chainsFinished": 2,
         "modifiersActiveMax": 2,
         "eventLivesLost": 0,
         "eventLivesGained": 0,
@@ -652,7 +654,7 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "7-13.5 min",
-          "value": 10.16,
+          "value": 10.83,
           "pass": true,
           "note": null
         },
@@ -660,7 +662,7 @@
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": 3.62,
+          "value": 2.28,
           "pass": true,
           "note": null
         },
@@ -668,8 +670,8 @@
           "key": "maxLivesLost",
           "metric": "livesLost",
           "target": "≤ 0",
-          "value": 1,
-          "pass": false,
+          "value": 0,
+          "pass": true,
           "note": null
         },
         {
@@ -684,7 +686,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 12.8,
+          "value": 11.08,
           "pass": true,
           "note": null
         },
@@ -708,7 +710,7 @@
           "key": "level3Min",
           "metric": "level3Min",
           "target": "13.5-18 min",
-          "value": 16.81,
+          "value": 16.21,
           "pass": true,
           "note": null
         },
@@ -716,7 +718,7 @@
           "key": "firstOverseasClearedAfterLevel3MaxMin",
           "metric": "firstOverseasClearedAfterLevel3Min",
           "target": "≤ 3 min after L3",
-          "value": 1.9,
+          "value": 2.52,
           "pass": true,
           "note": null
         },
@@ -724,7 +726,7 @@
           "key": "level4Min",
           "metric": "level4Min",
           "target": "18-22.5 min",
-          "value": 20.07,
+          "value": 19.67,
           "pass": true,
           "note": null
         },
@@ -732,7 +734,7 @@
           "key": "level5Min",
           "metric": "level5Min",
           "target": "22.5-27 min",
-          "value": 25.62,
+          "value": 25.32,
           "pass": true,
           "note": null
         },
@@ -740,7 +742,7 @@
           "key": "eventsOfferedBy30MinMin",
           "metric": "eventsOffered30",
           "target": "≥ 15 cards by 30 min",
-          "value": 17,
+          "value": 23,
           "pass": true,
           "note": null
         },
@@ -756,7 +758,7 @@
           "key": "eventsL1PlateauMin",
           "metric": "eventsL1Decisions",
           "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 3,
+          "value": 4,
           "pass": true,
           "note": null
         },
@@ -764,16 +766,16 @@
           "key": "policyEvPerCard",
           "metric": "policyEvPerCard",
           "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 17.42,
-          "pass": true,
+          "value": -20.94,
+          "pass": false,
           "note": null
         },
         {
           "key": "policyNonDefaultShare",
           "metric": "policyNonDefaultShare",
           "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.667,
-          "pass": true,
+          "value": 0.353,
+          "pass": false,
           "note": null
         }
       ],
@@ -786,33 +788,33 @@
         "minutes": 30,
         "firstDeliveryS": 48.8,
         "firstMalwareCaughtS": 163.6,
-        "level2Min": 9.32,
-        "truckAfterLevel2Min": 3.12,
+        "level2Min": 9.44,
+        "truckAfterLevel2Min": 3.87,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 5.36,
-        "holdBayEventsPer10Min": 17,
+        "holdBayEventsPer10MinL1": 4.24,
+        "holdBayEventsPer10Min": 12.33,
         "scriptedCaughtS": 163.6,
-        "wrongTosses": 27,
+        "wrongTosses": 17,
         "malwareShareAtEnd": 0.11,
-        "level3Min": 15.39,
-        "level4Min": 19.03,
-        "level5Min": 23.55,
+        "level3Min": 16.67,
+        "level4Min": 20.48,
+        "level5Min": 25.77,
         "firstOverseasClearedAfterLevel3Min": 3.64,
-        "overseasCleared": 19,
+        "overseasCleared": 13,
         "overseasLivesLost": 0,
-        "dock2Min": 18.33,
+        "dock2Min": 23.91,
         "dock3Min": null,
         "armTosses": 0,
-        "payrollShareOfGross": 0.216,
+        "payrollShareOfGross": 0.223,
         "sorterDecisions": 0,
         "sorterWrongToss": 0,
         "sorterMissed": 0,
-        "hires": 7,
+        "hires": 6,
         "questsOffered30": 6,
         "questsCompleted30": 4,
         "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 23.55,
+        "goldenReleaseOfferedMin": 25.77,
         "victoryMin": null,
         "magicSpawned": 1,
         "magicOnTime": 1,
@@ -835,41 +837,48 @@
             "failed": 0,
             "declined": 0
           },
-          "customs_run": {
+          "night_shift": {
             "offered": 1,
             "completed": 1,
             "failed": 0,
             "declined": 0
           },
-          "golden_release": {
-            "offered": 2,
+          "big_haul": {
+            "offered": 1,
             "completed": 0,
             "failed": 1,
             "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 0,
+            "declined": 0
           }
         },
-        "eventsOffered30": 21,
+        "eventsOffered30": 19,
         "eventsOpenMaxTicks": 0,
         "eventsL1Decisions": 3,
-        "policyEvPerCard": 18.86,
-        "policyNonDefaultShare": 0.5,
+        "policyEvPerCard": 51.08,
+        "policyNonDefaultShare": 0.615,
         "eventsByCategory": {
           "fleet": 2,
-          "job": 4,
-          "staff": 2,
-          "underworld": 5,
-          "customers": 2,
-          "security": 1,
+          "job": 5,
+          "luck": 1,
+          "underworld": 2,
+          "cityhall": 1,
+          "press": 2,
+          "staff": 1,
+          "port": 2,
           "weather": 1,
-          "money": 1,
           "tech": 1,
-          "cityhall": 2
+          "security": 1
         },
-        "chainsStarted": 3,
-        "chainsFinished": 2,
-        "modifiersActiveMax": 2,
+        "chainsStarted": 1,
+        "chainsFinished": 1,
+        "modifiersActiveMax": 5,
         "eventLivesLost": 0,
-        "eventLivesGained": 1,
+        "eventLivesGained": 0,
         "eventVehiclesLost": 0,
         "eventWorkersLost": 0,
         "eventGameOvers": 0
@@ -895,7 +904,7 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "7-13.5 min",
-          "value": 9.32,
+          "value": 9.44,
           "pass": true,
           "note": null
         },
@@ -903,7 +912,7 @@
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": 3.12,
+          "value": 3.87,
           "pass": true,
           "note": null
         },
@@ -927,7 +936,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 5.36,
+          "value": 4.24,
           "pass": false,
           "note": null
         },
@@ -951,7 +960,7 @@
           "key": "level3Min",
           "metric": "level3Min",
           "target": "13.5-18 min",
-          "value": 15.39,
+          "value": 16.67,
           "pass": true,
           "note": null
         },
@@ -967,7 +976,7 @@
           "key": "level4Min",
           "metric": "level4Min",
           "target": "18-22.5 min",
-          "value": 19.03,
+          "value": 20.48,
           "pass": true,
           "note": null
         },
@@ -975,960 +984,7 @@
           "key": "level5Min",
           "metric": "level5Min",
           "target": "22.5-27 min",
-          "value": 23.55,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsOfferedBy30MinMin",
-          "metric": "eventsOffered30",
-          "target": "≥ 15 cards by 30 min",
-          "value": 21,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsOpenMaxTicks",
-          "metric": "eventsOpenMaxTicks",
-          "target": "≤ 1 tick open",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsL1PlateauMin",
-          "metric": "eventsL1Decisions",
-          "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 3,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "policyEvPerCard",
-          "metric": "policyEvPerCard",
-          "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 18.86,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "policyNonDefaultShare",
-          "metric": "policyNonDefaultShare",
-          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.5,
-          "pass": true,
-          "note": null
-        }
-      ],
-      "asserts": [],
-      "pass": false
-    },
-    {
-      "metrics": {
-        "seed": 5,
-        "minutes": 30,
-        "firstDeliveryS": 60.8,
-        "firstMalwareCaughtS": 176.5,
-        "level2Min": 11.79,
-        "truckAfterLevel2Min": 8.14,
-        "livesLost": 0,
-        "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 11.88,
-        "holdBayEventsPer10Min": 13.33,
-        "scriptedCaughtS": 176.5,
-        "wrongTosses": 18,
-        "malwareShareAtEnd": 0.095,
-        "level3Min": 21.36,
-        "level4Min": 26,
-        "level5Min": null,
-        "firstOverseasClearedAfterLevel3Min": 4.77,
-        "overseasCleared": 5,
-        "overseasLivesLost": 0,
-        "dock2Min": 23.44,
-        "dock3Min": null,
-        "armTosses": 0,
-        "payrollShareOfGross": 0.262,
-        "sorterDecisions": 0,
-        "sorterWrongToss": 0,
-        "sorterMissed": 0,
-        "hires": 4,
-        "questsOffered30": 5,
-        "questsCompleted30": 2,
-        "questActive7to13": 1,
-        "goldenReleaseOfferedMin": null,
-        "victoryMin": null,
-        "magicSpawned": 1,
-        "magicOnTime": 1,
-        "questsByTemplate": {
-          "rush_district": {
-            "offered": 1,
-            "completed": 1,
-            "failed": 0,
-            "declined": 0
-          },
-          "cheer_up": {
-            "offered": 2,
-            "completed": 0,
-            "failed": 1,
-            "declined": 0
-          },
-          "magic_parcel": {
-            "offered": 1,
-            "completed": 1,
-            "failed": 0,
-            "declined": 0
-          },
-          "night_shift": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 1,
-            "declined": 0
-          }
-        },
-        "eventsOffered30": 23,
-        "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 5,
-        "policyEvPerCard": 37.03,
-        "policyNonDefaultShare": 0.625,
-        "eventsByCategory": {
-          "press": 1,
-          "job": 5,
-          "customers": 1,
-          "fleet": 1,
-          "staff": 2,
-          "luck": 1,
-          "underworld": 5,
-          "tech": 1,
-          "security": 2,
-          "money": 2,
-          "port": 1,
-          "weather": 1
-        },
-        "chainsStarted": 2,
-        "chainsFinished": 2,
-        "modifiersActiveMax": 5,
-        "eventLivesLost": 0,
-        "eventLivesGained": 1,
-        "eventVehiclesLost": 0,
-        "eventWorkersLost": 0,
-        "eventGameOvers": 0
-      },
-      "checks": [
-        {
-          "key": "firstDeliveryS",
-          "metric": "firstDeliveryS",
-          "target": "< 60 s",
-          "value": 60.8,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "firstMalwareCaughtMaxS",
-          "metric": "firstMalwareCaughtS",
-          "target": "≤ 300 s",
-          "value": 176.5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level2Min",
-          "metric": "level2Min",
-          "target": "7-13.5 min",
-          "value": 11.79,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "truckAfterLevel2MaxMin",
-          "metric": "truckAfterLevel2Min",
-          "target": "≤ 4 min",
-          "value": 8.14,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "maxLivesLost",
-          "metric": "livesLost",
-          "target": "≤ 0",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "maxShelfStallS",
-          "metric": "shelfStallS",
-          "target": "≤ 0 s",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "holdBayEventsPer10MinMin",
-          "metric": "holdBayEventsPer10MinL1",
-          "target": "≥ 6 /10 min at L1",
-          "value": 11.88,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsOfferedBy30MinMin",
-          "metric": "questsOffered30",
-          "target": "≥ 4 by 30 min",
-          "value": 5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsCompletedBy30MinMin",
-          "metric": "questsCompleted30",
-          "target": "≥ 2 by 30 min",
-          "value": 2,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level3Min",
-          "metric": "level3Min",
-          "target": "13.5-18 min",
-          "value": 21.36,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "firstOverseasClearedAfterLevel3MaxMin",
-          "metric": "firstOverseasClearedAfterLevel3Min",
-          "target": "≤ 3 min after L3",
-          "value": 4.77,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level4Min",
-          "metric": "level4Min",
-          "target": "18-22.5 min",
-          "value": 26,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level5Min",
-          "metric": "level5Min",
-          "target": "22.5-27 min",
-          "value": null,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "eventsOfferedBy30MinMin",
-          "metric": "eventsOffered30",
-          "target": "≥ 15 cards by 30 min",
-          "value": 23,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsOpenMaxTicks",
-          "metric": "eventsOpenMaxTicks",
-          "target": "≤ 1 tick open",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsL1PlateauMin",
-          "metric": "eventsL1Decisions",
-          "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "policyEvPerCard",
-          "metric": "policyEvPerCard",
-          "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 37.03,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "policyNonDefaultShare",
-          "metric": "policyNonDefaultShare",
-          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.625,
-          "pass": true,
-          "note": null
-        }
-      ],
-      "asserts": [],
-      "pass": false
-    },
-    {
-      "metrics": {
-        "seed": 6,
-        "minutes": 30,
-        "firstDeliveryS": 36,
-        "firstMalwareCaughtS": 181.5,
-        "level2Min": 11.68,
-        "truckAfterLevel2Min": 5.37,
-        "livesLost": 2,
-        "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 4.28,
-        "holdBayEventsPer10Min": 14.33,
-        "scriptedCaughtS": 181.5,
-        "wrongTosses": 18,
-        "malwareShareAtEnd": 0.095,
-        "level3Min": 20.1,
-        "level4Min": 24.54,
-        "level5Min": null,
-        "firstOverseasClearedAfterLevel3Min": 3.43,
-        "overseasCleared": 6,
-        "overseasLivesLost": 0,
-        "dock2Min": null,
-        "dock3Min": null,
-        "armTosses": 0,
-        "payrollShareOfGross": 0.26,
-        "sorterDecisions": 0,
-        "sorterWrongToss": 0,
-        "sorterMissed": 0,
-        "hires": 5,
-        "questsOffered30": 6,
-        "questsCompleted30": 2,
-        "questActive7to13": 1,
-        "goldenReleaseOfferedMin": null,
-        "victoryMin": null,
-        "magicSpawned": 1,
-        "magicOnTime": 1,
-        "questsByTemplate": {
-          "rush_district": {
-            "offered": 2,
-            "completed": 1,
-            "failed": 1,
-            "declined": 0
-          },
-          "on_time_day": {
-            "offered": 2,
-            "completed": 0,
-            "failed": 2,
-            "declined": 0
-          },
-          "big_haul": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 1,
-            "declined": 0
-          },
-          "magic_parcel": {
-            "offered": 1,
-            "completed": 1,
-            "failed": 0,
-            "declined": 0
-          }
-        },
-        "eventsOffered30": 23,
-        "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 3,
-        "policyEvPerCard": -24.54,
-        "policyNonDefaultShare": 0.385,
-        "eventsByCategory": {
-          "job": 6,
-          "weather": 2,
-          "underworld": 7,
-          "fleet": 1,
-          "customers": 1,
-          "staff": 1,
-          "cityhall": 2,
-          "luck": 1,
-          "port": 1,
-          "security": 1
-        },
-        "chainsStarted": 2,
-        "chainsFinished": 2,
-        "modifiersActiveMax": 2,
-        "eventLivesLost": 0,
-        "eventLivesGained": 1,
-        "eventVehiclesLost": 0,
-        "eventWorkersLost": 0,
-        "eventGameOvers": 0
-      },
-      "checks": [
-        {
-          "key": "firstDeliveryS",
-          "metric": "firstDeliveryS",
-          "target": "< 60 s",
-          "value": 36,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "firstMalwareCaughtMaxS",
-          "metric": "firstMalwareCaughtS",
-          "target": "≤ 300 s",
-          "value": 181.5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level2Min",
-          "metric": "level2Min",
-          "target": "7-13.5 min",
-          "value": 11.68,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "truckAfterLevel2MaxMin",
-          "metric": "truckAfterLevel2Min",
-          "target": "≤ 4 min",
-          "value": 5.37,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "maxLivesLost",
-          "metric": "livesLost",
-          "target": "≤ 0",
-          "value": 2,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "maxShelfStallS",
-          "metric": "shelfStallS",
-          "target": "≤ 0 s",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "holdBayEventsPer10MinMin",
-          "metric": "holdBayEventsPer10MinL1",
-          "target": "≥ 6 /10 min at L1",
-          "value": 4.28,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "questsOfferedBy30MinMin",
-          "metric": "questsOffered30",
-          "target": "≥ 4 by 30 min",
-          "value": 6,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsCompletedBy30MinMin",
-          "metric": "questsCompleted30",
-          "target": "≥ 2 by 30 min",
-          "value": 2,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level3Min",
-          "metric": "level3Min",
-          "target": "13.5-18 min",
-          "value": 20.1,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "firstOverseasClearedAfterLevel3MaxMin",
-          "metric": "firstOverseasClearedAfterLevel3Min",
-          "target": "≤ 3 min after L3",
-          "value": 3.43,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level4Min",
-          "metric": "level4Min",
-          "target": "18-22.5 min",
-          "value": 24.54,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level5Min",
-          "metric": "level5Min",
-          "target": "22.5-27 min",
-          "value": null,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "eventsOfferedBy30MinMin",
-          "metric": "eventsOffered30",
-          "target": "≥ 15 cards by 30 min",
-          "value": 23,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsOpenMaxTicks",
-          "metric": "eventsOpenMaxTicks",
-          "target": "≤ 1 tick open",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsL1PlateauMin",
-          "metric": "eventsL1Decisions",
-          "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 3,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "policyEvPerCard",
-          "metric": "policyEvPerCard",
-          "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": -24.54,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "policyNonDefaultShare",
-          "metric": "policyNonDefaultShare",
-          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.385,
-          "pass": false,
-          "note": null
-        }
-      ],
-      "asserts": [],
-      "pass": false
-    },
-    {
-      "metrics": {
-        "seed": 7,
-        "minutes": 30,
-        "firstDeliveryS": 31.5,
-        "firstMalwareCaughtS": 180.1,
-        "level2Min": 12.45,
-        "truckAfterLevel2Min": 6.44,
-        "livesLost": 0,
-        "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 8.83,
-        "holdBayEventsPer10Min": 13.67,
-        "scriptedCaughtS": 180.1,
-        "wrongTosses": 23,
-        "malwareShareAtEnd": 0.095,
-        "level3Min": 21.23,
-        "level4Min": 27.05,
-        "level5Min": null,
-        "firstOverseasClearedAfterLevel3Min": 1.82,
-        "overseasCleared": 5,
-        "overseasLivesLost": 0,
-        "dock2Min": 23.91,
-        "dock3Min": null,
-        "armTosses": 0,
-        "payrollShareOfGross": 0.278,
-        "sorterDecisions": 0,
-        "sorterWrongToss": 0,
-        "sorterMissed": 0,
-        "hires": 4,
-        "questsOffered30": 5,
-        "questsCompleted30": 1,
-        "questActive7to13": 1,
-        "goldenReleaseOfferedMin": null,
-        "victoryMin": null,
-        "magicSpawned": 0,
-        "magicOnTime": 0,
-        "questsByTemplate": {
-          "on_time_day": {
-            "offered": 2,
-            "completed": 0,
-            "failed": 2,
-            "declined": 0
-          },
-          "rush_district": {
-            "offered": 1,
-            "completed": 1,
-            "failed": 0,
-            "declined": 0
-          },
-          "cheer_up": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 1,
-            "declined": 0
-          },
-          "big_haul": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 0,
-            "declined": 0
-          }
-        },
-        "eventsOffered30": 21,
-        "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 5,
-        "policyEvPerCard": 40.32,
-        "policyNonDefaultShare": 0.714,
-        "eventsByCategory": {
-          "customers": 1,
-          "fleet": 3,
-          "job": 5,
-          "staff": 4,
-          "tech": 1,
-          "cityhall": 2,
-          "money": 3,
-          "security": 2
-        },
-        "chainsStarted": 2,
-        "chainsFinished": 2,
-        "modifiersActiveMax": 5,
-        "eventLivesLost": 0,
-        "eventLivesGained": 0,
-        "eventVehiclesLost": 0,
-        "eventWorkersLost": 0,
-        "eventGameOvers": 0
-      },
-      "checks": [
-        {
-          "key": "firstDeliveryS",
-          "metric": "firstDeliveryS",
-          "target": "< 60 s",
-          "value": 31.5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "firstMalwareCaughtMaxS",
-          "metric": "firstMalwareCaughtS",
-          "target": "≤ 300 s",
-          "value": 180.1,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level2Min",
-          "metric": "level2Min",
-          "target": "7-13.5 min",
-          "value": 12.45,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "truckAfterLevel2MaxMin",
-          "metric": "truckAfterLevel2Min",
-          "target": "≤ 4 min",
-          "value": 6.44,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "maxLivesLost",
-          "metric": "livesLost",
-          "target": "≤ 0",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "maxShelfStallS",
-          "metric": "shelfStallS",
-          "target": "≤ 0 s",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "holdBayEventsPer10MinMin",
-          "metric": "holdBayEventsPer10MinL1",
-          "target": "≥ 6 /10 min at L1",
-          "value": 8.83,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsOfferedBy30MinMin",
-          "metric": "questsOffered30",
-          "target": "≥ 4 by 30 min",
-          "value": 5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsCompletedBy30MinMin",
-          "metric": "questsCompleted30",
-          "target": "≥ 2 by 30 min",
-          "value": 1,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level3Min",
-          "metric": "level3Min",
-          "target": "13.5-18 min",
-          "value": 21.23,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "firstOverseasClearedAfterLevel3MaxMin",
-          "metric": "firstOverseasClearedAfterLevel3Min",
-          "target": "≤ 3 min after L3",
-          "value": 1.82,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level4Min",
-          "metric": "level4Min",
-          "target": "18-22.5 min",
-          "value": 27.05,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level5Min",
-          "metric": "level5Min",
-          "target": "22.5-27 min",
-          "value": null,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "eventsOfferedBy30MinMin",
-          "metric": "eventsOffered30",
-          "target": "≥ 15 cards by 30 min",
-          "value": 21,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsOpenMaxTicks",
-          "metric": "eventsOpenMaxTicks",
-          "target": "≤ 1 tick open",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "eventsL1PlateauMin",
-          "metric": "eventsL1Decisions",
-          "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "policyEvPerCard",
-          "metric": "policyEvPerCard",
-          "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 40.32,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "policyNonDefaultShare",
-          "metric": "policyNonDefaultShare",
-          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.714,
-          "pass": true,
-          "note": null
-        }
-      ],
-      "asserts": [],
-      "pass": false
-    },
-    {
-      "metrics": {
-        "seed": 8,
-        "minutes": 30,
-        "firstDeliveryS": 37.8,
-        "firstMalwareCaughtS": 205.7,
-        "level2Min": 11.59,
-        "truckAfterLevel2Min": 0.63,
-        "livesLost": 0,
-        "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 9.49,
-        "holdBayEventsPer10Min": 17.67,
-        "scriptedCaughtS": 205.7,
-        "wrongTosses": 27,
-        "malwareShareAtEnd": 0.11,
-        "level3Min": 17.91,
-        "level4Min": 22.64,
-        "level5Min": 26.58,
-        "firstOverseasClearedAfterLevel3Min": 2.15,
-        "overseasCleared": 9,
-        "overseasLivesLost": 0,
-        "dock2Min": 18.39,
-        "dock3Min": null,
-        "armTosses": 0,
-        "payrollShareOfGross": 0.205,
-        "sorterDecisions": 0,
-        "sorterWrongToss": 0,
-        "sorterMissed": 0,
-        "hires": 7,
-        "questsOffered30": 5,
-        "questsCompleted30": 2,
-        "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 26.58,
-        "victoryMin": null,
-        "magicSpawned": 0,
-        "magicOnTime": 0,
-        "questsByTemplate": {
-          "on_time_day": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 1,
-            "declined": 0
-          },
-          "rush_district": {
-            "offered": 1,
-            "completed": 1,
-            "failed": 0,
-            "declined": 0
-          },
-          "night_shift": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 1,
-            "declined": 0
-          },
-          "big_haul": {
-            "offered": 1,
-            "completed": 1,
-            "failed": 0,
-            "declined": 0
-          },
-          "golden_release": {
-            "offered": 1,
-            "completed": 0,
-            "failed": 0,
-            "declined": 0
-          }
-        },
-        "eventsOffered30": 19,
-        "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 3,
-        "policyEvPerCard": 72,
-        "policyNonDefaultShare": 0.786,
-        "eventsByCategory": {
-          "job": 4,
-          "staff": 3,
-          "underworld": 1,
-          "customers": 3,
-          "money": 3,
-          "luck": 1,
-          "security": 1,
-          "fleet": 2,
-          "weather": 1
-        },
-        "chainsStarted": 1,
-        "chainsFinished": 1,
-        "modifiersActiveMax": 3,
-        "eventLivesLost": 0,
-        "eventLivesGained": 0,
-        "eventVehiclesLost": 0,
-        "eventWorkersLost": 0,
-        "eventGameOvers": 0
-      },
-      "checks": [
-        {
-          "key": "firstDeliveryS",
-          "metric": "firstDeliveryS",
-          "target": "< 60 s",
-          "value": 37.8,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "firstMalwareCaughtMaxS",
-          "metric": "firstMalwareCaughtS",
-          "target": "≤ 300 s",
-          "value": 205.7,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level2Min",
-          "metric": "level2Min",
-          "target": "7-13.5 min",
-          "value": 11.59,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "truckAfterLevel2MaxMin",
-          "metric": "truckAfterLevel2Min",
-          "target": "≤ 4 min",
-          "value": 0.63,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "maxLivesLost",
-          "metric": "livesLost",
-          "target": "≤ 0",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "maxShelfStallS",
-          "metric": "shelfStallS",
-          "target": "≤ 0 s",
-          "value": 0,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "holdBayEventsPer10MinMin",
-          "metric": "holdBayEventsPer10MinL1",
-          "target": "≥ 6 /10 min at L1",
-          "value": 9.49,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsOfferedBy30MinMin",
-          "metric": "questsOffered30",
-          "target": "≥ 4 by 30 min",
-          "value": 5,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "questsCompletedBy30MinMin",
-          "metric": "questsCompleted30",
-          "target": "≥ 2 by 30 min",
-          "value": 2,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level3Min",
-          "metric": "level3Min",
-          "target": "13.5-18 min",
-          "value": 17.91,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "firstOverseasClearedAfterLevel3MaxMin",
-          "metric": "firstOverseasClearedAfterLevel3Min",
-          "target": "≤ 3 min after L3",
-          "value": 2.15,
-          "pass": true,
-          "note": null
-        },
-        {
-          "key": "level4Min",
-          "metric": "level4Min",
-          "target": "18-22.5 min",
-          "value": 22.64,
-          "pass": false,
-          "note": null
-        },
-        {
-          "key": "level5Min",
-          "metric": "level5Min",
-          "target": "22.5-27 min",
-          "value": 26.58,
+          "value": 25.77,
           "pass": true,
           "note": null
         },
@@ -1960,7 +1016,7 @@
           "key": "policyEvPerCard",
           "metric": "policyEvPerCard",
           "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 72,
+          "value": 51.08,
           "pass": false,
           "note": null
         },
@@ -1968,7 +1024,7 @@
           "key": "policyNonDefaultShare",
           "metric": "policyNonDefaultShare",
           "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.786,
+          "value": 0.615,
           "pass": true,
           "note": null
         }
@@ -1978,40 +1034,40 @@
     },
     {
       "metrics": {
-        "seed": 9,
+        "seed": 5,
         "minutes": 30,
-        "firstDeliveryS": 36.3,
-        "firstMalwareCaughtS": 165.5,
-        "level2Min": 10.41,
-        "truckAfterLevel2Min": 2.44,
+        "firstDeliveryS": 60.8,
+        "firstMalwareCaughtS": 176.5,
+        "level2Min": 11.33,
+        "truckAfterLevel2Min": 1.93,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 3.84,
-        "holdBayEventsPer10Min": 19.67,
-        "scriptedCaughtS": 165.5,
-        "wrongTosses": 25,
+        "holdBayEventsPer10MinL1": 9.71,
+        "holdBayEventsPer10Min": 18.33,
+        "scriptedCaughtS": 176.5,
+        "wrongTosses": 30,
         "malwareShareAtEnd": 0.11,
-        "level3Min": 16.64,
-        "level4Min": 20.17,
-        "level5Min": 25,
-        "firstOverseasClearedAfterLevel3Min": 2.28,
-        "overseasCleared": 10,
+        "level3Min": 16.38,
+        "level4Min": 19.16,
+        "level5Min": 24.83,
+        "firstOverseasClearedAfterLevel3Min": 4.74,
+        "overseasCleared": 13,
         "overseasLivesLost": 0,
-        "dock2Min": 20.16,
+        "dock2Min": 18.62,
         "dock3Min": null,
         "armTosses": 0,
-        "payrollShareOfGross": 0.2,
+        "payrollShareOfGross": 0.202,
         "sorterDecisions": 0,
         "sorterWrongToss": 0,
         "sorterMissed": 0,
-        "hires": 7,
+        "hires": 5,
         "questsOffered30": 6,
         "questsCompleted30": 3,
         "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 25,
+        "goldenReleaseOfferedMin": 24.83,
         "victoryMin": null,
-        "magicSpawned": 0,
-        "magicOnTime": 0,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
         "questsByTemplate": {
           "rush_district": {
             "offered": 1,
@@ -2021,7 +1077,250 @@
           },
           "cheer_up": {
             "offered": 2,
+            "completed": 0,
+            "failed": 2,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 1,
             "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "inspector_general": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 0,
+            "declined": 0
+          }
+        },
+        "eventsOffered30": 18,
+        "eventsOpenMaxTicks": 0,
+        "eventsL1Decisions": 5,
+        "policyEvPerCard": 34.75,
+        "policyNonDefaultShare": 0.667,
+        "eventsByCategory": {
+          "underworld": 2,
+          "job": 5,
+          "money": 1,
+          "fleet": 2,
+          "luck": 1,
+          "tech": 3,
+          "press": 1,
+          "cityhall": 1,
+          "weather": 1,
+          "port": 1
+        },
+        "chainsStarted": 0,
+        "chainsFinished": 0,
+        "modifiersActiveMax": 4,
+        "eventLivesLost": 0,
+        "eventLivesGained": 0,
+        "eventVehiclesLost": 0,
+        "eventWorkersLost": 0,
+        "eventGameOvers": 0
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 60.8,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 176.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "7-13.5 min",
+          "value": 11.33,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 1.93,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 9.71,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "13.5-18 min",
+          "value": 16.38,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 4.74,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "18-22.5 min",
+          "value": 19.16,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "22.5-27 min",
+          "value": 24.83,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOfferedBy30MinMin",
+          "metric": "eventsOffered30",
+          "target": "≥ 15 cards by 30 min",
+          "value": 18,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOpenMaxTicks",
+          "metric": "eventsOpenMaxTicks",
+          "target": "≤ 1 tick open",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsL1PlateauMin",
+          "metric": "eventsL1Decisions",
+          "target": "≥ 3 decision cards from min 3 to L2",
+          "value": 5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyEvPerCard",
+          "metric": "policyEvPerCard",
+          "target": "-20 to 40 $/card (events.json policy.evBand)",
+          "value": 34.75,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyNonDefaultShare",
+          "metric": "policyNonDefaultShare",
+          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
+          "value": 0.667,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 6,
+        "minutes": 30,
+        "firstDeliveryS": 36,
+        "firstMalwareCaughtS": 181.5,
+        "level2Min": 10.72,
+        "truckAfterLevel2Min": 1.62,
+        "livesLost": 3,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 4.66,
+        "holdBayEventsPer10Min": 19.67,
+        "scriptedCaughtS": 181.5,
+        "wrongTosses": 23,
+        "malwareShareAtEnd": 0.11,
+        "level3Min": 16.64,
+        "level4Min": 21.09,
+        "level5Min": 24.19,
+        "firstOverseasClearedAfterLevel3Min": 4.45,
+        "overseasCleared": 18,
+        "overseasLivesLost": 1,
+        "dock2Min": 23.53,
+        "dock3Min": null,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.199,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 7,
+        "questsOffered30": 7,
+        "questsCompleted30": 3,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 24.19,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "on_time_day": {
+            "offered": 1,
+            "completed": 0,
             "failed": 1,
             "declined": 0
           },
@@ -2037,6 +1336,496 @@
             "failed": 0,
             "declined": 0
           },
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 2,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        },
+        "eventsOffered30": 26,
+        "eventsOpenMaxTicks": 0,
+        "eventsL1Decisions": 5,
+        "policyEvPerCard": 49,
+        "policyNonDefaultShare": 0.533,
+        "eventsByCategory": {
+          "job": 5,
+          "press": 3,
+          "tech": 2,
+          "customers": 2,
+          "security": 1,
+          "fleet": 1,
+          "weather": 2,
+          "port": 6,
+          "luck": 1,
+          "cityhall": 3
+        },
+        "chainsStarted": 5,
+        "chainsFinished": 5,
+        "modifiersActiveMax": 6,
+        "eventLivesLost": 0,
+        "eventLivesGained": 0,
+        "eventVehiclesLost": 0,
+        "eventWorkersLost": 0,
+        "eventGameOvers": 0
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 36,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 181.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "7-13.5 min",
+          "value": 10.72,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 1.62,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 3,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 4.66,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 3,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "13.5-18 min",
+          "value": 16.64,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 4.45,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "18-22.5 min",
+          "value": 21.09,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "22.5-27 min",
+          "value": 24.19,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOfferedBy30MinMin",
+          "metric": "eventsOffered30",
+          "target": "≥ 15 cards by 30 min",
+          "value": 26,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOpenMaxTicks",
+          "metric": "eventsOpenMaxTicks",
+          "target": "≤ 1 tick open",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsL1PlateauMin",
+          "metric": "eventsL1Decisions",
+          "target": "≥ 3 decision cards from min 3 to L2",
+          "value": 5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyEvPerCard",
+          "metric": "policyEvPerCard",
+          "target": "-20 to 40 $/card (events.json policy.evBand)",
+          "value": 49,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "policyNonDefaultShare",
+          "metric": "policyNonDefaultShare",
+          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
+          "value": 0.533,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 7,
+        "minutes": 30,
+        "firstDeliveryS": 31.5,
+        "firstMalwareCaughtS": 180.1,
+        "level2Min": 10.74,
+        "truckAfterLevel2Min": 1.91,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 5.59,
+        "holdBayEventsPer10Min": 20.33,
+        "scriptedCaughtS": 180.1,
+        "wrongTosses": 30,
+        "malwareShareAtEnd": 0.11,
+        "level3Min": 15.92,
+        "level4Min": 20.61,
+        "level5Min": 24.85,
+        "firstOverseasClearedAfterLevel3Min": 2.28,
+        "overseasCleared": 17,
+        "overseasLivesLost": 0,
+        "dock2Min": 19.51,
+        "dock3Min": null,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.206,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 7,
+        "questsOffered30": 6,
+        "questsCompleted30": 4,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 24.85,
+        "victoryMin": null,
+        "magicSpawned": 1,
+        "magicOnTime": 1,
+        "questsByTemplate": {
+          "on_time_day": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 2,
+            "completed": 1,
+            "failed": 1,
+            "declined": 0
+          },
+          "magic_parcel": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          }
+        },
+        "eventsOffered30": 19,
+        "eventsOpenMaxTicks": 0,
+        "eventsL1Decisions": 4,
+        "policyEvPerCard": 26.54,
+        "policyNonDefaultShare": 0.385,
+        "eventsByCategory": {
+          "money": 1,
+          "customers": 3,
+          "job": 5,
+          "staff": 2,
+          "fleet": 3,
+          "luck": 2,
+          "weather": 2,
+          "press": 1
+        },
+        "chainsStarted": 1,
+        "chainsFinished": 1,
+        "modifiersActiveMax": 1,
+        "eventLivesLost": 0,
+        "eventLivesGained": 0,
+        "eventVehiclesLost": 0,
+        "eventWorkersLost": 0,
+        "eventGameOvers": 0
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 31.5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 180.1,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "7-13.5 min",
+          "value": 10.74,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 1.91,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 5.59,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 6,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "13.5-18 min",
+          "value": 15.92,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 2.28,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "18-22.5 min",
+          "value": 20.61,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "22.5-27 min",
+          "value": 24.85,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOfferedBy30MinMin",
+          "metric": "eventsOffered30",
+          "target": "≥ 15 cards by 30 min",
+          "value": 19,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOpenMaxTicks",
+          "metric": "eventsOpenMaxTicks",
+          "target": "≤ 1 tick open",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsL1PlateauMin",
+          "metric": "eventsL1Decisions",
+          "target": "≥ 3 decision cards from min 3 to L2",
+          "value": 4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyEvPerCard",
+          "metric": "policyEvPerCard",
+          "target": "-20 to 40 $/card (events.json policy.evBand)",
+          "value": 26.54,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyNonDefaultShare",
+          "metric": "policyNonDefaultShare",
+          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
+          "value": 0.385,
+          "pass": false,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 8,
+        "minutes": 30,
+        "firstDeliveryS": 37.8,
+        "firstMalwareCaughtS": 205.7,
+        "level2Min": 11.83,
+        "truckAfterLevel2Min": 5.33,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 8.46,
+        "holdBayEventsPer10Min": 12.67,
+        "scriptedCaughtS": 205.7,
+        "wrongTosses": 19,
+        "malwareShareAtEnd": 0.11,
+        "level3Min": 19.63,
+        "level4Min": 23.91,
+        "level5Min": 29.04,
+        "firstOverseasClearedAfterLevel3Min": 4.12,
+        "overseasCleared": 11,
+        "overseasLivesLost": 0,
+        "dock2Min": 29.05,
+        "dock3Min": null,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.224,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 4,
+        "questsOffered30": 5,
+        "questsCompleted30": 2,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 29.04,
+        "victoryMin": null,
+        "magicSpawned": 0,
+        "magicOnTime": 0,
+        "questsByTemplate": {
+          "on_time_day": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "night_shift": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
           "golden_release": {
             "offered": 1,
             "completed": 0,
@@ -2044,28 +1833,271 @@
             "declined": 0
           }
         },
-        "eventsOffered30": 21,
+        "eventsOffered30": 23,
         "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 2,
-        "policyEvPerCard": 26.31,
-        "policyNonDefaultShare": 0.538,
+        "eventsL1Decisions": 4,
+        "policyEvPerCard": 13.4,
+        "policyNonDefaultShare": 0.467,
+        "eventsByCategory": {
+          "job": 4,
+          "staff": 3,
+          "press": 2,
+          "tech": 1,
+          "money": 3,
+          "security": 1,
+          "weather": 2,
+          "cityhall": 5,
+          "fleet": 1,
+          "port": 1
+        },
+        "chainsStarted": 3,
+        "chainsFinished": 3,
+        "modifiersActiveMax": 2,
+        "eventLivesLost": 0,
+        "eventLivesGained": 0,
+        "eventVehiclesLost": 0,
+        "eventWorkersLost": 0,
+        "eventGameOvers": 0
+      },
+      "checks": [
+        {
+          "key": "firstDeliveryS",
+          "metric": "firstDeliveryS",
+          "target": "< 60 s",
+          "value": 37.8,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "firstMalwareCaughtMaxS",
+          "metric": "firstMalwareCaughtS",
+          "target": "≤ 300 s",
+          "value": 205.7,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level2Min",
+          "metric": "level2Min",
+          "target": "7-13.5 min",
+          "value": 11.83,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "truckAfterLevel2MaxMin",
+          "metric": "truckAfterLevel2Min",
+          "target": "≤ 4 min",
+          "value": 5.33,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "maxLivesLost",
+          "metric": "livesLost",
+          "target": "≤ 0",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "maxShelfStallS",
+          "metric": "shelfStallS",
+          "target": "≤ 0 s",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "holdBayEventsPer10MinMin",
+          "metric": "holdBayEventsPer10MinL1",
+          "target": "≥ 6 /10 min at L1",
+          "value": 8.46,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsOfferedBy30MinMin",
+          "metric": "questsOffered30",
+          "target": "≥ 4 by 30 min",
+          "value": 5,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "questsCompletedBy30MinMin",
+          "metric": "questsCompleted30",
+          "target": "≥ 2 by 30 min",
+          "value": 2,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "level3Min",
+          "metric": "level3Min",
+          "target": "13.5-18 min",
+          "value": 19.63,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "firstOverseasClearedAfterLevel3MaxMin",
+          "metric": "firstOverseasClearedAfterLevel3Min",
+          "target": "≤ 3 min after L3",
+          "value": 4.12,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level4Min",
+          "metric": "level4Min",
+          "target": "18-22.5 min",
+          "value": 23.91,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "level5Min",
+          "metric": "level5Min",
+          "target": "22.5-27 min",
+          "value": 29.04,
+          "pass": false,
+          "note": null
+        },
+        {
+          "key": "eventsOfferedBy30MinMin",
+          "metric": "eventsOffered30",
+          "target": "≥ 15 cards by 30 min",
+          "value": 23,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsOpenMaxTicks",
+          "metric": "eventsOpenMaxTicks",
+          "target": "≤ 1 tick open",
+          "value": 0,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "eventsL1PlateauMin",
+          "metric": "eventsL1Decisions",
+          "target": "≥ 3 decision cards from min 3 to L2",
+          "value": 4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyEvPerCard",
+          "metric": "policyEvPerCard",
+          "target": "-20 to 40 $/card (events.json policy.evBand)",
+          "value": 13.4,
+          "pass": true,
+          "note": null
+        },
+        {
+          "key": "policyNonDefaultShare",
+          "metric": "policyNonDefaultShare",
+          "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
+          "value": 0.467,
+          "pass": true,
+          "note": null
+        }
+      ],
+      "asserts": [],
+      "pass": false
+    },
+    {
+      "metrics": {
+        "seed": 9,
+        "minutes": 30,
+        "firstDeliveryS": 36.3,
+        "firstMalwareCaughtS": 165.5,
+        "level2Min": 10.97,
+        "truckAfterLevel2Min": 3.48,
+        "livesLost": 0,
+        "shelfStallS": 0,
+        "holdBayEventsPer10MinL1": 6.38,
+        "holdBayEventsPer10Min": 15,
+        "scriptedCaughtS": 165.5,
+        "wrongTosses": 25,
+        "malwareShareAtEnd": 0.11,
+        "level3Min": 17.23,
+        "level4Min": 21.59,
+        "level5Min": 27.64,
+        "firstOverseasClearedAfterLevel3Min": 1.97,
+        "overseasCleared": 9,
+        "overseasLivesLost": 0,
+        "dock2Min": 26.96,
+        "dock3Min": null,
+        "armTosses": 0,
+        "payrollShareOfGross": 0.219,
+        "sorterDecisions": 0,
+        "sorterWrongToss": 0,
+        "sorterMissed": 0,
+        "hires": 4,
+        "questsOffered30": 6,
+        "questsCompleted30": 2,
+        "questActive7to13": 1,
+        "goldenReleaseOfferedMin": 27.64,
+        "victoryMin": null,
+        "magicSpawned": 0,
+        "magicOnTime": 0,
+        "questsByTemplate": {
+          "rush_district": {
+            "offered": 1,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "cheer_up": {
+            "offered": 2,
+            "completed": 1,
+            "failed": 0,
+            "declined": 0
+          },
+          "big_haul": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "customs_run": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 1,
+            "declined": 0
+          },
+          "golden_release": {
+            "offered": 1,
+            "completed": 0,
+            "failed": 0,
+            "declined": 0
+          }
+        },
+        "eventsOffered30": 19,
+        "eventsOpenMaxTicks": 0,
+        "eventsL1Decisions": 4,
+        "policyEvPerCard": 21.38,
+        "policyNonDefaultShare": 0.667,
         "eventsByCategory": {
           "job": 5,
-          "staff": 3,
-          "weather": 1,
-          "customers": 1,
+          "staff": 1,
+          "fleet": 3,
+          "weather": 3,
           "luck": 1,
+          "press": 1,
           "security": 1,
-          "underworld": 5,
-          "fleet": 2,
-          "port": 1,
-          "money": 1
+          "money": 1,
+          "customers": 1,
+          "port": 2
         },
-        "chainsStarted": 2,
+        "chainsStarted": 1,
         "chainsFinished": 1,
-        "modifiersActiveMax": 1,
+        "modifiersActiveMax": 2,
         "eventLivesLost": 0,
-        "eventLivesGained": 1,
+        "eventLivesGained": 0,
         "eventVehiclesLost": 0,
         "eventWorkersLost": 0,
         "eventGameOvers": 0
@@ -2091,7 +2123,7 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "7-13.5 min",
-          "value": 10.41,
+          "value": 10.97,
           "pass": true,
           "note": null
         },
@@ -2099,7 +2131,7 @@
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": 2.44,
+          "value": 3.48,
           "pass": true,
           "note": null
         },
@@ -2123,8 +2155,8 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 3.84,
-          "pass": false,
+          "value": 6.38,
+          "pass": true,
           "note": null
         },
         {
@@ -2139,7 +2171,7 @@
           "key": "questsCompletedBy30MinMin",
           "metric": "questsCompleted30",
           "target": "≥ 2 by 30 min",
-          "value": 3,
+          "value": 2,
           "pass": true,
           "note": null
         },
@@ -2147,7 +2179,7 @@
           "key": "level3Min",
           "metric": "level3Min",
           "target": "13.5-18 min",
-          "value": 16.64,
+          "value": 17.23,
           "pass": true,
           "note": null
         },
@@ -2155,7 +2187,7 @@
           "key": "firstOverseasClearedAfterLevel3MaxMin",
           "metric": "firstOverseasClearedAfterLevel3Min",
           "target": "≤ 3 min after L3",
-          "value": 2.28,
+          "value": 1.97,
           "pass": true,
           "note": null
         },
@@ -2163,7 +2195,7 @@
           "key": "level4Min",
           "metric": "level4Min",
           "target": "18-22.5 min",
-          "value": 20.17,
+          "value": 21.59,
           "pass": true,
           "note": null
         },
@@ -2171,15 +2203,15 @@
           "key": "level5Min",
           "metric": "level5Min",
           "target": "22.5-27 min",
-          "value": 25,
-          "pass": true,
+          "value": 27.64,
+          "pass": false,
           "note": null
         },
         {
           "key": "eventsOfferedBy30MinMin",
           "metric": "eventsOffered30",
           "target": "≥ 15 cards by 30 min",
-          "value": 21,
+          "value": 19,
           "pass": true,
           "note": null
         },
@@ -2195,15 +2227,15 @@
           "key": "eventsL1PlateauMin",
           "metric": "eventsL1Decisions",
           "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 2,
-          "pass": false,
+          "value": 4,
+          "pass": true,
           "note": null
         },
         {
           "key": "policyEvPerCard",
           "metric": "policyEvPerCard",
           "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 26.31,
+          "value": 21.38,
           "pass": true,
           "note": null
         },
@@ -2211,7 +2243,7 @@
           "key": "policyNonDefaultShare",
           "metric": "policyNonDefaultShare",
           "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.538,
+          "value": 0.667,
           "pass": true,
           "note": null
         }
@@ -2225,33 +2257,33 @@
         "minutes": 30,
         "firstDeliveryS": 34.5,
         "firstMalwareCaughtS": 153.1,
-        "level2Min": 9.41,
-        "truckAfterLevel2Min": 1.11,
+        "level2Min": 9.33,
+        "truckAfterLevel2Min": 2.31,
         "livesLost": 0,
         "shelfStallS": 0,
-        "holdBayEventsPer10MinL1": 7.44,
-        "holdBayEventsPer10Min": 23,
+        "holdBayEventsPer10MinL1": 9.64,
+        "holdBayEventsPer10Min": 27.33,
         "scriptedCaughtS": 153.1,
-        "wrongTosses": 35,
+        "wrongTosses": 39,
         "malwareShareAtEnd": 0.11,
-        "level3Min": 13.94,
-        "level4Min": 17.84,
-        "level5Min": 23.5,
-        "firstOverseasClearedAfterLevel3Min": 2.78,
-        "overseasCleared": 29,
+        "level3Min": 14.75,
+        "level4Min": 18.71,
+        "level5Min": 22.31,
+        "firstOverseasClearedAfterLevel3Min": 2.09,
+        "overseasCleared": 15,
         "overseasLivesLost": 0,
-        "dock2Min": 17.4,
+        "dock2Min": 18.31,
         "dock3Min": null,
         "armTosses": 0,
         "payrollShareOfGross": 0.2,
         "sorterDecisions": 0,
         "sorterWrongToss": 0,
         "sorterMissed": 0,
-        "hires": 8,
+        "hires": 7,
         "questsOffered30": 7,
         "questsCompleted30": 4,
         "questActive7to13": 1,
-        "goldenReleaseOfferedMin": 23.5,
+        "goldenReleaseOfferedMin": 22.31,
         "victoryMin": null,
         "magicSpawned": 1,
         "magicOnTime": 1,
@@ -2270,8 +2302,8 @@
           },
           "night_shift": {
             "offered": 1,
-            "completed": 1,
-            "failed": 0,
+            "completed": 0,
+            "failed": 1,
             "declined": 0
           },
           "customs_run": {
@@ -2282,8 +2314,8 @@
           },
           "on_time_day": {
             "offered": 1,
-            "completed": 0,
-            "failed": 1,
+            "completed": 1,
+            "failed": 0,
             "declined": 0
           },
           "golden_release": {
@@ -2293,25 +2325,24 @@
             "declined": 0
           }
         },
-        "eventsOffered30": 21,
+        "eventsOffered30": 22,
         "eventsOpenMaxTicks": 0,
-        "eventsL1Decisions": 2,
-        "policyEvPerCard": 23.71,
-        "policyNonDefaultShare": 0.643,
+        "eventsL1Decisions": 3,
+        "policyEvPerCard": 33.63,
+        "policyNonDefaultShare": 0.533,
         "eventsByCategory": {
           "job": 5,
-          "underworld": 5,
-          "money": 1,
+          "tech": 3,
+          "press": 2,
           "luck": 3,
-          "staff": 1,
-          "customers": 3,
-          "press": 1,
-          "weather": 1,
-          "security": 1
+          "customers": 1,
+          "underworld": 4,
+          "money": 2,
+          "cityhall": 2
         },
-        "chainsStarted": 1,
-        "chainsFinished": 1,
-        "modifiersActiveMax": 3,
+        "chainsStarted": 3,
+        "chainsFinished": 2,
+        "modifiersActiveMax": 6,
         "eventLivesLost": 0,
         "eventLivesGained": 1,
         "eventVehiclesLost": 0,
@@ -2339,7 +2370,7 @@
           "key": "level2Min",
           "metric": "level2Min",
           "target": "7-13.5 min",
-          "value": 9.41,
+          "value": 9.33,
           "pass": true,
           "note": null
         },
@@ -2347,7 +2378,7 @@
           "key": "truckAfterLevel2MaxMin",
           "metric": "truckAfterLevel2Min",
           "target": "≤ 4 min",
-          "value": 1.11,
+          "value": 2.31,
           "pass": true,
           "note": null
         },
@@ -2371,7 +2402,7 @@
           "key": "holdBayEventsPer10MinMin",
           "metric": "holdBayEventsPer10MinL1",
           "target": "≥ 6 /10 min at L1",
-          "value": 7.44,
+          "value": 9.64,
           "pass": true,
           "note": null
         },
@@ -2395,7 +2426,7 @@
           "key": "level3Min",
           "metric": "level3Min",
           "target": "13.5-18 min",
-          "value": 13.94,
+          "value": 14.75,
           "pass": true,
           "note": null
         },
@@ -2403,7 +2434,7 @@
           "key": "firstOverseasClearedAfterLevel3MaxMin",
           "metric": "firstOverseasClearedAfterLevel3Min",
           "target": "≤ 3 min after L3",
-          "value": 2.78,
+          "value": 2.09,
           "pass": true,
           "note": null
         },
@@ -2411,23 +2442,23 @@
           "key": "level4Min",
           "metric": "level4Min",
           "target": "18-22.5 min",
-          "value": 17.84,
-          "pass": false,
+          "value": 18.71,
+          "pass": true,
           "note": null
         },
         {
           "key": "level5Min",
           "metric": "level5Min",
           "target": "22.5-27 min",
-          "value": 23.5,
-          "pass": true,
+          "value": 22.31,
+          "pass": false,
           "note": null
         },
         {
           "key": "eventsOfferedBy30MinMin",
           "metric": "eventsOffered30",
           "target": "≥ 15 cards by 30 min",
-          "value": 21,
+          "value": 22,
           "pass": true,
           "note": null
         },
@@ -2443,15 +2474,15 @@
           "key": "eventsL1PlateauMin",
           "metric": "eventsL1Decisions",
           "target": "≥ 3 decision cards from min 3 to L2",
-          "value": 2,
-          "pass": false,
+          "value": 3,
+          "pass": true,
           "note": null
         },
         {
           "key": "policyEvPerCard",
           "metric": "policyEvPerCard",
           "target": "-20 to 40 $/card (events.json policy.evBand)",
-          "value": 23.71,
+          "value": 33.63,
           "pass": true,
           "note": null
         },
@@ -2459,7 +2490,7 @@
           "key": "policyNonDefaultShare",
           "metric": "policyNonDefaultShare",
           "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-          "value": 0.643,
+          "value": 0.533,
           "pass": true,
           "note": null
         }
@@ -2471,46 +2502,46 @@
   "medians": {
     "firstDeliveryS": 43.3,
     "firstMalwareCaughtS": 178.3,
-    "level2Min": 10.29,
-    "truckAfterLevel2Min": 2.78,
+    "level2Min": 10.73,
+    "truckAfterLevel2Min": 2.3,
     "livesLost": 0,
     "shelfStallS": 0,
-    "holdBayEventsPer10MinL1": 8.89,
-    "holdBayEventsPer10Min": 17.84,
+    "holdBayEventsPer10MinL1": 8.23,
+    "holdBayEventsPer10Min": 19,
     "scriptedCaughtS": 178.3,
-    "wrongTosses": 27,
+    "wrongTosses": 27.5,
     "malwareShareAtEnd": 0.11,
-    "level3Min": 16.73,
-    "level4Min": 20.13,
-    "level5Min": 25.46,
-    "firstOverseasClearedAfterLevel3Min": 2.55,
-    "overseasCleared": 12,
+    "level3Min": 16.51,
+    "level4Min": 20.55,
+    "level5Min": 25.33,
+    "firstOverseasClearedAfterLevel3Min": 2.95,
+    "overseasCleared": 13.5,
     "overseasLivesLost": 0,
-    "dock2Min": 19.31,
+    "dock2Min": 21.52,
     "dock3Min": null,
     "armTosses": 0,
-    "payrollShareOfGross": 0.22,
+    "payrollShareOfGross": 0.21,
     "sorterDecisions": 0,
     "sorterWrongToss": 0,
     "sorterMissed": 0,
-    "hires": 6.5,
+    "hires": 6,
     "questsOffered30": 6,
-    "questsCompleted30": 3.5,
+    "questsCompleted30": 3,
     "questActive7to13": 1,
-    "goldenReleaseOfferedMin": 25.46,
+    "goldenReleaseOfferedMin": 25.33,
     "victoryMin": null,
     "magicSpawned": 1,
     "magicOnTime": 1,
     "eventsOffered30": 21,
     "eventsOpenMaxTicks": 0,
-    "eventsL1Decisions": 3,
-    "policyEvPerCard": 25.01,
-    "policyNonDefaultShare": 0.63,
+    "eventsL1Decisions": 4,
+    "policyEvPerCard": 24.38,
+    "policyNonDefaultShare": 0.52,
     "chainsStarted": 2,
-    "chainsFinished": 1,
-    "modifiersActiveMax": 2.5,
+    "chainsFinished": 1.5,
+    "modifiersActiveMax": 3,
     "eventLivesLost": 0,
-    "eventLivesGained": 0.5,
+    "eventLivesGained": 0,
     "eventVehiclesLost": 0,
     "eventWorkersLost": 0,
     "eventGameOvers": 0
@@ -2536,7 +2567,7 @@
       "key": "level2Min",
       "metric": "level2Min",
       "target": "7-13.5 min",
-      "value": 10.29,
+      "value": 10.73,
       "pass": true,
       "note": null
     },
@@ -2544,7 +2575,7 @@
       "key": "truckAfterLevel2MaxMin",
       "metric": "truckAfterLevel2Min",
       "target": "≤ 4 min",
-      "value": 2.78,
+      "value": 2.3,
       "pass": true,
       "note": null
     },
@@ -2568,7 +2599,7 @@
       "key": "holdBayEventsPer10MinMin",
       "metric": "holdBayEventsPer10MinL1",
       "target": "≥ 6 /10 min at L1",
-      "value": 8.89,
+      "value": 8.23,
       "pass": true,
       "note": null
     },
@@ -2584,7 +2615,7 @@
       "key": "questsCompletedBy30MinMin",
       "metric": "questsCompleted30",
       "target": "≥ 2 by 30 min",
-      "value": 3.5,
+      "value": 3,
       "pass": true,
       "note": null
     },
@@ -2592,7 +2623,7 @@
       "key": "level3Min",
       "metric": "level3Min",
       "target": "13.5-18 min",
-      "value": 16.73,
+      "value": 16.51,
       "pass": true,
       "note": null
     },
@@ -2600,7 +2631,7 @@
       "key": "firstOverseasClearedAfterLevel3MaxMin",
       "metric": "firstOverseasClearedAfterLevel3Min",
       "target": "≤ 3 min after L3",
-      "value": 2.55,
+      "value": 2.95,
       "pass": true,
       "note": null
     },
@@ -2608,7 +2639,7 @@
       "key": "level4Min",
       "metric": "level4Min",
       "target": "18-22.5 min",
-      "value": 20.13,
+      "value": 20.55,
       "pass": true,
       "note": null
     },
@@ -2616,7 +2647,7 @@
       "key": "level5Min",
       "metric": "level5Min",
       "target": "22.5-27 min",
-      "value": 25.46,
+      "value": 25.33,
       "pass": true,
       "note": null
     },
@@ -2640,7 +2671,7 @@
       "key": "eventsL1PlateauMin",
       "metric": "eventsL1Decisions",
       "target": "≥ 3 decision cards from min 3 to L2",
-      "value": 3,
+      "value": 4,
       "pass": true,
       "note": null
     },
@@ -2648,7 +2679,7 @@
       "key": "policyEvPerCard",
       "metric": "policyEvPerCard",
       "target": "-20 to 40 $/card (events.json policy.evBand)",
-      "value": 25.01,
+      "value": 24.38,
       "pass": true,
       "note": null
     },
@@ -2656,7 +2687,7 @@
       "key": "policyNonDefaultShare",
       "metric": "policyNonDefaultShare",
       "target": "≥ 0.4 (events.json policy.nonDefaultShareMin)",
-      "value": 0.63,
+      "value": 0.52,
       "pass": true,
       "note": null
     }
@@ -2676,7 +2707,7 @@
     {
       "key": "holdBayEventsPer10Min",
       "target": "whole run",
-      "median": 17.84,
+      "median": 19,
       "note": "informational"
     },
     {
@@ -2688,7 +2719,7 @@
     {
       "key": "wrongTosses",
       "target": "clean parcels tossed (Toss-everything)",
-      "median": 27,
+      "median": 27.5,
       "note": "informational"
     },
     {
@@ -2700,7 +2731,7 @@
     {
       "key": "payrollShareOfGross",
       "target": "≤ 0.25 (payroll paid ÷ gross income at 30 min)",
-      "median": 0.22,
+      "median": 0.21,
       "note": "informational"
     },
     {
@@ -2724,13 +2755,13 @@
     {
       "key": "hires",
       "target": "hires (not re-hires)",
-      "median": 6.5,
+      "median": 6,
       "note": "informational"
     },
     {
       "key": "overseasCleared",
       "target": "overseas clearances (parcel:cleared, malware included)",
-      "median": 12,
+      "median": 13.5,
       "note": "informational"
     },
     {
@@ -2742,7 +2773,7 @@
     {
       "key": "dock2Min",
       "target": "minute loading dock 2 is bought",
-      "median": 19.31,
+      "median": 21.52,
       "note": "informational"
     },
     {
@@ -2760,7 +2791,7 @@
     {
       "key": "goldenReleaseOfferedMaxMin",
       "target": "≤ 29 min (seeds 1-10 × 35 min, --minutes 35)",
-      "median": 25.46,
+      "median": 25.33,
       "note": "informational"
     },
     {
@@ -2795,7 +2826,7 @@
       "target": "per template, all seeds",
       "median": null,
       "note": "informational",
-      "text": "offered 8 · completed 1 · failed 7 · declined 0"
+      "text": "offered 6 · completed 3 · failed 3 · declined 0"
     },
     {
       "key": "quest:rush_district",
@@ -2809,61 +2840,68 @@
       "target": "per template, all seeds",
       "median": null,
       "note": "informational",
-      "text": "offered 7 · completed 4 · failed 2 · declined 0"
+      "text": "offered 9 · completed 4 · failed 5 · declined 0"
     },
     {
       "key": "quest:customs_run",
       "target": "per template, all seeds",
       "median": null,
       "note": "informational",
-      "text": "offered 4 · completed 4 · failed 0 · declined 0"
+      "text": "offered 4 · completed 3 · failed 1 · declined 0"
     },
     {
       "key": "quest:golden_release",
       "target": "per template, all seeds",
       "median": null,
       "note": "informational",
-      "text": "offered 9 · completed 0 · failed 2 · declined 0"
+      "text": "offered 12 · completed 0 · failed 3 · declined 0"
     },
     {
       "key": "quest:cheer_up",
       "target": "per template, all seeds",
       "median": null,
       "note": "informational",
-      "text": "offered 7 · completed 3 · failed 3 · declined 0"
+      "text": "offered 6 · completed 2 · failed 3 · declined 0"
     },
     {
       "key": "quest:night_shift",
       "target": "per template, all seeds",
       "median": null,
       "note": "informational",
-      "text": "offered 4 · completed 2 · failed 2 · declined 0"
+      "text": "offered 4 · completed 3 · failed 1 · declined 0"
+    },
+    {
+      "key": "quest:inspector_general",
+      "target": "per template, all seeds",
+      "median": null,
+      "note": "informational",
+      "text": "offered 1 · completed 1 · failed 0 · declined 0"
     },
     {
       "key": "livesLostShare",
       "target": "seeds that lost a life to malware (the 40-seed share: ≤ 35 %)",
       "median": null,
       "note": "informational",
-      "text": "3/10 seeds"
+      "text": "2/10 seeds"
     },
     {
       "key": "eventsByCategory",
       "target": "cards offered per category, all seeds",
       "median": null,
       "note": "informational",
-      "text": "job 49 · underworld 37 · staff 21 · customers 19 · money 18 · fleet 16 · security 12 · weather 8 · luck 8 · cityhall 8 · port 4 · tech 4 · press 2"
+      "text": "job 49 · weather 19 · fleet 19 · port 18 · underworld 15 · cityhall 15 · press 14 · customers 14 · tech 12 · money 12 · staff 9 · luck 9 · security 6"
     },
     {
       "key": "chainsStarted",
       "target": "chains started / finished, all seeds",
       "median": 2,
       "note": "informational",
-      "text": "17 / 12"
+      "text": "21 / 19"
     },
     {
       "key": "modifiersActiveMax",
       "target": "most modifiers live at once",
-      "median": 2.5,
+      "median": 3,
       "note": "informational"
     },
     {
@@ -2876,9 +2914,9 @@
     {
       "key": "eventLivesGained",
       "target": "lives events gave (all seeds in brackets)",
-      "median": 0.5,
+      "median": 0,
       "note": "informational",
-      "text": "median 0.5 (5)"
+      "text": "median 0.0 (1)"
     },
     {
       "key": "eventVehiclesLost",
@@ -2904,7 +2942,7 @@
     {
       "key": "deckEvMean",
       "target": "mean state-free score over every option of every card ($)",
-      "median": -33.86,
+      "median": -30.88,
       "note": "informational"
     }
   ],

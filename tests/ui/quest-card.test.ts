@@ -1,20 +1,23 @@
 // M7 QuestCard (spec-build2 §3.1, §3.4; design-m7 §6.3, §7 "quest-card";
 // plan-build2 §8.4 task 4): the card rect (300×212, 8 px above the bottom
 // bar: 360×604 → y 320, 393×659 → y 375, centred in the 430 column), the
-// button row the e2e taps (Accept x + 6, Later x + 134, Decline x + 214 at
-// y + 160), the model per mode (the Golden Release: gold, no Decline, the
+// button row the e2e taps (Accept x + 6, Later x + 134 at y + 160), the
+// model per mode (the Golden Release: gold, no Decline, the
 // blocked line), every line fitting its row in m5x7 (flavour and objective in
 // ≤ 2 lines of 276 px for every template, target and magic A/B pair), and the
 // card itself on a stub scene against a live sim: the modal stack, Later /
-// Decline / Esc / Enter, Accept left to the caller, deny, refresh, the
+// Esc / Enter, Accept left to the caller, deny, refresh, the
 // Abandon confirm and the complete state. Phaser is stubbed with chainable
 // no-op game objects (the card builds real kit Buttons).
 // Build 3 M12 (B3 §3.4, §6 "one path for jobs"): a job offer is an EventCard,
 // so the M11 interim job mode (Accept · Decline at the right edge, Esc only
 // hiding the card) is gone: the offer mode is Accept · Later (only the
 // Golden Release reaches it), no mode shows Decline, and Esc / outside are
-// Later again. A job offer's time row (`waiting for you`, D-18) still answers
-// a direct call; the abandon text names events.schedule.jobCooldownDays.
+// Later again; the abandon text names events.schedule.jobCooldownDays.
+// M13 (plan-build3 §8.4 task 2, Q-B3-15): the dead job-offer leftovers are
+// gone from the card — the Decline button (and its onDecline call) and the
+// offer countdown (`offer ends in …` / `waiting for you`): no offer expires
+// since build 3, so an offer's time row always reads `· the offer stays open`.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -188,28 +191,15 @@ describe('design-m7 §6.3: the card rect, 8 px above the bottom bar', () => {
     expect(qc.questCardRect(computeLayout(300, 604, 0, 0, 1)).w).toBe(288)
   })
 
-  it('the button row: Accept x + 6 (120), Later x + 134, Decline x + 214 at y + 160 (the e2e taps)', () => {
+  it('the button row: Accept x + 6 (120), Later x + 134 at y + 160 (the e2e taps)', () => {
     expect(qc.QUEST_CARD_ROWS.buttons).toBe(160)
     expect(qc.QUEST_CARD_BTN_H).toBe(44)
     expect(
       qc.QUEST_CARD_ROWS.buttons + qc.QUEST_CARD_BTN_H,
     ).toBeLessThanOrEqual(qc.QUEST_CARD_H)
-    expect(
-      qc.questCardButtonRects(300, ['accept', 'later', 'decline']),
-    ).toEqual([
-      { name: 'accept', x: 6, w: 120 },
-      { name: 'later', x: 134, w: 72 },
-      { name: 'decline', x: 214, w: 72 },
-    ])
     expect(qc.questCardButtonRects(300, ['accept', 'later'])).toEqual([
       { name: 'accept', x: 6, w: 120 },
       { name: 'later', x: 134, w: 72 },
-    ])
-    // M12: the interim job row (Decline moved to the right edge) is gone —
-    // two buttons just follow each other.
-    expect(qc.questCardButtonRects(300, ['accept', 'decline'])).toEqual([
-      { name: 'accept', x: 6, w: 120 },
-      { name: 'decline', x: 134, w: 72 },
     ])
     expect(qc.questCardButtonRects(300, ['abandon', 'close'])).toEqual([
       { name: 'abandon', x: 6, w: 96 },
@@ -223,9 +213,7 @@ describe('design-m7 §6.3: the card rect, 8 px above the bottom bar', () => {
   it('buttons stay inside the card and never overlap, at 300 and 288', () => {
     for (const w of [300, 288]) {
       for (const set of [
-        ['accept', 'later', 'decline'],
         ['accept', 'later'],
-        ['accept', 'decline'],
         ['abandon', 'close'],
         ['ok'],
       ] as const) {
@@ -265,7 +253,7 @@ describe('M5 atlas rule: the card binds world frames only', () => {
 // ---- model ------------------------------------------------------------------------------
 
 describe('design-m7 §6.3: the model per mode', () => {
-  it('M12: the offer mode is Accept / Later for any quest (a job offer is an EventCard since M12; its model still reads JOB BOARD and `waiting for you`), never Decline', () => {
+  it('M12: the offer mode is Accept / Later for any quest (a job offer is an EventCard since M12; its model still reads JOB BOARD); M13: the button set has no Decline at all and an offer never counts down', () => {
     const q = at(offer('rush_district'), 'downtown')
     const m = qc.questCardModel(data, q, 'offer', OFFER_TICK + 150, names, null)
     expect(m).toEqual({
@@ -275,15 +263,16 @@ describe('design-m7 §6.3: the model per mode', () => {
       flavour: 'Registry Row is swamped — get their parcels moving',
       objective: 'Deliver 6 parcels sent from Registry Row',
       reward: 'Reward: $120',
-      time: 'Time: 3 days · waiting for you',
+      time: 'Time: 3 days · the offer stays open',
       bar: null,
       buttons: ['accept', 'later'],
       blocked: null,
       waiting: false,
     })
-    for (const mode of ['offer', 'active', 'complete'] as const)
-      for (const ultimate of [false, true])
-        expect(qc.questCardButtons({ ultimate }, mode)).not.toContain('decline')
+    expect(qc.questCardButtons('offer')).toEqual(['accept', 'later'])
+    expect(qc.questCardButtons('active')).toEqual(['abandon', 'close'])
+    expect(qc.questCardButtons('complete')).toEqual(['ok'])
+    expect(Object.keys(qc.QUEST_BUTTON_LABEL)).not.toContain('decline')
   })
 
   it('the Golden Release offer: gold, its own masthead, Accept / Later only (no Decline), no expiry', () => {
@@ -361,7 +350,7 @@ describe('design-m7 §6.3: the model per mode', () => {
     const o = offer('magic_parcel')
     expect(
       qc.questCardModel(data, o, 'offer', OFFER_TICK, names, null).time,
-    ).toBe('Time: 2:00 · waiting for you')
+    ).toBe('Time: 2:00 · the offer stays open')
     const a = active('magic_parcel', {}, 1200, {
       route: { origin: 'dt_registry_tower', dest: 'dt_semver_bank' },
     })
@@ -570,7 +559,6 @@ function makeCard(
   const cb = {
     onAccept: vi.fn(),
     onLater: vi.fn(),
-    onDecline: vi.fn(),
     onAbandon: vi.fn(),
     onClose: vi.fn(),
   }
@@ -600,9 +588,6 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     expect(card.model?.buttons).toEqual(['accept', 'later'])
     expect(modalCount()).toBe(before + 1)
     expect(topModal()).toBe(card)
-    // No Decline on any offer: the tap does nothing.
-    card.tap('decline')
-    expect(card.isOpen).toBe(true)
     ;(card as unknown as { outside(): void }).outside()
     expect(card.isOpen).toBe(false)
     expect(modalCount()).toBe(before)
@@ -628,21 +613,9 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     scene.input.keyboard.emit('keydown', key('Escape'))
     expect(card.isOpen).toBe(false)
     expect(cb.onLater).toHaveBeenCalledTimes(1)
-    expect(cb.onDecline).not.toHaveBeenCalled()
     // Closed: the keys no longer reach it.
     scene.input.keyboard.emit('keydown', key('Enter'))
     expect(cb.onAccept).toHaveBeenCalledTimes(1)
-  })
-
-  it('M12: no offer shows Decline any more (a job is declined on its EventCard): the tap does nothing', () => {
-    const { card, cb } = makeCard()
-    for (const id of ['rush_district', 'golden_release']) {
-      card.open(offer(id), 'offer', OFFER_TICK, 4)
-      card.tap('decline')
-      expect(card.isOpen).toBe(true)
-      card.close()
-    }
-    expect(cb.onDecline).not.toHaveBeenCalled()
   })
 
   it('Accept through the sim: the caller closes on success, or denies a refusal (shake, deny SFX, tooltip over Accept)', () => {
@@ -691,13 +664,7 @@ describe('design-m7 §6.3: the card on the modal stack (no sim hold)', () => {
     const { card, cb } = makeCard()
     const q = offer('rush_district')
     card.open(q, 'offer', OFFER_TICK, 4)
-    expect(card.model?.time).toBe('Time: 3 days · waiting for you')
-    // An offer that carries an expiry still shows its countdown.
-    card.refresh(
-      { ...q, expiresTick: OFFER_TICK + 600, ticksLeft: 300 },
-      OFFER_TICK + 300,
-    )
-    expect(card.model?.time).toBe('Time: 3 days · offer ends in 12h')
+    expect(card.model?.time).toBe('Time: 3 days · the offer stays open')
     card.refresh(
       {
         ...q,

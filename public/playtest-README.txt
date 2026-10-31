@@ -1,4 +1,4 @@
-Package Management Tycoon - playtest 2 build
+Package Management Tycoon - playtest 3 build
 =============================================
 
 This folder is the whole game: a static web build (index.html, assets/,
@@ -8,10 +8,12 @@ Plain http is fine: localStorage, WebGL and the sound-unlock tap all work.
 
 The build stamp (short git sha + date) is shown on the Title screen.
 
-Build 2 is the whole planned game: levels 1 to 5, hired people with
-stats and salaries, quests with a golden parcel, the Docks and the
-Airport, a warehouse that grows through five tiers, and the Golden
-Release that wins the game (then endless mode).
+The game: levels 1 to 5, hired people with stats and salaries, quests
+with a golden parcel, the Docks and the Airport, a warehouse that grows
+through five tiers, and the Golden Release that wins the game (then
+endless mode). Build 3 adds event cards (every minute or two the clock
+stops and a card asks you to decide something about the company; job
+offers are cards too) and a climb about 10% shorter than build 2's.
 
 
 1. Serve it from the Mac
@@ -43,18 +45,33 @@ Stop the server with Ctrl-C.
     applicants, watch the first delivery land, and when the first parcel
     is flagged, open the Warehouse and Toss it from the Hold Bay.
   - Then play without help or debug flags. What to expect along the way
-    (the scripted test player's times; a cold human is usually later):
-      from day 4   (3:00) the job board offers quests (Accept / Later /
-                   Decline)
-      ~12 min      level 2: Industrial, the truck, the Shaky shaker, and
+    (the scripted test player's times: the 10-seed sim gate's medians
+    with the card deck on, in game time - the pauses on cards come on
+    top; a cold human is usually later):
+      3:20 (day 4) the first card; then one every 60-100 s of game time
+                   at level 1 (a little less often at higher levels)
+      ~10.7 min    level 2: Industrial, the truck, the Shaky shaker, and
                    a sorter for the Hold Bay station
-      ~18 min      level 3: the Docks and the ship, overseas parcels,
+      ~16.5 min    level 3: the Docks and the ship, overseas parcels,
                    a second desk, loading dock 2, the Battery checker
-      ~22 min      level 4: two new districts, the X-ray, the Sorter Arm,
+      ~20.6 min    level 4: two new districts, the X-ray, the Sorter Arm,
                    dock 3; the warehouse room grows (drag to scroll)
-      ~28 min      level 5: the Airport and the civic park; the Golden
+      ~25.3 min    level 5: the Airport and the civic park; the Golden
                    Release (60 deliveries in 5 days, no malware
                    delivered, 90% on time) wins the game
+  - The cards: every card pauses the game until you choose (PAUSED in
+    its corner; no timer, no Later). Under each option the card prints
+    exactly what it does: costs in red, gains in green, "Can't afford"
+    on a greyed option, "- this can end the run" on a red option that
+    could take your last life, "...then: <next card> (in N days)" when a
+    story continues. News cards have one OK (any tap closes them).
+    Jobs come as JOB BOARD cards: Accept or Decline, no Later; the chip
+    next to the level bar then shows the job's progress (tap it for
+    Abandon). While a card's effect runs, a small effects chip with a
+    count sits in the top bar: tap it (or "Effects" in the pause menu)
+    for the list and the time each has left. The Golden Release is the
+    one offer that is not an event card: its gold card does not pause
+    the game and keeps Later.
   - At 30:00 of game time (never before 25 real minutes: fun bar item
     4 counts real minutes, and at 2x the game clock runs ahead) a ticker
     line and a toast offer the summary card. Open it then, or keep
@@ -64,9 +81,10 @@ Stop the server with Ctrl-C.
     a "Run summary" button.
   - On the card: "Download playtest.json" saves the run profile,
     "Copy summary" copies a plain-text version to paste into your notes.
-    Then note how it felt: was a hire a real choice, did you want the
-    next quest, did level 3 and the Docks feel like a new beat, and could
-    you explain every lost life?
+    Then note how it felt: was a hire a real choice, were the cards
+    real choices and did they come too often or too rarely, did you want
+    the next quest, did level 3 and the Docks feel like a new beat, and
+    could you explain every lost life?
 
   Controls: tap = pick / rush a building, double-tap = zoom 1x/2x (on a
   vehicle: follow it), drag = pan (in a tall tier-4/5 warehouse room:
@@ -76,7 +94,8 @@ Stop the server with Ctrl-C.
   mouse drag, wheel zoom (wheel scrolls a tall room), right-click =
   long-press, Space pause, 1 / 2 speed, W warehouse, G garage, Esc
   close, Enter confirm, arrows pan, F follow the vehicle nearest the
-  cursor.
+  cursor. On an event or job card Esc and a tap outside do nothing;
+  Enter takes the first option unless it is red or greyed.
 
 
 3. Sending playtest.json back
@@ -101,9 +120,10 @@ Stop the server with Ctrl-C.
     http://<host>:4173/?debug=1&config=tycoon
 
   configs/spicy.json: more malware (9% at level 1 instead of 5%) and
-  decoys (30% instead of 22%), a Hold Bay of 2 at levels 1-2, and the card
-  deck from 1:00 with a draw every 30-60 s (40-70 s from level 3), so a
-  Hold Bay stall, the lost-life card and a job card show up within a few
+  decoys (30% instead of 22%), a Hold Bay of 2 at levels 1-2, and the
+  cards at about twice the pace: the first at 1:00 (instead of 3:20),
+  then one every 30-60 s (40-70 s from level 3), so a Hold Bay stall,
+  the lost-life card, a job card and a story show up within a few
   minutes.
 
   configs/tycoon.json: every New game starts at level 5 with the lane
@@ -132,8 +152,8 @@ Stop the server with Ctrl-C.
   A ?config=<name> session (spicy, tycoon) uses its own two keys:
     pm.save.v2:cfg:<name> and pm.playtest.v2:cfg:<name>
   (settings are shared). A save from another build (the playtest-1
-  pm.save.v1, or an older build-2 save) is never loaded: the Title says
-  "Save from an older build was reset" and removes it.
+  pm.save.v1, a build-2 save, or an older build-3 one) is never loaded:
+  the Title says "Save from an older build was reset" and removes it.
   Title -> Reset clears all of them: the save and profile of the cold run
   and of every config, a leftover pm.save.v1 or pm.playtest.v1, and the
   settings.

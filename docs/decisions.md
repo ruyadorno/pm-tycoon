@@ -1129,3 +1129,45 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
 - **A card waiting behind a sheet holds the sim** (M12 wave 0): with M11's sim-side hold, a card drawn while a sheet
   is open freezes the sim (the chip pulses) until the sheet closes and the card shows — B3 §3.4 said "a sheet does
   not hold the sim". Kept: every card pauses (Q-B3-2), and the frozen frame is stable (no jitter).
+
+## Run decisions and deviations (M13 — the full deck)
+
+- **No author notes**: the feel-check notes block was empty, so the deck review applied plan-build3 §8.4 task 3's
+  rules alone; three fresh-context reviewers (by category group) judged every card on the sim's own generated lines.
+- **[Q-B3-11] Ship 115 cards** of the 145-card pool (+ 4 routers and the rescue loaner = 120 rows). 29 whole singles
+  cut, weakest first, no chain link: `ev_luck_lottery`, `ev_staff_sorter_screen`, `ev_staff_retire`, `ev_fleet_keys`,
+  `ev_sec_marbles`, `ev_money_machine_sale`, `ev_city_roadworks`, `ev_wx_fog`, `ev_press_scandal`,
+  `ev_crime_graffiti`, `ev_tech_bug`, `ev_tech_drone`, `ev_port_crane`, `ev_luck_competitor`, `ev_fleet_schoolrun`,
+  `ev_cust_loyalty`, `ev_sec_firmware`, `ev_cust_bulk`, `ev_sec_outbreak`, `ev_money_prices`, `ev_money_accountant`,
+  `ev_fleet_gps`, `ev_fleet_ebike`, `ev_staff_sick`, `ev_city_zoning`, `ev_staff_pauses`, `ev_fleet_livery`,
+  `ev_money_lot_sale`, `ev_city_noise` (reasons: never offered in 40 seeds, a same-shape twin in the category, no real
+  choice, or a flat body). Shipped by category: staff 11, fleet 7, customers 15, security 13, money 11, city hall 13,
+  weather 7, press 9, underworld 9, tech 5, port 9, luck 6; 33 eligible at L1; every modifier key still used.
+- **Spec numbers changed** (B3 §4 is a first pass; each to keep an option under `evMax` 400, the policy EV band, or an
+  option a human would pick): bike lanes speed ×1.15 → ×1.05; the container 8 → 4 large parcels; the investor $800
+  → $400, buy-out $1,000 → $300, exit −$300 → −$150 (the policy now declines the angel — B3 §3.8's "+275" no longer
+  holds; humans still see the chain); the gang's return $500 → $400; sponsor, crate owner, VIP and award rewards
+  halved (R21: "the richest money options halved before any threshold moves"); the influencer's glowing video loses
+  its +$100, sat +5 → +3, spawn ×0.6 → ×0.75; tips income ×0.97 → ×0.95; barcode and the dispatch update ×0.9 →
+  ×0.94; night cargo ×0.5 → ×0.6; insider Ignore becomes desk catch −3 %; the election's loser becomes every
+  district −1; the scam's Click adds a vehicle price ×0.85 (the vehicle discount moved off the cut lot sale); the
+  cat drops its +2 happiness and costs $2/day; spot check, outage and festival became decisions; the rival poach
+  bonus $180 (M12); per-vehicle voluntary charges are `costPerVehicle` (fuel, snow, radio, service).
+- **Copy fit (R22)**: hints use `50+` / `45+` (no `≥` glyph and two lines at 360 px); the storm's "Do it yourselves"
+  drops its processS line to fit two rows.
+- **Weights and cooldowns** (plan §8.4 task 1: ≥ 9 categories per 30-min run, ≥ 3 decision cards on the L1 plateau
+  on 10/10 seeds, no `once` repeat): decision weights per category (staff 4, fleet 5, customers 4, security 5, money
+  5, city hall 11, weather 9, press 7, underworld 6, tech 7, port 16, luck 7; the reactive cards 12; news 1) and a
+  15-day cooldown floor on repeatable decision cards (≈ 13 deck draws over 12 categories gives a random-draw limit
+  of ≈ 8.5 distinct categories; the floor lifts the median to 9). Seven news cards moved from L1 to L2 (they took
+  plateau slots).
+- **Two late changes at the final check** (the quick gate's seeds 1–3 failed the truck row, the EV band and the
+  non-default share): `ev_money_tax` minLevel 2 → **3** (a % of the balance at L2 is the truck fund; B3 §4.6 said L≥2)
+  and `ev_fleet_gearbox` gains `cond.balanceAtLeast` 200 (its "Fix it now ($200)" must be affordable — the rule the
+  poach and recall cards already follow). Over 40 seeds: truck within 4 min 25 → 26/40, EV in band 34 → 36/40,
+  non-default ≥ 0.4 30 → 33/40, L5 26.91 → 26.68; seeds losing a malware life 10 → 12/40 (≤ 14).
+- **Deferred copy edits** (pinned in tests; for the M14 copy polish): the gang's "Accept ($300)" / "Deny" → "Pay up
+  ($300)" / "Refuse"; the watch's Yes / No → "Hide the fleet" / "Carry on"; "Match it (a bonus)" → "Pay a bonus
+  ($180)"; the audit hint's awkward wrap; the friend's "Offer a job"; "Send everyone" only with two inspectors;
+  "satisfaction" → "happiness" in job lines. Not taken: the recall's appeal option and the grant's desk cost (they
+  move the policy's picks and the gate).

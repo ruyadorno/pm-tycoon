@@ -71,7 +71,7 @@ const LEVEL_LEAD_S = 3
 const L4_SETTLE_S = 60
 /** victory: snapshot this long before the game:victory tick. */
 const VICTORY_LEAD_S = 3
-/** Give up past this (sim seconds) — the victory seed (8 since the M12 review fixes) wins at ≈ 48 min. */
+/** Give up past this (sim seconds) — the victory seed (8 since the M12 review fixes; seed 7 is past the goal 3 s out since M13) wins at ≈ 57 min. */
 const CAP_S = 3600
 /** Measuring a fixture's "…InS" under a fresh policy gives up after this. */
 const MEASURE_CAP_S = 600
@@ -305,6 +305,10 @@ function victorySeed(seed: number): string | null {
     return 'the Golden Release is not active at the snapshot'
   if (st.economy.victory || st.economy.gameOver)
     return 'already won or over at the snapshot'
+  // The shot shows the chip a few deliveries short of the goal: a seed past
+  // the goal and only waiting on the on-time rate is not that moment.
+  if (q.progress.delivered >= q.goal)
+    return `${q.progress.delivered} of ${q.goal} delivered at the snapshot (waiting on the on-time rate)`
   const inS = measure(sim, (s) => s.state.economy.victory)
   if (inS !== VICTORY_LEAD_S)
     return `a fresh policy wins after ${String(inS)} s, want ${VICTORY_LEAD_S}`

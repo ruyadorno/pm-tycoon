@@ -20,7 +20,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 
 - [x] M11 pacing pass 1 + the events engine: windows, the threshold scan, the modifier registry, `events.json`, deck/effects/policy, gate rows, save v6 (commit `M11: …`)
 - [x] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
-- [ ] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
+- [x] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
 - [ ] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
 - [ ] M15 playtest-3 build: metrics v3, summary card v3 + fun bar 3, shots, report, hand-off (commit `M15: …`)
 
@@ -61,7 +61,31 @@ L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `
 
 ## Checkpoint entries (newest first)
 
-## M12 — the cards on screen (feel check) — 2026-10-31 13:30 UTC — DONE at (this commit; sha recorded in the M13 entry)
+## M13 — the full deck — 2026-10-31 11:58 UTC — DONE at (this commit; sha recorded in the M14 entry)
+
+M12 is 617e97b.
+Built: the full B3 §4 deck authored (145 cards + 4 routers), merged with M12's reviewed rows, judged by three
+fresh-context reviewers on the sim's generated lines, and shipped at **115 cards** (29 whole singles cut, every chain
+whole: gang, union, rival, investor, permit/hearing, audit, crate, strike, storm, ring + the outcome trios and pairs;
+19 stories); copy edits, honest effects, weights + a 15-day cooldown floor; `tests/sim/chains-stories.test.ts` (every
+shipped 4–5-card story driven through decideEvent, conditional branches both ways), a 60-min deck soak on seeds 1–3,
+the EV band over seeds 1–10; jobs fully folded (spicy cadence, dead offer code removed, docs text); 12
+`event-card-<category>` shots + `art/contact/events@4x.png` rebuilt in situ from them.
+Gate (seeds 1–10 × 30 min, the shipped deck — docs/gate/latest.md): PASS — L2 10.73 (−8.4 % vs build 2), truck
++2.30, L3 16.51 (−8.2 %), overseas +2.95, L4 20.55 (−8.1 %), L5 25.33 (−8.6 %), lives 0 (2/10 seeds), quests 6 / 3,
+21 cards by 30 min, 4 decision cards on the L1 plateau (≥ 3 on 10/10 seeds), EV $24.4 per card, non-default share
+0.52, categories per run median 9, no `once` repeat, no card took a life, a vehicle or a worker; 35-min PASS (Golden
+Release offered 25.33); delegating PASS (L5 26.22, EV $21.1); 40 seeds PASS (L5 26.68, 12/40 seeds lose a malware life).
+Tests: vitest green (`vlr check` PASS, 188 s); shots 109 passed (the category cards, job, three, danger)
+Shots (read): `art/contact/events@4x.png` — the 12 category cards in situ at 393 × 659 + the job board: every title
+on one line, bodies ≤ 3 lines, effect lines coloured by tone, pictures on the darker inset
+Deviations from spec-build3.md: the spec numbers changed on 20-odd cards and the 115-card ship list —
+docs/decisions.md "Run decisions and deviations (M13)"
+Open for the author: no feel-check notes were supplied — the review ran on the plan's rules; deferred copy edits go
+to M14's copy polish
+Next: M14 pacing pass 2 (deck on)
+
+## M12 — the cards on screen (feel check) — 2026-10-31 10:05 UTC — DONE at (this commit; sha recorded in the M13 entry)
 
 M11 is 7d2ec44 (+ 266015e, the M12 build checkpoint).
 Built: `src/ui/effectText.ts` (the pure card model) + `EventCard.ts` (decision, three-option, job and news modes,

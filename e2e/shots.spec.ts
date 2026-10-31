@@ -245,10 +245,20 @@
 //   event-lost-life      the recall's strike at 3 lives: the event variant
 //   event-game-over      one-life.json + the strike: the GameOverCard's
 //                        `The recall — you chose: Take the strike`
-//   buysheet-sale        the Warehouse at 60 s, Vendor clearance's OK, an
-//                        empty slot tapped: the BuySheet's SALE pills
+//   buysheet-sale        the Warehouse at 60 s, Cheap scanners' Take the
+//                        deal (machines ×0.6 for a day), an empty slot
+//                        tapped: the BuySheet's SALE pills
 //   victory              re-taken with victory_art and the confetti burst
 //                        (12 frames after the card opens) (+ `-360x604`)
+//
+// Build 3 M13 (plan-build3 §8.4 task 5): event-card-<category> for the 12
+// decision categories — one shipped card each (CATEGORY_CARDS; every
+// option drawn with its effects rows), offered over l3-docks.json without
+// the policy (L4, $251 since M13: every option affordable; the docks live for the
+// port's card), the deck quiet and the hints done. Each shot (and
+// event-card-job) also writes shots/<name>.card.json — the card's logical
+// rect — for the in-situ row of art/contact/events@4x.png
+// (`node tools/art/contact.ts events` crops the real cards).
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
@@ -262,6 +272,7 @@ import {
   finishUltimate,
   questUi,
   quietHints,
+  SHOTS_DIR,
   test,
   titleUp,
   type PmHelpers,
@@ -3734,6 +3745,33 @@ async function expectEventCardFits(page: Page, label: string): Promise<void> {
 }
 
 /**
+ * shots/<name>.card.json beside the shot: the open EventCard's logical rect
+ * and the canvas size (logical), so `node tools/art/contact.ts events` can
+ * crop the real card at 1x for the sheet's in-situ row (M13, §8.4 task 5).
+ */
+async function saveCardRect(page: Page, name: string): Promise<void> {
+  const fit = await eventCardFit(page)
+  const ui = await eventUi(page)
+  expect(fit.card, `${name}: the card is open`).not.toBeNull()
+  mkdirSync(SHOTS_DIR, { recursive: true })
+  writeFileSync(
+    `${SHOTS_DIR}/${name}.card.json`,
+    JSON.stringify(
+      {
+        shot: `${name}.png`,
+        eventId: ui.open!.eventId,
+        title: ui.open!.title,
+        W: fit.W,
+        H: fit.H,
+        rect: fit.card,
+      },
+      null,
+      2,
+    ) + '\n',
+  )
+}
+
+/**
  * 60 s of the policy (bikes out, an inspector at the desk), then the policy
  * off — no one answers a card now — the deck quiet (deckOff: only the cards
  * a shot offers) and the one-time hints done (nothing over the card).
@@ -3804,6 +3842,7 @@ test.describe('M12 shots', () => {
     expect(texts).toContain('Rush hour')
     expect(texts).toContain('JOB BOARD')
     await expectEventCardFits(page, 'event-card-job')
+    await saveCardRect(page, 'event-card-job')
     await pm.shot('event-card-job', 10)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
@@ -4003,9 +4042,11 @@ test.describe('M12 shots', () => {
 
   test('buysheet-sale', async ({ page, pm, consoleErrors }) => {
     phoneOnly()
-    // Vendor clearance: machines ×0.8 for a day — the BuySheet's SALE tags.
-    // The grant's Apply first ($102 + $150): the sale price is affordable,
-    // so the row shows the pill on a live row, not a greyed one.
+    // Cheap scanners' Take the deal: machines ×0.6 for a day — the
+    // BuySheet's SALE tags (M13: Vendor clearance was cut; the fence's
+    // `Traced` link is due two days later, after the shot). The grant's
+    // Apply first ($102 + $150): the sale price is affordable, so the row
+    // shows the pill on a live row, not a greyed one.
     await warehouseAt60s(page, pm)
     await policyOff(page)
     await deckOff(page)
@@ -4025,8 +4066,9 @@ test.describe('M12 shots', () => {
     await pm.settle(24)
     await tapTarget(page, pm, 'HUD', 'newspaper:ok')
     await pm.settle(24)
-    await debugEvent(page, 'ev_money_machine_sale')
-    await eventCardUp(page, pm, 'ev_money_machine_sale')
+    await debugEvent(page, 'ev_crime_fence')
+    const fence = await eventCardUp(page, pm, 'ev_crime_fence')
+    expect(fence.open!.options[0]!.label).toBe('Take the deal')
     await tapTarget(page, pm, 'HUD', 'event:opt0')
     await pm.settle(20)
     expect((await eventUi(page)).modifiers.map((m) => m.key)).toContain(
@@ -4059,4 +4101,105 @@ test.describe('M12 shots', () => {
     await pm.shot('buysheet-sale', 10)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
+})
+
+// ---- M13: one card per category (plan-build3 §8.4 task 5) -------------------------
+
+/**
+ * The shipped deck as the shots read it (src/data/events.json): the card
+ * each category shot offers must still ship under its category, so a cut
+ * or a move fails here by name, not as a timeout.
+ */
+const EVENTS = JSON.parse(readFileSync('src/data/events.json', 'utf8')) as {
+  categories: Record<string, { word: string; picture: string }>
+  deck: {
+    id: string
+    category: string
+    kind?: string
+    router?: boolean
+    title: string
+    options?: { label: string }[]
+  }[]
+}
+
+/**
+ * One representative shipped card per decision category (B3 §4): a
+ * decision with 2–3 options, all affordable on the l3-docks state, each
+ * option with its effects rows where the category has such a card (money's
+ * and press's best cards keep a plain Decline), and a mix of shapes: a
+ * `{inspector}` pick (staff), a `{vehicle}` fill (fleet, underworld,
+ * luck), a `{district}` target (customers, underworld, luck), three
+ * options (security, underworld), `…then:` links (money, port, security),
+ * a conditional `Outcome depends on …` (press), a state-scaled cost
+ * (weather's tyres per vehicle) and the pun universe (tech's left-pad).
+ */
+const CATEGORY_CARDS: readonly { category: string; eventId: string }[] = [
+  { category: 'staff', eventId: 'ev_staff_birthday' },
+  { category: 'fleet', eventId: 'ev_fleet_ticket' },
+  { category: 'customers', eventId: 'ev_cust_fair' },
+  { category: 'security', eventId: 'ev_sec_crate' },
+  { category: 'money', eventId: 'ev_money_investor' },
+  { category: 'cityhall', eventId: 'ev_city_bikelanes' },
+  { category: 'weather', eventId: 'ev_wx_snow' },
+  { category: 'press', eventId: 'ev_press_review' },
+  { category: 'underworld', eventId: 'ev_crime_theft' },
+  { category: 'tech', eventId: 'ev_tech_leftpad' },
+  { category: 'port', eventId: 'ev_port_strike' },
+  { category: 'luck', eventId: 'ev_luck_wallet' },
+]
+
+test.describe('M13 shots', () => {
+  test('the category shots cover every decision category', () => {
+    phoneOnly()
+    const decision = Object.keys(EVENTS.categories).filter((c) => c !== 'job')
+    expect(CATEGORY_CARDS.map((c) => c.category).toSorted()).toEqual(
+      decision.toSorted(),
+    )
+  })
+
+  for (const { category, eventId } of CATEGORY_CARDS) {
+    test(`event-card-${category}`, async ({ page, pm, consoleErrors }) => {
+      phoneOnly()
+      const name = `event-card-${category}`
+      const def = EVENTS.deck.find((c) => c.id === eventId)
+      expect(def, `${eventId} ships (src/data/events.json)`).toBeDefined()
+      expect(def!.category, `${eventId}'s category`).toBe(category)
+      expect(def!.kind ?? 'decision', `${eventId} is a decision`).not.toBe(
+        'news',
+      )
+      expect(def!.router ?? false, `${eventId} is not a router`).toBe(false)
+      // l3-docks.json without the policy: L4, $251, the docks live.
+      await pm.open(POLICY)
+      await loadFixture(page, pm, 'l3-docks')
+      await policyOff(page)
+      await deckOff(page)
+      await debugEvent(page, eventId)
+      await pm.settle(2)
+      await quietHints(page)
+      const ui = await eventCardUp(page, pm, eventId)
+      console.log(
+        `shots: ${name} ${JSON.stringify({ title: ui.open!.title, mode: ui.card.mode, h: ui.card.h, options: ui.open!.options.map((o) => ({ label: o.label, lines: o.lines, affordable: o.affordable })) })}`,
+      )
+      expect(ui.open!.title).toBe(def!.title)
+      expect(['decision', 'three']).toContain(ui.card.mode)
+      expect(ui.open!.options, 'every option visible').toHaveLength(
+        def!.options!.length,
+      )
+      expect(
+        ui.open!.options.filter((o) => !o.affordable).map((o) => o.label),
+        'every option affordable on the fixture balance',
+      ).toEqual([])
+      expect(ui.holds).toContain('event')
+      expect(await sceneTexts(page, 'HUD')).toContain(
+        EVENTS.categories[category]!.word,
+      )
+      await expectEventCardFits(page, name)
+      // The card holds the sim: let the load's money float (900 ms) fade.
+      await pm.settle(64)
+      expect((await eventUi(page)).paper, 'no paper over the card').toBeNull()
+      await saveCardRect(page, name)
+      await pm.shot(name, 10)
+      expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+    })
+  }
 })

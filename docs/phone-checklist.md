@@ -1,21 +1,22 @@
-# Phone checklist (playtest 2)
+# Phone checklist (playtest 3)
 
 The checks only a real device can answer (phaser4-notes.md "Install-time verification checklist", plan.md §6.11,
 plan-build2.md §8.7 and §9), for one session on the **iPhone 16 (Safari)** and one in **desktop devtools mobile
 mode**. Serve the build first (README "How to serve on a phone", or `playtest-README.txt` in the zip). Tick each line;
-a failed line names the file to look at. The playtest-1 lines are kept; the build-2 lines are marked **(B2)**.
+a failed line names the file to look at. The playtest-1 lines are kept; the build-2 lines are marked **(B2)**, the
+build-3 lines **(B3)**.
 
 The automated side already passed on the VM, in headless Chromium (not Safari): `e2e/smoke.spec.ts` (max texture ≥
 4096, `OES_standard_derivatives`, `displayScale` = 1/zoom, m5x7 font, ≤ 8 draw calls, hit rects ≥ 44 px, the logo over
-the attract city, the Garage driver picker, the sorter, the tall rooms' scroll at L5), `e2e/quests.spec.ts` (offer,
-Accept / Later / Decline, the golden parcel, the Golden Release and the VictoryCard), `e2e/lifecycle.spec.ts` (view
-storms, rotate and hide/show holds) and `e2e/dist.spec.ts` (the production build, hashed assets, no `__pm` without
-`?debug=1`, `?config=` only with it).
+the attract city, the Garage driver picker, the sorter, the tall rooms' scroll at L5), `e2e/quests.spec.ts` (the
+golden parcel, the Golden Release and the VictoryCard), `e2e/events.spec.ts` (the event and job cards, the hold, the
+modal stack, the effects chip and list), `e2e/lifecycle.spec.ts` (view storms, rotate and hide/show holds) and
+`e2e/dist.spec.ts` (the production build, hashed assets, no `__pm` without `?debug=1`, `?config=` only with it).
 
 Shortcuts for the build-2 lines that come late in a cold run (use them **after** the cold session; each keeps its own
 save, see README "Saves"): `?debug=1&config=tycoon` starts at level 5 with a full lane, fleet and docks 2–3 (the tall
-tier-5 room, the plane, the Golden Release); `?debug=1&config=spicy` brings a quest offer on day 2 (1:00) and a lost life
-within minutes.
+tier-5 room, the plane, the Golden Release); `?debug=1&config=spicy` brings the first card at 1:00 (then one every
+30–60 s), a job card and a lost life within minutes.
 
 ## iPhone 16, Safari
 
@@ -58,6 +59,8 @@ Open `http://<mac-lan-ip>:4173/` (portrait).
 - [ ] Every button is comfortably tappable (≥ 44 pt) and no two bottom-bar buttons are hit by one tap.
 - [ ] **(B2)** With a quest active, the quest chip, the shortened level bar and the shield share the second top row
       without overlapping, and each one opens its own card or popover.
+- [ ] **(B3)** With a quest active **and** an effect running, the effects chip sits between the level bar and the
+      compact quest chip (its bar only, no time text); the level bar still reads, and each chip opens its own card.
 
 **Hiring (B2)** (`src/ui/HireSheet.ts`, `src/scenes/GarageSheet.ts`, `src/ui/warehouse/SlotCard.ts`,
 `src/ui/warehouse/StationCard.ts`, B2 §2)
@@ -75,13 +78,34 @@ Open `http://<mac-lan-ip>:4173/` (portrait).
       sorter stands at the podium, tosses on their own, and a held parcel's card reads `<name>: looks clean (NN%)`.
 - [ ] A ★ applicant (a Clean sweep or Like clockwork reward) shows the gold star and `fee $0`.
 
-**Quests (B2)** (`src/ui/QuestCard.ts`, `src/ui/QuestChip.ts`, `src/render/cityHub.ts`, B2 §3)
+**Cards (B3)** (`src/ui/EventCard.ts`, `src/ui/EventChip.ts`, `src/ui/EffectsCard.ts`, `src/ui/effectText.ts`, B3
+§3.4)
 
-- [ ] On Day 4 (3:00 of game time) the JOB BOARD card opens by itself in the city (or the chip pulses if another card is up):
-      title, flavour line, objective, `Reward: …`, `Time: …`, and **Accept** · **Later** · **Decline**, each easy to
-      hit; the sim keeps running under it.
-- [ ] After Accept the chip in the top bar shows the gold progress bar and the time left; a chip tap reopens the card
-      with **Abandon** (asks first) and **Close**.
+- [ ] At 3:20 of game time (Day 4) the first card opens by itself, in the city or the warehouse: masthead (category
+      word, `Day N`, the `PAUSED` pill), the 48 × 48 picture, the title, the story, then one full-width button per
+      option with its effects line under it; nothing is cut off at 393 px and the text is readable at 1×.
+- [ ] **The game is paused under it**: vehicles stop, the clock and the ticker freeze, the music plays on; the sim
+      resumes the moment you pick an option. Another card follows about every 60–100 s of game time at L1.
+- [ ] The effects lines read at a glance: costs in red, gains in green, the rest muted; a greyed option shows `Can't
+      afford · $N` and does nothing when tapped (a shake and a tooltip); a red option reads as dangerous, and at one
+      life its line ends `— this can end the run`.
+- [ ] A double tap never decides the next card unread: tapping fast through one card does not land on the next one's
+      buttons (a red option needs a slightly longer look).
+- [ ] A tap outside a decision or job card does nothing; a one-option news card closes on any tap.
+- [ ] A story reads as one: a follow-up card opens with `You chose: …`, and an option that continues one says `…then:
+      <next card> (in N days)`.
+- [ ] While an effect runs, the effects chip (an icon with a count) shows in the top bar; tap it → the Effects list
+      (each effect, `1d 12h left` / `permanent`, the card that set it), and the pause menu (❚❚, ❚❚ again) has `Effects ·
+      N` opening the same list. When a card comes while a sheet is open (the Garage, a slot card), the game holds, the
+      chip pulses, and the card opens when the sheet closes (or at once from a chip tap).
+
+**Quests (B2, jobs B3)** (`src/ui/EventCard.ts` for the offer, `src/ui/QuestCard.ts`, `src/ui/QuestChip.ts`,
+`src/render/cityHub.ts`, B2 §3, B3 §3.1)
+
+- [ ] A job offer is a JOB BOARD card like the others (it pauses the game): title, story, objective, `Reward: …` and the
+      time limit in the effects line, and **Accept** · **Decline** — no Later — each easy to hit.
+- [ ] After Accept the chip in the top bar shows the gold progress bar and the time left; a chip tap opens the quest
+      card with **Abandon** (asks first) and **Close**.
 - [ ] A Special delivery: the golden parcel and its markers over A and B are easy to spot at zoom 1, the 2:00
       countdown runs, and an on-time delivery lights a new life slot (`+1 life — 4 of 5`).
 - [ ] QUEST COMPLETE: the gold stamp rises at the money cell, the sting plays, and the card's **OK** closes it.
@@ -106,8 +130,9 @@ B2 §4)
 
 **Victory and Tycoon ✓ (B2)** (`src/ui/VictoryCard.ts`, `src/boot/autosave.ts`, B2 §3.4)
 
-- [ ] The Golden Release offer has a gold frame and only Accept / Later; once accepted its chip reads `41/60` on the
-      bar and `0✕ 94%` beside it (malware delivered, on-time rate), both glyphs drawn, not boxes.
+- [ ] The Golden Release offer has a gold frame and only Accept / Later (**(B3)** the one offer that is not an event
+      card: it does not pause the game, and Later keeps it waiting); once accepted its chip reads `41/60` on the bar and
+      `0✕ 94%` beside it (malware delivered, on-time rate), both glyphs drawn, not boxes.
 - [ ] Shipping it pauses on the **TYCOON** card: the stats fit at 393 px, Continue / New game / Run summary tappable.
 - [ ] After Continue the level bar reads `$… · Tycoon ✓` and, back on the Title (reload), the Continue line reads
       `Day N · $… · Lv 5 · Tycoon ✓` — the ✓ is a real glyph, not a box or a question mark.
@@ -178,7 +203,10 @@ switching the preset (the canvas measures `#game` at boot).
       the overlay's `dc` stays ≤ 8.
 - [ ] Desktop parity with the device toolbar **off** (430 px portrait column centred): mouse drag pans, wheel zooms,
       right-click opens the district panel, keys Space / 1 / 2 / W / G / Esc / Enter / arrows / F work; the hire sheet,
-      quest card and TYCOON card are centred in the column.
+      quest card, event card and TYCOON card are centred in the column.
+- [ ] **(B3)** On an event card `Enter` takes the first option (on a red or greyed first option it shows `Tap an
+      option` instead), `Esc` does nothing on a decision or job card, and `Esc` or `Enter` closes a news card;
+      `?event=<id>` opens that card on a fresh game and `__pm.events()` shows the deck's state.
 - [ ] `__pm.playtest()` returns the live profile; its `device` block matches the preset (393, DPR 3, zoom 1), and
       `localStorage['pm.playtest.v2']` holds the same run.
 

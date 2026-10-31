@@ -10,10 +10,12 @@ warehouse's intake lane, where inspectors at a desk and machines (Metal detector
 X-ray) flag suspicious parcels into the Hold Bay. Toss or clear each one: every malware parcel delivered to a customer
 costs one of your lives (three to start), and every lost life comes with a card that explains why it got through.
 
-**Build 2 (playtest 2)** is the whole planned game: company levels 1 → 5 with all eight districts of the map, hired
-people with their own stats and salaries, quests with a golden parcel, overseas hubs (the Docks and the Airport), a
-warehouse that grows through five tiers, and the Golden Release that wins the game — then endless mode. The Title is
-the author's logo over a live demo city.
+The game: company levels 1 → 5 with all eight districts of the map, hired people with their own stats and salaries,
+quests with a golden parcel, overseas hubs (the Docks and the Airport), a warehouse that grows through five tiers, and
+the Golden Release that wins the game — then endless mode. The Title is the author's logo over a live demo city.
+**Build 3 (playtest 3)** adds **event cards**: every minute or two the clock stops and a card asks you to run the
+company — the crew wants a raise, a gang wants money, a storm is coming — with every option's effects printed under it;
+job offers are cards too. The climb is about 10 % shorter than in build 2.
 
 ## How to play
 
@@ -27,7 +29,7 @@ The game teaches itself in about a minute:
    Hold Bay and **Toss** it. Read the label: some flags are decoys, and clean parcels thrown away cost money.
 
 Then grow: more vehicles, a machine next to the desk, rush buildings whose waiting badge turns amber or red, keep
-payroll covered on payday, take the jobs the job board offers, and climb the levels.
+payroll covered on payday, decide the cards as they come (jobs included), and climb the levels.
 
 **The playtest brief: play thirty to forty minutes cold**, without help or the debug flags. Then open the summary card
 (tap ❚❚ to pause, then ❚❚ again for the pause menu → **End run — show summary**; a ticker line also offers it at 30:00 of game time,
@@ -39,8 +41,8 @@ summary**, and note how it felt. `docs/playtest.md` explains the file and the fu
 
 - One in-game day is one minute at 1×. Payday is every day: inspectors, the sorter and the drivers are paid in that
   order; two unpaid paydays in a row and a person walks out (re-hire costs one day's salary).
-- The level bar counts **lifetime earned** (`$3,410 / $3,700`), so spending never sets you back a level; quest cash
-  counts too.
+- The level bar counts **lifetime earned** (`$3,010 / $3,250`), so spending never sets you back a level; quest cash
+  counts too (cash from event cards does not: it only moves your balance).
 - You start with $450 and **3 lives** (up to 5). A malware parcel delivered to a customer costs one; the lost-life
   card names the slot, the person or machine that missed it, and what would have caught it. No lives left: game over.
 - Tossing a malware parcel pays a $50 bounty; tossing a clean one costs a $25 fee and some satisfaction. A district's
@@ -52,16 +54,17 @@ summary**, and note how it felt. `docs/playtest.md` explains the file and the fu
 | Level        | Lifetime earned | What opens                                                                                                                                                                                                         |
 | ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1 · Scrappy  | start           | Node Heights (high-density) and Registry Row (downtown); bike $200, van $1,000; Metal detector $150 (the `metal` strain); 3 lane slots, Hold Bay 3, shelf 30                                                       |
-| 2 · Local    | $2,000          | Hoist Hill (industrial — trucks only); truck $1,200; Shaky shaker $300 (`rattle`); slot 4, shelf 45; the Hold Bay station takes a sorter                                                                           |
-| 3 · Regional | $3,700          | Shrinkwrap Shore (the Docks: overseas parcels pay ×1.5); Battery checker $500 (`battery`); a second desk $400; loading dock 2 $800; Hold Bay 5, shelf 60                                                           |
-| 4 · National | $5,200          | Semver Street (low-density) and Pasture Peer Fields (rural); X-ray $1,000 (any strain, 70 %, 2 s a parcel); Sorter Arm $600; the `dense` strain with its typosquat labels; slot 5, loading dock 3 $1,000, shelf 80 |
-| 5 · Tycoon   | $7,400          | Prefetch International (the Airport: S and M parcels only, ×2) and Monorepo Commons (park & civic); slot 6, shelf 100; the Golden Release                                                                          |
+| 2 · Local    | $1,750          | Hoist Hill (industrial — trucks only); truck $1,200; Shaky shaker $300 (`rattle`); slot 4, shelf 45; the Hold Bay station takes a sorter                                                                           |
+| 3 · Regional | $3,250          | Shrinkwrap Shore (the Docks: overseas parcels pay ×1.5); Battery checker $500 (`battery`); a second desk $400; loading dock 2 $800; Hold Bay 5, shelf 60                                                           |
+| 4 · National | $4,650          | Semver Street (low-density) and Pasture Peer Fields (rural); X-ray $1,000 (any strain, 70 %, 2 s a parcel); Sorter Arm $600; the `dense` strain with its typosquat labels; slot 5, loading dock 3 $1,000, shelf 80 |
+| 5 · Tycoon   | $6,500          | Prefetch International (the Airport: S and M parcels only, ×2) and Monorepo Commons (park & civic); slot 6, shelf 100; the Golden Release                                                                          |
 
 Each level-up is a moment: the warehouse rebuilds in a dust cloud into its next tier, the new region lifts its fog, and
-a newspaper names what opened. Levels 2–4 each announce a new malware strain, which starts arriving a minute later:
+a newspaper names what opened. Levels 2–4 each announce a new malware strain, which starts arriving 90 seconds later:
 its own checker catches it 80 % of the time, the other checkers only 15 %, while inspectors and the X-ray catch every
-strain alike. The malware share grows by 2 points a level (5 % at L1). The scripted test player reaches L2 at about 12
-minutes, L3 at 18, L4 at 22 and L5 at 28 (the 10-seed gate's medians); a cold human is usually later.
+strain alike. The malware share grows by 1.5 points a level (5 % at L1). The scripted test player reaches L2 at about
+10.7 minutes, L3 at 16.5, L4 at 20.6 and L5 at 25.3 (the 10-seed sim gate's medians with the card deck on,
+docs/gate/latest.md; game time — the pauses on cards come on top); a cold human is usually later.
 
 ### People and hiring
 
@@ -84,12 +87,38 @@ improves with the company level, and a ★ applicant (a quest reward) costs no f
 - **Drivers.** Every vehicle purchase opens `Who drives the Bike?`; **Hire later** parks it as `No driver`. A Garage
   row's `···` menu has Replace driver (the swap waits for the trip to end), Fire driver, Re-hire and Sell.
 
+### Cards
+
+The first card opens at **3:20** of game time (Day 4; the HUD counts days from Day 1); after that a new one comes every
+60–100 seconds of game time at L1, a little less often from L2 (60–110 s) to L5 (90–140 s). A card has a masthead
+(`STAFF`, `FLEET`, `CUSTOMERS`, `SECURITY`, `MONEY`, `CITY HALL`, `WEATHER`, `PRESS`, `UNDERWORLD`, `TECH`, `PORT`,
+`LUCK`, or `JOB BOARD` for a job), a picture, a short story and two or three options.
+
+- **Every card pauses the game** (`PAUSED` in its corner) until you choose: no timer, no **Later**, nothing decided
+  behind your back. The music plays on; the clock, the vehicles and the ticker wait.
+- **Under each option is exactly what it does**, written from the game's own effects (costs in red, gains in green):
+  `−$300`, `+1 life`, `all drivers: speed +1, charisma −1`, `bikes ×0.85 speed for 1 day`, `wanted list +1`. An
+  option you cannot afford is greyed (`Can't afford · $300`) and always has a free sibling. A **red** option can cost a
+  life (`— this can end the run` when it could take your last one). An option that takes a life, a vehicle or a person
+  always has a way out beside it, on the same card or on the card that started the story.
+- **Stories**: some options continue later (`…then: On the doorstep (in 1 day)`); the next card opens with `You chose:
+  …`. Some outcomes depend on how you play, never on dice (`Outcome depends on your catch rate …`).
+- **News** cards have one **OK**: any tap closes them.
+- **Jobs are cards too**: a `JOB BOARD` card with the objective, the reward and the time limit — **Accept** or
+  **Decline**, no Later. A job card can come once no job is running and a day has passed since the last one ended.
+- **The effects chip**: while a card's effect runs (a speed boost for a day, a cheaper truck, a permanent change), a
+  small chip with the count of active effects sits in the top bar beside the level bar (it also shows, pulsing, when a
+  card is waiting behind an open sheet: the game holds, and a tap brings the card up). Tap it, or **Effects · N** in
+  the pause menu (❚❚, then ❚❚ again), for the list: each effect, its time left (or `permanent`) and the card that set
+  it.
+- If the fleet ever drops to zero and you cannot afford a bike, a neighbour wheels one over (with a rider) half a minute
+  later.
+
 ### Quests
 
-From Day 4 (3:00 of game time; the HUD counts days from Day 1), and then every two days while no job is active, the
-**job board** offers one quest: a card with the objective, the reward and the time limit — **Accept**, **Later** or
-**Decline** (the next offer then waits a day). An offer stays open one day; one job runs at a time; the chip next to the
-level bar shows its progress and time left (tap it for the card and **Abandon**). A failed or expired job costs nothing.
+Job offers arrive as `JOB BOARD` cards (above). One job runs at a time; the chip next to the level bar shows its
+progress and time left (tap it for the card and **Abandon**, which asks first). A failed or abandoned job costs
+nothing; the next job card can come one day after a job ends (done, failed, declined or abandoned).
 
 | Quest             | From                                     | Goal                                                                                                  | Time      | Reward                                             |
 | ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------- |
@@ -104,10 +133,11 @@ level bar shows its progress and time left (tap it for the card and **Abandon**)
 | Inspector general | L3                                       | lane detection ≥ 95 % against every announced strain for a whole day                                  | 4 days    | $500                                               |
 | Express lane      | L5, the Airport live                     | clear 4 Airport parcels                                                                               | 5 days    | $600                                               |
 
-**The Golden Release** is offered when you reach L5 (a gold card with no Decline; Later keeps it waiting): within 5
-days, 60 deliveries, 0 malware delivered and ≥ 90 % on time. Shipping it wins: the **TYCOON** card with the run's stats,
-then **Continue** (endless mode: quests keep coming, the malware share climbs 1 point a day up to 20 %, the Title's
-Continue line reads `Tycoon ✓`), **New game** or **Run summary**.
+**The Golden Release** is offered when you reach L5 on its own gold card — the one offer that is not an event card: it
+does not pause the game, has no Decline, and **Later** keeps it waiting (decision cards hold back while it is open):
+within 5 days, 60 deliveries, 0 malware delivered and ≥ 90 % on time. Shipping it wins: the **TYCOON** card with the
+run's stats, then **Continue** (endless mode: quests keep coming, the malware share climbs 1 point a day up to 20 %,
+the Title's Continue line reads `Tycoon ✓`), **New game** or **Run summary**.
 
 ### Overseas hubs
 
@@ -146,18 +176,21 @@ it.
 
 ### Controls
 
-| Touch             | Desktop                 | Does                                                                          |
-| ----------------- | ----------------------- | ----------------------------------------------------------------------------- |
-| tap               | click                   | select a building (rush it), a vehicle, the warehouse, a hub, a locked region |
-| double-tap        | double-click            | zoom 1× ⇄ 2× at that point; on a vehicle: follow it                           |
-| drag              | mouse drag / arrow keys | pan the city (with inertia); scroll the tall rooms at tiers 4–5               |
-| swipe the chips   | mouse drag              | scroll the region chips above the bottom bar (`<` / `>` mark hidden chips)    |
-| pinch             | mouse wheel             | zoom 1× / 2× (in the warehouse the wheel scrolls a tall room)                 |
-| long-press        | right-click             | district panel (satisfaction, favours, waiting parcels, its quest)            |
-| HUD buttons       | `Space` / `1` / `2`     | pause / 1× / 2× (❚❚ while paused opens the pause menu)                        |
-| Warehouse, Garage | `W`, `G`                | switch views, open the Garage                                                 |
-| —                 | `Esc`, `F`              | close the top sheet or card; follow the vehicle nearest the cursor            |
-| —                 | `Enter`                 | confirm a dialog; Accept a job offer; Run summary on the Game Over card       |
+| Touch             | Desktop                 | Does                                                                           |
+| ----------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| tap               | click                   | select a building (rush it), a vehicle, the warehouse, a hub, a locked region  |
+| double-tap        | double-click            | zoom 1× ⇄ 2× at that point; on a vehicle: follow it                            |
+| drag              | mouse drag / arrow keys | pan the city (with inertia); scroll the tall rooms at tiers 4–5                |
+| swipe the chips   | mouse drag              | scroll the region chips above the bottom bar (`<` / `>` mark hidden chips)     |
+| pinch             | mouse wheel             | zoom 1× / 2× (in the warehouse the wheel scrolls a tall room)                  |
+| long-press        | right-click             | district panel (satisfaction, favours, waiting parcels, its quest)             |
+| HUD buttons       | `Space` / `1` / `2`     | pause / 1× / 2× (❚❚ while paused opens the pause menu)                         |
+| Warehouse, Garage | `W`, `G`                | switch views, open the Garage                                                  |
+| —                 | `Esc`, `F`              | close the top sheet or card; follow the vehicle nearest the cursor             |
+| —                 | `Enter`                 | confirm a dialog; Accept the Golden Release; Run summary on the Game Over card |
+
+On an event or job card `Esc` and a tap outside do nothing (the card waits for your choice; a news card closes on any
+tap, `Esc` or `Enter`), and `Enter` takes the first option unless it is red or greyed.
 
 Sound starts with the first tap anywhere on the Title; the sax button mutes. Switching apps pauses and saves. Portrait
 only.
@@ -168,8 +201,9 @@ Both need `?debug=1` (it also shows the fps / draw-call overlay, allows 4× spee
 and each keeps its own save and profile, so the cold run's stay untouched:
 
 - `?debug=1&config=spicy` loads `configs/spicy.json`: malware 9 % instead of 5 % at L1, decoys 30 % instead of 22 %, a
-  Hold Bay of 2 at levels 1–2, and a job board that opens on day 2 (1:00) and offers again one day after each job ends, so a
-  Hold Bay stall, a lost-life card and a quest show up within minutes.
+  Hold Bay of 2 at levels 1–2, and the cards at about twice the pace — the first at 1:00 (60 s instead of 3:20), then
+  one every 30–60 s at L1–L2 and 40–70 s from L3 — so a Hold Bay stall, a lost-life card, a job card and a story show
+  up within minutes.
 - `?debug=1&config=tycoon` loads `configs/tycoon.json`: every New game starts at level 5 with the lane built (desk 1
   and desk 2 with two inspectors each, Metal detector, Shaky shaker, Battery checker, X-ray), the Sorter Arm in the
   Hold Bay station, docks 2–3, and 3 bikes, 2 vans and 3 trucks with their drivers, paid out of a $14,500 start; the
@@ -248,7 +282,8 @@ URL parameters (`src/debug/params.ts`): `seed=N`, `skipTitle=1`, `newGame=1`, `m
 `attract=0` (the Title on a plain backdrop, no demo city), `view=city|warehouse`, `fastForward=S` (sim seconds before
 the first frame), `policy=1` (the competent scripted player; `policy=delegating` for the delegating one); `debug=1`
 installs `window.__pm`, the overlay and 4× speed, and enables `config=<name>` (`public/configs/<name>.json`),
-`level=N` (a fresh game forced to level N), `quest=<id>` (offer that quest on a fresh game) and `view=gallery`.
+`level=N` (a fresh game forced to level N), `quest=<id>` (offer that quest on a fresh game), `event=<id>` (open that
+`src/data/events.json` card on a fresh game; `__pm.events()` shows the deck's state) and `view=gallery`.
 
 ## Documents
 
@@ -257,10 +292,11 @@ installs `window.__pm`, the overlay and 4× speed, and enables `config=<name>` (
 | `AGENTS.md`                | rules for coding agents working in this repo (commands, commits, code rules)         |
 | `docs/report-playtest2.md` | the build-2 end-of-run report: what changed since playtest 1, art approvals, balance |
 | `docs/report-playtest1.md` | the playtest-1 report (levels 1–2)                                                   |
-| `docs/status.md`           | one entry per milestone (M0–M4, then M5–M10)                                         |
+| `docs/status.md`           | one entry per milestone (M0–M4, M5–M10, then M11–M15)                                |
 | `docs/decisions.md`        | every default taken, run decision, retune and runtime dependency                     |
 | `docs/gate/latest.md`      | the latest 10-seed sim gate table                                                    |
 | `docs/playtest.md`         | how to read `playtest.json` and the fun bar                                          |
+| `docs/feel-check-m12.md`   | a ten-minute phone session on the first build with the cards (M12)                   |
 | `docs/phone-checklist.md`  | the iPhone 16 + desktop devtools checklist                                           |
 | `docs/art-todo.md`         | the art awaiting the author's approval (G2–G6), the exact approve / reject commands  |
 | `art/STYLE.md`             | the art contract (palette, grid, light, canvas classes)                              |

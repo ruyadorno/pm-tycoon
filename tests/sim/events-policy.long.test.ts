@@ -14,18 +14,34 @@
 // lives / vehicles / workers events took are printed. Tagged [long]:
 // excluded from `vlr check:quick` (tools/check.mjs), run by the full
 // `vlr check`.
+// M13 (the full deck, plan-build3 §8.4 tasks 1 + 4 and the acceptance):
+// the L1 plateau shows ≥ eventsL1PlateauMin decision cards on EVERY seed
+// (10/10, not just the median); a run sees ≥ 9 deck categories (median,
+// jobs left out) and never offers a `once` card twice; the quest rows hold
+// with the deck on (questsOfferedBy30MinMin / questsCompletedBy30MinMin by
+// median, B3 §3.9 "kept"); and the `delegating` policy's rows over the same
+// seeds with the deck on are printed (informational, as `vlr
+// sim:delegating`; its runs keep the invariants and the slot never sticks).
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { SIM_FEATURES } from '../../src/sim/features.ts'
+import { deckEvMean } from '../../src/sim/policies/eventPolicy.ts'
 import { createPolicy } from '../../src/sim/policy.ts'
 import { TICKS_PER_DAY } from '../../src/sim/types.ts'
 import { runSeed } from '../../tools/sim/cli.ts'
 import type { RunResult } from '../../tools/sim/cli.ts'
-import { categoryTallies, median } from '../../tools/sim/report.ts'
+import {
+  categoryTallies,
+  formatGate,
+  median,
+  summarise,
+} from '../../tools/sim/report.ts'
 import { dataFixture } from './helpers.ts'
 
 const data = dataFixture()
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+/** plan-build3 §8.4 task 1 / acceptance: deck categories a 30-min policy run sees (median). */
+const CATEGORIES_PER_RUN_MIN = 9
 const featureEvents = SIM_FEATURES.events
 
 beforeAll(() => {
@@ -40,6 +56,13 @@ let cached: RunResult[] | null = null
 function runs(): RunResult[] {
   cached ??= SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy))
   return cached
+}
+
+/** The deck categories a run's cards came from (job cards left out). */
+function deckCategories(r: RunResult): string[] {
+  return Object.keys(r.result.metrics.eventsByCategory).filter(
+    (k) => k !== 'job',
+  )
 }
 
 describe('[long] the event policy on the shipped deck, seeds 1-10 × 30 min (events on)', () => {
@@ -117,6 +140,97 @@ describe('[long] the event policy on the shipped deck, seeds 1-10 × 30 min (eve
   it('the policy never ends its own run: no event game over on any seed', () => {
     for (const r of runs()) {
       expect(r.result.metrics.eventGameOvers, `seed ${r.seed}`).toBe(0)
+    }
+  }, 180_000)
+
+  it('M13: the L1 plateau shows ≥ eventsL1PlateauMin decision cards on every seed (10/10)', () => {
+    const min = data.economy.pacingTargets.eventsL1PlateauMin
+    const short = runs()
+      .filter((r) => r.result.metrics.eventsL1Decisions < min)
+      .map((r) => `seed ${r.seed}: ${r.result.metrics.eventsL1Decisions}`)
+    expect(short).toEqual([])
+  }, 180_000)
+
+  it(`M13: a run sees ≥ ${CATEGORIES_PER_RUN_MIN} deck categories (median, jobs left out) and never offers a once card twice`, () => {
+    const per = runs().map((r) => deckCategories(r).length)
+    console.log(
+      `[events-policy] deck categories per run ${per.join(',')} (median ${median(per)}, target ≥ ${CATEGORIES_PER_RUN_MIN}); never seen: ${
+        Object.keys(data.events.categories)
+          .filter(
+            (k) =>
+              k !== 'job' &&
+              runs().every((r) => !deckCategories(r).includes(k)),
+          )
+          .join(', ') || 'none'
+      }`,
+    )
+    expect(median(per)!).toBeGreaterThanOrEqual(CATEGORIES_PER_RUN_MIN)
+    const once = new Set(
+      data.events.deck.filter((d) => d.once).map((d) => d.id),
+    )
+    for (const r of runs()) {
+      const seen = new Map<string, number>()
+      for (const e of r.events) {
+        if (e.name !== 'event:offered' || !once.has(String(e.eventId))) continue
+        seen.set(String(e.eventId), (seen.get(String(e.eventId)) ?? 0) + 1)
+      }
+      expect(
+        [...seen].filter(([, n]) => n > 1),
+        `seed ${r.seed}: once cards offered twice`,
+      ).toEqual([])
+    }
+  }, 180_000)
+
+  it('M13: the quest rows hold with the deck on (B3 §3.9 "kept"): questsOffered30 ≥ questsOfferedBy30MinMin, questsCompleted30 ≥ questsCompletedBy30MinMin by median', () => {
+    const t = data.economy.pacingTargets
+    const offered = runs().map((r) => r.result.metrics.questsOffered30)
+    const completed = runs().map((r) => r.result.metrics.questsCompleted30)
+    console.log(
+      `[events-policy] quests offered by 30 min ${offered.join(',')} (median ${median(offered)}, target ≥ ${t.questsOfferedBy30MinMin}); completed ${completed.join(',')} (median ${median(completed)}, target ≥ ${t.questsCompletedBy30MinMin})`,
+    )
+    expect(median(offered)!).toBeGreaterThanOrEqual(t.questsOfferedBy30MinMin)
+    expect(median(completed)!).toBeGreaterThanOrEqual(
+      t.questsCompletedBy30MinMin,
+    )
+  }, 180_000)
+})
+
+describe('[long] the delegating rows with the deck on, seeds 1-10 × 30 min (informational; plan-build3 §8.4 task 4)', () => {
+  let delegating: RunResult[] | null = null
+  const dRuns = (): RunResult[] => {
+    delegating ??= SEEDS.map((seed) =>
+      runSeed(data, seed, 30, createPolicy, { kind: 'delegating' }),
+    )
+    return delegating
+  }
+
+  it('printed as `vlr sim:delegating` prints them; the runs keep the invariants, the slot never sticks, no event game over', () => {
+    const summary = summarise(
+      dRuns().map((r) => r.result),
+      {
+        dataHash: data.hash,
+        config: null,
+        policy: 'delegating',
+        minutes: 30,
+        targets: data.economy.pacingTargets,
+        features: { ...SIM_FEATURES, events: true },
+        eventPolicy: data.events.policy,
+        deckEvMean: deckEvMean(data),
+      },
+    )
+    for (const line of formatGate(summary)) console.log(`[delegating] ${line}`)
+    for (const r of dRuns()) {
+      const m = r.result.metrics
+      expect(r.result.asserts, `seed ${r.seed}`).toEqual([])
+      expect(r.conservation.ok, `seed ${r.seed}`).toBe(true)
+      expect(m.eventsOpenMaxTicks, `seed ${r.seed}`).toBeLessThanOrEqual(
+        data.economy.pacingTargets.eventsOpenMaxTicks,
+      )
+      expect(m.eventGameOvers, `seed ${r.seed}`).toBe(0)
+      expect(
+        m.sorterDecisions,
+        `seed ${r.seed}: the sorter at work`,
+      ).toBeGreaterThan(0)
     }
   }, 180_000)
 })

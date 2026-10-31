@@ -18,7 +18,12 @@
 // (M12) — run both with vlr test -- tests/data/events.
 // The static EV max (B3 §3.8, critique 20: life gains left out) holds for
 // every option. Gated on the full deck (M13, ≥ 100 cards): every bounds key
-// is used by some card, and ≥ 30 cards are L1-eligible.
+// is used by some card, and ≥ 30 cards are L1-eligible. The M13 review rules
+// (plan-build3 §8.4 task 3), each with a mutate-and-expect case: the spec's
+// policy band pinned (evBand [−20, 40], evMax 400, nonDefaultShareMin 0.4),
+// L1 never costs a life or a vehicle (an L1 head, the rescue, a link that
+// can open at L1), decision cards outweigh news in every category, and no
+// two drawable cards of one category share a shape.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildGameData, validateGameData } from '../../src/data/index.ts'
@@ -565,12 +570,12 @@ describe('checkEvents: the harsh-consequence rule (B3 §3.5, critique 21-22)', (
 
   it('review deck-1: costPerVehicle is a price — never with cost, never on the default, and it needs an unpaid sibling', () => {
     const radio = at('ev_staff_radio')
-    const livery = at('ev_fleet_livery')
+    const snow = at('ev_wx_snow')
     const service = at('ev_fleet_service')
     expect(problems(() => {})).toEqual([])
     const p = problems((r) => {
       cardOf(r, 'ev_staff_radio').options[0].cost = 10
-      const l = cardOf(r, 'ev_fleet_livery')
+      const l = cardOf(r, 'ev_wx_snow')
       l.options[1].costPerVehicle = { each: 5 }
       const sv = cardOf(r, 'ev_fleet_service')
       sv.options[1].costPerVehicle = { each: 5, type: 'van' }
@@ -579,10 +584,10 @@ describe('checkEvents: the harsh-consequence rule (B3 §3.5, critique 21-22)', (
       `events.deck[${radio}].options[0].costPerVehicle: an option takes \`cost\` or \`costPerVehicle\`, not both`,
     )
     expect(p).toContainEqual(
-      `events.deck[${livery}].options[1].costPerVehicle: the default never takes a per-vehicle price (a fleet-sized price no cond can cover)`,
+      `events.deck[${snow}].options[1].costPerVehicle: the default never takes a per-vehicle price (a fleet-sized price no cond can cover)`,
     )
     expect(p).toContainEqual(
-      `events.deck[${livery}].options[0].costPerVehicle: a paid option needs an unpaid sibling with no \`if\` (a card never greys out every option)`,
+      `events.deck[${snow}].options[0].costPerVehicle: a paid option needs an unpaid sibling with no \`if\` (a card never greys out every option)`,
     )
     expect(p).toContainEqual(
       `events.deck[${service}].options[1].costPerVehicle: a paid option needs an unpaid sibling with no \`if\` (a card never greys out every option)`,
@@ -1194,6 +1199,22 @@ describe('the full deck (M13: ≥ 100 cards)', () => {
     ).toEqual([])
   })
 
+  it.skipIf(!full)(
+    'the ship list: 100–120 cards, routers and the rescue left out (Q-B3-11, plan-build3 §8.4 task 3)',
+    () => {
+      const shipped = deck.filter((c) => !c.router && !c.rescue)
+      expect(shipped.length).toBeGreaterThanOrEqual(100)
+      expect(shipped.length).toBeLessThanOrEqual(120)
+      // Every decision category keeps a hand of its own (the 9-categories row needs them all).
+      const by = new Map<string, number>()
+      for (const c of shipped) by.set(c.category, (by.get(c.category) ?? 0) + 1)
+      expect(new Set(by.keys())).toEqual(
+        new Set(Object.keys(data.events.categories).filter((k) => k !== 'job')),
+      )
+      expect(Math.min(...by.values())).toBeGreaterThanOrEqual(5)
+    },
+  )
+
   it.skipIf(!full)('≥ 30 cards are eligible at L1', () => {
     const l1 = deck.filter(
       (c) =>
@@ -1203,5 +1224,180 @@ describe('the full deck (M13: ≥ 100 cards)', () => {
         (c.minLevel ?? 1) <= 1,
     )
     expect(l1.length).toBeGreaterThanOrEqual(30)
+  })
+})
+
+// M13 deck review rules over the shipped deck (plan-build3 §8.4 tasks 3-4) ---------------
+
+/** A card's direct children: next ids, conditional branch ids, a router's branches. */
+function childIds(c: EventDef): string[] {
+  const out: string[] = []
+  for (const b of c.next?.branches ?? []) out.push(b.id)
+  for (const o of c.options ?? [])
+    for (const e of o.effects)
+      if (e.kind === 'next')
+        out.push(
+          ...('branches' in e ? e.branches.map((b) => b.id) : [e.eventId]),
+        )
+  return out
+}
+
+/**
+ * The life / vehicle losses a player can meet at L1: on an L1 head, the
+ * rescue, and every link reachable from one whose minLevel lets it open at
+ * L1 (deck.ts drops a link below its minLevel).
+ */
+function l1Harsh(cards: readonly EventDef[]): string[] {
+  const by = new Map(cards.map((c) => [c.id, c]))
+  const stack = cards
+    .filter(
+      (c) =>
+        (c.minLevel ?? 1) <= 1 &&
+        (c.rescue === true || (c.drawable !== false && !c.router)),
+    )
+    .map((c) => c.id)
+  const seen = new Set<string>()
+  const out: string[] = []
+  while (stack.length > 0) {
+    const id = stack.pop()!
+    const c = by.get(id)
+    if (!c || seen.has(id) || (c.minLevel ?? 1) > 1) continue
+    seen.add(id)
+    for (const o of c.options ?? [])
+      for (const e of o.effects)
+        if (
+          (e.kind === 'lives' && e.delta < 0) ||
+          (e.kind === 'vehicle' && 'lose' in e)
+        )
+          out.push(`${id} "${o.label}": ${e.kind}`)
+    stack.push(...childIds(c))
+  }
+  return out
+}
+
+/** The draw weight (deck.ts weightOf): `weight`, else weightDefault by kind. */
+const drawWeight = (d: GameData, c: EventDef): number =>
+  c.weight ??
+  d.events.schedule.weightDefault[
+    (c.options?.length ?? 0) >= 2 ? 'decision' : 'news'
+  ]
+
+/** Per category: a news card at least as heavy as the category's lightest decision card. */
+function newsOverDecisions(d: GameData, cards: readonly EventDef[]): string[] {
+  const drawn = cards.filter(
+    (c) => c.drawable !== false && !c.router && !c.rescue,
+  )
+  const out: string[] = []
+  for (const cat of new Set(drawn.map((c) => c.category))) {
+    const inCat = drawn.filter((c) => c.category === cat)
+    const decisions = inCat.filter((c) => (c.options?.length ?? 0) >= 2)
+    const lightest = Math.min(...decisions.map((c) => drawWeight(d, c)))
+    for (const n of inCat.filter((c) => (c.options?.length ?? 0) === 1))
+      if (drawWeight(d, n) >= lightest)
+        out.push(`${cat}: ${n.id} weight ${drawWeight(d, n)} ≥ ${lightest}`)
+  }
+  return out
+}
+
+/** An effect's shape: its kind with its key / type / role / scope / sign. */
+function effectToken(e: EventEffect): string {
+  switch (e.kind) {
+    case 'mod':
+      return `mod:${e.key}`
+    case 'vehicle':
+      return 'lose' in e ? `vehicle-:${e.lose}` : `vehicle+:${e.gain}`
+    case 'staff':
+      return 'quit' in e
+        ? `quit:${e.quit}`
+        : 'star' in e
+          ? `star:${e.star.role}`
+          : `absent:${e.absent}`
+    case 'satisfaction':
+      return `sat:${e.scope}`
+    case 'pips':
+      return `pips:${e.role}`
+    case 'parcels':
+      return 'spawn' in e ? 'parcels+' : 'parcels-'
+    case 'lives':
+      return e.delta < 0 ? 'lives-' : 'lives+'
+    default:
+      return e.kind
+  }
+}
+
+/** A card's shape: per option its price and its effects' shapes. */
+function shapeOf(c: EventDef): string {
+  return JSON.stringify(
+    (c.options ?? [])
+      .map((o) => [
+        o.cost !== undefined || o.costPerVehicle !== undefined
+          ? 'paid'
+          : 'free',
+        ...o.effects.map(effectToken).toSorted(),
+      ])
+      .toSorted((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1)),
+  )
+}
+
+/** Drawable cards of one category sharing a shape. */
+function sameShapes(cards: readonly EventDef[]): string[] {
+  const groups = new Map<string, string[]>()
+  for (const c of cards) {
+    if (c.drawable === false || c.router || c.rescue) continue
+    const k = `${c.category} ${shapeOf(c)}`
+    groups.set(k, [...(groups.get(k) ?? []), c.id])
+  }
+  return [...groups.values()]
+    .filter((ids) => ids.length > 1)
+    .map((ids) => ids.join(' = '))
+}
+
+describe('M13: the deck review rules on the shipped deck (plan-build3 §8.4 task 3; B3 §3.5, §3.8)', () => {
+  it("the policy design rules are the spec's: evBand [−20, 40], evMax 400, nonDefaultShareMin 0.4 (a gate row is never passed by moving its band)", () => {
+    expect(data.events.policy.evBand).toEqual([-20, 40])
+    expect(data.events.policy.evMax).toBe(400)
+    expect(data.events.policy.nonDefaultShareMin).toBe(0.4)
+  })
+
+  it('L1 never costs a life or a vehicle: no L1 head, rescue or link that can open at L1 takes one', () => {
+    expect(l1Harsh(deck)).toEqual([])
+    // The rule bites: a strike on the L1 VIP's furious ending, a lost bike on a
+    // link that cannot open before L2 (left alone).
+    const raw = fresh()
+    cardOf(raw, 'ev_cust_vip_mad').options[0].effects.push({
+      kind: 'lives',
+      delta: -1,
+    })
+    cardOf(raw, 'ev_sec_crate_open').options[1].effects.push({
+      kind: 'vehicle',
+      lose: 'bike',
+      fallback: 0,
+    })
+    expect(l1Harsh(raw.events.deck as EventDef[])).toEqual([
+      'ev_cust_vip_mad "OK": lives',
+    ])
+  })
+
+  it('decision cards are weighted over news: in every category the lightest drawable decision card outweighs every news card', () => {
+    expect(newsOverDecisions(data, deck)).toEqual([])
+    const raw = fresh()
+    const news = (raw.events.deck as Record<string, any>[]).find(
+      (c) => c.drawable !== false && !c.rescue && c.options?.length === 1,
+    )!
+    news.weight = 99
+    expect(newsOverDecisions(data, raw.events.deck as EventDef[])).toHaveLength(
+      1,
+    )
+  })
+
+  it('no two drawable cards in one category share a shape (each option: its price and its effect kinds / keys)', () => {
+    expect(sameShapes(deck)).toEqual([])
+    const raw = fresh()
+    const twin = structuredClone(cardOf(raw, 'ev_cust_refund'))
+    twin.id = 'ev_cust_refund_twin'
+    ;(raw.events.deck as Record<string, any>[]).push(twin)
+    expect(sameShapes(raw.events.deck as EventDef[])).toEqual([
+      'ev_cust_refund = ev_cust_refund_twin',
+    ])
   })
 })

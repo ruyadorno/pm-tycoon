@@ -24,12 +24,6 @@ const TICKS_PER_HOUR = TICKS_PER_DAY / HOURS_PER_DAY
 export const MAGIC_DANGER_S = 30
 /** U+2715: the malware cross of the Golden Release chip (m5x7 has no ✗). */
 export const CROSS = '✕'
-/**
- * Build 3 (B3 §3.2, D-18): a job offer never expires — the sim waits on its
- * card — so where the offer's countdown was, the card says so.
- */
-export const JOB_WAITING_TEXT = 'waiting for you'
-
 export type QuestTone = 'light' | 'warn' | 'danger'
 
 const plural = (n: number, one: string, many = `${one}s`): string =>
@@ -68,7 +62,7 @@ export function formatQuestDays(ticks: number): string {
 
 /**
  * Ticks left at `tick`: an offer until it expires (null: the ultimate and,
- * since build 3, every job offer never expire — JOB_WAITING_TEXT), an active
+ * since build 3, every job offer never expire — B3 §3.2), an active
  * quest until its deadline. Falls back to the view's own `ticksLeft`
  * (computed at the view's revision) without a tick.
  */

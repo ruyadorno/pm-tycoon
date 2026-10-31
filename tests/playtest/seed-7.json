@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildStamp": "266015e 2026-10-31",
+  "buildStamp": "617e97b 2026-10-31",
   "seed": 7,
-  "startedAt": "2026-10-31T09:58:30Z",
+  "startedAt": "2026-10-31T11:51:18Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -11,9 +11,9 @@
     "zoom": 1,
     "maxTexture": 8192
   },
-  "elapsedS": 107.5,
-  "simS": 2102.7,
-  "pausedS": 0.8,
+  "elapsedS": 107.7,
+  "simS": 2102.5,
+  "pausedS": 0.9,
   "firstDeliveryS": 31.5,
   "firstMalware": {
     "spawnedS": 138.4,
@@ -21,67 +21,67 @@
     "by": "inspector",
     "tossedS": 180.1
   },
-  "level2AtS": 747.1,
-  "level3AtS": 1273.9,
-  "level4AtS": 1623.1,
-  "level5AtS": 1963.9,
+  "level2AtS": 644.5,
+  "level3AtS": 955.2,
+  "level4AtS": 1236.4,
+  "level5AtS": 1491,
   "victoryAtS": null,
   "endlessS": null,
-  "truckBoughtS": 1133.5,
+  "truckBoughtS": 758.9,
   "deliveries": {
-    "total": 243,
-    "onTime": 137,
-    "late": 106,
+    "total": 308,
+    "onTime": 191,
+    "late": 117,
     "byType": {
-      "bike": 175,
-      "van": 0,
-      "truck": 68
+      "bike": 187,
+      "van": 24,
+      "truck": 97
     }
   },
   "moneyPerMin": [
     40,
     45,
     54,
-    118,
-    64,
-    73,
-    100,
-    215,
-    263,
-    206,
-    195,
-    258,
-    286,
-    155,
-    243,
-    151,
-    138,
-    82,
-    151,
+    122,
+    129,
+    264,
+    239,
+    185,
+    244,
+    223,
     228,
-    183,
-    294,
-    201,
-    393,
-    117,
-    217,
-    137,
-    280,
-    269,
+    253,
+    270,
+    252,
+    277,
+    491,
+    288,
+    164,
+    372,
     338,
-    492,
-    230,
-    438,
-    357,
-    519
+    359,
+    325,
+    485,
+    517,
+    678,
+    244,
+    254,
+    592,
+    549,
+    456,
+    453,
+    789,
+    868,
+    665,
+    724
   ],
-  "lifetimeEarned": 7530,
-  "balanceEnd": 957,
+  "lifetimeEarned": 12436,
+  "balanceEnd": 563,
   "malware": {
-    "spawned": 37,
-    "caught": 30,
+    "spawned": 53,
+    "caught": 49,
     "missed": 0,
-    "tossedClean": 33,
+    "tossedClean": 49,
     "cleared": 0
   },
   "livesLost": [],
@@ -92,18 +92,26 @@
     },
     {
       "type": "bike",
-      "atS": 268.6
+      "atS": 200
     },
     {
       "type": "bike",
-      "atS": 494.8
+      "atS": 267.8
     },
     {
       "type": "truck",
-      "atS": 1133.5
+      "atS": 758.9
+    },
+    {
+      "type": "van",
+      "atS": 1596.9
+    },
+    {
+      "type": "truck",
+      "atS": 1791.9
     }
   ],
-  "inspectorsHired": 0,
+  "inspectorsHired": 2,
   "machinesBought": [
     {
       "id": "metal_detector",
@@ -111,25 +119,33 @@
     },
     {
       "id": "metal_detector",
-      "atS": 531
+      "atS": 344.4
     },
     {
       "id": "shaky_shaker",
-      "atS": 1289.3
+      "atS": 838.5
     },
     {
       "id": "battery_checker",
-      "atS": 1367.9
+      "atS": 955.2
     },
     {
       "id": "xray",
-      "atS": 1915.7
+      "atS": 1405.6
+    },
+    {
+      "id": "sorter_arm",
+      "atS": 2004.5
     }
   ],
   "docksBought": [
     {
       "index": 2,
-      "atS": 1434.3
+      "atS": 1170.4
+    },
+    {
+      "index": 3,
+      "atS": 1947.8
     }
   ],
   "desks": 1,
@@ -149,37 +165,85 @@
     {
       "role": "driver",
       "pips": {
-        "speed": 3,
-        "energy": 3,
-        "charisma": 0
+        "speed": 1,
+        "energy": 1,
+        "charisma": 1
       },
-      "salary": 8,
+      "salary": 6,
       "star": false,
-      "atS": 268.6,
-      "cheapest": false
+      "atS": 200,
+      "cheapest": true
     },
     {
       "role": "driver",
       "pips": {
-        "speed": 2,
-        "energy": 4,
-        "charisma": 0
+        "speed": 3,
+        "energy": 2,
+        "charisma": 2
       },
-      "salary": 8,
+      "salary": 9,
       "star": false,
-      "atS": 494.8,
+      "atS": 267.8,
       "cheapest": false
     },
     {
       "role": "driver",
       "pips": {
         "speed": 4,
-        "energy": 2,
-        "charisma": 2
+        "energy": 4,
+        "charisma": 0
       },
       "salary": 30,
       "star": false,
-      "atS": 1133.5,
+      "atS": 758.9,
+      "cheapest": false
+    },
+    {
+      "role": "driver",
+      "pips": {
+        "speed": 5,
+        "energy": 3,
+        "charisma": 0
+      },
+      "salary": 18,
+      "star": false,
+      "atS": 1596.9,
+      "cheapest": true
+    },
+    {
+      "role": "inspector",
+      "pips": {
+        "eye": 5,
+        "pace": 3,
+        "charisma": 0
+      },
+      "salary": 24,
+      "star": false,
+      "atS": 1632.1,
+      "cheapest": false
+    },
+    {
+      "role": "driver",
+      "pips": {
+        "speed": 5,
+        "energy": 3,
+        "charisma": 0
+      },
+      "salary": 30,
+      "star": false,
+      "atS": 1791.9,
+      "cheapest": true
+    },
+    {
+      "role": "inspector",
+      "pips": {
+        "eye": 5,
+        "pace": 2,
+        "charisma": 0
+      },
+      "salary": 22,
+      "star": false,
+      "atS": 1840.6,
       "cheapest": false
     }
   ],
@@ -191,19 +255,19 @@
     "clearedMalware": 0
   },
   "quests": {
-    "offered": 6,
-    "accepted": 6,
+    "offered": 7,
+    "accepted": 7,
     "declined": 0,
-    "completed": 1,
-    "failed": 4,
-    "firstCompletedS": 846,
+    "completed": 4,
+    "failed": 2,
+    "firstCompletedS": 480,
     "byTemplate": {
       "on_time_day": {
-        "offered": 2,
-        "accepted": 2,
+        "offered": 1,
+        "accepted": 1,
         "declined": 0,
-        "completed": 0,
-        "failed": 2
+        "completed": 1,
+        "failed": 0
       },
       "rush_district": {
         "offered": 1,
@@ -212,62 +276,62 @@
         "completed": 1,
         "failed": 0
       },
-      "cheer_up": {
-        "offered": 1,
-        "accepted": 1,
+      "big_haul": {
+        "offered": 2,
+        "accepted": 2,
         "declined": 0,
-        "completed": 0,
+        "completed": 1,
         "failed": 1
       },
-      "big_haul": {
+      "magic_parcel": {
         "offered": 1,
         "accepted": 1,
         "declined": 0,
-        "completed": 0,
-        "failed": 1
+        "completed": 1,
+        "failed": 0
       },
       "golden_release": {
-        "offered": 1,
-        "accepted": 1,
+        "offered": 2,
+        "accepted": 2,
         "declined": 0,
         "completed": 0,
-        "failed": 0
+        "failed": 1
       }
     }
   },
   "overseas": {
-    "handedOff": 11,
-    "cleared": 11,
+    "handedOff": 29,
+    "cleared": 28,
     "malwareAtClearance": 0
   },
   "taps": 7,
   "tapsPerMin": 3.9,
-  "rushTaps": 0,
+  "rushTaps": 1,
   "viewSwitches": 2,
-  "warehouseS": 59,
+  "warehouseS": 59.3,
   "fps": {
-    "p50": 60,
+    "p50": 61,
     "p5": 59,
     "min": 55,
     "samples": 107
   },
-  "holdBayEvents": 63,
-  "holdBayEventsPer10Min": 18,
+  "holdBayEvents": 98,
+  "holdBayEventsPer10Min": 28,
   "stalls": {
     "count": 0,
     "totalS": 0
   },
   "payroll": {
     "paid": 35,
-    "short": 2,
+    "short": 1,
     "walkouts": 0
   },
   "satisfactionEnd": {
-    "highres": 32,
-    "downtown": 11,
-    "industrial": 4,
-    "lowres": 58,
-    "rural": 30,
-    "civic": 58
+    "highres": 5,
+    "downtown": 12,
+    "industrial": 1,
+    "lowres": 14,
+    "rural": 3,
+    "civic": 40
   }
 }

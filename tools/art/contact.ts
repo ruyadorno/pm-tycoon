@@ -43,8 +43,10 @@
 //     at level 4 / 5, every district's buildings and props in it).
 //   art/contact/events@4x.png             M12 / G7 (build 3): `node
 //     tools/art/contact.ts events` — the 13 category pictures as shipped,
-//     EventCard mocks, the victory art on a VictoryCard mock with the
-//     confetti, ic_event, the procedural fallbacks (eventsSheet).
+//     in situ (M13: the real EventCards cropped at 1x from
+//     shots/event-card-<category>.png + .card.json when `vlr shots` has
+//     run, else EventCard mocks), the victory art on a VictoryCard mock
+//     with the confetti, ic_event, the procedural fallbacks (eventsSheet).
 //   art/contact/docks@4x.png is the gallery's docks category (gallery.ts):
 //     since M8 it opens with the port on the map in colour (live at L3);
 //     since M9 with dk_ship faint along its departure (portScene).
@@ -2643,6 +2645,76 @@ function victoryMock(m: Manifest, frame: number): Canvas {
   return cv
 }
 
+/** shots/ (gitignored): `vlr shots` writes the real screens there */
+const SHOTS = join(ROOT, 'shots')
+
+/**
+ * The real EventCard of shots/<name>.png at 1x (M13, plan-build3 §8.4 task
+ * 5), or null when the shot or its `<name>.card.json` (the card's logical
+ * rect, e2e/shots.spec.ts saveCardRect) is missing: the shot is taken at
+ * device scale (3 on the iPhone 16) and every logical pixel is a flat
+ * s x s block, so the block centres give the 1x card exactly. The rect is
+ * the card to its 1-px outline (nothing is drawn outside it), so the crop
+ * takes no city around it.
+ */
+function shotCard(
+  name: string,
+): { cv: Canvas; eventId: string; title: string } | null {
+  const png = join(SHOTS, `${name}.png`)
+  const meta = join(SHOTS, `${name}.card.json`)
+  if (!existsSync(png) || !existsSync(meta)) return null
+  const card = JSON.parse(readFileSync(meta, 'utf8')) as {
+    eventId: string
+    title: string
+    W: number
+    H: number
+    rect: { x: number; y: number; w: number; h: number }
+  }
+  const { rgba, w, h } = decodePng(readFileSync(png))
+  const s = w / card.W
+  if (!Number.isInteger(s) || h !== card.H * s) {
+    console.warn(
+      `contact: ${name}.png is ${w}x${h}, not ${card.W}x${card.H} at an integer scale — skipped`,
+    )
+    return null
+  }
+  const x0 = Math.max(0, card.rect.x)
+  const y0 = Math.max(0, card.rect.y)
+  const x1 = Math.min(card.W, card.rect.x + card.rect.w)
+  const y1 = Math.min(card.H, card.rect.y + card.rect.h)
+  const cv = createCanvas(x1 - x0, y1 - y0)
+  const ctx = cv.getContext('2d')
+  const out = ctx.createImageData(cv.width, cv.height)
+  const c = Math.floor(s / 2)
+  for (let y = 0; y < cv.height; y++)
+    for (let x = 0; x < cv.width; x++) {
+      const k = ((x0 + x) * s + c + ((y0 + y) * s + c) * w) * 4
+      const o = (x + y * cv.width) * 4
+      out.data[o] = rgba[k] as number
+      out.data[o + 1] = rgba[k + 1] as number
+      out.data[o + 2] = rgba[k + 2] as number
+      out.data[o + 3] = 255
+    }
+  // The panel's rounded corners: the three pixels outside the outline at
+  // each corner are the city — cleared, so the sheet's ground shows.
+  const cw = cv.width - 1
+  const ch = cv.height - 1
+  for (const [cx, cy, dx, dy] of [
+    [0, 0, 1, 1],
+    [cw, 0, -1, 1],
+    [0, ch, 1, -1],
+    [cw, ch, -1, -1],
+  ] as const)
+    for (const [i, j] of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+    ] as const)
+      out.data[(cx + i * dx + (cy + j * dy) * cv.width) * 4 + 3] = 0
+  ctx.putImageData(out, 0, 0)
+  return { cv, eventId: card.eventId, title: card.title }
+}
+
 export async function eventsSheet(m: Manifest): Promise<string> {
   const { EVENT_PIC_IDS, eventPic, victoryPlate } =
     await import('./eventPics.ts')
@@ -2662,15 +2734,36 @@ export async function eventsSheet(m: Manifest): Promise<string> {
     const tag = !e || e.placeholder ? 'proc' : `PL #${e.chosenCandidate ?? '?'}`
     return { cv, label: `${shortPic(id)} ${tag}` }
   })
-  const inSitu: Block[] = [
-    'ev_pic_underworld',
-    'ev_pic_staff',
-    'ev_pic_money',
-    'ev_pic_job',
-  ].map((id) => ({
-    cv: eventCardMock(m, fin(m, id)),
-    label: `EventCard mock — ${shortPic(id)}`,
+  // In situ: the real cards of `vlr shots` (event-card-<category>, and
+  // event-card-job for the job board) when any exist, else the 1x mocks.
+  const real = EVENT_PIC_IDS.map((id) => ({
+    cat: shortPic(id),
+    card: shotCard(`event-card-${shortPic(id)}`),
   }))
+  const shotBlocks: Block[] = real.flatMap(({ cat, card }) =>
+    card
+      ? [{ cv: card.cv, label: `${cat} — ${card.title} (${card.eventId})` }]
+      : [],
+  )
+  const noShot = real.filter((r) => r.card === null).map((r) => r.cat)
+  const inSitu: Block[] =
+    shotBlocks.length > 0
+      ? shotBlocks
+      : ['ev_pic_underworld', 'ev_pic_staff', 'ev_pic_money', 'ev_pic_job'].map(
+          (id) => ({
+            cv: eventCardMock(m, fin(m, id)),
+            label: `EventCard mock — ${shortPic(id)}`,
+          }),
+        )
+  const inSituTitle =
+    shotBlocks.length > 0
+      ? 'in situ: the real EventCard, cropped at 1x from shots/event-card-' +
+        '<category>.png (vlr shots, iPhone 16 393x659, l3-docks.json; the ' +
+        'job board from event-card-job.png)' +
+        (noShot.length > 0 ? ` — no shot yet: ${noShot.join(', ')}` : '')
+      : 'in situ: EventCard mocks at 1x (344 px = the card at 360; greeked ' +
+        'text, masthead with ic_event, effects line gain / danger) — run ' +
+        '`vlr shots` for the real cards'
   const fallbacks: Block[] = EVENT_PIC_IDS.map((id) => {
     const cv = panel(56, 56)
     cv.getContext('2d').drawImage(gridCanvas(eventPic(id)), 4, 4)
@@ -2702,12 +2795,7 @@ export async function eventsSheet(m: Manifest): Promise<string> {
         'they ship',
       blocks: shipped,
     },
-    {
-      title:
-        'in situ: EventCard mocks at 1x (344 px = the card at 360; greeked ' +
-        'text, masthead with ic_event, effects line gain / danger)',
-      blocks: inSitu,
-    },
+    { title: inSituTitle, blocks: inSitu },
     {
       title: `victory_art (ui 208x104, ${provenance(va)}) on a VictoryCard mock, the confetti burst over its top edge (f2, f4)`,
       blocks: [

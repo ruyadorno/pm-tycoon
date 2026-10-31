@@ -1277,3 +1277,26 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
   same bytes — `tools/art/webicons.ts`.
 - **No runtime dependency**: the step runs on sharp, already a dev dependency of the art pipeline; nothing new ships in
   the game's JS — `package.json`.
+
+## After M15 — the sponsor link (author request, 2026-10-31)
+
+- **`Sponsored by vlt technology`, a link to https://vlt.io**, at the bottom of the Title and in its Credits card —
+  one component, `src/ui/SponsorLink.ts` (`addSponsorLink`). The name `vlt technology` is the link: an accent tint
+  over a 1-px underline one clear row below m5x7's descenders; the line drops 1 px while pressed, a tap emits `ui:tap`
+  (the tap sfx) like a Button. On the Title it is centred one line + 2 px above the footer line (build stamp / debug
+  seed), light text with the drop shadow and a gold name on either backdrop (default — confirm; the footer's muted
+  grey would not read as a link over the moving city); at 360×604 with Continue its 44-px hit box still clears the
+  button column. In the Credits card it is the third line, under the title with an empty line on each side (its hit
+  box spans them, so the title line and the music lines keep closing the card), dark text with a `blue0` name; a tap
+  on it opens the site and leaves the card up. The card is two lines taller (16 lines, 240 px) —
+  `src/scenes/TitleScene.ts`.
+- **window.open in the tap's pointerup**: `window.open(url, '_blank', 'noopener')` (no handle back to the game; the
+  referrer is kept so the sponsor sees where visits come from). Phaser's InputManager dispatches DOM input
+  synchronously, so the call lands inside a user activation: on touch screens touchend is activation-triggering, and a
+  mouse click's mouseup still holds the activation its mousedown granted (about 5 s in Chromium), so pop-up blockers
+  allow it; never on pointerdown (iOS: touchstart is not activation-triggering). A tap is Button's: down and up on the
+  hit zone, at most `TAP_PX` of travel. The Title's link is inert while a Dialog or the Credits card is up or a game is
+  starting (the card's catcher takes the tap first anyway). `e2e/smoke.spec.ts` (M5 attract title) stubs
+  `window.open` and checks both links, the placement and that the Credits catcher swallows a tap on the footer link;
+  `docs/phone-checklist.md` has the real-device line (Safari's pop-up blocker).
+- **Not a new runtime dependency, not new art**: m5x7 text and two 1-px rectangles; CREDITS.md gains a Sponsor line.

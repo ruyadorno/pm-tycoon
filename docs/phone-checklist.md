@@ -36,6 +36,9 @@ Open `http://<mac-lan-ip>:4173/` (portrait).
 - [ ] New game (or Continue) fades into the player's own city within about half a second and the HUD appears; the demo
       city never leaks into the save (Continue later shows your day and money, not the demo's).
 - [ ] The Title feels smooth (no visible stutter while the city drifts); the build stamp is readable.
+- [ ] `Sponsored by vlt technology` reads clearly above the build stamp; a tap on it opens https://vlt.io in a new tab
+      (no pop-up-blocked notice), and so does the same line in the Credits card, which stays open
+      (`src/ui/SponsorLink.ts`).
 
 **Page and gestures** (`index.html` CSS, `src/input/GestureClassifier.ts`)
 

@@ -912,6 +912,69 @@ function creditsOpen(page: Page): Promise<boolean> {
   })
 }
 
+/** Record window.open calls instead of opening tabs (the sponsor link). */
+function stubWindowOpen(page: Page): Promise<void> {
+  return page.evaluate(() => {
+    const w = window as unknown as { pmOpened: unknown[][] }
+    w.pmOpened = []
+    window.open = (...args: unknown[]): null => {
+      w.pmOpened.push(args)
+      return null
+    }
+  })
+}
+
+function openedUrls(page: Page): Promise<unknown[][]> {
+  return page.evaluate(
+    () => (window as unknown as { pmOpened: unknown[][] }).pmOpened,
+  )
+}
+
+interface SponsorProbe {
+  W: number
+  H: number
+  zoom: number
+  safeBottom: number
+  /** The link's container top-left (its BitmapText tops). */
+  x: number
+  y: number
+  texts: string[]
+}
+
+/** The Title's sponsor link (After M15): its container and BitmapTexts. */
+function probeSponsor(page: Page): Promise<SponsorProbe | null> {
+  return page.evaluate((): SponsorProbe | null => {
+    type Obj = {
+      x: number
+      y: number
+      text?: string
+      visible: boolean
+      list?: Obj[]
+      getData?(k: string): unknown
+    }
+    const api = window.__pm!
+    const title = api.game.scene.getScene('Title') as unknown as {
+      children: { list: Obj[] }
+    }
+    const root = title.children.list.find((o) =>
+      o.list?.some((c) => c.getData?.('id') === 'title:sponsor'),
+    )
+    if (!root?.list || !root.visible) return null
+    return {
+      W: api.game.scale.width,
+      H: api.game.scale.height,
+      zoom: api.game.scale.zoom,
+      safeBottom:
+        (api.game.registry.get('safeBottom') as number | undefined) ?? 0,
+      x: root.x,
+      y: root.y,
+      texts: root.list.flatMap((c) =>
+        typeof c.text === 'string' && c.visible ? [c.text] : [],
+      ),
+    }
+  })
+}
+
 test.describe('M5 attract title smoke', () => {
   test('the logo over a moving attract city, no HUD, modal Credits; New game swaps the sims and wakes the HUD', async ({
     page,
@@ -982,6 +1045,58 @@ test.describe('M5 attract title smoke', () => {
     await page.keyboard.press('Escape')
     await expect.poll(() => creditsOpen(page)).toBe(false)
     expect(await titleDialogOpen(page)).toBe(false)
+
+    // The sponsor link (After M15): centred one line above the footer, under
+    // the buttons; a tap opens https://vlt.io in a new tab (window.open is
+    // stubbed: no tab, no network). Under the Credits card its catcher takes
+    // the tap; the card's own link opens the site and leaves the card up.
+    const sp = await probeSponsor(page)
+    console.log(`smoke: sponsor link ${JSON.stringify(sp)}`)
+    expect(sp, 'the sponsor link on the Title').not.toBeNull()
+    expect(sp!.texts).toEqual(['Sponsored by', 'vlt technology'])
+    expect(sp!.y, 'one line + 2 px above the footer line').toBe(
+      sp!.H - sp!.safeBottom - 14 - 16,
+    )
+    const spHit = await sceneTarget(page, 'Title', 'title:sponsor')
+    expect(spHit, 'the sponsor link is tappable').not.toBeNull()
+    expect(Math.abs(spHit!.x + spHit!.w / 2 - sp!.W / 2)).toBeLessThanOrEqual(1)
+    expect(spHit!.h).toBeGreaterThanOrEqual(Math.ceil(44 / sp!.zoom))
+    expect(spHit!.x).toBeGreaterThanOrEqual(0)
+    expect(spHit!.x + spHit!.w).toBeLessThanOrEqual(sp!.W)
+    const lastBtn = await sceneTarget(page, 'Title', 'title:credits')
+    expect(
+      spHit!.y,
+      'the link’s hit box clears the button column',
+    ).toBeGreaterThanOrEqual(lastBtn!.y + lastBtn!.h)
+    await stubWindowOpen(page)
+    await tapTarget(page, pm, 'Title', 'title:sponsor')
+    await expect
+      .poll(() => openedUrls(page))
+      .toEqual([['https://vlt.io', '_blank', 'noopener']])
+    await tapTarget(page, pm, 'Title', 'title:credits')
+    await expect.poll(() => creditsOpen(page)).toBe(true)
+    await tapTarget(page, pm, 'Title', 'title:sponsor')
+    await expect.poll(() => creditsOpen(page)).toBe(false)
+    expect(
+      await openedUrls(page),
+      'the Credits catcher took the tap',
+    ).toHaveLength(1)
+    await tapTarget(page, pm, 'Title', 'title:credits')
+    await expect.poll(() => creditsOpen(page)).toBe(true)
+    // The card's zone joins the input list on the next frame.
+    await expect
+      .poll(() => sceneTarget(page, 'Title', 'title:credits-sponsor'))
+      .not.toBeNull()
+    await tapTarget(page, pm, 'Title', 'title:credits-sponsor')
+    await expect.poll(() => openedUrls(page)).toHaveLength(2)
+    expect((await openedUrls(page))[1]).toEqual([
+      'https://vlt.io',
+      '_blank',
+      'noopener',
+    ])
+    expect(await creditsOpen(page), 'the card stays up').toBe(true)
+    await page.keyboard.press('Escape')
+    await expect.poll(() => creditsOpen(page)).toBe(false)
 
     // The attract city (L2) has Industrial live: colour frames, smoke on.
     const fogBefore = await probeFog(page)

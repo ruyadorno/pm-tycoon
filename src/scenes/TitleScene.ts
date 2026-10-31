@@ -43,8 +43,11 @@
 // pointerup / touchend are activation-triggering). Under the buttons a muted
 // "tuning up…" line stays until the first 'audio:ready' (piano + bass
 // decoded, or failed). Footer: the build stamp bottom-right (registry
-// 'buildStamp', pinned by __pm.stamp), the seed bottom-left in debug builds.
-// A phone in landscape gets the rotate card instead of the buttons.
+// 'buildStamp', pinned by __pm.stamp), the seed bottom-left in debug builds,
+// and centred one line above them the sponsor link `Sponsored by vlt
+// technology` (src/ui/SponsorLink.ts: opens https://vlt.io; author request,
+// docs/decisions.md "After M15"), which the Credits card repeats under its
+// title. A phone in landscape gets the rotate card instead of the buttons.
 import Phaser from 'phaser'
 import type { AudioDirector } from '../audio/director.ts'
 import {
@@ -83,8 +86,9 @@ import { buttonColumn, computeLayout, type Target } from '../ui/layout.ts'
 import { addPanel } from '../ui/Panel.ts'
 import { RotateCard, wantsRotateCard } from '../ui/RotateCard.ts'
 import { addText, hasFont, LINE_H, textTop } from '../ui/text.ts'
+import { addSponsorLink, SPONSOR_TEXT } from '../ui/SponsorLink.ts'
 import { Toast } from '../ui/Toast.ts'
-import { FONT_SIZE_BIG, THEME } from '../ui/theme.ts'
+import { FONT_SIZE_BIG, PALETTE, THEME } from '../ui/theme.ts'
 import { REG_AUDIO } from './BootScene.ts'
 import type { CityScene } from './CityScene.ts'
 
@@ -110,9 +114,13 @@ export const LOGO_ID = 'title:logo'
  * CC BY 3.0 attribution of the samples in full (author, pre-renderer, licence)
  * — then the audio code, the font, the logo (the author's art/logo.png) and
  * the engine. One screen, ≤ 36 chars a line (fits the 300-px card at W = 360).
+ * The sponsor line (SPONSOR_TEXT) is drawn as the sponsor link, with an empty
+ * line on each side for its hit zone.
  */
 export const CREDITS_LINES: readonly string[] = [
   'Package Management Tycoon',
+  '',
+  SPONSOR_TEXT,
   '',
   'Music: "Semver Swing" — original',
   'composition, MIT',
@@ -142,6 +150,11 @@ const SKYLINE = [
 
 /** The Credits card and its full-screen catcher over everything else. */
 const CREDITS_DEPTH = 100
+/** The sponsor link's text top above the footer line's (one line + 2 px). */
+export const SPONSOR_ABOVE_FOOT = LINE_H + 2
+/** Data 'id' of the sponsor link's hit zone: the Title's bottom, the Credits card. */
+export const SPONSOR_ID = 'title:sponsor'
+export const CREDITS_SPONSOR_ID = 'title:credits-sponsor'
 
 export class TitleScene extends Phaser.Scene {
   private unlocked = false
@@ -256,6 +269,18 @@ export class TitleScene extends Phaser.Scene {
           tint: footTint,
           shadow: this.attractOn,
         })
+      // Light with a shadow on either backdrop: it has to read as a link.
+      addSponsorLink(this, {
+        x: W / 2,
+        y: footY - SPONSOR_ABOVE_FOOT,
+        align: 'center',
+        tint: THEME.textLight,
+        linkTint: THEME.gold,
+        shadow: true,
+        id: SPONSOR_ID,
+        canOpen: () =>
+          !this.starting && !this.dialog?.isOpen() && !this.credits,
+      })
     }
 
     const toast = font ? new Toast(this, { lane: L.toast }) : null
@@ -644,11 +669,21 @@ export class TitleScene extends Phaser.Scene {
     catcher.on(Phaser.Input.Events.POINTER_UP, () => this.closeCredits())
     catcher.setData('id', 'title:credits-catcher')
     const panel = addPanel(this, 0, 0, w, h, 'ui_panel')
-    const txt = addText(this, 8, 5, CREDITS_LINES.join('\n'), {
+    const lines = CREDITS_LINES.map((l) => (l === SPONSOR_TEXT ? '' : l))
+    const txt = addText(this, 8, 5, lines.join('\n'), {
       tint: THEME.textDark,
     })
+    // Above the panel: a tap on the link opens it and leaves the card up.
+    const sponsor = addSponsorLink(this, {
+      x: 8,
+      y: 5 + CREDITS_LINES.indexOf(SPONSOR_TEXT) * LINE_H,
+      tint: THEME.textDark,
+      linkTint: PALETTE.blue0,
+      id: CREDITS_SPONSOR_ID,
+      canOpen: () => !this.starting,
+    })
     this.credits = this.add
-      .container(x, y, [panel, txt])
+      .container(x, y, [panel, txt, sponsor])
       .setDepth(CREDITS_DEPTH + 1)
     this.credits.setData('id', 'title:credits')
     panel.setInteractive()

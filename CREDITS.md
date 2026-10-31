@@ -1,8 +1,13 @@
 # Credits
 
 Package Management Tycoon is original work released under the MIT licence (`LICENSE`). Nothing from Transport
-Tycoon or OpenTTD is used; their look is a reference only. The Title screen's Credits card summarises the font and
-music lines below.
+Tycoon or OpenTTD is used; their look is a reference only. The Title screen's Credits card summarises the sponsor,
+font and music lines below.
+
+## Sponsor
+
+- Package Management Tycoon is **sponsored by vlt technology** (https://vlt.io). The Title shows `Sponsored by vlt
+  technology` at its bottom and under the Credits card's title; a tap on either opens https://vlt.io in a new tab.
 
 ## Font
 

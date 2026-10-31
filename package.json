@@ -41,6 +41,8 @@
     "art:reject": "node --env-file-if-exists=.env tools/art/build.ts reject",
     "art:balance": "node --env-file-if-exists=.env tools/art/build.ts balance",
     "art:logo": "node tools/art/logo.ts",
+    "art:webicons": "node tools/art/webicons.ts",
+    "webicons:capture": "node tools/e2e-available.mjs && vite build && PM_WEBICONS=1 playwright test e2e/webicons.spec.ts --project=iphone16 && node tools/art/webicons.ts",
     "art:build": "node --env-file-if-exists=.env tools/art/build.ts all",
     "check": "node tools/check.mjs",
     "check:quick": "node tools/check.mjs --quick",

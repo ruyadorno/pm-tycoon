@@ -17,6 +17,9 @@ music lines below.
   in 84334f7). It is used as-is (plan-build2 Q-B2-1): `tools/art/logo.ts` (`vlr art:logo`) Lanczos-downscales it to
   352×176 into `src/assets/logo.png`, drawn 1:1 on the Title; it is brand art outside the palette contract and outside
   both atlases (manifest row `logo`, `source: "author"`).
+- The **favicon and home-screen icons** (`public/favicon.ico`, `public/icons/`) are renders of the game's own city art —
+  the PixelLab-generated L5 HQ (`wh_ext_t5`) and the procedural and PixelLab tiles and buildings around it (see Art
+  below) — captured from the game into `art/webicon-src.png` and cut by `tools/art/webicons.ts`; no new art.
 
 ## Art
 

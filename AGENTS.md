@@ -62,7 +62,9 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
   workers, the desk, the m5x7 glyph sheet) are packed into both. Placement = manifest `atlas` ('world' | 'interior' | 'both')
   ?? the class default in `tools/art/atlas.ts`; frames.generated.ts carries FRAME_ATLAS / SHARED_FRAMES. Every asset URL
   (atlases, m5x7.xml, `src/assets/logo.png` — brand art outside both atlases and the palette lint — and attract.json) is
-  content-hashed by Vite through `src/render/assetUrls.ts` (the only `?url` module); nothing ships from `public/assets/`.
+  content-hashed by Vite through `src/render/assetUrls.ts` (the only `?url` module); nothing ships from `public/assets/`;
+  the web icons (`public/favicon.ico`, `public/icons/`, `public/manifest.webmanifest` — `tools/art/webicons.ts`, linked
+  by index.html) ship unhashed from `public/`, like `configs/` and `audio/sf/`.
   BitmapText only (Text only in the debug overlay);
   integer camera zoom {1, 2}; no setScale/rotation/filters/flipX on world art; `scene.sleep/run` for view switches (never
   `start`); sim events are subscribed on WAKE/create and removed on SLEEP/SHUTDOWN, with `syncAll()` on wake.
@@ -71,6 +73,8 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 
 - `vlr art:build` is the offline loop (draw → gen-if-token → normalize → quantize → outline → variants → lint → atlas → gallery)
   and is idempotent (seeded procedural art, hashed finals).
+- `vlr art:webicons` re-cuts the web icons from the committed `art/webicon-src.png`; `vlr webicons:capture` re-shoots that
+  render (Chromium).
 - `vlr art:gen` needs PIXELLAB_TOKEN in the gitignored .env (already there; never paste it into chat, a commit or a log);
   without it the procedural placeholders stay and the script exits 0. One agent at a time calls PixelLab; `vlr art:balance`
   first. Build-3 budget 400 generations with a 100 reserve (B3 §5, Q-B3-9); the author approves or rejects ids after the run
@@ -101,8 +105,9 @@ Phaser 4 recipes: `plans/pm-tycoon/phaser4-notes.md` and the linked skills under
 
 - Levels 1–5, people, quests as job cards, **events** (decision cards that pause the sim and never expire, chains,
   routers, flags, the modifier registry); the fixed lane only — no belts of any kind, no management scene, no train,
-  no splitters/traffic/day-night/bankruptcy, no PWA/service worker, no save migrations (v5 saves are discarded), no
-  ready-made art packs, no chance rolls in events (Q-B3-10), no timed cards or `Later` on event cards (Q-B3-2), no new
-  quest templates or goal kinds, no art beyond the 13 category pictures, `ic_event`, `victory_art` and `fx_confetti`
-  (B3 §5). Pages deploy only through the `pages.yml` workflow dispatch at M15; GitHub mechanics beyond that and
-  `git push origin main` stay out. The sorter is Toss-only (it never Clears).
+  no splitters/traffic/day-night/bankruptcy, no PWA/service worker (the web app manifest only adds the home-screen
+  icons and a standalone, portrait launch), no save migrations (v5 saves are discarded), no ready-made art packs, no
+  chance rolls in events (Q-B3-10), no timed cards or `Later` on event cards (Q-B3-2), no new quest templates or goal
+  kinds, no art beyond the 13 category pictures, `ic_event`, `victory_art` and `fx_confetti` (B3 §5). Pages deploy only
+  through the `pages.yml` workflow dispatch at M15; GitHub mechanics beyond that and `git push origin main` stay out.
+  The sorter is Toss-only (it never Clears).

@@ -12,7 +12,11 @@
 //     those bytes); no unhashed assets/world.png / world.json / m5x7.xml (the playtest-1 public/assets/
 //     copies) in dist/, and no public/assets/ in the repo;
 //   - configs/spicy.json and configs/tycoon.json (valid JSON, identical to public/configs/), every vendored sample of
-//     public/audio/sf/ (same bytes count) + LICENSE.txt, and playtest-README.txt are present.
+//     public/audio/sf/ (same bytes count) + LICENSE.txt, and playtest-README.txt are present;
+//   - the web icons (tools/art/webicons.ts; unhashed from public/, index.html links them): favicon.ico (an ICONDIR,
+//     identical to public/), every file of public/icons/ byte-identical in dist/icons/, apple-touch-icon.png 180²,
+//     manifest.webmanifest identical to public/ and JSON with every icons[] src a dist PNG of its `sizes`, and
+//     index.html linking ./favicon.ico (rel=icon), ./icons/apple-touch-icon.png and ./manifest.webmanifest, each present.
 // Lists the biggest files, the JS chunks with gzip estimates against the §6.11 targets, the samples, and any
 // dev-only files that slipped into dist/ (public/gallery/ is gitignored but copied when it exists locally).
 // Sourcemaps stay in the build (sourcemap: true): browsers fetch them only with devtools open, so the budget
@@ -41,7 +45,7 @@ const TARGETS = {
   phaserGz: 300_000,
   samplesMax: 3_000_000,
 }
-const TEXT_EXT = /\.(js|mjs|json|html|xml|txt|css|svg|map)$/i
+const TEXT_EXT = /\.(js|mjs|json|webmanifest|html|xml|txt|css|svg|map)$/i
 const DEV_ONLY = (p) => p === 'gallery.html' || p.startsWith('gallery/')
 
 const args = process.argv.slice(2)
@@ -246,6 +250,120 @@ if (samplesBytes > TARGETS.samplesMax) {
   )
 }
 
+// The web icons (tools/art/webicons.ts, `vlr art:webicons`): public/ ships them unhashed — index.html links
+// them and Vite does not rewrite the icon URLs inside a manifest. Icons only: no service worker, not a PWA.
+/** index.html <link rel> -> the page-relative href it must carry. */
+const ICON_LINKS = [
+  ['icon', './favicon.ico'],
+  ['apple-touch-icon', './icons/apple-touch-icon.png'],
+  ['manifest', './manifest.webmanifest'],
+]
+const APPLE_TOUCH_SIDE = 180
+const ICONDIR = Buffer.from([0, 0, 1, 0])
+/** Identical bytes in dist/ and public/ (true when public/ has no such file). */
+const sameAsPublic = (rel) => {
+  const src = join(ROOT, 'public', rel)
+  return (
+    !existsSync(src) || readFileSync(src).equals(readFileSync(join(dist, rel)))
+  )
+}
+const iconFiles = transfer.filter(
+  (f) =>
+    f.path === 'favicon.ico' ||
+    f.path === 'manifest.webmanifest' ||
+    f.path.startsWith('icons/'),
+)
+let icoEntries = 0
+if (!existsSync(join(dist, 'favicon.ico'))) fail('favicon.ico missing')
+else {
+  const ico = readFileSync(join(dist, 'favicon.ico'))
+  if (ico.length < 6 || !ico.subarray(0, 4).equals(ICONDIR)) {
+    fail('favicon.ico is not an ICO (no 00 00 01 00 ICONDIR)')
+  } else icoEntries = ico.readUInt16LE(4)
+  if (!sameAsPublic('favicon.ico'))
+    fail('favicon.ico differs from public/favicon.ico')
+}
+const iconsSrc = join(ROOT, 'public/icons')
+if (!existsSync(join(dist, 'icons'))) fail('icons/ missing')
+else if (existsSync(iconsSrc)) {
+  for (const f of walk(iconsSrc)) {
+    const rel = `icons/${relative(iconsSrc, f.abs).split(sep).join('/')}`
+    if (!existsSync(join(dist, rel))) fail(`${rel} missing`)
+    else if (!sameAsPublic(rel)) fail(`${rel} differs from public/${rel}`)
+  }
+}
+const touchIcon = join(dist, 'icons/apple-touch-icon.png')
+const touchSize = existsSync(touchIcon) ? pngSize(touchIcon) : null
+if (!existsSync(touchIcon)) fail('icons/apple-touch-icon.png missing')
+else if (!touchSize) fail('icons/apple-touch-icon.png is not a PNG')
+else if (touchSize.w !== APPLE_TOUCH_SIDE || touchSize.h !== APPLE_TOUCH_SIDE) {
+  fail(
+    `icons/apple-touch-icon.png is ${touchSize.w}×${touchSize.h}, not ${APPLE_TOUCH_SIDE}²`,
+  )
+}
+/** The manifest's icons as resolved in dist/. */
+const manifestIcons = []
+const manifestPath = join(dist, 'manifest.webmanifest')
+if (!existsSync(manifestPath)) fail('manifest.webmanifest missing')
+else {
+  if (!sameAsPublic('manifest.webmanifest')) {
+    fail('manifest.webmanifest differs from public/manifest.webmanifest')
+  }
+  let manifest = null
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch (err) {
+    fail(`manifest.webmanifest is not JSON: ${err.message}`)
+  }
+  const list = Array.isArray(manifest?.icons) ? manifest.icons : []
+  if (manifest && list.length === 0) fail('manifest.webmanifest has no icons[]')
+  for (const icon of list) {
+    // src resolves against the manifest's URL (the dist root): relative only, inside dist/.
+    const src = String(icon?.src ?? '')
+    const abs = resolve(dist, src)
+    if (!src || /^(?:[a-z][\w+.-]*:|\/)/i.test(src)) {
+      fail(
+        `manifest icon "${src}" is not a relative URL (breaks under /pm-tycoon/)`,
+      )
+      continue
+    }
+    if (!abs.startsWith(dist + sep) || !existsSync(abs)) {
+      fail(`manifest icon ${src} missing in dist/`)
+      continue
+    }
+    const size = pngSize(abs)
+    if (!size) fail(`manifest icon ${src} is not a PNG`)
+    else if (icon.sizes !== `${size.w}x${size.h}`) {
+      fail(
+        `manifest icon ${src} is ${size.w}×${size.h}, its sizes say "${icon.sizes}"`,
+      )
+    }
+    manifestIcons.push({
+      src,
+      sizes: icon.sizes ?? null,
+      purpose: icon.purpose ?? 'any',
+    })
+  }
+}
+const links = [...html.matchAll(/<link\b[^>]*>/gi)].map((m) => ({
+  rel: /(?:^|\s)rel="([^"]*)"/i.exec(m[0])?.[1] ?? '',
+  href: /(?:^|\s)href="([^"]*)"/i.exec(m[0])?.[1] ?? '',
+}))
+for (const [rel, href] of ICON_LINKS) {
+  const hits = links.filter((l) => l.rel.split(/\s+/).includes(rel))
+  if (hits.length === 0) fail(`index.html: no <link rel="${rel}">`)
+  else if (!hits.some((l) => l.href === href)) {
+    fail(
+      `index.html: rel="${rel}" links ${hits.map((l) => l.href).join(', ')}, not ${href}`,
+    )
+  }
+  for (const l of hits) {
+    if (l.href.startsWith('./') && !existsSync(join(dist, l.href))) {
+      fail(`index.html: rel="${rel}" ${l.href} is not in dist/`)
+    }
+  }
+}
+
 if (!existsSync(join(dist, 'playtest-README.txt'))) {
   fail('playtest-README.txt missing (public/playtest-README.txt)')
 }
@@ -291,6 +409,13 @@ const report = {
     mp3: mp3s.length,
     presets: presets.length,
     bytes: samplesBytes,
+  },
+  icons: {
+    files: iconFiles.length,
+    bytes: sum(iconFiles, 'size'),
+    icoEntries,
+    appleTouch: touchSize,
+    manifest: manifestIcons,
   },
   biggest: biggest.map((f) => ({ path: f.path, bytes: f.size, gz: f.gz })),
   warnings,
@@ -340,6 +465,11 @@ if (json) {
       CONFIGS.map(
         (n) => `${n} ${configPresent[n] ? 'present' : 'MISSING'}`,
       ).join(' · '),
+  )
+  console.log(
+    `  icons      ${iconFiles.length} files ${kb(report.icons.bytes)} · favicon.ico ${icoEntries} sizes · ` +
+      `apple-touch-icon ${touchSize ? `${touchSize.w}×${touchSize.h}` : 'MISSING'} · manifest ${manifestIcons.length} icons ` +
+      `(${manifestIcons.map((i) => `${i.sizes} ${i.purpose}`).join(', ')})`,
   )
   console.log('  biggest files (transfer set)')
   for (const f of biggest) {

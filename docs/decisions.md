@@ -1242,3 +1242,38 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
 - **Docs**: the phone checklist's app-switch line and the summary-card fit line (mobile-2).
 - Refuted (recorded in docs/report-playtest3.md §6): outcome cards that repeat their title in the body, the
   influencer's hidden condition, the aftermath's repeat, star names shared with the people pool.
+
+## After M15 — browser and home-screen icons (author request, 2026-10-31)
+
+- **Icons from the real city**, not new art: the favicon and the iOS / Android home-screen icons are square close-ups
+  of one committed render, `art/webicon-src.png` (512×512, 1 art px = 1 px, read back from the renderer so the DPR
+  never matters): the L5 HQ (`wh_ext_t5`) with the city around it, from the `tycoon` session config at tick 0 (no
+  fixture to go stale), overlays and the days-without-incident sign hidden (text has no place in an icon).
+  `vlr webicons:capture` re-shoots it (`e2e/webicons.spec.ts` with `PM_WEBICONS=1`, Chromium) and re-cuts;
+  `vlr art:webicons` only cuts, and runs as an `art:build` step after `logo`. Framing, chosen by a three-lens judge
+  panel: the favicons 16 / 32 / 48 px from 96 / 128 / 192 art-px crops moved 60 / 44 / 24 px up the tower, towards the
+  neon parcel sign (a whole block is mush at 16 px); the apple-touch icon and the manifest's `any` icons from a 320
+  crop; the `maskable` icons from a 448 crop, so a launcher's circle (about the central two thirds) lands on about the
+  same framing. Each crop goes nearest-neighbour up to a whole multiple, then Lanczos-3 down to its size. The render is
+  brand art outside the palette lint and both atlases, like the logo (B2 §5), and the icons are derived renders of
+  shipped art, not new sprites, so B3 §5's art scope holds — `tools/art/webicons.ts`, `e2e/webicons.spec.ts`,
+  `tools/art/build.ts`, `package.json`.
+- **A web app manifest, not a PWA.** The author's request for iOS / Android icons supersedes plan.md §12.11's "app
+  icons beyond a favicon"; the rest of that line (PWA, service worker, offline caching) still holds. The generated
+  `public/manifest.webmanifest`: `name` "Package Management Tycoon", `short_name` "PM Tycoon" (default — confirm; also
+  index.html's `apple-mobile-web-app-title`), `start_url` / `scope` `./` (works under `/pm-tycoon/`),
+  `display: standalone` (index.html already sets the `apple-mobile-web-app-capable` / `mobile-web-app-capable` metas),
+  `orientation: portrait`, `background_color` / `theme_color` #2f9bd6 (the Title sky, index.html's theme-color). No
+  service worker, no CacheStorage, no install prompt of the game's own: `e2e/dist.spec.ts` still asserts
+  `{ caches: 0, sw: false }`. The files live in `public/` and ship unhashed (index.html links them; Vite rewrites the
+  root paths to `./…`) because Vite does not rewrite the icon URLs inside a manifest, the game never loads them, and a
+  stale icon is harmless. The inline SVG `data:` favicon is gone — `index.html`, `public/favicon.ico`, `public/icons/`,
+  `public/manifest.webmanifest`.
+- **Palette PNGs and a hand-written ICO writer**: the home-screen PNGs are opaque 256-colour palette PNGs (libimagequant
+  at quality 100) — about 390 KB for the whole set instead of about 1.2 MB in full colour, PSNR 37–40 dB against the
+  full-colour cut; the step fails over 480 KB (`WEBICON_MAX_BYTES`). sharp writes no .ico, so `encodeIco()` writes the
+  PNG-in-ICO container (Vista+) with opaque 32-bit RGBA entries, what the Windows icon loader expects. Every icon is
+  opaque (iOS shows a transparent icon on black); fixed PNG settings and no metadata, so the same source yields the
+  same bytes — `tools/art/webicons.ts`.
+- **No runtime dependency**: the step runs on sharp, already a dev dependency of the art pipeline; nothing new ships in
+  the game's JS — `package.json`.

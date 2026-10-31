@@ -34,6 +34,14 @@
 //   6. Build 3 M12 (plan-build3 §8.3 acceptance, contract §9.3): City + HUD
 //      + an open EventCard (the gold crate, three options) ≤ 8 draw
 //      calls; the EffectsCard (Rain's timed modifier) ≤ 8.
+//   7. The web icons (tools/art/webicons.ts, shipped unhashed from public/):
+//      on `/`, every <link rel~="icon">, rel="apple-touch-icon" and
+//      rel="manifest" href is page-relative ('./…') and answered 200 with its
+//      content type (PNG, ICO, manifest JSON); Chromium parses the manifest
+//      without an error (CDP Page.getAppManifest), each of its icons is a PNG
+//      of its `sizes`, and every icon src, start_url and scope stays under
+//      /pm-tycoon/ when the manifest is served there (Pages); no service
+//      worker is registered (icons only, not a PWA); no console error.
 import { readFileSync } from 'node:fs'
 import type { CDPSession, Page } from '@playwright/test'
 import sharp from 'sharp'
@@ -83,6 +91,16 @@ function hashedRe(asset: string): RegExp {
   return new RegExp(`/assets/${stem}-[\\w-]{6,}\\${asset.slice(dot)}$`)
 }
 const SPICY_PATH = 'public/configs/spicy.json'
+/** The <link>s the web icons ride on (index.html, tools/art/webicons.ts). */
+const ICON_LINK_SELECTOR =
+  'link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="manifest"]'
+const PNG_TYPE = /^image\/png\b/
+/** Content-type family by file extension (vite preview: sirv + Vite's mimes). */
+const ICON_CONTENT_TYPES: Record<string, RegExp> = {
+  png: PNG_TYPE,
+  ico: /^image\/(?:x-icon|vnd\.microsoft\.icon)\b/,
+  webmanifest: /^application\/(?:manifest\+)?json\b/,
+}
 /** Share of identical pixels for "the New game button is on screen". */
 const SAME_PIXELS_MIN = 0.97
 
@@ -646,6 +664,117 @@ test.describe('dist build (vite preview of dist/)', () => {
     expect(effects, 'City + HUD + EffectsCard draw calls').toBeLessThanOrEqual(
       EVENT_DRAW_CALLS,
     )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('web icons: favicon, apple-touch-icon and manifest links are page-relative and served; the manifest parses and its icons resolve; no service worker', async ({
+    page,
+    consoleErrors,
+  }) => {
+    // The page as a player opens it (no ?debug): once Preload asks for the
+    // world atlas, Boot has run on the production bundle.
+    const atlas = page.waitForResponse((r) =>
+      hashedRe('world.png').test(new URL(r.url()).pathname),
+    )
+    await page.goto('/')
+    expect((await atlas).status()).toBe(200)
+    const pageDir = new URL('./', page.url()).href
+
+    type Served = { rel: string; href: string; type: string; bytes: number }
+    const links: (Served & { url: string })[] = []
+    for (const el of await page.locator(ICON_LINK_SELECTOR).all()) {
+      const rel = (await el.getAttribute('rel')) ?? ''
+      const href = (await el.getAttribute('href')) ?? ''
+      expect(href, `<link rel="${rel}"> is page-relative`).toMatch(/^\.\/[^/]/)
+      const url = new URL(href, page.url()).href
+      const res = await page.request.get(url)
+      expect(res.status(), url).toBe(200)
+      const type = res.headers()['content-type'] ?? ''
+      const want = ICON_CONTENT_TYPES[url.slice(url.lastIndexOf('.') + 1)]
+      expect(want, `a known icon file type: ${url}`).toBeDefined()
+      expect(type, url).toMatch(want!)
+      const body = await res.body()
+      if (url.endsWith('.ico')) {
+        expect(body.subarray(0, 4).toString('hex'), `${url} ICONDIR`).toBe(
+          '00000100',
+        )
+      } else if (url.endsWith('.png')) {
+        expect((await sharp(body).metadata()).format, url).toBe('png')
+      }
+      links.push({ rel, href, url, type, bytes: body.length })
+    }
+    for (const rel of ['icon', 'apple-touch-icon', 'manifest']) {
+      expect(
+        links.some((l) => l.rel.split(/\s+/).includes(rel)),
+        `<link rel="${rel}">`,
+      ).toBe(true)
+    }
+
+    // Chromium's own manifest parse: no error, every icon same-origin under
+    // the page's directory and a PNG of its `sizes`. Preview serves the page
+    // at /, so the subpath case is checked on the raw manifest: every icon
+    // src, start_url and scope resolved against a manifest under /pm-tycoon/
+    // (the Pages path) stays under /pm-tycoon/ ('/icons/…' or '../…' would not).
+    const cdp: CDPSession = await page.context().newCDPSession(page)
+    const app = await cdp.send('Page.getAppManifest')
+    expect(app.errors, JSON.stringify(app.errors)).toEqual([])
+    expect(app.url).toBe(links.find((l) => l.rel === 'manifest')?.url)
+    const raw = JSON.parse(app.data ?? '{}') as {
+      icons?: { src?: string }[]
+      start_url?: string
+      scope?: string
+    }
+    const SUBPATH = 'https://pages.test/pm-tycoon/'
+    for (const v of [
+      ...(raw.icons ?? []).map((i) => i.src ?? ''),
+      raw.start_url ?? '',
+      raw.scope ?? '',
+    ]) {
+      const under = new URL(v, `${SUBPATH}manifest.webmanifest`).href
+      expect(under.startsWith(SUBPATH), `${v} under /pm-tycoon/`).toBe(true)
+    }
+    const icons = app.manifest?.icons ?? []
+    expect(icons.length, 'manifest icons').toBeGreaterThan(0)
+    expect(icons).toHaveLength(raw.icons?.length ?? 0)
+    const manifestIcons: Served[] = []
+    for (const icon of icons) {
+      expect(icon.url.startsWith(pageDir), icon.url).toBe(true)
+      const res = await page.request.get(icon.url)
+      expect(res.status(), icon.url).toBe(200)
+      const type = res.headers()['content-type'] ?? ''
+      expect(type, icon.url).toMatch(PNG_TYPE)
+      const body = await res.body()
+      const meta = await sharp(body).metadata()
+      expect(`${meta.width}x${meta.height}`, icon.url).toBe(icon.sizes)
+      manifestIcons.push({
+        rel: 'manifest icon',
+        href: new URL(icon.url).pathname,
+        type: `${type} ${icon.sizes}`,
+        bytes: body.length,
+      })
+    }
+    await cdp.detach()
+
+    const storage = await page.evaluate(async () => ({
+      registrations:
+        (await navigator.serviceWorker?.getRegistrations())?.length ?? 0,
+      controller: !!navigator.serviceWorker?.controller,
+      caches: 'caches' in window ? (await caches.keys()).length : 0,
+    }))
+    expect(storage).toEqual({ registrations: 0, controller: false, caches: 0 })
+    await page.waitForTimeout(500) // a late manifest warning or error
+    const line = (s: Served): string =>
+      `${s.rel} ${s.href} (${s.type}, ${(s.bytes / 1024).toFixed(1)} KB)`
+    console.log(`dist: web icon links ${links.map(line).join(' · ')}`)
+    console.log(
+      `dist: manifest ${app.url} — ${icons.length} icons, ${app.errors.length} errors, ` +
+        `start_url ${app.manifest?.startUrl ?? '?'}: ${manifestIcons.map(line).join(' · ')}`,
+    )
+    console.log(`dist: no service worker ${JSON.stringify(storage)}`)
+    test.info().annotations.push({
+      type: 'web icons',
+      description: `${links.length} links, ${icons.length} manifest icons, 0 manifest errors`,
+    })
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

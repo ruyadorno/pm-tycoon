@@ -265,6 +265,11 @@ work), there is no service worker. The hand-off zip (`vlr bundle` → `dist-zip/
 
 Each origin (`localhost`, the LAN address, the Pages domain) keeps its own save and playtest profile.
 
+**Add to Home Screen** (Safari's share sheet on iOS, Chrome's ⋮ menu on Android) puts the HQ icon on the home screen
+and opens the game standalone, without the browser bars (on Android only over https, i.e. the Pages site). On iOS the
+home-screen copy keeps its own save, apart from Safari's. It is still a web page: no service worker and no offline
+mode.
+
 ## Develop
 
 Needs Node ≥ 26 and vlt 1.6.x (`npm i -g vlt@1.6.0`); vlt is the only package manager used here.
@@ -280,14 +285,18 @@ vlr sim:delegating                # the informational delegating policy (hires a
 vlr fixtures                      # regenerate the saved sim states (tests/fixtures, src/assets/attract.json)
 vlr e2e:install                   # once: Playwright's Chromium (no root); without it the e2e steps print SKIPPED
 vlr shots                         # build + screenshots into shots/
-vlr art:build                     # the offline art pipeline → src/assets/{world,interior}.{png,json} (+ logo.png)
+vlr art:build                     # the offline art pipeline → src/assets/{world,interior}.{png,json} (+ logo.png),
+                                  # public/favicon.ico, public/icons/, public/manifest.webmanifest
+vlr art:webicons                  # only the web icons: re-cut from the committed art/webicon-src.png
+vlr webicons:capture              # re-shoot art/webicon-src.png (build + Chromium: the L5 HQ in the city), then re-cut
 vlr build                         # production build → dist/
 node tools/check-dist.mjs         # transfer budget (≤ 8 MB without source maps), hashed atlases, samples, configs
 vlr bundle                        # dist/ → dist-zip/pm-tycoon-<sha>.zip
 ```
 
-Long commands (`vlr check`, `vlr shots`, `vlr sim:gate`, `vlr art:build`) take a minute or more. `vlr art:gen` needs
-a `PIXELLAB_TOKEN` in a gitignored `.env`; without it the procedural art is used and the pipeline still runs.
+Long commands (`vlr check`, `vlr shots`, `vlr sim:gate`, `vlr art:build`, `vlr webicons:capture`) take a minute or
+more. `vlr art:gen` needs a `PIXELLAB_TOKEN` in a gitignored `.env`; without it the procedural art is used and the
+pipeline still runs.
 
 URL parameters (`src/debug/params.ts`): `seed=N`, `skipTitle=1`, `newGame=1`, `mute=1`, `audio=0`, `audiolog=1`,
 `attract=0` (the Title on a plain backdrop, no demo city), `view=city|warehouse`, `fastForward=S` (sim seconds before

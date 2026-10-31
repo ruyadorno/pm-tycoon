@@ -2,8 +2,9 @@ Package Management Tycoon - playtest 3 build
 =============================================
 
 This folder is the whole game: a static web build (index.html, assets/,
-audio/, configs/). It needs a web server (ES modules and fetch() do not
-work from file://). Nothing is installed, and no service worker is used.
+audio/, configs/, icons/, favicon.ico, manifest.webmanifest). It needs a
+web server (ES modules and fetch() do not work from file://). Nothing is
+installed, and no service worker is used.
 Plain http is fine: localStorage, WebGL and the sound-unlock tap all work.
 
 The build stamp (short git sha + date) is shown on the Title screen.
@@ -230,6 +231,10 @@ Files
                                (audio/sf/LICENSE.txt)
   configs/spicy.json,          the optional short-session data overrides
   configs/tycoon.json
+  favicon.ico, icons/,         the browser and home-screen icons (renders
+  manifest.webmanifest         of the game's city); the manifest also opens
+                               the home-screen copy full screen in portrait
+                               - no service worker, no offline
   gallery.html, gallery/       dev-only art review page, if present (not
                                part of the game)
 

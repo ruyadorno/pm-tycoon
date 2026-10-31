@@ -939,6 +939,8 @@ interface SponsorProbe {
   x: number
   y: number
   texts: string[]
+  /** The BitmapTexts' font sizes. */
+  sizes: number[]
 }
 
 /** The Title's sponsor link (After M15): its container and BitmapTexts. */
@@ -948,6 +950,7 @@ function probeSponsor(page: Page): Promise<SponsorProbe | null> {
       x: number
       y: number
       text?: string
+      fontSize?: number
       visible: boolean
       list?: Obj[]
       getData?(k: string): unknown
@@ -970,6 +973,9 @@ function probeSponsor(page: Page): Promise<SponsorProbe | null> {
       y: root.y,
       texts: root.list.flatMap((c) =>
         typeof c.text === 'string' && c.visible ? [c.text] : [],
+      ),
+      sizes: root.list.flatMap((c) =>
+        typeof c.text === 'string' && c.visible ? [c.fontSize ?? 0] : [],
       ),
     }
   })
@@ -1046,7 +1052,7 @@ test.describe('M5 attract title smoke', () => {
     await expect.poll(() => creditsOpen(page)).toBe(false)
     expect(await titleDialogOpen(page)).toBe(false)
 
-    // The sponsor link (After M15): centred one line above the footer, under
+    // The sponsor link (After M15): centred above the footer at 32 px, under
     // the buttons; a tap opens https://vlt.io in a new tab (window.open is
     // stubbed: no tab, no network). Under the Credits card its catcher takes
     // the tap; the card's own link opens the site and leaves the card up.
@@ -1054,8 +1060,9 @@ test.describe('M5 attract title smoke', () => {
     console.log(`smoke: sponsor link ${JSON.stringify(sp)}`)
     expect(sp, 'the sponsor link on the Title').not.toBeNull()
     expect(sp!.texts).toEqual(['Sponsored by', 'vlt technology'])
-    expect(sp!.y, 'one line + 2 px above the footer line').toBe(
-      sp!.H - sp!.safeBottom - 14 - 16,
+    expect(sp!.sizes, 'm5x7 at 2× (32 px)').toEqual([32, 32])
+    expect(sp!.y, 'a 32-px line (28-px pitch) + 4 above the footer line').toBe(
+      sp!.H - sp!.safeBottom - 14 - 32,
     )
     const spHit = await sceneTarget(page, 'Title', 'title:sponsor')
     expect(spHit, 'the sponsor link is tappable').not.toBeNull()

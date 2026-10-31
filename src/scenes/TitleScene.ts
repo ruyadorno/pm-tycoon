@@ -44,10 +44,10 @@
 // "tuning up…" line stays until the first 'audio:ready' (piano + bass
 // decoded, or failed). Footer: the build stamp bottom-right (registry
 // 'buildStamp', pinned by __pm.stamp), the seed bottom-left in debug builds,
-// and centred one line above them the sponsor link `Sponsored by vlt
-// technology` (src/ui/SponsorLink.ts: opens https://vlt.io; author request,
-// docs/decisions.md "After M15"), which the Credits card repeats under its
-// title. A phone in landscape gets the rotate card instead of the buttons.
+// and centred above them the sponsor link `Sponsored by vlt technology` at
+// 32 px (src/ui/SponsorLink.ts: opens https://vlt.io; author request,
+// docs/decisions.md "After M15"), which the Credits card repeats at 16 px
+// under its title. A phone in landscape gets the rotate card instead of the buttons.
 import Phaser from 'phaser'
 import type { AudioDirector } from '../audio/director.ts'
 import {
@@ -150,8 +150,11 @@ const SKYLINE = [
 
 /** The Credits card and its full-screen catcher over everything else. */
 const CREDITS_DEPTH = 100
-/** The sponsor link's text top above the footer line's (one line + 2 px). */
-export const SPONSOR_ABOVE_FOOT = LINE_H + 2
+/**
+ * The 32-px sponsor link's text top above the footer line's: its 28-px pitch
+ * + 4, so its underline's shadow ends 5 px above the footer's caps.
+ */
+export const SPONSOR_ABOVE_FOOT = 2 * LINE_H + 4
 /** Data 'id' of the sponsor link's hit zone: the Title's bottom, the Credits card. */
 export const SPONSOR_ID = 'title:sponsor'
 export const CREDITS_SPONSOR_ID = 'title:credits-sponsor'
@@ -274,6 +277,7 @@ export class TitleScene extends Phaser.Scene {
         x: W / 2,
         y: footY - SPONSOR_ABOVE_FOOT,
         align: 'center',
+        size: FONT_SIZE_BIG,
         tint: THEME.textLight,
         linkTint: THEME.gold,
         shadow: true,

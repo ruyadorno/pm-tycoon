@@ -367,6 +367,20 @@ export function cardTitle(data: GameData, card: OpenCard): string {
   return def === null ? card.eventId : fillCardText(data, def.title, card)
 }
 
+/**
+ * A link's chain-head title as decideEvent's `chainDone` ticker fills it
+ * (the head's title with the link's refs, else the card's own); null for a
+ * head, a single or a job card. The EventCard's chain line (view-api) and
+ * the playtest recorder's `choices[].chain.title` (M15) read it.
+ */
+export function chainTitleOf(data: GameData, card: OpenCard): string | null {
+  if (card.kind === 'job' || card.depth < 2) return null
+  const head = eventDef(data, card.chainHeadId ?? card.eventId)
+  return head === null
+    ? cardTitle(data, card)
+    : fillCardText(data, head.title, card)
+}
+
 // Conditions ------------------------------------------------------------------------
 
 /** min over announced strains of the lane's compounded catch rate (modifier-aware); 0 with none. */
@@ -591,6 +605,25 @@ function chainRunning(ev: EventsState, id: string): boolean {
   if (ev.open?.chainHeadId === id) return true
   if (ev.queue.some((c) => c.chainHeadId === id)) return true
   return ev.scheduled.some((l) => l.chainHeadId === id)
+}
+
+/**
+ * Chains under way now: the distinct heads with a link scheduled, or a link
+ * (depth ≥ 2) open or queued — a head's own card has booked nothing yet.
+ * Not stats.chainsStarted − chainsFinished: openDueLink drops a due link
+ * whose card fails its cond or minLevel, which ends that chain with no
+ * finish (review sim-1; the playtest's events.chainsRunning, fun bar 3
+ * item 4).
+ */
+export function chainsRunning(ev: EventsState): number {
+  const heads = new Set<string>()
+  for (const l of ev.scheduled) heads.add(l.chainHeadId)
+  for (const c of [ev.open, ...ev.queue]) {
+    if (c !== null && c.depth >= 2 && c.chainHeadId !== null) {
+      heads.add(c.chainHeadId)
+    }
+  }
+  return heads.size
 }
 
 /**
@@ -893,15 +926,19 @@ export function optionLines(
   }
   if (card.kind === 'job') {
     if (opt.index === JOB_ACCEPT) return effectSummary(sim, opt.effects, refs)
+    // A floor, not a date: the next job also waits for the draw gap and the
+    // job roll (review sim-4).
     const days = data.quests.offer.declineCooldownDays
-    return [{ text: `Next job in ${dayText(days)}`, tone: 'neutral' }]
+    return [{ text: `No jobs for ${dayText(days)}`, tone: 'neutral' }]
   }
   const out: EffectLine[] = []
   const per = opt.perVehicle
   if (per) out.push(perVehicleLine(sim, -per.each, per.type))
   else if (opt.cost > 0) out.push({ text: `−$${opt.cost}`, tone: 'cost' })
   const world = opt.effects.filter((e) => !DECK_KINDS.includes(e.kind))
-  out.push(...effectSummary(sim, world, refs))
+  // applyOption debits the cost first: the money lines meet what is left (review sim-2).
+  const left = sim.state.economy.balance - opt.cost
+  out.push(...effectSummary(sim, world, refs, left))
   for (const e of opt.effects) {
     if (e.kind !== 'next') continue
     if ('branches' in e) {

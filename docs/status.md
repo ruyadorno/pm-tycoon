@@ -7,7 +7,8 @@ plan-build3.md) copies the file back at M15.
 Run (build 3): started 2026-10-31 — plan-build3.md DRAFT v3 + spec-build3.md — from the part-B prompt with part A
 never run (M11 → M15 in one run; no author feel-check notes; docs/decisions.md "Run decisions (build 3)") — Node v26 /
 vlt 1.6.x — Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab
-token: present; budget 400 generations with a 100 reserve.
+token: present; budget 400 generations with a 100 reserve; 233 spent (2,422 → 2,189) — M11 7d2ec44, M12 617e97b, M13
+f4cb2a4, M14 3b8bc50, M15 + the hand-off docs commit; zip dist-zip/pm-tycoon-<M15 sha>.zip.
 
 Run (build 2): started 2026-10-30 00:46 UTC — plan-build2.md DRAFT v2 + spec-build2.md — Node v26 / vlt 1.6.1 —
 Chromium: installed (Chrome for Testing, SwiftShader WebGL) — Playwright device: iPhone 16 — PixelLab token: present,
@@ -22,7 +23,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 - [x] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
 - [x] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
 - [x] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
-- [ ] M15 playtest-3 build: metrics v3, summary card v3 + fun bar 3, shots, report, hand-off (commit `M15: …`)
+- [x] M15 playtest-3 build: metrics v3, summary card v3 + fun bar 3, shots, report, hand-off (commit `M15: …`)
 
 ## Milestone checklist (build 2)
 
@@ -60,6 +61,33 @@ JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 an
 L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `level:up {3}` in any 30-min run).
 
 ## Checkpoint entries (newest first)
+
+## M15 — playtest-3 build — 2026-10-31 14:30 UTC — DONE at (this commit; sha recorded in the hand-off docs commit)
+
+M14 is 3b8bc50.
+Built: the playtest recorder v3 (`src/metrics/playtest.ts`, `pm.playtest.v3`: `events {offered, decided, byCategory,
+choices[] (id, option, default, kind, atS, thinkS, chain), thinkMedianS, chainsStarted, chainsFinished, chainsRunning,
+livesLost, livesGained, vehiclesLost, workersLost, gameOverByEvent, modifiersPeak}` and `beats[]` in sim time; think
+time = the wall time the EventCard showed the card); `src/metrics/funBar.ts` + SummaryCard v3 (Cards, Stories, Longest
+quiet; fun bar 3's seven items; fits 360 × 604 exactly); `tests/playtest/seed-7.json` v3 from the 35-min automated run;
+README / playtest-README / docs/playtest.md / docs/phone-checklist.md / docs/art-todo.md v3; four adversarial review
+passes (sim, scenes, mobile, deck/copy on 30 random cards): 9 of 21 findings confirmed and fixed (a loss line capped at
+the balance, `bills +$N/day`, `No jobs for 1 day`, think time not counted behind the rotate card, chains running);
+`docs/report-playtest3.md`.
+Gate (seeds 1–10 × 30 min, deck on — docs/gate/latest.md): PASS, unchanged from M14 — L2 10.73, L3 16.51, L4 20.55,
+L5 25.33 (−8.4 / −8.2 / −8.1 / −8.6 % vs build 2), truck +2.30, lives 0, 21 cards, EV $24.4, non-default 0.52; 35-min
+PASS (Golden Release 25.33); delegating PASS; 40 seeds PASS (L5 26.68, 12/40).
+Tests: 3,101 passing (vitest, 126 files); e2e 170 passed / 146 project-gated skips; `vlr check` 186 s; cold install
+(fresh clone + `vlt install` + `vlr check:quick`) PASS in 52 s; attribution grep 0; dist transfer 6.59 MB (≤ 8 MB)
+Shots: 109 regenerated at this commit; `summary-card` and `summary-card-360x604` read (17 rows, fun bar 3 marks, the
+buttons inside the card); `art/contact/events@4x.png` (G7) in situ
+Seed-7 profile (policy, 35 min): 23 cards (16 decisions, 6 off the default; 5 jobs; 2 news), 2 chains (pairs),
+133 beats, longest quiet on the ramp 95 s; fun bar 3: 1 judge, 2 fail (1:35 > 1:30), 3 fail (L2 10:44), 4 fail (pairs
+only), 5 pass, 6 pass, 7 pending — the policy proxy; the human run decides
+Deviations from spec-build3.md: no "slid" row (nothing slides under Q-B3-2) and the metrics departures D-M15-1…12 —
+docs/decisions.md "Run decisions and deviations (M15)"
+Open for the author: docs/report-playtest3.md §7 (Q-RUN12–Q-RUN21), G7, the playtest itself
+Next: the author's playtest 3 (thirty to forty minutes cold on the iPhone 16)
 
 ## M14 — pacing pass 2 (deck on) — 2026-10-31 12:46 UTC — DONE at (this commit; sha recorded in the M15 entry)
 
@@ -467,6 +495,9 @@ Numbering continues after the consolidated list in plan.md; each line carries th
   ultimateQuest`, `tests/sim/victory.long.test.ts`.
 - Q-RUN10 Threshold and price retunes (L3 $3,700, L4 $5,200, L5 $7,400, dock 3 $1,000; quest goals) — default: as in
   docs/decisions.md with the gate rows named — code: `levels.json`, `economy.json`, `quests.json`.
+- Q-RUN12–Q-RUN21 (build 3): see docs/report-playtest3.md §7.2 (part A never ran; victory by 40 not met; ≈ −8 %
+  not −10 %; spec numbers changed on ~20 cards; the investor declined; a card behind a sheet holds the sim; Enter
+  takes the first option; engine, metrics and effect-line departures).
 - Q-RUN11 The Pages dispatch is refused for the ruy-bot app (HTTP 403, no Actions: write) — default: recorded; the
   author runs the workflow by hand — code: `.github/workflows/pages.yml`.
 

@@ -798,7 +798,7 @@ describe('the pm.save.v2 payload under damage (plan.md §6.4, R9; autosave.ts)',
     ])
   })
 
-  it('Autosave: a quota error toasts once and keeps the previous save, which still resumes tick-exact; a failing pm.playtest.v2 write never blocks the save; a stale payload is discarded with the toast', () => {
+  it('Autosave: a quota error toasts once and keeps the previous save, which still resumes tick-exact; a failing pm.playtest.v3 write never blocks the save; a stale payload is discarded with the toast', () => {
     const data = dataFixture()
     const { sim } = savedGame()
     const map = new Map<string, string>()

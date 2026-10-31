@@ -28,6 +28,7 @@ import type { Sim } from './sim.ts'
 import {
   cardOptions,
   cardTitle,
+  chainTitleOf,
   DECK_OFF_TICK,
   eventDef,
   fillCardText,
@@ -803,19 +804,6 @@ function nextOfferIn(sim: Sim): number | null {
     !ultimatePending(sim)
   if (!open || ev.nextDrawTick >= DECK_OFF_TICK) return null
   return Math.max(0, Math.max(qs.jobReadyTick, ev.nextDrawTick) - s.tick)
-}
-
-/**
- * A link's chain-head title as decideEvent's `chainDone` ticker fills it
- * (the head's title with the link's refs, else the card's own); null for a
- * head, a single or a job card.
- */
-function chainTitleOf(data: GameData, card: OpenCard): string | null {
-  if (card.kind === 'job' || card.depth < 2) return null
-  const head = eventDef(data, card.chainHeadId ?? card.eventId)
-  return head === null
-    ? cardTitle(data, card)
-    : fillCardText(data, head.title, card)
 }
 
 /** The open card as the EventCard reads it (B3 §3.4, §6). */

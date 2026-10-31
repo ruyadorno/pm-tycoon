@@ -11,9 +11,10 @@ The build stamp (short git sha + date) is shown on the Title screen.
 The game: levels 1 to 5, hired people with stats and salaries, quests
 with a golden parcel, the Docks and the Airport, a warehouse that grows
 through five tiers, and the Golden Release that wins the game (then
-endless mode). Build 3 adds event cards (every minute or two the clock
-stops and a card asks you to decide something about the company; job
-offers are cards too) and a climb about 10% shorter than build 2's.
+endless mode). Build 3 adds event cards: decisions, news and job offers
+that pause the game until you answer them, some of them chapters of a
+longer story (every minute or two of game time a card asks you to run
+the company). The climb is about 10% faster than build 2's.
 
 
 1. Serve it from the Mac
@@ -39,6 +40,11 @@ Stop the server with Ctrl-C.
 2. Play thirty to forty minutes cold
 ------------------------------------
 
+  On the iPhone 16: a new game, no seed typed, no ?config=, no help
+  beyond what the game shows. Answer the cards as you like - there is
+  no right answer the build is waiting for - then open the summary card
+  (see below) and send it back with your notes.
+
   - The Title is the logo over a live demo city. Tap anywhere (that tap
     also switches the sound on), then New game.
   - The tutorial: buy a bike in the Garage and pick its driver from three
@@ -49,42 +55,67 @@ Stop the server with Ctrl-C.
     with the card deck on, in game time - the pauses on cards come on
     top; a cold human is usually later):
       3:20 (day 4) the first card; then one every 60-100 s of game time
-                   at level 1 (a little less often at higher levels)
+                   at level 1 (60-110 s at level 2, up to 90-140 s at
+                   level 5)
       ~10.7 min    level 2: Industrial, the truck, the Shaky shaker, and
                    a sorter for the Hold Bay station
       ~16.5 min    level 3: the Docks and the ship, overseas parcels,
                    a second desk, loading dock 2, the Battery checker
       ~20.6 min    level 4: two new districts, the X-ray, the Sorter Arm,
                    dock 3; the warehouse room grows (drag to scroll)
-      ~25.3 min    level 5: the Airport and the civic park; the Golden
-                   Release (60 deliveries in 5 days, no malware
-                   delivered, 85% on time) wins the game
-  - The cards: every card pauses the game until you choose (PAUSED in
-    its corner; no timer, no Later). Under each option the card prints
-    exactly what it does: costs in red, gains in green, "Can't afford"
-    on a greyed option, "- this can end the run" on a red option that
-    could take your last life, "...then: <next card> (in N days)" when a
-    story continues. News cards have one OK (any tap closes them).
-    Jobs come as JOB BOARD cards: Accept or Decline, no Later; the chip
-    next to the level bar then shows the job's progress (tap it for
-    Abandon). While a card's effect runs, a small effects chip with a
-    count sits in the top bar: tap it (or "Effects" in the pause menu)
-    for the list and the time each has left. The Golden Release is the
-    one offer that is not an event card: its gold card does not pause
-    the game and keeps Later.
+      ~25.3 min    level 5: the Airport and the civic park, and the
+                   Golden Release offer: 60 deliveries in 5 days, no
+                   malware delivered, 85% on time (build 2 asked 90%).
+                   Shipping it wins the game. The scripted player
+                   misses most offers on the 5-day clock and wins at
+                   47.6-56.6 min (seeds 1-3), so a Victory inside the
+                   session is the stretch goal, not the expectation.
+  - The cards. Every card pauses the game until you choose: PAUSED in
+    its corner, no timer, no Later, nothing decided behind your back
+    (the music plays on). A card is a decision (two or three options),
+    news (one OK: any tap closes it) or a JOB BOARD offer (Accept or
+    Decline). Under each option the card prints exactly what it does:
+    costs in red, gains in green, the rest grey. A greyed option reads
+    "Can't afford" with its price and does nothing when tapped. Some
+    options continue a story: "...then: <next card> (in N days)"; the
+    next card opens with "You chose: ...", and the last one ends with a
+    "<story> - the story ends" paper.
+  - Danger cards: a red option is the one that can hurt (a life or a
+    vehicle); "- this can end the run" when it could take your last
+    life. An option that takes a life, a vehicle or a person always has
+    a way out beside it, on the same card or on the card that started
+    the story. A red option takes a tap only after a slightly longer
+    look, and Enter never picks it. When a card takes a life, the
+    lost-life card says what you chose (on the last life, the Game Over
+    card does).
+  - A card that arrives while a sheet or a paper is open waits, and the
+    game stays paused: the orange bell chip in the top bar blinks; tap
+    it to bring the card up (it also opens by itself when the sheet
+    closes). While a card's effect runs (a speed boost for a day, a
+    cheaper truck, a permanent change), the same chip shows how many
+    are running: tap it, or "Effects" in the pause menu, for the Effects
+    list - each effect, its time left (or "permanent") and the card
+    that set it. The list does not pause the game.
+  - Jobs: after Accept on a JOB BOARD card, the chip next to the level
+    bar shows the job's progress (tap it for Abandon). The Golden
+    Release is the one offer that is not an event card: its gold card
+    does not pause the game, has no Decline, and keeps Later.
   - At 30:00 of game time (never before 25 real minutes: fun bar item
-    4 counts real minutes, and at 2x the game clock runs ahead) a ticker
+    5 counts real minutes, and at 2x the game clock runs ahead) a ticker
     line and a toast offer the summary card. Open it then, or keep
-    playing and open it later: tap the pause
-    button, then tap it again while paused to open the pause menu ->
-    "End run - show summary". The Game Over and Victory cards also have
-    a "Run summary" button.
-  - On the card: "Download playtest.json" saves the run profile,
-    "Copy summary" copies a plain-text version to paste into your notes.
-    Then note how it felt: was a hire a real choice, were the cards
-    real choices and did they come too often or too rarely, did you want
-    the next quest, did level 3 and the Docks feel like a new beat, and
-    could you explain every lost life?
+    playing and open it later: tap the pause button, then tap it again
+    while paused to open the pause menu -> "End run - show summary". The
+    Game Over and Victory cards also have a "Run summary" button.
+  - On the card: the run's numbers (new in build 3: Cards, Stories,
+    Longest quiet, and the lives the cards took) and fun bar 3, seven
+    checks: a tick or a cross from the data, "?" where only you can
+    judge, a dash while the window is still open. "Download
+    playtest.json" saves the run profile, "Copy summary" copies a
+    plain-text version to paste into your notes. Then note how it felt:
+    did your choices feel like yours (name one you regret or are proud
+    of), did a story read as one, did the cards feel like interruptions,
+    was there a quiet stretch on the way to level 2, and could you
+    explain every lost life, the ones a card took included?
 
   Controls: tap = pick / rush a building, double-tap = zoom 1x/2x (on a
   vehicle: follow it), drag = pan (in a tall tier-4/5 warehouse room:
@@ -95,7 +126,8 @@ Stop the server with Ctrl-C.
   long-press, Space pause, 1 / 2 speed, W warehouse, G garage, Esc
   close, Enter confirm, arrows pan, F follow the vehicle nearest the
   cursor. On an event or job card Esc and a tap outside do nothing;
-  Enter takes the first option unless it is red or greyed.
+  Enter takes the first option unless it is red or greyed (a news card
+  closes on any tap, Esc or Enter).
 
 
 3. Sending playtest.json back
@@ -147,15 +179,17 @@ Stop the server with Ctrl-C.
   localStorage on the page's origin (http://<host>:4173):
     pm.save.v2      the autosave (every 10 s and when the tab hides)
     pm.settings.v1  mute + speed
-    pm.playtest.v2  the playtest profile (the same object as
-                    playtest.json)
+    pm.playtest.v3  the playtest profile (the same object as
+                    playtest.json, version 3)
   A ?config=<name> session (spicy, tycoon) uses its own two keys:
-    pm.save.v2:cfg:<name> and pm.playtest.v2:cfg:<name>
+    pm.save.v2:cfg:<name> and pm.playtest.v3:cfg:<name>
   (settings are shared). A save from another build (the playtest-1
   pm.save.v1, a build-2 save, or an older build-3 one) is never loaded:
   the Title says "Save from an older build was reset" and removes it.
-  Title -> Reset clears all of them: the save and profile of the cold run
-  and of every config, a leftover pm.save.v1 or pm.playtest.v1, and the
+  A build-2 profile (pm.playtest.v2) is never resumed: build 3 starts a
+  new v3 profile. Title -> Reset clears all of them: the save and
+  profile of the cold run and of every config, a leftover pm.save.v1,
+  pm.playtest.v2 or pm.playtest.v1 (and their config copies), and the
   settings.
   ?newGame=1 starts fresh without the Title's Continue. After a Victory
   the Title's Continue line ends with "Tycoon" and a check mark. A

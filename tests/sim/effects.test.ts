@@ -121,6 +121,48 @@ describe('money (B3 §3.5: balance only, a cost clamped to the balance)', () => 
     clean(sim)
   })
 
+  it('review sim-2: a loss the balance cuts short reads what it takes, in data order through a running balance (B3 §3.3)', () => {
+    const sim = quietSim(1)
+    buy(sim, 'bike')
+    buy(sim, 'bike')
+    sim.state.economy.balance = 30
+    const effects: EventEffect[] = [
+      { kind: 'money', delta: -200 },
+      { kind: 'money', delta: 50 },
+      { kind: 'moneyPct', pct: -0.1 },
+      { kind: 'moneyPerVehicle', delta: -40 },
+      { kind: 'money', delta: -10 },
+    ]
+    expect(lines(sim, effects)).toEqual([
+      { text: `${M}$30 (all you have)`, tone: 'cost' },
+      { text: '+$50', tone: 'gain' },
+      { text: `${M}$5 (10 % of the balance)`, tone: 'cost' },
+      { text: `${M}$45 (all you have)`, tone: 'cost' },
+      { text: '$0 (nothing to take)', tone: 'neutral' },
+    ])
+    // The sim moves exactly that: −30, +50, −5, −45, 0.
+    const money = collect(sim, 'money:changed')
+    for (const e of effects) applyEffect(sim, ctxOf(), e)
+    expect(money.map((m) => m.delta)).toEqual([-30, 50, -5, -45])
+    expect(sim.state.economy.balance).toBe(0)
+    // An explicit balance (deck.ts optionLines: the balance less the cost).
+    sim.state.economy.balance = 1000
+    expect(
+      effectSummary(
+        sim,
+        [{ kind: 'money', delta: -200 }],
+        {
+          eventId: 'ev_test',
+          title: 'Test card',
+          target: null,
+          pick: null,
+        },
+        150,
+      ).map((l) => l.text),
+    ).toEqual([`${M}$150 (all you have)`])
+    clean(sim)
+  })
+
   it('moneyPerVehicle: delta × the owned vehicles (of the type when set)', () => {
     const sim = quietSim(1)
     buy(sim, 'bike')
@@ -395,7 +437,7 @@ describe('mod (B3 §3.5 / §3.6: a modifier row)', () => {
     expect(applied.map((a) => a.id)).toEqual(['m1', 'm2'])
     const [spawn, subs] = sim.state.modifiers
     expect(modifierLine(sim, spawn!)).toBe('Registry Row orders +25 %')
-    expect(modifierLine(sim, subs!)).toBe('subscriptions +$15/day')
+    expect(modifierLine(sim, subs!)).toBe('bills +$15/day')
     clean(sim)
   })
 
@@ -440,7 +482,7 @@ describe('mod (B3 §3.5 / §3.6: a modifier row)', () => {
     ).toEqual([
       { text: 'bikes ×0.92 speed for 2 days', tone: 'cost' },
       { text: 'desk catch rate +3 % for 1 day', tone: 'gain' },
-      { text: 'subscriptions +$15/day for good', tone: 'cost' },
+      { text: 'bills +$15/day for good', tone: 'cost' },
       { text: 'orders +25 % for 2 days', tone: 'gain' },
       { text: 'Registry Row orders +25 % for 12h', tone: 'gain' },
       { text: 'no wrong-toss fee for good', tone: 'gain' },
@@ -706,7 +748,7 @@ describe('vehicle lose (B3 §3.5: the oldest of the type, the last one included)
 
   it('none of the type: the fallback money delta (clamped), "−$250 (no bike to lose)"; fallback 0 does nothing', () => {
     const sim = quietSim(1)
-    sim.state.economy.balance = 100
+    sim.state.economy.balance = 500
     expect(
       lines(sim, [
         { kind: 'vehicle', lose: 'bike', fallback: -250 },
@@ -717,6 +759,17 @@ describe('vehicle lose (B3 §3.5: the oldest of the type, the last one included)
       { text: `${M}$250 (no bike to lose)`, tone: 'cost' },
       { text: 'no truck to lose', tone: 'neutral' },
       { text: `${M}$50 (no vehicle to lose)`, tone: 'cost' },
+    ])
+    // Review sim-2: the lines run through the balance as applyMoney clamps.
+    sim.state.economy.balance = 100
+    expect(
+      lines(sim, [
+        { kind: 'vehicle', lose: 'bike', fallback: -250 },
+        { kind: 'vehicle', lose: 'any', fallback: -50 },
+      ]),
+    ).toEqual([
+      { text: `${M}$100 (all you have, no bike)`, tone: 'cost' },
+      { text: '$0 (nothing to take, no vehicle)', tone: 'neutral' },
     ])
     applyEffect(sim, ctxOf(), { kind: 'vehicle', lose: 'truck', fallback: 0 })
     expect(sim.state.economy.balance).toBe(100)

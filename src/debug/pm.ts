@@ -25,7 +25,8 @@
 // M4 (plan.md §12.7 task 1, §12.9): playtest() is the live playtest profile
 // (the HUD's PlaytestRecorder, registry REG_PLAYTEST; null before the HUD
 // exists), downloadPlaytest() saves it as playtest.json (the summary card's
-// Blob + <a download>), and metrics().playtest carries its live counters.
+// Blob + <a download>), and metrics().playtest carries its live counters
+// (M15, v3: `cards` {offered, decided, thinkMedianS} too).
 // M7 (design-m7 §6.10, plan-build2 §8.4 task 6): quests() is the ViewSim's
 // quests() (offer / active slots with their derived fields, history,
 // vouchers, victory) — a plain-data read for e2e; the debug offer is
@@ -91,6 +92,8 @@ export interface PmMetrics {
     viewSwitches: number
     warehouseS: number
     fps: Playtest['fps']
+    /** v3 (M15): the cards so far (state counters) and the median think time. */
+    cards: { offered: number; decided: number; thinkMedianS: number | null }
   } | null
 }
 
@@ -182,6 +185,11 @@ function playtestCounters(pt: Playtest | null): PmMetrics['playtest'] {
     viewSwitches: pt.viewSwitches,
     warehouseS: pt.warehouseS,
     fps: pt.fps,
+    cards: {
+      offered: pt.events.offered,
+      decided: pt.events.decided,
+      thinkMedianS: pt.events.thinkMedianS,
+    },
   }
 }
 

@@ -395,7 +395,7 @@ describe('B3 §3.4 layoutEventCard: the heights of contract §1.4 (w 300)', () =
         objective: 'Deliver 22 parcels sent from Pasture Peer Fields',
         options: [
           opt(0, ONE),
-          opt(1, [neutral('Next job in 2 days')], { default: true }),
+          opt(1, [neutral('No jobs for 2 days')], { default: true }),
         ],
       }),
       width,

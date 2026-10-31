@@ -54,7 +54,8 @@
 //                       Shaky shaker in slot 4 (+ `-360x604`)
 // The two warehouse shots also run at the 360×604 profile.
 //
-// M4 (plan.md §12.7 tasks 1-2, §12.9; M10 v2, plan-build2 §8.7 tasks 1-2):
+// M4 (plan.md §12.7 tasks 1-2, §12.9; M10 v2, plan-build2 §8.7 tasks 1-2;
+// M15 v3, plan-build3 §8.6 tasks 1-2, §9):
 //   playtest-35min  iPhone 16: the 35-minute automated run (seed 7, policy):
 //                   the first 6:00 in real time at 4× — the recorder's wall
 //                   clock, fps sampler and pause clock see a real session;
@@ -63,8 +64,9 @@
 //                   (the HUD's recorder hears every sim event: hires,
 //                   quests, hand-offs), the last 4 s at 1× — then ❚❚, ❚❚
 //                   again (the pause menu) and `End run — show summary` by
-//                   real taps: the `summary-card` shot (the v2 rows + fun
-//                   bar 2), and the profile written to
+//                   real taps: the `summary-card` shot (the v3 rows —
+//                   Cards, Stories, Longest quiet — and fun bar 3's seven
+//                   checks), and the profile (v3: events, beats) written to
 //                   tests/playtest/seed-7.json (the committed format example;
 //                   tests/metrics/playtest-schema.test.ts validates it)
 //   summary-card    360×604 (`-360x604`): policy 10 min frozen, the same taps
@@ -1376,6 +1378,12 @@ const PLAYTEST_EXAMPLE = 'tests/playtest/seed-7.json'
 const PLAYTEST_RUN_S = 2100
 /** Sim ms per __pm.advance chunk while the run is fast-forwarded. */
 const PLAYTEST_FF_CHUNK_MS = 20_000
+/**
+ * Fun bar 3 item 2's ramp window (D-M15-2: minute 3 to the L2 tick, capped
+ * at minute 11 before L2), for the playtest-35min log line.
+ */
+const RAMP_FROM_S = 180
+const RAMP_TO_S = 660
 
 interface SummaryState {
   open: boolean
@@ -1636,7 +1644,36 @@ test.describe('M4 shots', () => {
         `overseas ${JSON.stringify(p.overseas)} docks ${JSON.stringify(p.docksBought)} ` +
         `desks ${p.desks} sorter ${JSON.stringify(p.sorter)} lives ${p.livesLost.length}`,
     )
-    expect(p.version).toBe(2)
+    // v3 (B3 §6): the cards and the beats. The policy decides each card in
+    // the step that opens it, so thinkS is 0 here (playtest-schema.test.ts
+    // times cards without a policy).
+    const ev = p.events
+    const rampTo = p.level2AtS ?? Math.min(p.simS, RAMP_TO_S)
+    const rampBeats = p.beats
+      .map((b) => b.atS)
+      .filter((t) => t >= RAMP_FROM_S && t <= rampTo)
+      .toSorted((a, b) => a - b)
+    const edges = [RAMP_FROM_S, ...rampBeats, rampTo]
+    let rampQuietS = 0
+    for (let i = 1; i < edges.length; i++)
+      rampQuietS = Math.max(rampQuietS, edges[i]! - edges[i - 1]!)
+    const nonDefault = ev.choices.filter(
+      (c) => c.kind === 'decision' && !c.default,
+    ).length
+    const decisions = ev.choices.filter((c) => c.kind === 'decision').length
+    const stories3 = ev.choices.filter(
+      (c) => c.chain !== null && c.chain.end && c.chain.depth >= 3,
+    ).length
+    console.log(
+      `shots: playtest cards offered ${ev.offered} decided ${ev.decided} ` +
+        `choices ${ev.choices.length} (${nonDefault} of ${decisions} decisions not default) ` +
+        `byCategory ${JSON.stringify(ev.byCategory)} chains ${ev.chainsStarted}/${ev.chainsFinished} ` +
+        `(${stories3} of 3+ cards) thinkMedianS ${ev.thinkMedianS} lives -${ev.livesLost}/+${ev.livesGained} ` +
+        `vehiclesLost ${ev.vehiclesLost} workersLost ${ev.workersLost} gameOverByEvent ${ev.gameOverByEvent} ` +
+        `modifiersPeak ${ev.modifiersPeak} beats ${p.beats.length} ` +
+        `ramp quiet ${Math.round(rampQuietS * 10) / 10} s (${RAMP_FROM_S}-${rampTo} s)`,
+    )
+    expect(p.version).toBe(3)
     expect(p.seed).toBe(7)
     expect(p.simS).toBeGreaterThanOrEqual(PLAYTEST_RUN_S)
     expect(p.moneyPerMin.length).toBe(Math.floor(p.simS / 60))
@@ -1652,6 +1689,13 @@ test.describe('M4 shots', () => {
     expect(p.hires.length).toBeGreaterThan(0)
     expect(p.quests.offered).toBeGreaterThan(0)
     expect(p.overseas.handedOff).toBeGreaterThanOrEqual(p.overseas.cleared)
+    // v3: the recorder was attached from tick 0, so every answered card is
+    // a choice; the beats stay inside the run.
+    expect(ev.offered).toBeGreaterThan(0)
+    expect(ev.choices.length).toBeGreaterThan(0)
+    expect(ev.choices.length).toBe(ev.decided)
+    expect(p.beats.length).toBeGreaterThan(0)
+    expect(p.beats.every((b) => b.atS <= p.simS)).toBe(true)
     const st = await summaryState(page)
     // The card shows elapsedS as of its opening (the recorder's
     // summaryOpenedS, the same frame); the wall clock runs on until
@@ -1668,9 +1712,15 @@ test.describe('M4 shots', () => {
     expect(st.title).toBe(
       `Run summary — seed 7 — ${Math.floor(shown / 60)}:${String(Math.floor(shown % 60)).padStart(2, '0')} played`,
     )
-    console.log(`shots: fun bar 2 ${JSON.stringify(st.checks)}`)
-    expect(st.checks.map((c) => c.n)).toEqual([1, 2, 3, 4, 5, 6])
-    // Every button live and inside the canvas with the v2 rows.
+    console.log(`shots: fun bar 3 ${JSON.stringify(st.checks)}`)
+    expect(st.checks.map((c) => c.n)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    // States as sets, not values: the level times move with the tuning.
+    for (const c of st.checks)
+      expect(['pass', 'fail', 'judge', 'pending']).toContain(c.state)
+    // L2 is reached by 35:00, so item 2's ramp window has closed.
+    if (p.level2AtS !== null)
+      expect(['pass', 'fail', 'judge']).toContain(st.checks[1]!.state)
+    // Every button live and inside the canvas with the v3 rows.
     const L = await page.evaluate(() => {
       const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
         L: { W: number; H: number }

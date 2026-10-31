@@ -6,20 +6,22 @@
 //                    src/sim/save.ts
 //   pm.settings.v1  {muted, speed} (merged: the AudioDirector writes `muted`
 //                    through its own store and keeps `speed`; we keep `muted`)
-//   pm.playtest.v2  the playtest profile v2 + its `restore` accumulators
+//   pm.playtest.v3  the playtest profile v3 + its `restore` accumulators
 //                   (src/metrics/playtest.ts, M4; v2 since M10, plan-build2
-//                   §8.7 — a leftover pm.playtest.v1 is only cleared by Reset)
+//                   §8.7; v3 since M15, plan-build3 §8.6 / B3 §6 — a leftover
+//                   pm.playtest.v2 / pm.playtest.v1 is never read, only
+//                   cleared by Reset)
 //
 // Per config (report-playtest1 §6.13): a session whose data carries a
 // `?config=<name>` override (Boot honours it with the debug surface on) saves
 // under `pm.save.v2:cfg:<name>` and keeps its profile under
-// `pm.playtest.v2:cfg:<name>`, so a spicy session never evicts the cold run's
+// `pm.playtest.v3:cfg:<name>`, so a spicy session never evicts the cold run's
 // save or profile; settings are per device and stay unsuffixed. A build-1
 // save (`pm.save.v1`, version 1) is never loaded: readSave reports it stale
 // and discardSave removes it, the same path (and STALE_SAVE_TEXT toast) as a
 // save from older data tables (plan.md R9: no migrations). Reset clears the
-// legacy keys (pm.save.v1, pm.playtest.v1 and its `:cfg:` copies), both
-// keys of every config, and the settings.
+// legacy keys (pm.save.v1, pm.playtest.v2 / pm.playtest.v1 and their `:cfg:`
+// copies), both keys of every config, and the settings.
 //
 // The HUD drives `Autosave`: tick(delta) from its update every 10 s of real
 // time, save('hidden') on Phaser HIDDEN and save('pagehide') on window
@@ -72,28 +74,34 @@ import { freshOnboarding, normaliseOnboarding } from '../ui/Onboarding.ts'
 
 export { LEGACY_SAVE_KEY, SAVE_KEY }
 export const SETTINGS_KEY = 'pm.settings.v1'
-/** The playtest profile v2 (plan-build2 §8.7 task 1, M10). */
-export const PLAYTEST_KEY = 'pm.playtest.v2'
-/** The build-1 / M5–M9 profile key; never read, only cleared by Reset. */
-export const LEGACY_PLAYTEST_KEY = 'pm.playtest.v1'
+/** The playtest profile v3 (plan-build3 §8.6 task 1, B3 §6; M15). */
+export const PLAYTEST_KEY = 'pm.playtest.v3'
+/**
+ * Older profile keys (build 2 / M10's v2, build 1 / M5–M9's v1; D-M15-11):
+ * never read, only cleared by Reset (with their `:cfg:` copies).
+ */
+export const LEGACY_PLAYTEST_KEYS: readonly string[] = [
+  'pm.playtest.v2',
+  'pm.playtest.v1',
+]
 /** Between a base key and the config name: `pm.save.v2:cfg:spicy`. */
 export const CONFIG_KEY_INFIX = ':cfg:'
 /**
  * The fixed keys Reset clears (plan.md §5); clearAllKeys also removes every
- * `<SAVE_KEY|PLAYTEST_KEY|LEGACY_PLAYTEST_KEY>:cfg:<name>` key it finds.
+ * `<SAVE_KEY|PLAYTEST_KEY|LEGACY_PLAYTEST_KEYS>:cfg:<name>` key it finds.
  */
 export const STORAGE_KEYS: readonly string[] = [
   LEGACY_SAVE_KEY,
   SAVE_KEY,
   SETTINGS_KEY,
   PLAYTEST_KEY,
-  LEGACY_PLAYTEST_KEY,
+  ...LEGACY_PLAYTEST_KEYS,
 ]
 /** Base keys that take the per-config suffix (settings do not). */
 const PER_CONFIG_KEYS: readonly string[] = [
   SAVE_KEY,
   PLAYTEST_KEY,
-  LEGACY_PLAYTEST_KEY,
+  ...LEGACY_PLAYTEST_KEYS,
 ]
 
 // ---- the config the keys follow --------------------------------------------------
@@ -130,7 +138,7 @@ export function saveKey(config: string | null = saveConfig()): string {
   return configKey(SAVE_KEY, config)
 }
 
-/** Where this session's playtest profile lives: pm.playtest.v2[:cfg:<name>]. */
+/** Where this session's playtest profile lives: pm.playtest.v3[:cfg:<name>]. */
 export function playtestKey(config: string | null = saveConfig()): string {
   return configKey(PLAYTEST_KEY, config)
 }
@@ -261,8 +269,8 @@ export function readPlaytest(store = browserStorage()): unknown {
 
 /**
  * Reset: clear every key of ours — pm.save.v1, pm.save.v2, pm.settings.v1,
- * pm.playtest.v1, pm.playtest.v2 and the `:cfg:<name>` save and profiles
- * (v1 and v2) of every config
+ * pm.playtest.v3, pm.playtest.v2, pm.playtest.v1 and the `:cfg:<name>` save
+ * and profiles (v1, v2 and v3) of every config
  * (found by enumerating the store; this session's are removed even when the
  * store cannot be enumerated).
  */

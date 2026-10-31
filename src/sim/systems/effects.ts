@@ -188,7 +188,8 @@ const isMultKey = (key: ModifierKey): boolean =>
  * A modifier's words without its duration and whether it helps
  * (`goodDirection`; null when it changes nothing): "bikes ×0.92 speed",
  * "desk catch rate +3 %", "orders +25 %" (spawn as the arrival rate 1/mult),
- * "subscriptions +$15/day", "shelf +15".
+ * "bills +$15/day" (a payrollAdd — a loan, a subscription, a night crew or a
+ * cat's dinner: the ledger books it as `subscriptions`, D-34), "shelf +15".
  */
 function modWords(
   view: ModCtx,
@@ -257,7 +258,7 @@ function modWords(
       text = `shelf ${signed(add, 0)}`
       break
     case 'payrollAdd':
-      text = `subscriptions ${money(Math.round(add))}/day`
+      text = `bills ${money(Math.round(add))}/day`
       break
   }
   return { text, good }
@@ -826,13 +827,22 @@ export function absenceStep(sim: Sim): void {
  * ("+1 life (already 5)", "Bike 1 lost — your last vehicle", "−$250 (no
  * bike to lose)", "(Audrey has left)", "wanted list +1 (none left)",
  * "— this can end the run").
+ *
+ * The money kinds run through `balance` (default: the live balance; deck.ts
+ * optionLines passes it less the option's cost, which applyOption debits
+ * first) in data order, as applyMoney clamps them: a debit the balance cuts
+ * short reads what it really takes, "−$30 (all you have)" / "$0 (nothing to
+ * take)", and a moneyPct reads its share of the balance it will meet
+ * (review sim-2, B3 §3.3).
  */
 export function effectSummary(
   view: ModCtx,
   effects: readonly EventEffect[],
   card: CardRefs & { eventId: string; title: string },
+  balance: number = view.state.economy.balance,
 ): EffectLine[] {
   const out: EffectLine[] = []
+  const wallet: Wallet = { balance: Math.max(0, balance) }
   for (let i = 0; i < effects.length; i++) {
     const e = effects[i] as EventEffect
     if (e.kind === 'pips') {
@@ -846,9 +856,27 @@ export function effectSummary(
       out.push(pipsLine(view, run, card))
       continue
     }
-    out.push(...linesOf(view, e, card))
+    out.push(...linesOf(view, e, card, wallet))
   }
   return out
+}
+
+/** The running balance an option's money effects meet (effectSummary). */
+interface Wallet {
+  balance: number
+}
+
+/** A money delta through the wallet as applyMoney moves it (a debit clamped to the balance). */
+function spend(wallet: Wallet, delta: number): number {
+  const d = delta < 0 ? -Math.min(-delta, wallet.balance) : delta
+  wallet.balance += d
+  return d
+}
+
+/** A debit the balance cut short (`d` is what it really takes, ≤ 0). */
+function shortLine(d: number, why = ''): EffectLine {
+  if (d === 0) return line(`$0 (nothing to take${why})`, null)
+  return line(`${money(d)} (all you have${why})`, false)
 }
 
 /**
@@ -876,16 +904,24 @@ function linesOf(
   view: ModCtx,
   e: EventEffect,
   card: CardRefs & { eventId: string; title: string },
+  wallet: Wallet,
 ): EffectLine[] {
   const s = view.state
   const data = view.data
   switch (e.kind) {
-    case 'money':
+    case 'money': {
+      const d = spend(wallet, e.delta)
+      if (d !== e.delta) return [shortLine(d)]
       return [line(money(e.delta), e.delta === 0 ? null : e.delta > 0)]
-    case 'moneyPerVehicle':
+    }
+    case 'moneyPerVehicle': {
+      const want = e.delta * vehicleCount(s, e.type)
+      const d = spend(wallet, want)
+      if (d !== want) return [shortLine(d)]
       return [perVehicleLine(view, e.delta, e.type)]
+    }
     case 'moneyPct': {
-      const amount = pctAmount(s.economy.balance, e.pct)
+      const amount = spend(wallet, pctAmount(wallet.balance, e.pct))
       return [
         line(
           `${money(amount)} (${num(Math.abs(e.pct) * 100, 1)} % of the balance)`,
@@ -931,6 +967,8 @@ function linesOf(
       if (v) return [line(lostText(v, s.vehicles.length === 1), false)]
       const noun = e.lose === 'any' ? 'vehicle' : vehicleWord(view, e.lose, 1)
       if (e.fallback === 0) return [line(`no ${noun} to lose`, null)]
+      const d = spend(wallet, e.fallback)
+      if (d !== e.fallback) return [shortLine(d, `, no ${noun}`)]
       return [line(`${money(e.fallback)} (no ${noun} to lose)`, e.fallback > 0)]
     }
     case 'staff':

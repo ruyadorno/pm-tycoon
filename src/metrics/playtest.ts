@@ -1,6 +1,7 @@
 // The playtest recorder (plan.md §12.7 task 1, §12.9; v2: plan-build2 §8.7
-// task 1, §9): one `playtest.json` profile per run, the object the summary
-// card shows and downloads, `__pm.playtest()` returns and `pm.playtest.v2`
+// task 1, §9; v3: plan-build3 §8.6 task 1, spec-build3 §6, the M15 metrics
+// contract §1): one `playtest.json` profile per run, the object the summary
+// card shows and downloads, `__pm.playtest()` returns and `pm.playtest.v3`
 // stores.
 //
 // Phaser- and DOM-free (tools/check-sim-purity.mjs keeps it so): the HUD
@@ -40,33 +41,75 @@
 //     (parcel:cleared with malware), quests.firstCompletedS (also read from
 //     the history), stalls.count (stalled-from-flowing transitions), payroll
 //     {paid, short, walkouts} (payroll:paid / payroll:short / walkout events);
+//     v3 (build 3's cards): events.choices (event:offered → event:decided:
+//     the card, its title, the option and its label, default or not, the
+//     think time, and the chain it belongs to — head, title, depth, whether
+//     it closed it), livesLost entries for the lives an option took (cause
+//     'event', the card, the option, the lives left; deduped on that), the
+//     game overs a card caused (game:over cause 'event') and the beats —
+//     one per card offered, Hold Bay parcel, level-up and gold quest
+//     offer / quest end, in sim seconds — fun bar 3 item 2 reads the gaps;
+//     events.offered / decided / byCategory and the chain, life, vehicle,
+//     worker and modifier counters come from state.events.stats, so a late
+//     profile still reports them;
 //   - the view layer: elapsedS / pausedS (wall seconds while the page is
 //     visible; a hidden tab does not count, a frame gap is capped at 1 s),
 //     one fps sample per elapsed second (a histogram, so p50 / p5 / min are
 //     exact nearest-rank percentiles over integer samples: p5 = the slowest
 //     5 %), taps (canvas pointerdowns), viewSwitches and warehouseS (sim
-//     seconds while the Warehouse is the awake view).
+//     seconds while the Warehouse is the awake view); v3: pausedS includes a
+//     card waiting behind a sheet or a paper (Sim.held, the HUD's isPaused)
+//     and a card's thinkS is the wall time the EventCard showed it
+//     (deps.cardShown; without it, while the sim is held — a policy never
+//     holds, so a policy run reads 0), capped and hidden-tab-free like
+//     elapsedS (D-M15-5).
 //
-// Rules (§12.9): every `*S` is sim seconds (ticks ÷ 10) except elapsedS and
-// pausedS (wall clock); null = not reached. `pm.playtest.v2` (src/boot/
-// autosave.ts playtestKey, `:cfg:<name>` in a config session) holds the
-// profile plus a `restore` record (the accumulators the profile alone cannot
-// rebuild: the fps histogram, the first-malware parcel id, the hires, …);
-// attach() resumes from it only for the same run (version 2, same seed, simS
-// within one autosave period of the sim's) — a New game starts a fresh
-// profile, and a v1 profile (build 1, M5–M9) is never resumed.
-import type { GameData } from '../data/types.ts'
+// Rules (§12.9): every `*S` is sim seconds (ticks ÷ 10) except elapsedS,
+// pausedS, choices[].thinkS and events.thinkMedianS (wall clock); null = not
+// reached. `pm.playtest.v3` (src/boot/autosave.ts playtestKey, `:cfg:<name>`
+// in a config session) holds the profile plus a `restore` record (the
+// accumulators the profile alone cannot rebuild: the fps histogram, the
+// first-malware parcel id, the hires, the choices and beats, the card being
+// timed, …); attach() resumes from it only for the same run (version 3, same
+// seed, simS within one autosave period of the sim's) — a New game starts a
+// fresh profile, and a v2 / v1 profile (builds 2 and 1) is never resumed.
+// Fun bar 3 and its helpers live in ./funBar.ts (re-exported here; it
+// imports only this module's types).
+import type { EventKind, GameData } from '../data/types.ts'
 import {
   onSimEvent,
+  type LifeLostEventPayload,
   type SimEmitter,
   type SimEventName,
   type SimEventPayloads,
 } from '../sim/events.ts'
 import type { CommandLogEntry } from '../sim/commands.ts'
+import { cardTitle, chainsRunning, chainTitleOf } from '../sim/systems/deck.ts'
 import { salaryOf } from '../sim/systems/people.ts'
-import type { LostLifeReport, SimState, VehicleType } from '../sim/types.ts'
+import type {
+  EventRecord,
+  LostLifeReport,
+  OpenCard,
+  SimState,
+  VehicleType,
+} from '../sim/types.ts'
+import { FUN_TARGETS, thinkMedian, type FunTargets } from './funBar.ts'
 
-export const PLAYTEST_VERSION = 2
+export {
+  clock,
+  FUN_TARGETS,
+  funBar,
+  lifeExplained,
+  longestQuiet,
+  rampWindow,
+  storiesOf,
+  thinkMedian,
+  type FunCheck,
+  type FunState,
+  type FunTargets,
+} from './funBar.ts'
+
+export const PLAYTEST_VERSION = 3
 /** Game registry key of the live PlaytestRecorder (HudScene sets it; __pm reads it). */
 export const REG_PLAYTEST = 'playtest'
 /** The download's file name (the summary card, __pm.downloadPlaytest()). */
@@ -79,38 +122,20 @@ export const MAX_FRAME_GAP_MS = 1000
 export const RESTORE_WINDOW_S = 15
 /** plan-build2 §8.7 task 2: the summary card is offered once at 30:00 of sim time. */
 export const SUMMARY_OFFER_S = 1800
+/** v3 (D-M15-10): beats kept; appending stops here (the ramp window is the run's start). */
+export const BEATS_MAX = 600
+/** v3 (D-M15-10): choices kept; the stats-backed counters keep counting past it. */
+export const CHOICES_MAX = 400
 
-/**
- * plan-build2 §9, the fun bar 2 windows: instrumentation for the author's
- * playtest, not game balance (the sim never reads them; the gate's windows
- * stay in economy.pacingTargets).
- */
-export interface FunTargets {
-  /** (2) the first quest completed by this sim second. */
-  questByS: number
-  /** (3) level 3 reached inside this window, sim minutes (inclusive). */
-  level3Min: readonly [number, number]
-  /** (4) wall seconds played before the summary card first opened. */
-  keepPlayingS: number
-  /** (6, stretch) level 5 or Victory by this sim second. */
-  stretchS: number
-}
-
-export const FUN_TARGETS: Readonly<FunTargets> = {
-  questByS: 900,
-  level3Min: [15, 22],
-  keepPlayingS: 1500,
-  stretchS: 2400,
-}
-/** §9 fun bar 2 (4): the author keeps playing past 25 min (elapsedS). */
+/** §9 fun bar 3 (5): the author keeps playing past 25 min (elapsedS). */
 export const FUN_KEEP_PLAYING_S = FUN_TARGETS.keepPlayingS
 
 /**
  * The summary offer is due: SUMMARY_OFFER_S (30:00) of sim time, and more
- * than fun bar item 4's keepPlayingS (25:00) of wall time on screen — at 2×
+ * than fun bar item 5's keepPlayingS (25:00) of wall time on screen — at 2×
  * the game clock reaches 30:00 after ~15–20 real minutes, and a tester who
- * opens the card when it is offered must not fail item 4 for it (final
- * review, mobile #7).
+ * opens the card when it is offered must not fail item 5 for it (final
+ * review, mobile #7; plan-build3 §9: as in build 2).
  */
 export function summaryOfferDue(
   simTick: number,
@@ -124,6 +149,15 @@ export function summaryOfferDue(
 
 const TICKS_PER_S = 10
 const VEHICLE_TYPES: readonly VehicleType[] = ['bike', 'van', 'truck']
+const EVENT_KINDS: readonly EventKind[] = ['decision', 'news', 'job']
+const BEAT_KINDS: readonly BeatKind[] = [
+  'decision',
+  'news',
+  'job',
+  'hold',
+  'level',
+  'quest',
+]
 
 // ---- the profile (plan.md §12.9 + plan-build2 §8.7 task 1) ---------------------------
 
@@ -169,6 +203,22 @@ export interface PlaytestLifeLost {
   sorter: string | null
   /** v2: the overseas hub whose clearance cost it (null = a local delivery). */
   hub: string | null
+  /**
+   * v3: what took it — a malware parcel, or an event option (B3 §3.5; then
+   * parcelId / strain / counter / sorter / hub are null, laneRate 0 and
+   * `label` is the card's title).
+   */
+  cause: 'malware' | 'event'
+  /** v3: the card whose option took it (an event loss), else null. */
+  eventId: string | null
+  /** v3: the chosen option's label (an event loss), else null. */
+  option: string | null
+  /**
+   * v3: lives left after it (null in a record restored from before the
+   * field). An event loss's replay dedupe key with atS and eventId: a
+   * `lives −2` option loses two on one tick under one card (D-M15-7).
+   */
+  livesLeft: number | null
 }
 
 /** v2: one hire from a picker (worker:hired, not a re-hire). */
@@ -212,8 +262,93 @@ export interface PlaytestQuests extends PlaytestQuestCounts {
   byTemplate: Record<string, PlaytestQuestCounts>
 }
 
+/** v3: what a beat was (B3 §6): a card offered (by kind), a Hold Bay parcel, a level-up, a gold quest offer or a quest's end. */
+export type BeatKind = 'decision' | 'news' | 'job' | 'hold' | 'level' | 'quest'
+
+/** v3: one beat of the timeline, in SIM seconds (B3 §6; fun bar 3 item 2). */
+export interface PlaytestBeat {
+  atS: number
+  kind: BeatKind
+}
+
+/** v3: the chain a choice belongs to (B3 §6 "chain"). */
+export interface PlaytestChain {
+  /** The chain head's deck id (OpenCard.chainHeadId). */
+  head: string
+  /** The head's title filled with this card's refs (chainTitleOf; the head's own title for the head). */
+  title: string
+  /** 1 = the head (it booked a link); 2+ = a link. Routers never count (they never open). */
+  depth: number
+  /** This card closed the chain: depth ≥ 2 and it booked no next (stats.chainsFinished rose on it). */
+  end: boolean
+}
+
+/** v3: one card the player answered (B3 §6; D-M15-7). */
+export interface PlaytestChoice {
+  /** Deck id, or `job:<templateId>`. */
+  id: string
+  kind: EventKind
+  /** cardTitle at the offer (a job: its quest's name). */
+  title: string
+  /** The option's data index (event:decided.option). */
+  option: number
+  label: string
+  default: boolean
+  /** Sim second of the decision (= the offer: the hold freezes sim time). */
+  atS: number
+  /** Wall seconds the EventCard showed this card, one decimal (0 under a policy). */
+  thinkS: number
+  /** null: a single, a news card, a job, or a head that booked nothing. */
+  chain: PlaytestChain | null
+}
+
+/** v3: the cards (B3 §6). The counters are state.events.stats (jobs included). */
+export interface PlaytestEvents {
+  offered: number
+  decided: number
+  /** stats.byCategory (it has a 'job' key: split it out to count deck cards). */
+  byCategory: Record<string, number>
+  /** The recorder's, oldest first, at most CHOICES_MAX. */
+  choices: PlaytestChoice[]
+  /** Median thinkS over decision + job choices, one decimal; null with none (D-M15-6). */
+  thinkMedianS: number | null
+  chainsStarted: number
+  /** Chains closed (2-card pairs included; fun bar 4 wants depth ≥ 3: storiesOf). */
+  chainsFinished: number
+  /**
+   * Chains under way at the snapshot (deck.ts chainsRunning: a link
+   * scheduled, open or queued). Not started − finished: a link dropped on
+   * its cond ends a chain unfinished (review sim-1).
+   */
+  chainsRunning: number
+  /** Lives an event option took (malware losses are in livesLost / malware.missed). */
+  livesLost: number
+  livesGained: number
+  vehiclesLost: number
+  workersLost: number
+  /** Game overs a card caused (game:over cause 'event'; the recorder's own count). */
+  gameOverByEvent: number
+  modifiersPeak: number
+}
+
+/** v3: the open card the recorder is timing (survives a reload mid-card). */
+export interface PlaytestTrackedCard {
+  eventId: string
+  openedTick: number
+  kind: EventKind
+  title: string
+  chainHeadId: string | null
+  /** chainTitleOf for a link, cardTitle for a head or a single. */
+  chainTitle: string
+  depth: number
+  /** stats.chainsStarted / chainsFinished when it opened (only decideEvent moves them, one card at a time). */
+  startedBefore: number
+  finishedBefore: number
+  thinkMs: number
+}
+
 export interface Playtest {
-  version: 2
+  version: 3
   buildStamp: string
   seed: number
   /** ISO 8601 UTC, seconds (`2026-10-30T18:02:11Z`). */
@@ -293,6 +428,10 @@ export interface Playtest {
   stalls: { count: number; totalS: number }
   payroll: { paid: number; short: number; walkouts: number }
   satisfactionEnd: Record<string, number>
+  /** v3: the cards (B3 §6). */
+  events: PlaytestEvents
+  /** v3: the timeline's beats, oldest first, at most BEATS_MAX (B3 §6). */
+  beats: PlaytestBeat[]
 }
 
 /** What the recorder accumulates beyond the sim state (stored as `restore`). */
@@ -322,14 +461,22 @@ export interface PlaytestRestore {
   malwareAtClearance: number
   /** v2: the first quest:completed tick (the history keeps only the last 50). */
   firstQuestCompletedTick: number | null
-  /** elapsedS when the summary card was first opened (fun bar 4), or null. */
+  /** elapsedS when the summary card was first opened (fun bar 5), or null. */
   summaryOpenedS: number | null
   /** The 30:00 offer ran (once per run). */
   offered: boolean
+  /** v3: the cards answered while attached (≤ CHOICES_MAX). */
+  choices: PlaytestChoice[]
+  /** v3: the beats while attached (≤ BEATS_MAX). */
+  beats: PlaytestBeat[]
+  /** v3: the card being timed (survives a reload mid-card). */
+  card: PlaytestTrackedCard | null
+  /** v3: game:over with cause 'event'. */
+  gameOverByEvent: number
 }
 
 /**
- * `pm.playtest.v2` (`pm.playtest.v2:cfg:<name>` in a `?config=` session, so
+ * `pm.playtest.v3` (`pm.playtest.v3:cfg:<name>` in a `?config=` session, so
  * a config run never replaces the cold run's profile — src/boot/autosave.ts
  * playtestKey, report-playtest1 §6.13): the profile and the accumulators
  * that resume it.
@@ -345,8 +492,14 @@ export interface PlaytestSim {
   readonly state: SimState
   readonly events: SimEmitter
   readonly commandLog: readonly CommandLogEntry[]
-  /** The tables (applicant salaries for hires[].cheapest, building districts). */
+  /** The tables (applicant salaries for hires[].cheapest, building districts, card titles). */
   readonly data: GameData
+  /**
+   * v3: the sim holds itself on an open card (Sim.held: no policy, not over)
+   * — the think clock's fallback without deps.cardShown. Optional so test
+   * fakes compile.
+   */
+  readonly held?: boolean
 }
 
 export interface RecorderDeps {
@@ -360,8 +513,17 @@ export interface RecorderDeps {
   fps: () => number
   /** Canvas pointerdowns since the page loaded (cumulative). */
   pointerDowns: () => number
-  /** The sim is held (a modal card, auto-pause) or at speed 0. */
+  /**
+   * The sim is held (a modal card, auto-pause, v3: a card waiting behind a
+   * sheet or a paper — Sim.held) or at speed 0.
+   */
   isPaused: () => boolean
+  /**
+   * v3 (D-M15-5): the card the EventCard shows now, or null — think time
+   * runs only while it shows the recorder's open card. Without it the clock
+   * runs while the sim is held.
+   */
+  cardShown?: () => { eventId: string; openedTick: number } | null
 }
 
 // ---- pure helpers ------------------------------------------------------------------------
@@ -562,7 +724,87 @@ function freshRestore(): PlaytestRestore {
     firstQuestCompletedTick: null,
     summaryOpenedS: null,
     offered: false,
+    choices: [],
+    beats: [],
+    card: null,
+    gameOverByEvent: 0,
   }
+}
+
+/** v3: the card the recorder times, from the open card (titles filled with its refs). */
+function trackCard(
+  data: GameData,
+  state: SimState,
+  open: OpenCard,
+): PlaytestTrackedCard {
+  const title = cardTitle(data, open)
+  const st = state.events.stats
+  return {
+    eventId: open.eventId,
+    openedTick: open.openedTick,
+    kind: open.kind,
+    title,
+    chainHeadId: open.chainHeadId,
+    chainTitle: open.depth >= 2 ? (chainTitleOf(data, open) ?? title) : title,
+    depth: open.depth,
+    startedBefore: st.chainsStarted,
+    finishedBefore: st.chainsFinished,
+    thinkMs: 0,
+  }
+}
+
+/** The tracked card is the sim's open card (eventId and openedTick: back-to-back jobs share `job:<tpl>`). */
+function isOpenCard(state: SimState, c: PlaytestTrackedCard): boolean {
+  const open = state.events.open
+  return (
+    open !== null &&
+    open.eventId === c.eventId &&
+    open.openedTick === c.openedTick
+  )
+}
+
+/**
+ * A card decided that the recorder was not timing (a profile attached in
+ * between — never in a normal run): rebuilt from its history record, with
+ * no think time; whether it booked a link is read off the schedule (a link
+ * booked this tick by this card's chain at depth + 1).
+ */
+function untrackedCard(
+  sim: PlaytestSim,
+  h: EventRecord | undefined,
+  eventId: string,
+  kind: EventKind,
+): PlaytestTrackedCard {
+  const s = sim.state
+  const ev = s.events
+  const card: OpenCard = {
+    eventId,
+    kind,
+    category: h?.category ?? 'job',
+    questId: null,
+    target: null,
+    pick: null,
+    openedTick: h?.openedTick ?? s.tick,
+    parentChoice: null,
+    chainHeadId: h?.chainHeadId ?? null,
+    depth: h?.depth ?? 1,
+    drawn: false,
+    gapTicks: null,
+  }
+  const c = trackCard(sim.data, s, card)
+  const head = card.chainHeadId ?? eventId
+  const booked =
+    kind !== 'job' &&
+    ev.scheduled.some(
+      (l) =>
+        l.bookedTick === s.tick &&
+        l.chainHeadId === head &&
+        l.depth === card.depth + 1,
+    )
+  // Seed the "before" counters so the decided handler reads booked / end.
+  if (kind !== 'job' && card.depth === 1 && booked) c.startedBefore -= 1
+  if (kind !== 'job' && card.depth >= 2 && !booked) c.finishedBefore -= 1
+  return c
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -587,8 +829,85 @@ function parseLifeLost(v: unknown): PlaytestLifeLost | null {
     clearedByPlayer: v.clearedByPlayer === true,
     sorter: strOrNull(v.sorter),
     hub: strOrNull(v.hub),
+    // A record from before v3 parses as malware (contract risk 10).
+    cause: v.cause === 'event' ? 'event' : 'malware',
+    eventId: strOrNull(v.eventId),
+    option: strOrNull(v.option),
+    livesLeft: numOrNull(v.livesLeft),
   }
 }
+
+const isEventKind = (v: unknown): v is EventKind =>
+  EVENT_KINDS.includes(v as EventKind)
+
+function parseChain(v: unknown): PlaytestChain | null {
+  if (!isObj(v) || typeof v.head !== 'string') return null
+  return {
+    head: v.head,
+    title: typeof v.title === 'string' ? v.title : v.head,
+    depth: Math.max(1, count(v.depth)),
+    end: v.end === true,
+  }
+}
+
+function parseChoice(v: unknown): PlaytestChoice | null {
+  if (!isObj(v) || typeof v.id !== 'string' || !isEventKind(v.kind)) return null
+  return {
+    id: v.id,
+    kind: v.kind,
+    title: typeof v.title === 'string' ? v.title : v.id,
+    option: count(v.option),
+    label: typeof v.label === 'string' ? v.label : '',
+    default: v.default === true,
+    atS: Math.max(0, num(v.atS)),
+    thinkS: Math.max(0, num(v.thinkS)),
+    chain: parseChain(v.chain),
+  }
+}
+
+function parseBeat(v: unknown): PlaytestBeat | null {
+  if (!isObj(v) || !BEAT_KINDS.includes(v.kind as BeatKind)) return null
+  const atS = numOrNull(v.atS)
+  return atS === null ? null : { atS, kind: v.kind as BeatKind }
+}
+
+function parseCard(v: unknown): PlaytestTrackedCard | null {
+  if (!isObj(v) || typeof v.eventId !== 'string' || !isEventKind(v.kind))
+    return null
+  const openedTick = numOrNull(v.openedTick)
+  if (openedTick === null) return null
+  const title = typeof v.title === 'string' ? v.title : v.eventId
+  return {
+    eventId: v.eventId,
+    openedTick,
+    kind: v.kind,
+    title,
+    chainHeadId: strOrNull(v.chainHeadId),
+    chainTitle: typeof v.chainTitle === 'string' ? v.chainTitle : title,
+    depth: Math.max(1, count(v.depth)),
+    startedBefore: count(v.startedBefore),
+    finishedBefore: count(v.finishedBefore),
+    thinkMs: Math.max(0, num(v.thinkMs)),
+  }
+}
+
+/** Parse each entry, drop the malformed ones, keep at most `max`. */
+function parseList<T>(
+  v: unknown,
+  parse: (x: unknown) => T | null,
+  max: number,
+): T[] {
+  if (!Array.isArray(v)) return []
+  return v
+    .map(parse)
+    .filter((x): x is T => x !== null)
+    .slice(0, max)
+}
+
+const copyChoice = (c: PlaytestChoice): PlaytestChoice => ({
+  ...c,
+  chain: c.chain === null ? null : { ...c.chain },
+})
 
 function parseHire(v: unknown): PlaytestHire | null {
   if (!isObj(v) || typeof v.role !== 'string') return null
@@ -652,13 +971,17 @@ export function parseRestore(v: unknown): PlaytestRestore {
   r.firstQuestCompletedTick = numOrNull(v.firstQuestCompletedTick)
   r.summaryOpenedS = numOrNull(v.summaryOpenedS)
   r.offered = v.offered === true
+  r.choices = parseList(v.choices, parseChoice, CHOICES_MAX)
+  r.beats = parseList(v.beats, parseBeat, BEATS_MAX)
+  r.card = parseCard(v.card)
+  r.gameOverByEvent = count(v.gameOverByEvent)
   return r
 }
 
 /**
- * The stored profile belongs to this run: version 2 (a v1 profile is never
- * resumed), same seed, its simS within RESTORE_WINDOW_S of the sim's, and a
- * `restore` record.
+ * The stored profile belongs to this run: version 3 (a v2 or v1 profile is
+ * never resumed, D-M15-11), same seed, its simS within RESTORE_WINDOW_S of
+ * the sim's, and a `restore` record.
  */
 export function sameRun(stored: unknown, state: SimState): boolean {
   if (!isObj(stored) || stored.version !== PLAYTEST_VERSION) return false
@@ -670,148 +993,6 @@ export function sameRun(stored: unknown, state: SimState): boolean {
     Math.abs(simS - ticksToS(state.tick)) <= RESTORE_WINDOW_S &&
     isObj(stored.restore)
   )
-}
-
-// ---- fun bar 2 (plan-build2 §9) -------------------------------------------------------------
-
-export type FunState = 'pass' | 'fail' | 'judge' | 'pending'
-
-export interface FunCheck {
-  /** 1..6 as numbered in plan-build2 §9. */
-  n: number
-  label: string
-  state: FunState
-  /** What the check read (`17:58`, `not yet`, `you judge`). */
-  detail: string
-}
-
-/** `m:ss` (minutes not wrapped into hours); `—` for null. */
-export function clock(s: number | null): string {
-  if (s === null || !Number.isFinite(s)) return '—'
-  const t = Math.max(0, Math.floor(s))
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
-}
-
-/** A lost life the data explains: a counter, a sorter's call, or the player's Clear. */
-export function lifeExplained(l: PlaytestLifeLost): boolean {
-  return l.counter !== null || l.sorter !== null || l.clearedByPlayer
-}
-
-/**
- * Fun bar 2 (plan-build2 §9) from the profile. `judge` = the data part
- * holds but the item also asks how it felt (only the author can say), read
- * `you judge`; `pending` = the window is still open.
- *
- *  1. Hiring was a choice — ≥ 1 hire whose pick was not the cheapest
- *     applicant (hires[].cheapest false) → judge (could you say why?); hires
- *     but always the cheapest → fail; none yet → pending.
- *  2. A quest completed by 15:00 (quests.firstCompletedS ≤ questByS).
- *  3. Level 3 between 15:00 and 22:00 (level3AtS).
- *  4. Kept playing past 25:00 — elapsedS at the first opening of the card
- *     (`openedAtS`, default the profile's elapsedS) > keepPlayingS.
- *  5. Every lost life explained — each has a counter, a sorter name or
- *     clearedByPlayer (an overseas one also says the ship has sailed / the
- *     plane has left on its card) → judge (did the card make sense?); none
- *     lost → pass; any without → fail.
- *  6. (stretch) Level 5 or Victory by 40:00 (level5AtS, victoryAtS).
- */
-export function funBar(
-  pt: Playtest,
-  targets: Readonly<FunTargets> = FUN_TARGETS,
-  openedAtS: number | null = null,
-): FunCheck[] {
-  const out: FunCheck[] = []
-  const inWindow = (
-    at: number | null,
-    lo: number,
-    hi: number,
-    none: string,
-  ): Pick<FunCheck, 'state' | 'detail'> => {
-    if (at !== null)
-      return {
-        state: at >= lo && at <= hi ? 'pass' : 'fail',
-        detail: clock(at),
-      }
-    return pt.simS <= hi
-      ? { state: 'pending', detail: 'not yet' }
-      : { state: 'fail', detail: none }
-  }
-
-  const hires = pt.hires
-  const choices = hires.filter((h) => !h.cheapest).length
-  out.push({
-    n: 1,
-    label: 'Hiring was a choice',
-    ...(hires.length === 0
-      ? { state: 'pending', detail: 'no hires yet' }
-      : choices === 0
-        ? { state: 'fail', detail: 'always the cheapest' }
-        : {
-            state: 'judge',
-            detail: `${choices} not cheapest · you judge`,
-          }),
-  })
-
-  const qBy = targets.questByS
-  out.push({
-    n: 2,
-    label: `A quest done by ${clock(qBy)}`,
-    ...inWindow(pt.quests.firstCompletedS, 0, qBy, `none by ${clock(qBy)}`),
-  })
-
-  const lo = (targets.level3Min[0] ?? 15) * 60
-  const hi = (targets.level3Min[1] ?? 22) * 60
-  out.push({
-    n: 3,
-    label: `Level 3 between ${clock(lo)} and ${clock(hi)}`,
-    ...inWindow(pt.level3AtS, lo, hi, `none by ${clock(hi)}`),
-  })
-
-  const keep = targets.keepPlayingS
-  const opened = openedAtS ?? pt.elapsedS
-  out.push({
-    n: 4,
-    label: `Kept playing past ${clock(keep)}`,
-    state: opened > keep ? 'pass' : 'fail',
-    detail: `summary at ${clock(opened)}`,
-  })
-
-  const lost = pt.livesLost
-  const unexplained = lost.filter((l) => !lifeExplained(l)).length
-  out.push({
-    n: 5,
-    label: 'Every lost life explained',
-    state: lost.length === 0 ? 'pass' : unexplained > 0 ? 'fail' : 'judge',
-    detail:
-      lost.length === 0
-        ? 'none lost'
-        : unexplained > 0
-          ? `${unexplained} unexplained`
-          : 'you judge',
-  })
-
-  const by = targets.stretchS
-  const v = pt.victoryAtS
-  const l5 = pt.level5AtS
-  const reached =
-    v !== null && v <= by
-      ? `Victory ${clock(v)}`
-      : l5 !== null && l5 <= by
-        ? `Lv 5 ${clock(l5)}`
-        : null
-  out.push({
-    n: 6,
-    label: `Stretch: Lv 5 or Victory by ${clock(by)}`,
-    ...(reached !== null
-      ? { state: 'pass', detail: reached }
-      : pt.simS <= by
-        ? { state: 'pending', detail: 'not yet' }
-        : {
-            state: 'fail',
-            detail: l5 !== null ? `Lv 5 ${clock(l5)}` : `none by ${clock(by)}`,
-          }),
-  })
-  return out
 }
 
 // ---- the recorder ----------------------------------------------------------------------
@@ -849,7 +1030,7 @@ export class PlaytestRecorder {
     return this.sim
   }
 
-  /** elapsedS at the first summary opening this run (fun bar 4). */
+  /** elapsedS at the first summary opening this run (fun bar 5). */
   get summaryOpenedS(): number | null {
     return this.r.summaryOpenedS
   }
@@ -865,9 +1046,11 @@ export class PlaytestRecorder {
   }
 
   /**
-   * Follow `sim`. With `stored` (pm.playtest.v2) of the same run the
+   * Follow `sim`. With `stored` (pm.playtest.v3) of the same run the
    * profile resumes from it; otherwise a fresh profile starts now. Returns
-   * true when it resumed.
+   * true when it resumed. v3: a stored card that is no longer the open one
+   * is dropped; an open card the recorder is not timing yet (a loaded save
+   * does not re-emit event:offered) is timed from 0, with no beat.
    */
   attach(sim: PlaytestSim, stored: unknown = null): boolean {
     this.detach()
@@ -879,6 +1062,7 @@ export class PlaytestRecorder {
       const s = stored as Record<string, unknown>
       this.r = parseRestore(s.restore)
       this.startedAt = String(s.startedAt)
+      this.dropReplayed(st)
     } else {
       this.r = freshRestore()
       this.startedAt = isoSeconds(this.deps.now())
@@ -887,6 +1071,10 @@ export class PlaytestRecorder {
       this.r.firstCaughtTick = st.stats.firstCatchTick
       this.r.stalled = st.lane.stalled
     }
+    const card = this.r.card
+    if (card !== null && !isOpenCard(st, card)) this.r.card = null
+    if (this.r.card === null && st.events.open !== null)
+      this.r.card = trackCard(sim.data, st, st.events.open)
     this.device = this.safeDevice()
     this.tapBase = this.safePointerDowns()
     this.lastWall = null
@@ -901,7 +1089,7 @@ export class PlaytestRecorder {
     this.off = []
   }
 
-  /** Once per frame: wall / paused clocks, the fps sampler, warehouse time. */
+  /** Once per frame: wall / paused / think clocks, the fps sampler, warehouse time. */
   update(): void {
     const t = this.deps.now()
     const last = this.lastWall
@@ -911,6 +1099,8 @@ export class PlaytestRecorder {
       if (dt > 0) {
         this.r.elapsedMs += dt
         if (this.safePaused()) this.r.pausedMs += dt
+        const c = this.r.card
+        if (c !== null && this.cardUp(c)) c.thinkMs += dt
         this.r.sampleMs += dt
         while (this.r.sampleMs >= FPS_SAMPLE_MS) {
           this.r.sampleMs -= FPS_SAMPLE_MS
@@ -934,7 +1124,7 @@ export class PlaytestRecorder {
     this.r.viewSwitches += 1
   }
 
-  /** The summary card opened (the first opening is kept for fun bar 4). */
+  /** The summary card opened (the first opening is kept for fun bar 5). */
   noteSummaryOpened(): void {
     if (this.r.summaryOpenedS === null)
       this.r.summaryOpenedS = round1(this.r.elapsedMs / 1000)
@@ -992,6 +1182,7 @@ export class PlaytestRecorder {
     const quests: PlaytestQuests = s
       ? questCounts(s, this.r.firstQuestCompletedTick)
       : { ...zeroCounts(), firstCompletedS: null, byTemplate: {} }
+    const es = s?.events.stats ?? null
     return {
       version: PLAYTEST_VERSION,
       buildStamp: this.deps.buildStamp,
@@ -1059,10 +1250,27 @@ export class PlaytestRecorder {
       stalls: { count: this.r.stallCount, totalS: round1(stallS) },
       payroll: { ...this.r.payroll },
       satisfactionEnd,
+      events: {
+        offered: es?.offered ?? 0,
+        decided: es?.decided ?? 0,
+        byCategory: { ...es?.byCategory },
+        choices: this.r.choices.map(copyChoice),
+        thinkMedianS: thinkMedian(this.r.choices),
+        chainsStarted: es?.chainsStarted ?? 0,
+        chainsFinished: es?.chainsFinished ?? 0,
+        chainsRunning: s ? chainsRunning(s.events) : 0,
+        livesLost: es?.livesLost ?? 0,
+        livesGained: es?.livesGained ?? 0,
+        vehiclesLost: es?.vehiclesLost ?? 0,
+        workersLost: es?.workersLost ?? 0,
+        gameOverByEvent: this.r.gameOverByEvent,
+        modifiersPeak: es?.modifiersPeak ?? 0,
+      },
+      beats: this.r.beats.map((b) => ({ ...b })),
     }
   }
 
-  /** What pm.playtest.v2 stores: the profile plus its accumulators. */
+  /** What pm.playtest.v3 stores: the profile plus its accumulators. */
   persisted(): StoredPlaytest {
     const pt = this.snapshot()
     const r = this.r
@@ -1077,6 +1285,9 @@ export class PlaytestRecorder {
         payroll: { ...r.payroll },
         hires: r.hires.map((h) => ({ ...h, pips: { ...h.pips } })),
         sorter: { ...r.sorter },
+        choices: r.choices.map(copyChoice),
+        beats: r.beats.map((b) => ({ ...b })),
+        card: r.card === null ? null : { ...r.card },
       },
     }
   }
@@ -1105,6 +1316,131 @@ export class PlaytestRecorder {
     if (!Number.isFinite(f)) return
     const k = String(Math.max(0, Math.min(240, Math.round(f))))
     this.r.fpsHist[k] = (this.r.fpsHist[k] ?? 0) + 1
+  }
+
+  /**
+   * The think clock runs for `c` (D-M15-5): it is the sim's open card and
+   * the EventCard shows it (deps.cardShown; a throw reads false), or —
+   * without that dep — the sim holds itself on it (never under a policy).
+   */
+  private cardUp(c: PlaytestTrackedCard): boolean {
+    const sim = this.sim
+    if (sim === null || !isOpenCard(sim.state, c)) return false
+    const shown = this.deps.cardShown
+    if (shown === undefined) return sim.held === true
+    try {
+      const v = shown()
+      return (
+        v !== null && v.eventId === c.eventId && v.openedTick === c.openedTick
+      )
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * A resumed profile can be ahead of the save it resumes with (the profile
+   * alone is written while the sim is held): what the restored sim will
+   * replay is dropped — beats and choices after its tick, and a choice (and
+   * the lives its option took) for the card that is open again, which the
+   * player answers anew.
+   */
+  private dropReplayed(st: SimState): void {
+    const r = this.r
+    const simS = ticksToS(st.tick)
+    const open = st.events.open
+    const openS = open === null ? null : ticksToS(open.openedTick)
+    const again = (id: string | null, atS: number): boolean =>
+      open !== null && id === open.eventId && atS >= (openS ?? 0)
+    r.beats = r.beats.filter((b) => b.atS <= simS)
+    r.choices = r.choices.filter((c) => c.atS <= simS && !again(c.id, c.atS))
+    r.livesLost = r.livesLost.filter(
+      (l) => l.cause !== 'event' || !again(l.eventId, l.atS),
+    )
+  }
+
+  private beat(kind: BeatKind): void {
+    if (this.r.beats.length >= BEATS_MAX) return
+    this.r.beats.push({ atS: ticksToS(this.tick()), kind })
+  }
+
+  /** event:offered — time the card that just opened, and its beat. */
+  private noteOffered(p: SimEventPayloads['event:offered']): void {
+    const sim = this.sim
+    const open = sim?.state.events.open ?? null
+    if (sim === null || open === null || open.eventId !== p.eventId) return
+    this.r.card = trackCard(sim.data, sim.state, open)
+    this.beat(open.kind)
+  }
+
+  /**
+   * event:decided — the choice. At the emit the history record is pushed
+   * and the stats have moved (deck.ts decideEvent), so the chain's booked /
+   * closed facts are the counters' rise since the card opened.
+   */
+  private noteDecided(p: SimEventPayloads['event:decided']): void {
+    const sim = this.sim
+    if (sim === null) return
+    const s = sim.state
+    const tracked = this.r.card
+    const c =
+      tracked !== null && tracked.eventId === p.eventId
+        ? tracked
+        : untrackedCard(sim, s.events.history.at(-1), p.eventId, p.kind)
+    this.r.card = null
+    if (this.r.choices.length >= CHOICES_MAX) return
+    const st = s.events.stats
+    const booked = st.chainsStarted > c.startedBefore
+    const end = st.chainsFinished > c.finishedBefore
+    this.r.choices.push({
+      id: p.eventId,
+      kind: p.kind,
+      title: c.title,
+      option: p.option,
+      label: p.label,
+      default: p.default,
+      atS: ticksToS(s.tick),
+      thinkS: round1(c.thinkMs / 1000),
+      chain:
+        p.kind !== 'job' && (c.depth >= 2 || booked)
+          ? {
+              head: c.chainHeadId ?? p.eventId,
+              title: c.chainTitle,
+              depth: c.depth,
+              end,
+            }
+          : null,
+    })
+  }
+
+  /** life:lost for an event option (B3 §3.5): once per (atS, eventId, livesLeft). */
+  private noteEventLife(p: LifeLostEventPayload): void {
+    const atS = ticksToS(p.report.tick)
+    if (
+      this.r.livesLost.some(
+        (l) =>
+          l.cause === 'event' &&
+          l.atS === atS &&
+          l.eventId === p.eventId &&
+          l.livesLeft === p.lives,
+      )
+    )
+      return
+    this.r.livesLost.push({
+      parcelId: null,
+      atS,
+      label: p.title,
+      strain: null,
+      laneRate: 0,
+      counter: null,
+      clearedByPlayer: false,
+      sorter: null,
+      hub: null,
+      cause: 'event',
+      eventId: p.eventId,
+      option: p.option,
+      livesLeft: p.lives,
+    })
   }
 
   private safePaused(): boolean {
@@ -1207,17 +1543,22 @@ export class PlaytestRecorder {
       if (p.malware) this.r.malwareAtClearance += 1
     })
     on('life:lost', (p) => {
-      if (p.cause === 'event') return // M12: the event variant (metrics v3)
+      if (p.cause === 'event') {
+        this.noteEventLife(p)
+        return
+      }
       const atS = ticksToS(p.report?.tick ?? this.tick())
       // A replayed loss (a reload just before it) is recorded once: the same
       // parcel id (ids are unique per run — two parcels sharing a label can
       // both be lost on one tick). A record restored from before parcelId
       // falls back to the time + label match.
       if (
-        this.r.livesLost.some((l) =>
-          l.parcelId !== null
-            ? l.parcelId === p.parcelId
-            : l.atS === atS && l.label === p.label,
+        this.r.livesLost.some(
+          (l) =>
+            l.cause === 'malware' &&
+            (l.parcelId !== null
+              ? l.parcelId === p.parcelId
+              : l.atS === atS && l.label === p.label),
         )
       )
         return
@@ -1231,8 +1572,29 @@ export class PlaytestRecorder {
         clearedByPlayer: p.clearedByPlayerAt !== null,
         sorter: p.sorterCall?.name ?? null,
         hub: p.report ? lossHub(this.sim?.data ?? null, p.report) : null,
+        cause: 'malware',
+        eventId: null,
+        option: null,
+        livesLeft: this.sim?.state.economy.lives ?? null,
       })
     })
+    on('game:over', (p) => {
+      // No state counter: continueWithOneLife clears economy.gameOver.
+      if (p.cause === 'event') this.r.gameOverByEvent += 1
+    })
+    on('event:offered', (p) => this.noteOffered(p))
+    on('event:decided', (p) => this.noteDecided(p))
+    on('event:withdrawn', (p) => {
+      // A job card whose offer went away (quests.ts closeJobCard): no choice.
+      if (this.r.card?.eventId === p.eventId) this.r.card = null
+    })
+    on('parcel:held', () => this.beat('hold'))
+    on('level:up', () => this.beat('level'))
+    on('quest:offered', (p) => {
+      // A job's quest:offered fires on its card's tick (the card's beat).
+      if (p.ultimate) this.beat('quest')
+    })
+    on('quest:failed', () => this.beat('quest'))
     on('worker:hired', (p) => this.noteHire(p))
     on('sorter:decided', (p) => {
       this.r.sorter.decisions += 1
@@ -1243,6 +1605,7 @@ export class PlaytestRecorder {
     on('quest:completed', () => {
       if (this.r.firstQuestCompletedTick === null)
         this.r.firstQuestCompletedTick = this.tick()
+      this.beat('quest')
     })
     on('lane:stalled', () => {
       if (!this.r.stalled) this.r.stallCount += 1

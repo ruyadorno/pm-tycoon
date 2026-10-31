@@ -31,11 +31,12 @@ The game teaches itself in about a minute:
 Then grow: more vehicles, a machine next to the desk, rush buildings whose waiting badge turns amber or red, keep
 payroll covered on payday, decide the cards as they come (jobs included), and climb the levels.
 
-**The playtest brief: play thirty to forty minutes cold**, without help or the debug flags. Then open the summary card
-(tap ❚❚ to pause, then ❚❚ again for the pause menu → **End run — show summary**; a ticker line also offers it at 30:00 of game time,
-once 25 real minutes have passed, and the Game Over and Victory cards have a **Run summary** button), press **Download playtest.json** and **Copy
-summary**, and note how it felt. `docs/playtest.md` explains the file and the fun-bar checks;
-`docs/phone-checklist.md` is the device checklist for the same session.
+**The playtest brief: play thirty to forty minutes cold** on the iPhone 16, without help or the debug flags, and answer
+the cards as you like. Then open the summary card (tap ❚❚ to pause, then ❚❚ again for the pause menu → **End run — show
+summary**; a ticker line also offers it at 30:00 of game time, once 25 real minutes have passed, and the Game Over and
+Victory cards have a **Run summary** button), press **Download playtest.json** and **Copy summary**, and note how it
+felt. The card ends with **fun bar 3** (seven checks); `docs/playtest.md` explains the file (`playtest.json` v3) and the
+checks; `docs/phone-checklist.md` is the device checklist for the same session.
 
 ### Money, days and lives
 
@@ -44,7 +45,8 @@ summary**, and note how it felt. `docs/playtest.md` explains the file and the fu
 - The level bar counts **lifetime earned** (`$3,010 / $3,250`), so spending never sets you back a level; quest cash
   counts too (cash from event cards does not: it only moves your balance).
 - You start with $450 and **3 lives** (up to 5). A malware parcel delivered to a customer costs one; the lost-life
-  card names the slot, the person or machine that missed it, and what would have caught it. No lives left: game over.
+  card names the slot, the person or machine that missed it, and what would have caught it. A red option on a card can
+  cost one too (its lost-life card says what you chose). No lives left: game over.
 - Tossing a malware parcel pays a $50 bounty; tossing a clean one costs a $25 fee and some satisfaction. A district's
   satisfaction rises with on-time deliveries and falls with late ones, long waits and malware; happy districts send
   more parcels.
@@ -96,13 +98,18 @@ The first card opens at **3:20** of game time (Day 4; the HUD counts days from D
 
 - **Every card pauses the game** (`PAUSED` in its corner) until you choose: no timer, no **Later**, nothing decided
   behind your back. The music plays on; the clock, the vehicles and the ticker wait.
-- **Under each option is exactly what it does**, written from the game's own effects (costs in red, gains in green):
+- **Under each option is exactly what it does**, written from the game's own effects (costs in red, gains in green, the
+  rest grey):
   `−$300`, `+1 life`, `all drivers: speed +1, charisma −1`, `bikes ×0.85 speed for 1 day`, `wanted list +1`. An
-  option you cannot afford is greyed (`Can't afford · $300`) and always has a free sibling. A **red** option can cost a
-  life (`— this can end the run` when it could take your last one). An option that takes a life, a vehicle or a person
-  always has a way out beside it, on the same card or on the card that started the story.
+  option you cannot afford is greyed (`Can't afford · $300`) and always has a free sibling.
+- **Danger cards**: a **red** option is the one that can hurt — it takes a life or a vehicle (`— this can end the run`
+  when it could take your last life). An option that takes a life, a vehicle or a person always has a way out beside
+  it, on the same card or on the card that started the story. A red button takes a tap only after a slightly longer
+  look (0.6 s instead of 0.3 s, so a double tap never lands on it unread), and `Enter` never picks it. When a card takes
+  a life, the lost-life card names the card and `You chose: …`; on the last life the Game Over card does.
 - **Stories**: some options continue later (`…then: On the doorstep (in 1 day)`); the next card opens with `You chose:
-  …`. Some outcomes depend on how you play, never on dice (`Outcome depends on your catch rate …`).
+  …`, and the last card's paper reads `<the story's title> — the story ends`. Some outcomes depend on how you play,
+  never on dice (`Outcome depends on your catch rate …`).
 - **News** cards have one **OK**: any tap closes them.
 - **Jobs are cards too**: a `JOB BOARD` card with the objective, the reward and the time limit — **Accept** or
   **Decline**, no Later. A job card can come once no job is running and a day has passed since the last one ended.
@@ -120,24 +127,26 @@ Job offers arrive as `JOB BOARD` cards (above). One job runs at a time; the chip
 progress and time left (tap it for the card and **Abandon**, which asks first). A failed or abandoned job costs
 nothing; the next job card can come one day after a job ends (done, failed, declined or abandoned).
 
-| Quest             | From                                     | Goal                                                                                                  | Time      | Reward                                             |
-| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------- |
-| Rush hour         | L1                                       | deliver 6 / 10 / 14 / 18 / 22 parcels (by level) sent from the district with the most waiting parcels | 3 days    | $120 / $200 / $300 / $400 / $500                   |
-| Cheer up          | L1, a district below 50                  | bring its satisfaction to 52                                                                          | 5 days    | $150 + 5 satisfaction there                        |
-| Special delivery  | L1, after your first Toss, below 5 lives | carry the golden parcel from A to B before its gold ring runs out                                     | 2 minutes | +1 life and $150 — the only way to win a life back |
-| Like clockwork    | L1                                       | one day with ≥ 85 % on time (at least 6 deliveries)                                                   | 3 days    | ★ driver Rae (speed 5, energy 4, charisma 1, van)  |
-| Clean sweep       | L2                                       | toss 3 malware in a row with no wrong Toss                                                            | 5 days    | ★ inspector Vera (eye 5, pace 3, charisma 1)       |
-| Big haul          | L2                                       | deliver 3 XL parcels                                                                                  | 4 days    | $300                                               |
-| Night shift       | L2                                       | 6 Hold Bay decisions with no Hold Bay stall                                                           | 4 days    | $250                                               |
-| Customs run       | L3, the Docks live                       | clear 3 overseas parcels at the Docks                                                                 | 5 days    | $400                                               |
-| Inspector general | L3                                       | lane detection ≥ 95 % against every announced strain for a whole day                                  | 4 days    | $500                                               |
-| Express lane      | L5, the Airport live                     | clear 4 Airport parcels                                                                               | 5 days    | $600                                               |
+| Quest             | From                                     | Goal                                                                                                  | Time      | Reward                                            |
+| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------- |
+| Rush hour         | L1                                       | deliver 6 / 10 / 14 / 18 / 22 parcels (by level) sent from the district with the most waiting parcels | 3 days    | $120 / $200 / $300 / $400 / $500                  |
+| Cheer up          | L1, a district below 50                  | bring its satisfaction to 52                                                                          | 5 days    | $150 + 5 satisfaction there                       |
+| Special delivery  | L1, after your first Toss, below 5 lives | carry the golden parcel from A to B before its gold ring runs out                                     | 2 minutes | +1 life and $150 (a few news cards give one too)  |
+| Like clockwork    | L1                                       | one day with ≥ 85 % on time (at least 6 deliveries)                                                   | 3 days    | ★ driver Rae (speed 5, energy 4, charisma 1, van) |
+| Clean sweep       | L2                                       | toss 3 malware in a row with no wrong Toss                                                            | 5 days    | ★ inspector Vera (eye 5, pace 3, charisma 1)      |
+| Big haul          | L2                                       | deliver 3 XL parcels                                                                                  | 4 days    | $300                                              |
+| Night shift       | L2                                       | 6 Hold Bay decisions with no Hold Bay stall                                                           | 4 days    | $250                                              |
+| Customs run       | L3, the Docks live                       | clear 3 overseas parcels at the Docks                                                                 | 5 days    | $400                                              |
+| Inspector general | L3                                       | lane detection ≥ 95 % against every announced strain for a whole day                                  | 4 days    | $500                                              |
+| Express lane      | L5, the Airport live                     | clear 4 Airport parcels                                                                               | 5 days    | $600                                              |
 
 **The Golden Release** is offered when you reach L5 on its own gold card — the one offer that is not an event card: it
 does not pause the game, has no Decline, and **Later** keeps it waiting (decision cards hold back while it is open):
-within 5 days, 60 deliveries, 0 malware delivered and ≥ 85 % on time. Shipping it wins: the **TYCOON** card with the
-run's stats, then **Continue** (endless mode: quests keep coming, the malware share climbs 1 point a day up to 20 %,
-the Title's Continue line reads `Tycoon ✓`), **New game** or **Run summary**.
+within 5 days, 60 deliveries, 0 malware delivered and ≥ 85 % on time (90 % in build 2). Shipping it wins: the
+**TYCOON** card with the run's stats, then **Continue** (endless mode: quests keep coming, the malware share climbs 1
+point a day up to 20 %, the Title's Continue line reads `Tycoon ✓`), **New game** or **Run summary**. The scripted
+test player gets the offer at about 25.3 minutes, misses most offers on the 5-day clock (not on the on-time rate) and
+wins at 47.6–56.6 minutes on seeds 1–3 (docs/decisions.md, M14), so a Victory inside a 40-minute session is a stretch.
 
 ### Overseas hubs
 
@@ -176,18 +185,18 @@ it.
 
 ### Controls
 
-| Touch             | Desktop                 | Does                                                                           |
-| ----------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| tap               | click                   | select a building (rush it), a vehicle, the warehouse, a hub, a locked region  |
-| double-tap        | double-click            | zoom 1× ⇄ 2× at that point; on a vehicle: follow it                            |
-| drag              | mouse drag / arrow keys | pan the city (with inertia); scroll the tall rooms at tiers 4–5                |
-| swipe the chips   | mouse drag              | scroll the region chips above the bottom bar (`<` / `>` mark hidden chips)     |
-| pinch             | mouse wheel             | zoom 1× / 2× (in the warehouse the wheel scrolls a tall room)                  |
-| long-press        | right-click             | district panel (satisfaction, favours, waiting parcels, its quest)             |
-| HUD buttons       | `Space` / `1` / `2`     | pause / 1× / 2× (❚❚ while paused opens the pause menu)                         |
-| Warehouse, Garage | `W`, `G`                | switch views, open the Garage                                                  |
-| —                 | `Esc`, `F`              | close the top sheet or card; follow the vehicle nearest the cursor             |
-| —                 | `Enter`                 | confirm a dialog; Accept the Golden Release; Run summary on the Game Over card |
+| Touch             | Desktop                 | Does                                                                                                                              |
+| ----------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| tap               | click                   | select a building (rush it), a vehicle, the warehouse, a hub, a locked region                                                     |
+| double-tap        | double-click            | zoom 1× ⇄ 2× at that point; on a vehicle: follow it                                                                               |
+| drag              | mouse drag / arrow keys | pan the city (with inertia); scroll the tall rooms at tiers 4–5                                                                   |
+| swipe the chips   | mouse drag              | scroll the region chips above the bottom bar (`<` / `>` mark hidden chips)                                                        |
+| pinch             | mouse wheel             | zoom 1× / 2× (in the warehouse the wheel scrolls a tall room)                                                                     |
+| long-press        | right-click             | district panel (satisfaction, favours, waiting parcels, its quest)                                                                |
+| HUD buttons       | `Space` / `1` / `2`     | pause / 1× / 2× (❚❚ while paused opens the pause menu)                                                                            |
+| Warehouse, Garage | `W`, `G`                | switch views, open the Garage                                                                                                     |
+| —                 | `Esc`, `F`              | close the top sheet or card (a decision or job card stays); follow the vehicle nearest the cursor                                 |
+| —                 | `Enter`                 | confirm a dialog; a card's first option (never a red or greyed one); Accept the Golden Release; Run summary on the Game Over card |
 
 On an event or job card `Esc` and a tap outside do nothing (the card waits for your choice; a news card closes on any
 tap, `Esc` or `Enter`), and `Enter` takes the first option unless it is red or greyed.
@@ -217,12 +226,14 @@ Everything lives in `localStorage` on the page's origin; nothing is sent anywher
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | `pm.save.v2`                                         | the autosave (every 10 s and when the tab hides); the Title offers **Continue** from it |
 | `pm.settings.v1`                                     | mute and speed (shared by every session)                                                |
-| `pm.playtest.v2`                                     | the playtest profile (the same object as `playtest.json`)                               |
-| `pm.save.v2:cfg:<name>`, `pm.playtest.v2:cfg:<name>` | the save and profile of a `?config=<name>` session (`spicy`, `tycoon`)                  |
+| `pm.playtest.v3`                                     | the playtest profile (the same object as `playtest.json`, version 3)                    |
+| `pm.save.v2:cfg:<name>`, `pm.playtest.v3:cfg:<name>` | the save and profile of a `?config=<name>` session (`spicy`, `tycoon`)                  |
 
 A save from another build (a playtest-1 `pm.save.v1`, or a `pm.save.v2` written with other data tables) is never
-loaded: the Title says `Save from an older build was reset` and drops it. Title → **Reset** clears all of these keys,
-every config's included, and a leftover playtest-1 `pm.save.v1` or `pm.playtest.v1`. `?newGame=1` starts fresh without the Title's Continue.
+loaded: the Title says `Save from an older build was reset` and drops it. A build-2 profile (`pm.playtest.v2`) is never
+resumed: build 3 starts a new v3 profile. Title → **Reset** clears all of these keys, every config's included, and a
+leftover `pm.save.v1`, `pm.playtest.v2` or `pm.playtest.v1` (with their `:cfg:` copies). `?newGame=1` starts fresh
+without the Title's Continue.
 
 ## How to serve on a phone
 
@@ -287,21 +298,22 @@ installs `window.__pm`, the overlay and 4× speed, and enables `config=<name>` (
 
 ## Documents
 
-| File                       | What                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------ |
-| `AGENTS.md`                | rules for coding agents working in this repo (commands, commits, code rules)         |
-| `docs/report-playtest2.md` | the build-2 end-of-run report: what changed since playtest 1, art approvals, balance |
-| `docs/report-playtest1.md` | the playtest-1 report (levels 1–2)                                                   |
-| `docs/status.md`           | one entry per milestone (M0–M4, M5–M10, then M11–M15)                                |
-| `docs/decisions.md`        | every default taken, run decision, retune and runtime dependency                     |
-| `docs/gate/latest.md`      | the latest 10-seed sim gate table                                                    |
-| `docs/playtest.md`         | how to read `playtest.json` and the fun bar                                          |
-| `docs/feel-check-m12.md`   | a ten-minute phone session on the first build with the cards (M12)                   |
-| `docs/phone-checklist.md`  | the iPhone 16 + desktop devtools checklist                                           |
-| `docs/art-todo.md`         | the art awaiting the author's approval (G2–G6), the exact approve / reject commands  |
-| `art/STYLE.md`             | the art contract (palette, grid, light, canvas classes)                              |
-| `tests/fixtures/README.md` | the saved sim states the screenshot specs load, and how to regenerate them           |
-| `CREDITS.md`               | font, logo, art, audio and code credits with licences                                |
+| File                       | What                                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| `AGENTS.md`                | rules for coding agents working in this repo (commands, commits, code rules)            |
+| `docs/report-playtest3.md` | the build-3 end-of-run report: the cards, the deck the policy chose, the −10 % pass, G7 |
+| `docs/report-playtest2.md` | the build-2 end-of-run report: what changed since playtest 1, art approvals, balance    |
+| `docs/report-playtest1.md` | the playtest-1 report (levels 1–2)                                                      |
+| `docs/status.md`           | one entry per milestone (M0–M4, M5–M10, then M11–M15)                                   |
+| `docs/decisions.md`        | every default taken, run decision, retune and runtime dependency                        |
+| `docs/gate/latest.md`      | the latest 10-seed sim gate table                                                       |
+| `docs/playtest.md`         | how to read `playtest.json` (v3) and the fun bar 3                                      |
+| `docs/feel-check-m12.md`   | a ten-minute phone session on the first build with the cards (M12)                      |
+| `docs/phone-checklist.md`  | the iPhone 16 + desktop devtools checklist                                              |
+| `docs/art-todo.md`         | the art awaiting the author's approval (G2–G7), the exact approve / reject commands     |
+| `art/STYLE.md`             | the art contract (palette, grid, light, canvas classes)                                 |
+| `tests/fixtures/README.md` | the saved sim states the screenshot specs load, and how to regenerate them              |
+| `CREDITS.md`               | font, logo, art, audio and code credits with licences                                   |
 
 The design documents (plans, mechanics specs, view specs, audio and style guides) live outside this repository.
 

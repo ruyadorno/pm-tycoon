@@ -13,9 +13,11 @@ swapped to another first-round candidate, `ev_pic_port` was re-rolled, and `vict
 download without the malware ramp (no spend). Every id has a PixelLab pick, so **no picture ships procedural**. Every
 pick is `approved: false` and waits for your yes or no.
 
-Sheet: **`art/contact/events@4x.png`** shows the 13 pictures as they ship, four EventCard mocks at 1× (344 px = the
-card at 360), the victory art on a VictoryCard mock with the confetti over its top edge, the confetti frames,
-`ic_event` beside the rush `ic_bell`, an EventChip mock, and the procedural fallbacks for comparison. The candidates
+Sheet: **`art/contact/events@4x.png`** shows the 13 pictures as they ship and in situ: since M13 the real EventCards,
+cropped at 1× from the shots (`shots/event-card-<category>.png`, one shipped card per category, regenerated at the
+M15 sha; `node tools/art/contact.ts events` falls back to EventCard mocks when the shots are missing). Then the victory
+art on a VictoryCard mock with the confetti over its top edge, the confetti frames, `ic_event` beside the rush
+`ic_bell`, an EventChip mock, and the procedural fallbacks for comparison. The candidates
 are on `art/contact/candidates-b3-events@4x.png` and `candidates-b3-port-reroll@4x.png` (processed | raw download per
 candidate). Both are gitignored like every candidate sheet.
 
@@ -68,9 +70,10 @@ Notes for the review:
   skyline-and-fireworks plate for the victory art.
 - **Budget**: build 3's PixelLab budget is 400 generations with a 100 reserve (Q-B3-9). `tools/art/gen.ts` counts from
   2026-10-31 (`PIXELLAB_RUN_SINCE`), refuses batches past 300 without `--use-reserve` (`PIXELLAB_RUN_RESERVE`) and past
-  400 outright (`PIXELLAB_RUN_BUDGET`). 233 are spent, so 67 are left before the reserve.
+  400 outright (`PIXELLAB_RUN_BUDGET`). **233 of 400 are spent** (the two rounds above; no generation since), so 67 are left
+  before the reserve and 167 with it. A re-roll of one picture is about 12–20 generations (3–4 candidates).
 
-## For the author: what to approve or reject (build 2, G4–G6) — start here
+## For the author: what to approve or reject (build 2, G4–G6) — still open
 
 Build 2 added or regenerated **47 PixelLab sprites** (43 new ids + `wh_ext`, `bike`, `ap_terminal` and `dk_ship`
 re-done). The agent picked one candidate per id by reading the contact sheets (`tools/art/decide.ts --manifest`); every
@@ -193,7 +196,9 @@ build VM (it needs the raw downloads in `art/candidates/`) and then `vlr art:bui
 ### Shipped procedural
 
 - **No PixelLab id fell back to procedural** in build 2; every id got its candidates (`xray` and `dk_ship` were
-  re-rolled in M9, `xray` twice).
+  re-rolled in M9, `xray` twice). **None in build 3 either**: the 13 `ev_pic_*` ids and `victory_art` all ship a
+  PixelLab pick (`ev_pic_port` after one re-roll), so the procedural fallbacks of `tools/art/eventPics.ts` ship
+  nowhere; they come back only if you set an id's `placeholder: true` (G7 "Fallbacks").
 - **Placeholders since playtest 1** (`placeholder: true`, the PixelLab candidates were rejected): `desk`, `shelf_t1`,
   `shelf_t2`.
 - **Procedural by design, new in build 2** (59 ids, drawn by `tools/art/*.ts`, final unless you say otherwise):
@@ -204,6 +209,8 @@ build VM (it needs the raw downloads in `art/candidates/`) and then `vlr art:bui
   - people: `face_00` … `face_11`, `ic_star`, `ic_pip_on`, `ic_pip_off`, `worker_sorter`;
   - quests and hubs: `ic_quest`, `ic_magic`, `magic_ring`, `ui_card_gold`, `ui_bar_fill_gold`, `ic_handoff`,
     `ic_cleared`, `ic_ship`, `ic_plane`.
+  - **New in build 3** (procedural by design, final unless you say otherwise): `ic_event` (the orange event bell, both
+    atlases) and `fx_confetti` (`_f0`…`_f7`, the VictoryCard's confetti).
   - Also redrawn or extended: `fx_dust` (one cloud per frame), `lamp_lock` (a fifth `lamp` frame), the m5x7 sheet's
     drawn glyphs (+ ★ and ✓). The logo is your own art (`source: 'author'`, not in an atlas).
 
@@ -219,16 +226,19 @@ build VM (it needs the raw downloads in `art/candidates/`) and then `vlr art:bui
 | M10         |       0 |           0 | —                      | none (as of the M10 docs)                                                      |
 | **Build 2** |  **16** |     **877** | **3,299 → 2,422**      | 47 ids                                                                         |
 | Build 3 M12 |       2 |         233 | 2,422 → 2,189          | the 13 `ev_pic_*` pictures + `victory_art` (3 each); `ev_pic_port` re-roll (4) |
+| M13–M15     |       0 |           0 | —                      | none (the contact sheet is redrawn from the shots, no generation)              |
+| **Build 3** |   **2** |     **233** | **2,422 → 2,189**      | 14 ids (233 of the 400-generation budget)                                      |
 | Playtest 1  |      25 |       1,700 | 5,000 → 3,300          | 66 ids                                                                         |
 
 $0 in credits throughout (Tier 2 subscription generations only). The build-2 run budget was 1,500 generations with a
 300 reserve (Q-B2-15 as set by the run prompt; `tools/art/gen.ts` `PIXELLAB_RUN_BUDGET` / `PIXELLAB_RESERVE`, counted
 from `PIXELLAB_RUN_SINCE` 2026-10-30): 877 spent, 623 left. The balance read 3,300 at the end of playtest 1 and 3,299
 when build 2 started (one generation outside any batch). Re-rolls after the run count against the same budget unless
-you set those variables. Regenerate the table:
+you set those variables. Build 3's budget (400 with a 100 reserve, Q-B3-9) is counted from 2026-10-31: 233 spent.
+Regenerate the table (build 2's batches are those from 2026-10-30, build 3's from 2026-10-31):
 
 ```sh
-node -e "const m=require('./art/manifest.json');let t=0;for(const b of m.batches.filter(b=>b.at>='2026-10-30')){t+=b.generations;console.log(b.at.slice(0,16),b.generations,b.balanceBefore+'->'+b.balanceAfter,b.ids.join(' '))}console.log('build 2 total',t)"
+node -e "const m=require('./art/manifest.json');let t=0;for(const b of m.batches.filter(b=>b.at>='2026-10-30')){t+=b.generations;console.log(b.at.slice(0,16),b.generations,b.balanceBefore+'->'+b.balanceAfter,b.ids.join(' '))}console.log('builds 2-3 total',t)"
 ```
 
 ## Build 2 — per-milestone notes (newest first; the agent's working record)

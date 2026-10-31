@@ -1,8 +1,8 @@
 {
-  "version": 2,
-  "buildStamp": "f4cb2a4 2026-10-31",
+  "version": 3,
+  "buildStamp": "3b8bc50 2026-10-31",
   "seed": 7,
-  "startedAt": "2026-10-31T12:35:26Z",
+  "startedAt": "2026-10-31T14:02:59Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -11,9 +11,9 @@
     "zoom": 1,
     "maxTexture": 8192
   },
-  "elapsedS": 107.7,
-  "simS": 2102.7,
-  "pausedS": 0.9,
+  "elapsedS": 107.6,
+  "simS": 2102.6,
+  "pausedS": 0.8,
   "firstDeliveryS": 31.5,
   "firstMalware": {
     "spawnedS": 138.4,
@@ -310,7 +310,7 @@
   "viewSwitches": 2,
   "warehouseS": 59.4,
   "fps": {
-    "p50": 61,
+    "p50": 60,
     "p5": 59,
     "min": 55,
     "samples": 107
@@ -333,5 +333,840 @@
     "lowres": 14,
     "rural": 3,
     "civic": 40
-  }
+  },
+  "events": {
+    "offered": 23,
+    "decided": 23,
+    "byCategory": {
+      "money": 1,
+      "customers": 3,
+      "job": 5,
+      "staff": 2,
+      "fleet": 4,
+      "luck": 2,
+      "weather": 2,
+      "press": 1,
+      "port": 2,
+      "security": 1
+    },
+    "choices": [
+      {
+        "id": "ev_money_grant",
+        "kind": "decision",
+        "title": "Small-business grant",
+        "option": 0,
+        "label": "Apply",
+        "default": false,
+        "atS": 200,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_cust_vip",
+        "kind": "decision",
+        "title": "A VIP",
+        "option": 0,
+        "label": "Promise it",
+        "default": false,
+        "atS": 291,
+        "thinkS": 0,
+        "chain": {
+          "head": "ev_cust_vip",
+          "title": "A VIP",
+          "depth": 1,
+          "end": false
+        }
+      },
+      {
+        "id": "job:on_time_day",
+        "kind": "job",
+        "title": "Like clockwork",
+        "option": 0,
+        "label": "Accept",
+        "default": false,
+        "atS": 386,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_cust_vip_glad",
+        "kind": "news",
+        "title": "Delighted",
+        "option": 0,
+        "label": "OK",
+        "default": true,
+        "atS": 411,
+        "thinkS": 0,
+        "chain": {
+          "head": "ev_cust_vip",
+          "title": "A VIP",
+          "depth": 2,
+          "end": true
+        }
+      },
+      {
+        "id": "ev_staff_radio",
+        "kind": "decision",
+        "title": "Radios",
+        "option": 0,
+        "label": "Buy them",
+        "default": false,
+        "atS": 456,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_fleet_ticket",
+        "kind": "decision",
+        "title": "Speeding ticket",
+        "option": 1,
+        "label": "Contest it",
+        "default": true,
+        "atS": 551,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "job:rush_district",
+        "kind": "job",
+        "title": "Rush hour",
+        "option": 0,
+        "label": "Accept",
+        "default": false,
+        "atS": 638,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_luck_wallet",
+        "kind": "decision",
+        "title": "A wallet",
+        "option": 1,
+        "label": "Keep it",
+        "default": true,
+        "atS": 700,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_wx_snow",
+        "kind": "decision",
+        "title": "Snow",
+        "option": 1,
+        "label": "Risk it",
+        "default": true,
+        "atS": 771,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "job:big_haul",
+        "kind": "job",
+        "title": "Big haul",
+        "option": 0,
+        "label": "Accept",
+        "default": false,
+        "atS": 859,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_wx_heat",
+        "kind": "decision",
+        "title": "Heatwave",
+        "option": 0,
+        "label": "Ice cream",
+        "default": false,
+        "atS": 940,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_fleet_shortcut",
+        "kind": "decision",
+        "title": "The alley",
+        "option": 0,
+        "label": "Allow it",
+        "default": false,
+        "atS": 1013,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_cust_refund",
+        "kind": "decision",
+        "title": "Squashed",
+        "option": 1,
+        "label": "Refuse",
+        "default": true,
+        "atS": 1112,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "job:magic_parcel",
+        "kind": "job",
+        "title": "Special delivery",
+        "option": 0,
+        "label": "Accept",
+        "default": false,
+        "atS": 1223,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_luck_festival",
+        "kind": "decision",
+        "title": "Festival",
+        "option": 1,
+        "label": "Just deliver",
+        "default": true,
+        "atS": 1322,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "job:big_haul",
+        "kind": "job",
+        "title": "Big haul",
+        "option": 0,
+        "label": "Accept",
+        "default": false,
+        "atS": 1411,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_press_ad",
+        "kind": "decision",
+        "title": "Radio ad",
+        "option": 1,
+        "label": "No",
+        "default": true,
+        "atS": 1506,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_staff_birthday",
+        "kind": "decision",
+        "title": "Cake day",
+        "option": 1,
+        "label": "No cake",
+        "default": true,
+        "atS": 1598,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_fleet_tyres",
+        "kind": "decision",
+        "title": "Bargain tyres",
+        "option": 1,
+        "label": "No",
+        "default": true,
+        "atS": 1717,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_port_spotcheck",
+        "kind": "decision",
+        "title": "Spot check",
+        "option": 0,
+        "label": "Show them",
+        "default": true,
+        "atS": 1831,
+        "thinkS": 0,
+        "chain": {
+          "head": "ev_port_spotcheck",
+          "title": "Spot check",
+          "depth": 1,
+          "end": false
+        }
+      },
+      {
+        "id": "ev_port_spotcheck_ok",
+        "kind": "news",
+        "title": "Spotless",
+        "option": 0,
+        "label": "OK",
+        "default": true,
+        "atS": 1831.1,
+        "thinkS": 0,
+        "chain": {
+          "head": "ev_port_spotcheck",
+          "title": "Spot check",
+          "depth": 2,
+          "end": true
+        }
+      },
+      {
+        "id": "ev_sec_crate",
+        "kind": "decision",
+        "title": "The gold crate",
+        "option": 1,
+        "label": "Toss it",
+        "default": true,
+        "atS": 1950,
+        "thinkS": 0,
+        "chain": null
+      },
+      {
+        "id": "ev_fleet_gearbox",
+        "kind": "decision",
+        "title": "Grinding gears",
+        "option": 0,
+        "label": "Fix it now",
+        "default": false,
+        "atS": 2071,
+        "thinkS": 0,
+        "chain": null
+      }
+    ],
+    "thinkMedianS": 0,
+    "chainsStarted": 2,
+    "chainsFinished": 2,
+    "chainsRunning": 0,
+    "livesLost": 0,
+    "livesGained": 0,
+    "vehiclesLost": 0,
+    "workersLost": 0,
+    "gameOverByEvent": 0,
+    "modifiersPeak": 1
+  },
+  "beats": [
+    {
+      "atS": 130.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 180.1,
+      "kind": "hold"
+    },
+    {
+      "atS": 200,
+      "kind": "decision"
+    },
+    {
+      "atS": 237.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 291,
+      "kind": "decision"
+    },
+    {
+      "atS": 386,
+      "kind": "job"
+    },
+    {
+      "atS": 411,
+      "kind": "news"
+    },
+    {
+      "atS": 419.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 456,
+      "kind": "decision"
+    },
+    {
+      "atS": 480,
+      "kind": "quest"
+    },
+    {
+      "atS": 508.5,
+      "kind": "hold"
+    },
+    {
+      "atS": 538,
+      "kind": "hold"
+    },
+    {
+      "atS": 551,
+      "kind": "decision"
+    },
+    {
+      "atS": 638,
+      "kind": "job"
+    },
+    {
+      "atS": 644.5,
+      "kind": "level"
+    },
+    {
+      "atS": 664.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 700,
+      "kind": "decision"
+    },
+    {
+      "atS": 708.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 771,
+      "kind": "decision"
+    },
+    {
+      "atS": 771,
+      "kind": "quest"
+    },
+    {
+      "atS": 818.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 838.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 859,
+      "kind": "hold"
+    },
+    {
+      "atS": 859,
+      "kind": "job"
+    },
+    {
+      "atS": 898.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 913.3,
+      "kind": "hold"
+    },
+    {
+      "atS": 918.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 937.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 937.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 940,
+      "kind": "decision"
+    },
+    {
+      "atS": 955.2,
+      "kind": "level"
+    },
+    {
+      "atS": 957.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 963,
+      "kind": "hold"
+    },
+    {
+      "atS": 974.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 994.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1013,
+      "kind": "decision"
+    },
+    {
+      "atS": 1045.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 1076.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1099.1,
+      "kind": "quest"
+    },
+    {
+      "atS": 1112,
+      "kind": "decision"
+    },
+    {
+      "atS": 1112.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1123.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1144.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1179.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 1223,
+      "kind": "job"
+    },
+    {
+      "atS": 1236.4,
+      "kind": "level"
+    },
+    {
+      "atS": 1248.1,
+      "kind": "hold"
+    },
+    {
+      "atS": 1249.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1276.4,
+      "kind": "quest"
+    },
+    {
+      "atS": 1283.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 1308.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1322,
+      "kind": "decision"
+    },
+    {
+      "atS": 1322.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1360.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1398.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1407.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 1411,
+      "kind": "job"
+    },
+    {
+      "atS": 1420.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1433.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1438.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1452.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1454.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 1464.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1472.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1491,
+      "kind": "level"
+    },
+    {
+      "atS": 1491,
+      "kind": "quest"
+    },
+    {
+      "atS": 1491,
+      "kind": "quest"
+    },
+    {
+      "atS": 1506,
+      "kind": "decision"
+    },
+    {
+      "atS": 1513.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1544.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1570.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 1572.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1583,
+      "kind": "hold"
+    },
+    {
+      "atS": 1598,
+      "kind": "decision"
+    },
+    {
+      "atS": 1605.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1618.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1621.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1633.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1645.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1654.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1661.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1696.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 1697.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1713.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1717,
+      "kind": "decision"
+    },
+    {
+      "atS": 1758.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1760.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1762.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 1764.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1771.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1791.1,
+      "kind": "quest"
+    },
+    {
+      "atS": 1810.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1822.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1831,
+      "kind": "decision"
+    },
+    {
+      "atS": 1831.1,
+      "kind": "news"
+    },
+    {
+      "atS": 1837.3,
+      "kind": "hold"
+    },
+    {
+      "atS": 1840.8,
+      "kind": "hold"
+    },
+    {
+      "atS": 1842.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1843.5,
+      "kind": "hold"
+    },
+    {
+      "atS": 1847.3,
+      "kind": "hold"
+    },
+    {
+      "atS": 1850.5,
+      "kind": "hold"
+    },
+    {
+      "atS": 1850.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1851.1,
+      "kind": "quest"
+    },
+    {
+      "atS": 1856.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1861.3,
+      "kind": "hold"
+    },
+    {
+      "atS": 1864.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 1866.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1866.7,
+      "kind": "hold"
+    },
+    {
+      "atS": 1899.1,
+      "kind": "hold"
+    },
+    {
+      "atS": 1900.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 1901.3,
+      "kind": "hold"
+    },
+    {
+      "atS": 1908.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 1927.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 1947.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 1950,
+      "kind": "decision"
+    },
+    {
+      "atS": 1965,
+      "kind": "hold"
+    },
+    {
+      "atS": 1967.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 1972,
+      "kind": "hold"
+    },
+    {
+      "atS": 1985,
+      "kind": "hold"
+    },
+    {
+      "atS": 2023.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 2031.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 2032.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 2036.5,
+      "kind": "hold"
+    },
+    {
+      "atS": 2037,
+      "kind": "hold"
+    },
+    {
+      "atS": 2043.2,
+      "kind": "hold"
+    },
+    {
+      "atS": 2059.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 2061.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 2066.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 2070.9,
+      "kind": "hold"
+    },
+    {
+      "atS": 2071,
+      "kind": "decision"
+    },
+    {
+      "atS": 2094.4,
+      "kind": "hold"
+    },
+    {
+      "atS": 2096.6,
+      "kind": "hold"
+    },
+    {
+      "atS": 2100,
+      "kind": "hold"
+    }
+  ]
 }

@@ -26,6 +26,8 @@
 //      level-up moment (debug level 5 with a job active) waits for it and its
 //      papers, then opens though the Golden Release offer it brought is
 //      blocked by the job (critique 3: never a frozen game).
+//   9. review scenes-2 / mobile-1: the think clock (D-M15-5) stops while the
+//      landscape rotate card covers the EventCard, and runs again upright.
 import { readFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import {
@@ -266,6 +268,66 @@ test.describe('M12 event cards', () => {
     console.log(`events: grant paper "${paper}"`)
     expect(paper).toContain('Small-business grant')
     expect(await page.evaluate(() => window.__pm!.replay().matches)).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('review scenes-2 / mobile-1: no think time while the rotate card covers the EventCard', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(BASE)
+    await pm.freeze()
+    await pm.settle(5)
+    await debugEvent(page, 'ev_money_grant')
+    await eventCardUp(page, pm, 'ev_money_grant')
+    await pm.thaw()
+    const probe = (): Promise<{
+      shown: boolean
+      thinkMs: number | null
+      rotate: boolean
+      holds: string[]
+    }> =>
+      page.evaluate(() => {
+        const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+          recorder: {
+            deps: { cardShown(): unknown }
+            r: { card: { thinkMs: number } | null }
+          }
+          rotate: { isOpen(): boolean }
+          holds: Set<string>
+        }
+        return {
+          shown: hud.recorder.deps.cardShown() !== null,
+          thinkMs: hud.recorder.r.card?.thinkMs ?? null,
+          rotate: hud.rotate.isOpen(),
+          holds: [...hud.holds].toSorted(),
+        }
+      })
+    await page.waitForTimeout(300)
+    expect(await probe()).toMatchObject({ shown: true, rotate: false })
+    const vp = page.viewportSize()!
+    await page.setViewportSize({ width: vp.height, height: vp.width })
+    await expect.poll(async () => (await probe()).rotate).toBe(true)
+    const covered = await probe()
+    expect(covered.shown, 'cardShown under the rotate card').toBe(false)
+    expect(covered.holds).toEqual(['event', 'rotate'])
+    await page.waitForTimeout(2000)
+    const after = await probe()
+    console.log(
+      `events: think ms behind the rotate card ${JSON.stringify({ covered: covered.thinkMs, after: after.thinkMs })}`,
+    )
+    expect(after.thinkMs, 'no think time behind the rotate card').toBe(
+      covered.thinkMs,
+    )
+    await page.setViewportSize(vp)
+    await expect.poll(async () => (await probe()).rotate).toBe(false)
+    await page.waitForTimeout(500)
+    const upright = await probe()
+    expect(upright.shown, 'cardShown upright').toBe(true)
+    expect(upright.thinkMs!, 'the clock runs again').toBeGreaterThan(
+      after.thinkMs!,
+    )
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 

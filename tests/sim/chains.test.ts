@@ -18,6 +18,7 @@ import { auditState, replay, Sim, stateHash } from '../../src/sim/sim.ts'
 import type { SimSnapshot } from '../../src/sim/sim.ts'
 import {
   cardOptions,
+  chainsRunning,
   condHolds,
   DECK_OFF_TICK,
   fillCardText,
@@ -118,7 +119,7 @@ function offer(sim: Sim, eventId: string): void {
 
 /** C's effectSummary produces lines (stream C landed): the pick-left line can be checked. */
 const summariesLanded =
-  effectSummary(data as never, [{ kind: 'money', delta: 1 }], {
+  effectSummary(quietSim(1), [{ kind: 'money', delta: 1 }], {
     target: null,
     pick: null,
     eventId: 'x',
@@ -447,6 +448,65 @@ describe('decide (B3 §6): failures, lines, history, counters', () => {
     })
   })
 
+  it('review sim-2: an uncosted money loss the balance cuts short reads what it takes — the line equals the debit; the cost comes off first', () => {
+    // By shape: the first deck option with no cost whose first world effect
+    // is a `money` loss over $30 (it never greys out; nothing before it
+    // moves the balance).
+    type Opt = NonNullable<EventDef['options']>[number]
+    const firstLoss = (o: Opt): number | null => {
+      const e = o.effects[0]
+      return !o.cost &&
+        !o.costPerVehicle &&
+        e?.kind === 'money' &&
+        e.delta < -30
+        ? e.delta
+        : null
+    }
+    const def = data.events.deck.find(
+      (d) => !d.router && d.options?.some((o) => firstLoss(o) !== null),
+    )
+    expect(def, 'a card with an uncosted money loss').toBeTruthy()
+    const i = def!.options!.findIndex((o) => firstLoss(o) !== null)
+    const delta = firstLoss(def!.options![i]!)!
+    for (const balance of [30, 0, -delta + 5]) {
+      const sim = playing()
+      offer(sim, def!.id)
+      sim.state.economy.balance = balance
+      const card = sim.state.events.open!
+      const opt = cardOptions(sim, card)[i]!
+      expect(opt, `${def!.id} option ${i}`).toMatchObject({
+        visible: true,
+        affordable: true,
+      })
+      const first = optionLines(sim, card, opt)[0]!.text
+      const takes = Math.min(-delta, balance)
+      expect(first, `${def!.id} at $${balance}`).toBe(
+        balance >= -delta
+          ? `−$${-delta}`
+          : balance === 0
+            ? '$0 (nothing to take)'
+            : `−$${takes} (all you have)`,
+      )
+      const money = collect(sim, 'money:changed')
+      decideOpen(sim, i)
+      const debit = money.find((m) => m.reason === 'event' && m.delta < 0)
+      expect(Math.abs(debit?.delta ?? 0), 'the line is the debit').toBe(takes)
+    }
+    // A cost comes off first: a later money loss meets what is left.
+    const sim = playing()
+    offer(sim, 'ev_crime_gang')
+    const card = sim.state.events.open!
+    const opt = cardOptions(sim, card)[0]!
+    sim.state.economy.balance = opt.cost + 20
+    const plus = {
+      ...opt,
+      effects: [...opt.effects, { kind: 'money' as const, delta: -100 }],
+    }
+    expect(optionLines(sim, card, plus).map((l) => l.text)).toContain(
+      '−$20 (all you have)',
+    )
+  })
+
   it('chainsStarted when a head books a link; chainsFinished + the chainDone ticker line when a link books nothing', () => {
     const sim = playing()
     const news = collect(sim, 'ticker:news')
@@ -467,6 +527,35 @@ describe('decide (B3 §6): failures, lines, history, counters', () => {
     expect(news.filter((n) => n.kind === 'event').map((n) => n.text)).toContain(
       'UNDERWORLD: Protection',
     )
+  })
+
+  it('chainsRunning: the heads with a link scheduled or open — a link dropped on its cond ends the chain unfinished (review sim-1)', () => {
+    const vip = structuredClone(VIP)
+    ;(vip[1] as EventDef).cond = { balanceAtLeast: 5000 }
+    const d = withCards(vip)
+    for (const rich of [false, true]) {
+      const sim = playing(1, d)
+      const ev = sim.state.events
+      offer(sim, 'ev_t_vip')
+      expect(chainsRunning(ev), 'a head books nothing until decided').toBe(0)
+      decideOpen(sim, 0) // Show them round → the link in 1 day
+      expect(ev.stats.chainsStarted).toBe(1)
+      expect(chainsRunning(ev)).toBe(1)
+      sim.state.economy.balance = rich ? 6000 : 100
+      runTicks(sim, DAY + 1)
+      expect(ev.scheduled).toEqual([])
+      if (rich) {
+        expect(ev.open).toMatchObject({ eventId: 'ev_t_vip_back', depth: 2 })
+        expect(chainsRunning(ev), 'an open link').toBe(1)
+        decideOpen(sim, 1)
+        expect(ev.stats.chainsFinished).toBe(1)
+      } else {
+        // Dropped: started − finished stays 1, yet nothing is under way.
+        expect(ev.open).toBeNull()
+        expect(ev.stats.chainsFinished).toBe(0)
+      }
+      expect(chainsRunning(ev)).toBe(0)
+    }
   })
 
   it('history keeps the last historyMax records', () => {

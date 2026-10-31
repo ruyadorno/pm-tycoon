@@ -108,18 +108,19 @@
 // (hubText.sailedText from its map.hubs vessel, design R11).
 //
 // M4 (plan.md §12.7 tasks 1-2, §12.9; v2 at M10, plan-build2 §8.7 tasks
-// 1-2): the PlaytestRecorder (src/metrics/playtest.ts) follows the sim from
-// create (resumed from the stored profile — pm.playtest.v2 since M10 — when
-// this is the same run as the save, a fresh profile otherwise and on every
-// Sim swap), counts canvas pointerdowns, samples game.loop.actualFps and the
-// view, and is stored with every autosave (and every 10 s while the sim is
-// held); registry REG_PLAYTEST hands it to __pm. The SummaryCard ('summary'
-// hold) opens from the Paused card's `End run — show summary` — the Paused
-// card is also the pause menu: ❚❚ tapped while already paused opens it (the
-// first pause toasts the hint) — from the game-over card's `Run summary`
-// (its `Back` returns there), and is offered once at 30:00 of sim time
+// 1-2; v3 at M15, plan-build3 §8.6 task 1): the PlaytestRecorder
+// (src/metrics/playtest.ts) follows the sim from create (resumed from the
+// stored profile — pm.playtest.v3 since M15 — when this is the same run as
+// the save, a fresh profile otherwise and on every Sim swap), counts canvas
+// pointerdowns, samples game.loop.actualFps and the view, and is stored with
+// every autosave (and every 10 s while the sim is held); registry
+// REG_PLAYTEST hands it to __pm. The SummaryCard ('summary' hold) opens from
+// the Paused card's `End run — show summary` — the Paused card is also the
+// pause menu: ❚❚ tapped while already paused opens it (the first pause
+// toasts the hint) — from the game-over card's `Run summary` (its `Back`
+// returns there), and is offered once at 30:00 of sim time
 // (SUMMARY_OFFER_S; 20:00 before M10, Q55), never before 25 real minutes
-// (summaryOfferDue: fun bar item 4), by a ticker line + toast. `Keep
+// (summaryOfferDue: fun bar item 5), by a ticker line + toast. `Keep
 // playing` resumes at the last running speed; `New game` asks first during
 // a live run.
 //
@@ -1360,7 +1361,7 @@ export class HudScene extends Phaser.Scene {
   private newGame(): void {
     this.paper.clear()
     this.saveSoon = null
-    // The ended run's profile stays in pm.playtest.v2 until the next run's
+    // The ended run's profile stays in pm.playtest.v3 until the next run's
     // first autosave replaces it.
     this.autosave.savePlaytest()
     this.autosave.enabled = false
@@ -1390,9 +1391,13 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
-   * The recorder for this HUD: it resumes pm.playtest.v2 only when the
+   * The recorder for this HUD: it resumes pm.playtest.v3 only when the
    * running sim is the run the autosave holds (Continue, a reload) and the
-   * stored profile matches it; a New game starts a fresh profile.
+   * stored profile matches it; a New game starts a fresh profile. v3 (M15,
+   * D-M15-5): a card waiting behind a sheet or a paper (Sim.held) counts as
+   * paused, and a card's think time is the wall time the EventCard showed
+   * it (`cardShown`, read before this frame's refresh; not while the rotate
+   * card covers it).
    */
   private startRecorder(): void {
     this.recorder = new PlaytestRecorder({
@@ -1401,7 +1406,20 @@ export class HudScene extends Phaser.Scene {
       now: () => Date.now(),
       fps: () => this.game.loop.actualFps,
       pointerDowns: () => this.tapCount,
-      isPaused: () => this.stepper.paused || this.stepper.speed === 0,
+      isPaused: () =>
+        this.stepper.paused || this.stepper.speed === 0 || this.vs.held,
+      // Not while the rotate card covers it or the tab is going hidden
+      // (review scenes-2 / mobile-1): think time is time the card was seen.
+      cardShown: () => {
+        const c = this.eventCard
+        return c.isOpen &&
+          !this.rotate.isOpen() &&
+          !this.holds.has('hidden') &&
+          c.eventId !== null &&
+          c.openedTick !== null
+          ? { eventId: c.eventId, openedTick: c.openedTick }
+          : null
+      },
     })
     const sim = getSim(this)
     this.recorder.attach(sim, this.resumesSave(sim) ? readPlaytest() : null)
@@ -1421,7 +1439,7 @@ export class HudScene extends Phaser.Scene {
 
   /**
    * Once per run at SUMMARY_OFFER_S (30:00) of sim time — and past fun bar
-   * item 4's 25 real minutes (summaryOfferDue) — a ticker line + toast offer.
+   * item 5's 25 real minutes (summaryOfferDue) — a ticker line + toast offer.
    */
   private pollSummaryOffer(): void {
     const r = this.recorder
@@ -1469,7 +1487,7 @@ export class HudScene extends Phaser.Scene {
       mode,
       this.recorder.summaryOpenedS,
     )
-    // Store the profile with its first opening (fun bar 4) right away.
+    // Store the profile with its first opening (fun bar 5) right away.
     this.autosave.savePlaytest()
   }
 

@@ -236,7 +236,7 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
       /^Reward: .+ · Limit: 3 days$/,
     )
     expect(open.options[1]!.lines.map((l) => l.text)).toEqual([
-      'Next job in 1 day',
+      'No jobs for 1 day',
     ])
     // The HUD's acceptQuest is the card's answer (commands.ts routes it).
     expect(vs.quest.accept(q.id).ok).toBe(true)

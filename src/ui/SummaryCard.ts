@@ -1,28 +1,36 @@
 // Run summary card (plan.md §12.7 task 2, §12.9; v2: plan-build2 §8.7 task
-// 2, §9): the playtest profile on one screen, for the author's review.
-// Title `Run summary — seed 7 — 35:12 played`; rows lifetime earned /
-// deliveries (on-time %) / first delivery · first malware caught (by whom) /
-// levels 2 · 3 · 4 · 5 at / Victory (+ endless time) / malware spawned ·
-// caught · missed / lives lost (label + what explains each: the counter
-// machine, the sorter's `looks clean` call, `cleared by you`, and for an
-// overseas loss `the ship has sailed` / `the plane has left`) / fleet bought
-// / hires · fired · ads / quests offered · done · failed / sorter calls ·
-// wrong / overseas cleared · malware at clearance / machines · docks · desks
-// / taps per min · fps p50 · p5; footer the §9 fun bar 2 checklist (ticks,
-// crosses, `?` = you judge, `–` = not yet) from the same object; buttons
-// `Download playtest.json` (Blob + <a download>), `Copy summary` (plain
-// text: navigator.clipboard, else a selected textarea + execCommand('copy'),
-// else a selectable text box over the game), and `Keep playing` (`Back`
-// over the game-over screen) / `New game`.
+// 2, §9; v3: plan-build3 §8.6 task 2, §9, the M15 metrics contract §2): the
+// playtest profile on one screen, for the author's review. Title `Run
+// summary — seed 7 — 35:12 played`; rows lifetime earned / deliveries
+// (on-time %) / first delivery · first malware caught (by whom) / levels 2 ·
+// 3 · 4 · 5 at / Victory (+ endless time) / v3: `Cards` (the deck cards
+// answered: decisions · news; jobs stay on the Quests row, D-M15-1) /
+// `Stories` (chains finished · the longest one's cards) / `Longest quiet`
+// (the longest gap between beats in the ramp window — the number fun bar 3
+// item 2 reads; `so far` while the window is open) / malware spawned ·
+// caught · missed / lives lost (`· 2 by cards` when a card took some; label +
+// what explains each: the counter machine, the sorter's `looks clean` call,
+// `cleared by you`, for an overseas loss `the ship has sailed` / `the plane
+// has left`, and for a card's the card's title and `chose: <option>`) /
+// fleet bought / hires · fired · ads / quests offered · done · failed /
+// sorter calls · wrong / overseas cleared · malware at clearance / machines
+// · docks · desks / taps per min · fps p50 · p5; footer the §9 fun bar 3
+// checklist (src/metrics/funBar.ts: ticks, crosses, `?` = you judge, `–` =
+// not yet) from the same object; buttons `Download playtest.json` (Blob +
+// <a download>), `Copy summary` (plain text: navigator.clipboard, else a
+// selected textarea + execCommand('copy'), else a selectable text box over
+// the game), and `Keep playing` (`Back` over the game-over screen) / `New
+// game`.
 //
 // HudScene owns it like the other cards: it holds the sim while open
 // ('summary', plan.md §5), opens it from the Paused card's `End run — show
 // summary`, from the game-over card's `Run summary`, and offers it once at
 // 30:00 (SUMMARY_OFFER_S). Like GameOverCard it draws through its own
 // full-screen camera over an off-screen origin and swallows every tap; it
-// fits 360×604 (the rows close up to LINE_H when a long lives list would
-// push the buttons off). The text and the checklist are pure
-// (tests/ui/summary-card.test.ts).
+// fits 360×604 (17 base rows + up to 4 lives rows, 21 at most: the rows
+// close up to 15 px at 19 rows and LINE_H at 20–21, the 21-row block is
+// exactly 604 — contract §2.3, pinned by tests/ui/summary-card.test.ts). The
+// text and the checklist are pure.
 import type Phaser from 'phaser'
 import { removeCamera } from './cameraBits.ts'
 import type { GameData } from '../data/types.ts'
@@ -30,11 +38,13 @@ import {
   clock,
   funBar,
   FUN_TARGETS,
-  PLAYTEST_FILE,
+  longestQuiet,
+  rampWindow,
+  storiesOf,
   type FunCheck,
   type FunState,
-  type Playtest,
-} from '../metrics/playtest.ts'
+} from '../metrics/funBar.ts'
+import { PLAYTEST_FILE, type Playtest } from '../metrics/playtest.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
 import { Button } from './Button.ts'
 import { sailedText } from './hubText.ts'
@@ -112,15 +122,18 @@ export function fleetLine(
 }
 
 /**
- * A lives-lost entry's value — what explains it: the counter machine, the
- * sorter's `looks clean` call (`Mo: looks clean`), `cleared by you`; `no
+ * A lives-lost entry's value — what explains it: for a card's (v3, its
+ * title is the entry's label) `chose: <option>`; else the counter machine,
+ * the sorter's `looks clean` call (`Mo: looks clean`), `cleared by you`; `no
  * counter` when none of them; an overseas loss adds `the ship has sailed` /
  * `the plane has left` (the lost-life card's words, hubText.sailedText).
+ * `chose:`, not `you chose:`: 25 px more for the title (contract §2.1).
  */
 export function lifeLostValue(
   l: Playtest['livesLost'][number],
   data: GameData,
 ): string {
+  if (l.cause === 'event') return `chose: ${l.option ?? '—'}`
   const parts: string[] = []
   if (l.counter !== null) parts.push(checkerName(data, l.counter))
   if (l.sorter !== null) parts.push(`${l.sorter}: looks clean`)
@@ -137,7 +150,68 @@ export function levelsLine(pt: Playtest): string {
     .join(' · ')
 }
 
-/** The card's rows (plan-build2 §8.7 order); lives-lost entries follow their row. */
+/**
+ * v3 `Cards`: the deck cards answered, `18 · 16 decisions · 2 news` (from
+ * events.choices; a job card is a quest and stays on the Quests row, and
+ * nothing slides under Q-B3-2 — D-M15-1); `none yet`.
+ */
+export function cardsLine(choices: Playtest['events']['choices']): string {
+  let dec = 0
+  let news = 0
+  for (const c of choices)
+    if (c.kind === 'decision') dec += 1
+    else if (c.kind === 'news') news += 1
+  if (dec + news === 0) return 'none yet'
+  const n = formatInt
+  return `${n(dec + news)} · ${n(dec)} decision${dec === 1 ? '' : 's'} · ${n(news)} news`
+}
+
+/**
+ * v3 `Stories`: chains finished (stats, pairs included) · the longest
+ * recorded one's cards (`2 · longest 4 cards`); the count alone when the
+ * profile started after them; `none yet`.
+ */
+export function storiesLine(pt: Playtest): string {
+  const n = pt.events.chainsFinished
+  if (n <= 0) return 'none yet'
+  const longest = storiesOf(pt.events.choices).reduce(
+    (a, c) => Math.max(a, c.depth),
+    0,
+  )
+  return longest > 0
+    ? `${formatInt(n)} · longest ${formatInt(longest)} cards`
+    : formatInt(n)
+}
+
+/** A quiet's length: `48 s` under a minute, else `1:12`. */
+export function quietText(s: number): string {
+  return s < 60 ? `${Math.max(0, Math.floor(s))} s` : clock(s)
+}
+
+/**
+ * v3 `Longest quiet`: the longest gap between beats in the ramp window
+ * (fun bar 3 item 2's number), ` so far` while the window is open; `—`
+ * before minute 3 (or with no window).
+ */
+export function quietLine(pt: Playtest): string {
+  const w = rampWindow(pt)
+  if (pt.simS < w.fromS) return '—'
+  const g = longestQuiet(pt.beats, w.fromS, w.toS)
+  if (g === null) return '—'
+  return quietText(g) + (w.open ? ' so far' : '')
+}
+
+/** v3 `Lives lost`: `3`, `3 · 1 by a card`, `3 · 2 by cards`; `none`. */
+export function livesLine(lost: Playtest['livesLost']): string {
+  if (lost.length === 0) return 'none'
+  const e = lost.filter((l) => l.cause === 'event').length
+  const n = formatInt(lost.length)
+  return e === 0
+    ? n
+    : `${n} · ${formatInt(e)} by ${e === 1 ? 'a card' : 'cards'}`
+}
+
+/** The card's rows (plan-build3 §8.6 order); lives-lost entries follow their row. */
 export function summaryRows(pt: Playtest, data: GameData): SummaryRow[] {
   const d = pt.deliveries
   const fm = pt.firstMalware
@@ -167,14 +241,14 @@ export function summaryRows(pt: Playtest, data: GameData): SummaryRow[] {
           ? `${clock(pt.victoryAtS)} · endless ${clock(pt.endlessS ?? 0)}`
           : 'not yet',
     },
+    { label: 'Cards', value: cardsLine(pt.events.choices) },
+    { label: 'Stories', value: storiesLine(pt) },
+    { label: 'Longest quiet', value: quietLine(pt) },
     {
       label: 'Malware spawned · caught · missed',
       value: `${n(m.spawned)} · ${n(m.caught)} · ${n(m.missed)}`,
     },
-    {
-      label: 'Lives lost',
-      value: pt.livesLost.length > 0 ? n(pt.livesLost.length) : 'none',
-    },
+    { label: 'Lives lost', value: livesLine(pt.livesLost) },
   ]
   for (const l of pt.livesLost.slice(0, LIVES_SHOWN))
     rows.push({ label: l.label, value: lifeLostValue(l, data), sub: true })
@@ -216,7 +290,7 @@ export function summaryRows(pt: Playtest, data: GameData): SummaryRow[] {
   return rows
 }
 
-/** The fun bar 2 checklist (plan-build2 §9 windows, FUN_TARGETS). */
+/** The fun bar 3 checklist (plan-build3 §9 windows, FUN_TARGETS; src/metrics/funBar.ts). */
 export function summaryChecks(
   pt: Playtest,
   openedAtS: number | null = null,
@@ -251,7 +325,7 @@ export function summaryText(
         ? `  - ${r.label}${r.value ? `: ${r.value}` : ''}`
         : `${r.label}: ${r.value}`,
     )
-  lines.push('Fun bar 2:')
+  lines.push('Fun bar 3:')
   for (const c of checks)
     lines.push(`${funMark(c.state)} ${c.n}. ${c.label} (${c.detail})`)
   const dv = pt.device
@@ -263,8 +337,9 @@ export function summaryText(
 }
 
 /**
- * The card column's height: title, the rows at `rowH`, the `Fun bar 2`
- * head, the checklist and the two button rows (with their gaps).
+ * The card column's height: title, the rows at `rowH`, the `Fun bar 3`
+ * head, the checklist and the two button rows (with their gaps): 286 +
+ * rows × rowH for a one-line title and fun bar 3's seven checks.
  */
 export function summaryBlockH(
   titleH: number,
@@ -288,7 +363,7 @@ export function summaryBlockH(
 /**
  * The row pitch: ROW_H, closed up (to LINE_H at the least) when the column
  * would not fit `avail` with a PAD above and below — a long lives list on
- * the 360×604 profile.
+ * the 360×604 profile (19 rows → 15 px, 20–21 → LINE_H).
  */
 export function summaryRowPitch(
   avail: number,
@@ -444,7 +519,7 @@ export class SummaryCard {
     return this.pt ? summaryChecks(this.pt, this.openedAtS) : null
   }
 
-  /** Show `pt`; `openedAtS` = elapsedS at the run's first opening (fun bar 4). */
+  /** Show `pt`; `openedAtS` = elapsedS at the run's first opening (fun bar 3 item 5). */
   open(pt: Playtest, mode: SummaryMode, openedAtS: number | null = null): void {
     this.teardown()
     if (!this.pt) {
@@ -578,7 +653,7 @@ export class SummaryCard {
     }
     y += 10
 
-    const head = addText(scene, x0, y - 3, 'Fun bar 2', { tint: THEME.gold })
+    const head = addText(scene, x0, y - 3, 'Fun bar 3', { tint: THEME.gold })
     parts.push(head)
     y += ROW_H
     for (const c of checks) {

@@ -831,7 +831,10 @@ M7 review fixes (rules the M7 contract did not state, or stated against the spec
   data weights; a conditional `next` is scored on the branch its condition picks now, with the option's own `flag`
   effects applied virtually (the audit's consultant scores the pass branch).
 - **Subscriptions are not payroll** [D-34]: the `payrollAdd` line is a separate `subscriptions` debit paid after every
-  employee, skipped when short (ticker `Subscriptions unpaid`), never counted in `payrollPaid`.
+  employee, skipped when short (ticker `Subscriptions unpaid`), never counted in `payrollPaid`. M15 (review deck-2): the
+  card's effects line and the EffectsCard row read `bills +$N/day`, not `subscriptions …` — of the five payrollAdd uses
+  only the AI subscription is one (the loan repayment, the cat's dinner, the night crew's wages and the insurance are
+  not); the ledger row and the ticker keep the spec's `Subscriptions` word (B3 §3.6), code-only, no data-hash change.
 - **The Sorter Arm has no stored price** [D-21]: `machinePrice` modifiers do not apply to it.
 - **Fixture tooling** (wave 0): fixtures answer an open card through a logged `decideEvent` (default option) instead
   of patching `nextDrawTick`, so every fixture still replays to its state hash; `tools/fixtures/cards.ts`.
@@ -1201,3 +1204,41 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
   2}`) — at one inspector it was "Send {inspector}" at a higher price; it moves no pick and no gate row.
 - **Pass-2 tests**: `policy.test.ts`, `levels3.long`, `quests-policy.long` and `victory.long` run with the deck on;
   `levels3.long` allows the L2 plan's leftover shaker or a carded vehicle between L3 and the Battery checker.
+
+## Run decisions and deviations (M15 — the playtest-3 build)
+
+### Metrics v3 and the summary card (plan-build3 §8.6 tasks 1–2, §9; B3 §6)
+
+- **No "slid" row** [D-M15-1]: plan §8.6's `Cards 18 · 16 decided · 2 slid` assumed expiring cards; under Q-B3-2
+  nothing slides. The row is `Cards 18 · 16 decisions · 2 news` (deck cards; jobs stay on the Quests row).
+- **The ramp window** [D-M15-2]: `[180 s, L2 tick]`, or `[180 s, min(simS, 660 s)]` before L2 (plan §9's bound when
+  it exists, the spec's minute 11 before then).
+- **Fun bar 1 counts decision cards only** [D-M15-3] (a job's Accept and a news OK never count); **fun bar 4 needs a
+  chain whose closing card has depth ≥ 3** [D-M15-4] (pairs do not count; the Stories row shows both).
+- **`thinkS`** [D-M15-5] is the wall time the EventCard showed that card (not while it waited behind a paper, a sheet,
+  the level-up moment, the rotate card or a hidden tab — review fixes scenes-2 / mobile-1); `pausedS` now includes
+  held time, so v2 and v3 `pausedS` are not comparable. `thinkMedianS` [D-M15-6] is over decision and job cards, 0.1 s
+  precision; it is 0 in the policy fixture because the policy decides on the step.
+- **Schema additions beyond B3 §6** [D-M15-7]: `choices[]` carries `kind`, `title`, `label` and `chain {head, title,
+  depth, end}`; `livesLost[]` carries `cause`, `eventId`, `option`, `livesLeft`; `events.chainsRunning` (review sim-1:
+  a dropped link left started > finished forever, so fun bar 4 reads the chains still running).
+- **Fun bar 3 item 6 is a data check** [D-M15-8]; item 2's think-time half is soft (it can turn a pass into "you
+  judge", never into a fail). `FUN_TARGETS` stays in code [D-M15-9]; caps `BEATS_MAX` 600, `CHOICES_MAX` 400
+  [D-M15-10]; the key is `pm.playtest.v3`, v2 joins the legacy keys Reset clears [D-M15-11]; the card keeps the three
+  new rows separate (17 base rows, ≤ 21 with the lives list — exactly 604 px at 360 × 604, pinned by a test) [D-M15-12].
+- **Recorder details**: a reload drops beats and choices recorded after the restored save's tick (and an event life
+  only when the same card is open again); event-life dedupe on (atS, eventId, livesLeft); malware dedupe matches
+  `cause === 'malware'` only.
+
+### Review fixes (M15: the sim, scenes, mobile and deck/copy passes)
+
+- **A loss line never promises more than the balance pays** (review sim-2): `effectSummary` walks the money effects
+  in data order against the balance left after the option's cost — `−$30 (all you have)`, `$0 (nothing to take)`,
+  `(…, no bike)`.
+- **The job card's Decline reads `No jobs for 1 day`** (sim-4: the next job can come later than "Next job in 1 day").
+- **`payrollAdd` lines read `bills +$N/day`** (deck-2: a loan repayment, the cat's dinner and a night-shift wage are
+  not subscriptions); the ledger row and the `Subscriptions unpaid` ticker keep the spec's word.
+- **Copy**: the intern's "two unpaid days" and "a typosquat" (deck-5); the ring's `Send {inspector} ($200)` (deck-8).
+- **Docs**: the phone checklist's app-switch line and the summary-card fit line (mobile-2).
+- Refuted (recorded in docs/report-playtest3.md §6): outcome cards that repeat their title in the body, the
+  influencer's hidden condition, the aftermath's repeat, star names shared with the people pool.

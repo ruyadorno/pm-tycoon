@@ -13,10 +13,11 @@ golden parcel, the Golden Release and the VictoryCard), `e2e/events.spec.ts` (th
 modal stack, the effects chip and list), `e2e/lifecycle.spec.ts` (view storms, rotate and hide/show holds) and
 `e2e/dist.spec.ts` (the production build, hashed assets, no `__pm` without `?debug=1`, `?config=` only with it).
 
-Shortcuts for the build-2 lines that come late in a cold run (use them **after** the cold session; each keeps its own
-save, see README "Saves"): `?debug=1&config=tycoon` starts at level 5 with a full lane, fleet and docks 2–3 (the tall
-tier-5 room, the plane, the Golden Release); `?debug=1&config=spicy` brings the first card at 1:00 (then one every
-30–60 s), a job card and a lost life within minutes.
+Shortcuts for the lines that come late in a cold run (use them **after** the cold session; each keeps its own save,
+see README "Saves"): `?debug=1&config=tycoon` starts at level 5 with a full lane, fleet and docks 2–3 (the tall tier-5
+room, the plane, the Golden Release); `?debug=1&config=spicy` brings the first card at 1:00 (then one every 30–60 s), a
+job card and a lost life within minutes; `?debug=1&event=ev_sec_recall` opens a danger card on a fresh game (`Take the
+strike` is the red option; it costs a life).
 
 ## iPhone 16, Safari
 
@@ -94,10 +95,24 @@ Open `http://<mac-lan-ip>:4173/` (portrait).
 - [ ] A tap outside a decision or job card does nothing; a one-option news card closes on any tap.
 - [ ] A story reads as one: a follow-up card opens with `You chose: …`, and an option that continues one says `…then:
       <next card> (in N days)`.
-- [ ] While an effect runs, the effects chip (an icon with a count) shows in the top bar; tap it → the Effects list
-      (each effect, `1d 12h left` / `permanent`, the card that set it), and the pause menu (❚❚, ❚❚ again) has `Effects ·
-      N` opening the same list. When a card comes while a sheet is open (the Garage, a slot card), the game holds, the
-      chip pulses, and the card opens when the sheet closes (or at once from a chip tap).
+- [ ] While an effect runs, the effects chip (the orange bell with a count) shows in the top bar; tap it → the Effects
+      list (each effect, `1d 12h left` / `permanent`, the card that set it), and the pause menu (❚❚, ❚❚ again) has
+      `Effects · N` opening the same list. The list does **not** pause the game: vehicles keep moving under it. When a
+      card comes while a sheet is open (the Garage, a slot card), the game holds, the chip pulses, and the card opens
+      when the sheet closes (or at once from a chip tap).
+- [ ] **Danger cards**: the red option reads as the dangerous one at a glance (not just a different shade of the
+      primary), and a quick tap the moment the card slides in does not take it. Pick `Take the strike` (the shortcut
+      above, or a strike card in the run): the lives flash, the ticker reads `The recall cost a life — 2 lives left`,
+      and the lost-life card shows the card's title, `You chose: Take the strike` and the lives left, with one OK. At
+      the last life the line ends `— this can end the run`, and the Game Over card reads `The recall — you chose: Take
+      the strike`.
+- [ ] A story's last card ends with the paper `<the story's title> — the story ends`; the cards between read as one
+      story (the same names, `You chose: …` at the top).
+- [ ] With a card up, switch apps and come back: the same card, still paused (no Paused card over it — the card is the
+      pause). Swipe Safari away with a card up and Continue from the Title: the card is back, held, and the clock has
+      not moved.
+- [ ] A card that opens in the warehouse looks the same as in the city, with the room frozen under it; after the
+      choice, the next tap on the room (a Hold Bay parcel, a slot) lands normally.
 
 **Quests (B2, jobs B3)** (`src/ui/EventCard.ts` for the offer, `src/ui/QuestCard.ts`, `src/ui/QuestChip.ts`,
 `src/render/cityHub.ts`, B2 §3, B3 §3.1)
@@ -172,11 +187,15 @@ B2 §4)
 
 **The run** (docs/playtest.md)
 
-- [ ] Played thirty to forty minutes cold, then opened the summary card (offered at 30:00 of game time, once 25 real
-      minutes have passed; or ❚❚, ❚❚ again → End run — show summary).
+- [ ] Played thirty to forty minutes cold, answering the cards as you liked, then opened the summary card (offered at
+      30:00 of game time, once 25 real minutes have passed; or ❚❚, ❚❚ again → End run — show summary).
+- [ ] **(B3)** The card fits at 393 px with its four buttons visible: the rows include `Cards`, `Stories` and `Longest
+      quiet`, `Lives lost` adds `· N by a card` when a card took one (its sub row reads `chose: <option>`), and the
+      **Fun bar 3** block lists seven checks.
 - [ ] **Download playtest.json** saved the file (Files → Downloads); **Copy summary** pasted into Notes; both sent back
       (AirDrop / Mail).
-- [ ] `playtest.json` → `device`: `cssW` 393, `dpr` 3, `zoom` 1, `maxTexture` ≥ 4096; `version` 2.
+- [ ] `playtest.json` → `device`: `cssW` 393, `dpr` 3, `zoom` 1, `maxTexture` ≥ 4096; `version` 3, with an `events`
+      block (your choices) and `beats`.
 
 ## Desktop devtools, iPhone 16 preset
 
@@ -208,7 +227,11 @@ switching the preset (the canvas measures `#game` at boot).
       option` instead), `Esc` does nothing on a decision or job card, and `Esc` or `Enter` closes a news card;
       `?event=<id>` opens that card on a fresh game and `__pm.events()` shows the deck's state.
 - [ ] `__pm.playtest()` returns the live profile; its `device` block matches the preset (393, DPR 3, zoom 1), and
-      `localStorage['pm.playtest.v2']` holds the same run.
+      `localStorage['pm.playtest.v3']` holds the same run. **(B3)** Leave a card up for about ten seconds, then pick
+      an option: the new `__pm.playtest().events.choices` entry has `thinkS` ≈ 10 (wall seconds on screen); a card that
+      waited behind the Garage counts only from when it showed.
+- [ ] **(B3)** On a custom device of **360 × 604**: a three-option card (e.g. `?debug=1&event=ev_sec_crate`) fits above
+      the bottom bar and the summary card fits the screen, every button inside the canvas.
 
 Record anything unticked with the device, the URL and what you saw; screenshots (or a screen recording) help most for
 the rubber-band, toolbar, tall-room scroll and audio items.

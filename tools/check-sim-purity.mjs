@@ -24,6 +24,7 @@ const PHASER_FREE = [
   'src/audio/leadsheet.ts',
   'src/audio/arranger.ts',
   'src/metrics/playtest.ts',
+  'src/metrics/funBar.ts',
 ]
 
 const DOM = /\b(window|document|localStorage|sessionStorage|navigator)\s*[.[]/

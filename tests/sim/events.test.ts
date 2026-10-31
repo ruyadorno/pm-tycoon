@@ -477,7 +477,7 @@ describe('jobs as cards (B3 §3.1–§3.2, §6)', () => {
       [JOB_DECLINE, 'Decline', true, true, true],
     ])
     expect(optionLines(sim, card, opts[1]!)).toEqual([
-      { text: 'Next job in 1 day', tone: 'neutral' },
+      { text: 'No jobs for 1 day', tone: 'neutral' },
     ])
     sim.state.districts.downtown!.satisfaction = 47
     const q = acceptOffer(sim)

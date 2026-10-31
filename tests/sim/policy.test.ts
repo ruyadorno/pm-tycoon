@@ -180,20 +180,20 @@ const PLAN_BUYS = [
 
 let gateRuns: RunResult[] | null = null
 /**
- * The 10-seed × 30-min policy runs (computed once for this file). Build 3,
- * M12: pass 1 (B3 §2.3, §3.9 — the level rows gated "pass 1 with events off,
- * pass 2 on"): the decision draw stays off here until M14's pass 2 re-gates
- * the windows with the deck; the deck-on event rows are gated in
- * tests/sim/events-policy.long.test.ts and by `vlr sim:gate`.
+ * The 10-seed × 30-min policy runs (computed once for this file). Build 3:
+ * pass 1 at M11-M13 (B3 §2.3, §3.9 — the level rows gated "pass 1 with
+ * events off, pass 2 on"); M14's pass 2 (plan-build3 §8.5 task 5) re-gates
+ * the windows with the shipped deck on, as `vlr sim:gate` does; the event
+ * rows are gated in tests/sim/events-policy.long.test.ts too.
  */
 function runs(): RunResult[] {
-  gateRuns ??= withDecisions(false, () =>
+  gateRuns ??= withDecisions(true, () =>
     SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy)),
   )
   return gateRuns
 }
-/** The pass-1 feature set the runs above use (the shipped flags, decisions off). */
-const PASS1 = { ...SIM_FEATURES, events: false }
+/** The pass-2 feature set the runs above use (the shipped flags, the deck on). */
+const PASS2 = { ...SIM_FEATURES, events: true }
 
 describe('competent policy (spec §7) [gate]', () => {
   it("opening A at t = 0: a bike with the best driver + a Metal detector, $100 − the driver's fee left; then bikes at price + $50 until 3; a 2nd Metal detector (COUNTERS); at L2 the truck, then the Shaky shaker; at L3 (M8) the Battery checker REPLACEs the 2nd Metal detector, then dock 2, a van, a 2nd truck; at L4 (M9) the X-ray, dock 3, the Sorter Arm, a 2nd van; at L5 a 3rd truck — each at price + $50 (a REPLACE counts its refund, a voucher makes a machine free), each vehicle with the best driver for its type (seed 1 × 35 min)", () => {
@@ -538,7 +538,7 @@ describe('competent policy (spec §7) [gate]', () => {
     }
   }, 60_000)
 
-  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows; M8: the L3 rows; M9: the L4-L5 rows)', () => {
+  it('the gate passes on seeds 1-10 × 30 min with every window gated (M3: levels + payroll on; M7: the two quest rows; M8: the L3 rows; M9: the L4-L5 rows; build 3 M14: the event rows with the deck on)', () => {
     const g = summarise(
       runs().map((r) => r.result),
       {
@@ -547,7 +547,8 @@ describe('competent policy (spec §7) [gate]', () => {
         policy: 'competent',
         minutes: 30,
         targets,
-        features: PASS1,
+        features: PASS2,
+        eventPolicy: data.events.policy,
       },
     )
     expect(SIM_FEATURES).toEqual({
@@ -575,13 +576,13 @@ describe('competent policy (spec §7) [gate]', () => {
       ['firstOverseasClearedAfterLevel3MaxMin', null],
       ['level4Min', null],
       ['level5Min', null],
-      // Build 3 (B3 §3.9): gated with the deck on since M12 — these are the
-      // pass-1 runs (decisions off), so they stay informational here.
-      ['eventsOfferedBy30MinMin', 'informational (M12)'],
-      ['eventsOpenMaxTicks', 'informational (M12)'],
-      ['eventsL1PlateauMin', 'informational (M12)'],
-      ['policyEvPerCard', 'informational (M12)'],
-      ['policyNonDefaultShare', 'informational (M12)'],
+      // Build 3 (B3 §3.9): gated with the deck on since M12; M14's pass-2
+      // runs carry the deck, and the policy rows read events.json policy.
+      ['eventsOfferedBy30MinMin', null],
+      ['eventsOpenMaxTicks', null],
+      ['eventsL1PlateauMin', null],
+      ['policyEvPerCard', null],
+      ['policyNonDefaultShare', null],
     ])
     expect(
       g.checks

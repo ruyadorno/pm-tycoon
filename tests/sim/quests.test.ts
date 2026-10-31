@@ -11,7 +11,7 @@
 // no-double-counting property test over 200 seeded random feeds. M9 (design-
 // m8-m9 §4.5, §7 M9 6): the Golden Release at the real L5 — the shipped cap
 // 5, the threshold earned — offered on `level:up {5}`, kept by Later, its
-// 60 / 0 / 90 % counters, Victory.
+// 60 / 0 / 85 % counters (build 3: Q-B3-7), Victory.
 
 import { describe, expect, it } from 'vitest'
 import type { SimEventName, SimEventPayloads } from '../../src/sim/events.ts'
@@ -134,10 +134,10 @@ describe('quests.json (B2 §9) and the start state', () => {
     expect(questName(data, 'golden_release')).toBe('The Golden Release')
     expect(
       questFlavour(data, { templateId: 'rush_district', target: 'downtown' }),
-    ).toBe('Registry Row is swamped — get their parcels moving')
+    ).toBe('Registry Row is swamped — get their parcels moving.')
     expect(
       questFlavour(data, { templateId: 'cheer_up', target: 'highres' }),
-    ).toBe('Node Heights is grumbling; win them back')
+    ).toBe('Node Heights is grumbling; win them back.')
     const none = {
       cash: 0,
       lives: 0,
@@ -151,7 +151,7 @@ describe('quests.json (B2 §9) and the start state', () => {
     )
     expect(
       rewardSummary(data, { ...none, cash: 150, satisfaction: 5 }, 'downtown'),
-    ).toBe('$150 + 5 satisfaction in Registry Row')
+    ).toBe('$150 + 5 happiness in Registry Row')
     expect(
       rewardSummary(
         data,
@@ -1066,7 +1066,7 @@ describe('commands (design-m7 §3.2): every failure reason', () => {
     expect(v.nextOfferInTicks).toBeNull()
     expect(v.offer).toMatchObject({
       name: 'Rush hour',
-      flavour: 'Node Heights is swamped — get their parcels moving',
+      flavour: 'Node Heights is swamped — get their parcels moving.',
       kind: 'deliveriesFrom',
       progress01: 0,
       ticksLeft: null, // a job offer never expires (B3 §3.2)
@@ -1438,13 +1438,13 @@ describe('no quest counts an event twice (plan-build2 §8.4 acceptance; design-m
 })
 
 describe('the Golden Release at the real L5 (M9: the shipped cap 5; design-m8-m9 §4.5, §7 M9 6)', () => {
-  it('offered on the level:up {5} tick of an earned L5; Later keeps it (no expiry, no Decline); 60 deliveries, 0 malware, 90 % on time → Victory: economy.victory, stats.victoryTick, game:victory', () => {
+  it('offered on the level:up {5} tick of an earned L5; Later keeps it (no expiry, no Decline); 60 deliveries, 0 malware, 85 % on time (Q-B3-7) → Victory: economy.victory, stats.victoryTick, game:victory', () => {
     const L5 = data.levels.find((l) => l.level === 5)!
     const u = L5.ultimateQuest!
     expect(u).toMatchObject({
       deliveries: 60,
       maxMalwareDelivered: 0,
-      minOnTimeRate: 0.9,
+      minOnTimeRate: 0.85,
     })
     expect(data.economy.playtestMaxLevel).toBe(5)
     const sim = noOffers(quietSim(21))
@@ -1482,18 +1482,18 @@ describe('the Golden Release at the real L5 (M9: the shipped cap 5; design-m8-m9
         i % 2 ? 'dt_cache_cafe' : 'hr_towers_b',
       ),
     )
-    parcels.slice(0, 6).forEach((p) => deliver(sim, p, false))
-    parcels.slice(6, -1).forEach((p) => deliver(sim, p))
+    parcels.slice(0, 9).forEach((p) => deliver(sim, p, false))
+    parcels.slice(9, -1).forEach((p) => deliver(sim, p))
     runTicks(sim, 1)
     expect(sim.state.quests.active?.progress).toEqual({
       kind: 'ultimate',
       delivered: 59,
-      onTime: 53,
+      onTime: 50,
       malware: 0,
     })
     expect(sim.state.economy.victory).toBe(false)
     const victory = collect(sim, 'game:victory')
-    deliver(sim, parcels.at(-1)!) // 54 / 60 = 90 %
+    deliver(sim, parcels.at(-1)!) // 51 / 60 = 85 % (the floor, Q-B3-7)
     runTicks(sim, 1)
     const t = sim.state.tick
     expect(victory).toEqual([{ day: sim.state.day }])

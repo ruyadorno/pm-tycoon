@@ -146,10 +146,10 @@ describe('District panel (city-view §5.1)', () => {
 
   it('favoured vehicle line uses districts.json favoured + economy favouredBonus', () => {
     expect(dp.favouredLine(district('highres'), data)).toBe(
-      'Favours: bike (+1 satisfaction)',
+      'Favours: bike (+1 happiness)',
     )
     expect(dp.favouredLine(district('downtown'), data)).toBe(
-      'Favours: van (+1 satisfaction)',
+      'Favours: van (+1 happiness)',
     )
     expect(dp.favouredLine(district('industrial'), data)).toBeNull()
     expect(dp.favouredLine(district('docks'), data)).toBeNull()

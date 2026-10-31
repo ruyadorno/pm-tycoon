@@ -32,7 +32,7 @@
 //      + HUD ≤ 7 after 60 s of the policy, and ≤ 7 again at tier 5 scrolled
 //      (M9 review: the cover over the bands batches with the readout).
 //   6. Build 3 M12 (plan-build3 §8.3 acceptance, contract §9.3): City + HUD
-//      + an open EventCard (the scanner course, three options) ≤ 8 draw
+//      + an open EventCard (the gold crate, three options) ≤ 8 draw
 //      calls; the EffectsCard (Rain's timed modifier) ≤ 8.
 import { readFileSync } from 'node:fs'
 import type { CDPSession, Page } from '@playwright/test'
@@ -610,15 +610,18 @@ test.describe('dist build (vite preview of dist/)', () => {
     pm,
     consoleErrors,
   }) => {
-    await pm.open(EVENT_URL('ev_staff_training'))
+    // The gold crate: three options on a new game (the scanner course shows
+    // 'Send everyone' only with two inspectors since M14).
+    await pm.open(EVENT_URL('ev_sec_crate'))
     await pm.freeze()
     await pm.overlay(false)
-    const ui = await eventCardUp(page, pm, 'ev_staff_training')
+    const ui = await eventCardUp(page, pm, 'ev_sec_crate')
     expect(ui.card.mode).toBe('three')
     await pm.settle(30)
     const card = await page.evaluate(() => window.__pm!.metrics().drawCalls)
-    // Skip (the default, index 2), then Rain's OK: one timed modifier.
-    await tapTarget(page, pm, 'HUD', 'event:opt2')
+    // Toss it (the default, index 1: +$50, no link), then Rain's OK: one
+    // timed modifier.
+    await tapTarget(page, pm, 'HUD', 'event:opt1')
     await eventCardDown(page, pm)
     await debugEvent(page, 'ev_wx_rain')
     await eventCardUp(page, pm, 'ev_wx_rain')

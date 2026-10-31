@@ -198,7 +198,7 @@ describe('B3 §3.4: the decision diff (pulse, sound, paper)', () => {
   it('the headline: the chain head at a chain end (critique 6), a news card its title and line (critique 7), else the choice', () => {
     const card = {
       title: 'On the doorstep',
-      option: 'Yes',
+      option: 'Hide the fleet',
       kind: 'decision' as const,
       chainTitle: 'Protection',
     }
@@ -381,10 +381,10 @@ describe('on a real sim: the decisions as the HUD presents them', () => {
     }
   })
 
-  it('the gang chain: Deny books the next link (no paper); the link names its head; the last link ends it — `Protection — the story ends`', () => {
+  it('the gang chain: Refuse books the next link (no paper); the link names its head; the last link ends it — `Protection — the story ends`', () => {
     const { sim, vs } = game(4)
     expect(vs.debug!.offerEvent('ev_crime_gang').ok).toBe(true)
-    const head = decide(sim, vs, 'Deny')
+    const head = decide(sim, vs, 'Refuse')
     expect(head.d.scheduled).toBe(1)
     expect(head.chainEnd).toBe(false)
     expect(head.paper).toBeNull()
@@ -392,8 +392,8 @@ describe('on a real sim: the decisions as the HUD presents them', () => {
     tickUntilOpen(sim, 'ev_crime_gang_watch')
     const watch = vs.events().open!
     expect(watch.chainTitle).toBe('Protection')
-    expect(watch.parentChoice).toBe('You chose: Deny')
-    const w = decide(sim, vs, 'Yes')
+    expect(watch.parentChoice).toBe('You chose: Refuse')
+    const w = decide(sim, vs, 'Hide the fleet')
     expect(w.chainEnd).toBe(false)
     expect(w.paper).toBeNull()
 
@@ -495,7 +495,7 @@ describe('m5x7: every M12 HUD string is drawn in glyphs the font has', () => {
         data,
         {
           title: 'Protection',
-          option: 'Deny',
+          option: 'Refuse',
           kind: 'decision',
           chainTitle: 'Protection',
         },

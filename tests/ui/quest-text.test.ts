@@ -139,16 +139,17 @@ describe('design-m7 §6.2: the objective in one sentence, per goal kind', () => 
   it('every template and the Golden Release', () => {
     const want: Record<string, string> = {
       rush_district: 'Deliver 6 parcels sent from Registry Row',
-      cheer_up: 'Bring Node Heights to 52 satisfaction',
-      magic_parcel: 'Deliver the golden parcel across town in 2:00',
+      cheer_up: 'Bring Node Heights to 52 happiness',
+      // The offer drops the clock: the job card's `Limit: 2 days` line carries it.
+      magic_parcel: 'Deliver the golden parcel across town',
       clean_sweep: 'Toss 3 malware in a row — a clean parcel tossed resets it',
-      on_time_day: 'One full day at 85% on time (6+ deliveries)',
+      on_time_day: 'One full day at 85 % on time (6+ deliveries)',
       big_haul: 'Deliver 3 XL parcels',
       night_shift: 'Make 6 Hold Bay calls without a full bay',
       customs_run: 'Clear 3 parcels through Shrinkwrap Shore',
-      inspector_general: 'Hold 95% detection on every strain for a day',
+      inspector_general: 'Hold 95 % detection on every strain for a day',
       express_lane: 'Clear 4 parcels through Prefetch International',
-      golden_release: 'In 5 days: 60 deliveries, no malware, 90% on time',
+      golden_release: 'In 5 days: 60 deliveries, no malware, 85 % on time',
     }
     for (const id of TEMPLATE_IDS) {
       let q = offer(id)
@@ -178,10 +179,10 @@ describe('design-m7 §6.2: the objective in one sentence, per goal kind', () => 
   it('{district}: the flavour line names the target (verbatim for Registry Row / Node Heights)', () => {
     const rush = at(offer('rush_district'), 'downtown')
     expect(rush.flavour).toBe(
-      'Registry Row is swamped — get their parcels moving',
+      'Registry Row is swamped — get their parcels moving.',
     )
     const cheer = at(offer('cheer_up'), 'highres')
-    expect(cheer.flavour).toBe('Node Heights is grumbling; win them back')
+    expect(cheer.flavour).toBe('Node Heights is grumbling; win them back.')
     // The sim's own view fills it for the target it picked.
     const real = offer('rush_district')
     expect(real.flavour).toContain(real.targetName!)
@@ -196,7 +197,7 @@ describe('design-m7 §6.2: the reward line (the sim formatter) and the stamp', (
       'Reward: +1 life + $150',
     )
     expect(qt.rewardText(data, at(offer('cheer_up'), 'downtown'))).toBe(
-      'Reward: $150 + 5 satisfaction in Registry Row',
+      'Reward: $150 + 5 happiness in Registry Row',
     )
     expect(qt.rewardText(data, offer('clean_sweep'))).toBe(
       'Reward: ★ inspector Vera',
@@ -218,7 +219,7 @@ describe('design-m7 §6.2: the reward line (the sim formatter) and the stamp', (
       'QUEST COMPLETE +2 lives',
     )
     expect(qt.stampText(data, offer('cheer_up').reward)).toBe(
-      'QUEST COMPLETE +$150 +5 satisfaction',
+      'QUEST COMPLETE +$150 +5 happiness',
     )
     expect(qt.stampText(data, offer('clean_sweep').reward)).toBe(
       'QUEST COMPLETE ★ Vera',

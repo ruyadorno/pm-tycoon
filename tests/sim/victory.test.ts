@@ -81,13 +81,13 @@ function atLevel5(seed = 1): Sim {
 }
 
 describe('the Golden Release offer (B2 §3.4; design Q15)', () => {
-  it('ultimateQuest in levels.json L5 is unchanged; the quest card name lives in puns', () => {
+  it('ultimateQuest in levels.json L5 (build 3: minOnTimeRate 0.85, Q-B3-7); the quest card name lives in puns', () => {
     expect(u).toEqual({
       id: 'golden_release',
       days: 5,
       deliveries: 60,
       maxMalwareDelivered: 0,
-      minOnTimeRate: 0.9,
+      minOnTimeRate: 0.85,
     })
     expect(dataFixture().puns.ultimateQuestName).toBe('The Golden Release')
   })
@@ -144,7 +144,7 @@ describe('the Golden Release offer (B2 §3.4; design Q15)', () => {
     })
     expect(createViewSim(sim).quests().offer).toMatchObject({
       name: 'The Golden Release',
-      flavour: 'Five perfect days — the Golden Release',
+      flavour: 'Five perfect days — the Golden Release.',
       ticksLeft: null,
       limitTicks: 5 * DAY,
       kind: 'ultimate',
@@ -180,24 +180,25 @@ describe('the Golden Release counters (design Q13)', () => {
   it('local deliveries and overseas clearances count, the on-time rate gates completion; Victory: economy.victory, stats.victoryTick, game:victory last', () => {
     const sim = noOffers(quietSim(3))
     const q = startQuest(sim, 'golden_release') // debug: any level
-    delivered(sim, 40)
-    delivered(sim, 7, false)
+    // Build 3 (M14, Q-B3-7): minOnTimeRate 0.85.
+    delivered(sim, 35)
+    delivered(sim, 12, false)
     clearedAtHub(sim, 13)
     expect(q.progress).toEqual({
       kind: 'ultimate',
       delivered: 60,
-      onTime: 53,
+      onTime: 48,
       malware: 0,
     })
-    runTicks(sim, 1) // 53/60 < 90 %: not yet
+    runTicks(sim, 1) // 48/60 = 80 % < 85 %: not yet
     expect(sim.state.quests.active?.id).toBe(q.id)
     expect(createViewSim(sim).quests().active?.progress01).toBe(1)
     const log = eventLog(sim)
-    delivered(sim, 2) // 55/62 = 88.7 %
+    delivered(sim, 2) // 50/62 = 80.6 %
     runTicks(sim, 1)
     expect(sim.state.quests.active?.id).toBe(q.id)
-    delivered(sim, 2) // 57/64 = 89.1 %
-    delivered(sim, 6) // 63/70 = 90 %
+    delivered(sim, 2) // 52/64 = 81.3 %
+    delivered(sim, 16) // 68/80 = 85 %
     runTicks(sim, 1)
     const t = sim.state.tick
     expect(sim.state.quests.history.at(-1)).toMatchObject({

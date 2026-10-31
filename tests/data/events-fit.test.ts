@@ -55,6 +55,8 @@ import {
   EVENT_CANT_AFFORD,
   EVENT_CARD_GAP,
   EVENT_CARD_MAX_H,
+  EVENT_CARD_PAD,
+  EVENT_CARD_W,
   EVENT_ENTER_DENY,
   EVENT_PAUSED_TEXT,
   type EventCardInput,
@@ -376,6 +378,25 @@ describe('B3 §3.4 copy fit: every deck card on the EventCard (S1, S2, S3; every
     const cases = deckCases(def)
     expect(cases.length).toBeGreaterThan(0)
     expect(cases.flatMap(misfits)).toEqual([])
+  })
+
+  it('every outcome hint fits one row, so a number never wraps away from its unit (M14 copy polish: no `(95` / `% or better)`)', () => {
+    const inner = EVENT_CARD_W - 2 * EVENT_CARD_PAD
+    const hints = new Set<string>()
+    const walk = (x: unknown): void => {
+      if (Array.isArray(x)) for (const y of x) walk(y)
+      else if (typeof x === 'object' && x !== null) {
+        const r = x as Record<string, unknown>
+        if (typeof r.hint === 'string') hints.add(r.hint)
+        for (const v of Object.values(r)) walk(v)
+      }
+    }
+    walk(deck)
+    expect(hints.size).toBeGreaterThan(0)
+    for (const h of hints) {
+      const line = data.puns.eventWords.outcome.replace('{hint}', h)
+      expect(width(line), line).toBeLessThanOrEqual(inner)
+    }
   })
 })
 

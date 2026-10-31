@@ -71,7 +71,7 @@ const LEVEL_LEAD_S = 3
 const L4_SETTLE_S = 60
 /** victory: snapshot this long before the game:victory tick. */
 const VICTORY_LEAD_S = 3
-/** Give up past this (sim seconds) — the victory seed (8 since the M12 review fixes; seed 7 is past the goal 3 s out since M13) wins at ≈ 57 min. */
+/** Give up past this (sim seconds) — the victory seed (8 since the M12 review fixes, ≈ 57 min; seed 7 again since M14's minOnTimeRate 0.85, Q-B3-7) wins at ≈ 46.6 min. */
 const CAP_S = 3600
 /** Measuring a fixture's "…InS" under a fresh policy gives up after this. */
 const MEASURE_CAP_S = 600

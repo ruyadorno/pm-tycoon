@@ -1175,7 +1175,7 @@ describe('events.json policy design rules (B3 §3.8)', () => {
     poach.options[0].cost = data.events.policy.weights.staffQuit
     poach.cond.balanceAtLeast = data.events.policy.weights.staffQuit
     expect(ties(buildGameData(raw))).toEqual([
-      `ev_cust_rival_poach "Let them go" = "Match it (a bonus)" (${-data.events.policy.weights.staffQuit + data.events.policy.weights.chain})`,
+      `ev_cust_rival_poach "Let them go" = "Pay a bonus ($180)" (${-data.events.policy.weights.staffQuit + data.events.policy.weights.chain})`,
     ])
   })
 })

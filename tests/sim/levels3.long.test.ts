@@ -14,14 +14,14 @@
 // thinner ($233-$390 on seven of seeds 1-10), so the Battery checker
 // ($500, price + buffer) lands on the first tick the policy can afford it
 // at or after L3 (21-96 s later), with nothing bought in between and the
-// REPLACE on that tick. L4 can now arrive before dock 2 (seeds 7 and 8):
-// NEW STRAIN FIRST (levelPlan.ts) then buys the X-ray ahead of dock 2,
-// which may fall past the 25 minutes.
+// REPLACE on that tick. L4 can now arrive before dock 2 (seeds 7 and 8;
+// M14 with the deck on: seeds 2, 4, 6, 8 and 9): NEW STRAIN FIRST
+// (levelPlan.ts) then buys the X-ray ahead of dock 2, which may fall past
+// the 25 minutes.
 //
-// Build 3, M12: SIM_FEATURES.events is on, but these are the pass-1 pacing
-// runs (B3 §2.3, §3.9: the level rows gated "pass 1 with events off, pass 2
-// on") — the decision draw stays off here until M14's pass 2 re-gates them
-// with the deck (the M12 deck-on drift is in docs/status.md).
+// Build 3, M12: these were the pass-1 pacing runs (B3 §2.3, §3.9: the level
+// rows gated "pass 1 with events off, pass 2 on"). M14 (pass 2, plan-build3
+// §8.5 task 5): the shipped deck is on, as in `vlr sim:gate`.
 
 import { describe, expect, it } from 'vitest'
 import { createPolicy } from '../../src/sim/policy.ts'
@@ -38,7 +38,7 @@ const MINUTES = 25
 let cached: RunResult[] | null = null
 /** The 10-seed × 25-min competent runs (computed once for this file). */
 function runs(): RunResult[] {
-  cached ??= withDecisions(false, () =>
+  cached ??= withDecisions(true, () =>
     SEEDS.map((seed) => runSeed(data, seed, MINUTES, createPolicy)),
   )
   return cached
@@ -75,6 +75,13 @@ describe('the L3 window under the competent policy (seeds 1-10 × 25 min) [long]
     const isChecker = (e: RunResult['events'][number], id: string): boolean =>
       e.name === 'lane:fixturePlaced' &&
       (e.fixture as { checker?: { defId?: string } }).checker?.defId === id
+    /**
+     * Not an L3 purchase: the L2 plan's last step (the Shaky shaker, B2
+     * §7.2) or a vehicle a card gave (`vehicle:bought {free}`, B3 §3.5).
+     */
+    const isL2Plan = (e: RunResult['events'][number]): boolean =>
+      isChecker(e, 'shaky_shaker') ||
+      (e.name === 'vehicle:bought' && e.free === true)
     const late: string[] = []
     for (const r of runs()) {
       const l3 = r.events.find((e) => e.name === 'level:up' && e.level === 3)!
@@ -82,12 +89,18 @@ describe('the L3 window under the competent policy (seeds 1-10 × 25 min) [long]
       const placed = r.events.find((e) => isChecker(e, 'battery_checker'))
       expect(placed, `seed ${r.seed}`).toBeDefined()
       expect(placed!.tick, `seed ${r.seed}`).toBeGreaterThanOrEqual(l3.tick)
-      // Nothing else is bought between L3 and the Battery checker.
+      // Nothing else is bought between L3 and the Battery checker — except
+      // what is left of the L2 plan (M14, the deck on: seed 8's late truck
+      // leaves the Shaky shaker to the L3 tick; the plan finishes L2 first)
+      // and a card's free vehicle.
       expect(
         r.events
           .filter(
             (e) =>
-              BUYS.has(e.name) && e.tick >= l3.tick && e.tick < placed!.tick,
+              BUYS.has(e.name) &&
+              e.tick >= l3.tick &&
+              e.tick < placed!.tick &&
+              !isL2Plan(e),
           )
           .map((e) => [e.tick, e.name]),
         `seed ${r.seed}`,

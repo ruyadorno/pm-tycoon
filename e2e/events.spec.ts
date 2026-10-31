@@ -526,20 +526,22 @@ test.describe('M12 event cards', () => {
     pm,
     consoleErrors,
   }) => {
-    await pm.open(EV('ev_staff_training'))
+    // The gold crate: three options on a new game (the scanner course needs
+    // two inspectors for its third since M14).
+    await pm.open(EV('ev_sec_crate'))
     await pm.freeze()
-    const ui = await eventCardUp(page, pm, 'ev_staff_training')
+    const ui = await eventCardUp(page, pm, 'ev_sec_crate')
     expect(ui.card.mode, 'three options').toBe('three')
     const tick = ui.tick
     await pm.thaw()
     // No ?seed= / ?event=: Boot resumes the autosave the pagehide wrote.
     await pm.open('/?debug=1&skipTitle=1&audio=0&attract=0')
     await pm.freeze()
-    const back = await eventCardUp(page, pm, 'ev_staff_training')
+    const back = await eventCardUp(page, pm, 'ev_sec_crate')
     console.log(
       `events: after the reload ${JSON.stringify({ open: back.open?.eventId, tick: back.tick, holds: back.holds })}`,
     )
-    expect(back.open?.eventId).toBe('ev_staff_training')
+    expect(back.open?.eventId).toBe('ev_sec_crate')
     expect(back.openedTick).toBe(ui.openedTick)
     expect(back.tick).toBe(tick)
     expect(back.holds).toContain('event')

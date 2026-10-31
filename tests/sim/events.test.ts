@@ -167,7 +167,7 @@ describe('the draw timer (B3 §3.2)', () => {
     expect(d.state.events.open).toMatchObject({ drawn: false, gapTicks: null })
     decideOpen(d, 0)
     d.dispatch({ kind: 'debugOfferEvent', eventId: 'ev_crime_gang' })
-    decideOpen(d, 1) // Deny → the watch in 1 day
+    decideOpen(d, 1) // Refuse → the watch in 1 day
     expect(
       runUntil(d, () => d.state.events.open !== null, 2 * DAY),
     ).toBeGreaterThan(0)
@@ -323,7 +323,7 @@ describe('quiet rules and the queue (B3 §3.2; critique 15, 30)', () => {
       ok: false,
       reason: 'invalid',
     })
-    decideOpen(sim, 1) // Deny: the watch booked
+    decideOpen(sim, 1) // Refuse: the watch booked
     const t = sim.state.tick
     sim.state.events.scheduled[0]!.dueTick = t // the link due now
     sim.state.events.nextDrawTick = t // and the draw
@@ -765,7 +765,7 @@ describe('the decision pool (B3 §3.2): once, cooldown, the category rule, runni
     sim.state.level.level = 2
     expect(ids(sim)).toContain('ev_crime_gang')
     sim.dispatch({ kind: 'debugOfferEvent', eventId: 'ev_crime_gang' })
-    decideOpen(sim, 1) // Deny: the chain runs
+    decideOpen(sim, 1) // Refuse: the chain runs
     sim.state.events.seen = {}
     sim.state.events.lastCategory = null
     expect(ids(sim)).not.toContain('ev_crime_gang')

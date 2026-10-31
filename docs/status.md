@@ -21,7 +21,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 - [x] M11 pacing pass 1 + the events engine: windows, the threshold scan, the modifier registry, `events.json`, deck/effects/policy, gate rows, save v6 (commit `M11: …`)
 - [x] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
 - [x] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
-- [ ] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
+- [x] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
 - [ ] M15 playtest-3 build: metrics v3, summary card v3 + fun bar 3, shots, report, hand-off (commit `M15: …`)
 
 ## Milestone checklist (build 2)
@@ -60,6 +60,35 @@ JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 an
 L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `level:up {3}` in any 30-min run).
 
 ## Checkpoint entries (newest first)
+
+## M14 — pacing pass 2 (deck on) — 2026-10-31 12:46 UTC — DONE at (this commit; sha recorded in the M15 entry)
+
+M13 is f4cb2a4.
+Built: the Golden Release at `minOnTimeRate` 0.85 (Q-B3-7); full gates with the shipped deck (no threshold nudge
+needed — every level median in band); the long victory test, the delegating rows and the robustness sweeps with the
+deck on; the M13 copy polish; fixtures regenerated (the victory fixture from seed 7); level times re-quoted.
+
+| median (min, seeds 1–10)        | build 2    | M11 (deck off)  | M14 (deck on)         | Δ vs build 2 |
+| ------------------------------- | ---------- | --------------- | --------------------- | ------------ |
+| L2                              | 11.72      | 10.57           | 10.73                 | −8.4 %       |
+| L3                              | 17.98      | 16.52           | 16.51                 | −8.2 %       |
+| L4                              | 22.35      | 20.56           | 20.55                 | −8.1 %       |
+| L5                              | 27.70      | 25.46           | 25.33                 | −8.6 %       |
+| truck after L2                  | +1.54      | +2.78           | +2.30                 |              |
+| Golden Release offered (35 min) | 27.70      | 25.46           | 25.33                 |              |
+| 40 seeds: L5 · lives share      | —          | 26.11 · 13/40   | 26.68 · 12/40         |              |
+| victory seeds 1–3 (≤ 40 target) | none by 45 | 47.6 / 49.5 / — | 48.82 / 56.60 / 47.62 |              |
+
+Gate: `vlr sim:gate` PASS (cards 21, L1 plateau 4, EV $24.4, non-default 0.52, lives 0 with 2/10 seeds losing any);
+35-min PASS (Golden Release 25.33, worst seed 29.04); `vlr sim:delegating` PASS (L5 26.22, lives 1, payroll 0.28);
+40 seeds PASS (L5 26.68; L3–L5 only −5.6 / −3.8 / −3.7 % over 40 seeds — the band is a 10-seed rule).
+Tests: 3,052 passing (vitest, 126 files); e2e smoke PASS; `vlr check` 189 s; shots 109 passed (`tests/playtest/seed-7.json`
+rewritten from the 35-min run: L2–L5 at 10.7 / 15.9 / 20.6 / 24.9 min, no life lost)
+Shots: regenerated; no layout change (copy only)
+Deviations from spec-build3.md: victory by 40 min not met (the Golden Release's 5-day clock); the run stays at ≈ −8 %
+(R26) — docs/decisions.md "Run decisions and deviations (M14)"
+Open for the author: the Golden Release's 5-day clock vs victory ≤ 40 (Q-RUN9 continued)
+Next: M15 playtest-3 build (metrics v3, summary card v3, report, hand-off)
 
 ## M13 — the full deck — 2026-10-31 11:58 UTC — DONE at (this commit; sha recorded in the M14 entry)
 

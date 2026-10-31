@@ -10,7 +10,7 @@
 //     trend arrow (ic_up / ic_down / ic_flat from districtStats.trend);
 //     < economy.satisfaction.loudBelow adds ic_angry `Residents are
 //     grumbling`, ≥ happyAbove ic_flower `Loves the service`
-//   3 favoured vehicle (`Favours: bike (+1 satisfaction)`), or for a
+//   3 favoured vehicle (`Favours: bike (+1 happiness)`), or for a
 //     hard-rule district (Industrial) the red `Trucks only — bikes and vans
 //     never enter` and, while the player owns none of its allowed types,
 //     `No truck yet (Lv 2, $1,200)` (vehicles.json)
@@ -188,12 +188,12 @@ export function moodNote(
   return null
 }
 
-/** `Favours: bike (+1 satisfaction)`; null for hubs / hard-rule districts. */
+/** `Favours: bike (+1 happiness)`; null for hubs / hard-rule districts. */
 export function favouredLine(def: DistrictDef, data: GameData): string | null {
   if (def.kind !== 'district' || def.hardRule || def.favoured.length === 0)
     return null
   const names = def.favoured.map((t) => typeName(data, t).toLowerCase())
-  return `Favours: ${names.join(' or ')} (+${data.economy.satisfaction.favouredBonus} satisfaction)`
+  return `Favours: ${names.join(' or ')} (+${data.economy.satisfaction.favouredBonus} happiness)`
 }
 
 /** `Trucks only — bikes and vans never enter` for a hard-rule district. */

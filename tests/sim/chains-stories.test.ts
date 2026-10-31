@@ -7,7 +7,7 @@
 // offered.
 //
 //   - The 4–5-card stories end to end, and every other chain too: the gang
-//     (Deny → watch → No → `vehicle:lost` bike → the price went up → the
+//     (Refuse → watch → Carry on → `vehicle:lost` bike → the price went up → the
 //     police → the raid's wanted reveal and the life back), the union, the
 //     rival (five cards), the investor, the permit / petition hearing, the
 //     audit, the ring, the crate, the storm, the influencer, the port
@@ -857,7 +857,7 @@ const BUST = 'ev_crime_gang_bust'
 const STORIES: Story[] = [
   // Underworld — the gang (4 cards).
   {
-    name: 'gang: Deny → watch: No → a bike lost → the price went up → the police → the raid (wanted, a life back)',
+    name: 'gang: Refuse → watch: Carry on → a bike lost → the price went up → the police → the raid (wanted, a life back)',
     level: 2,
     setup: withBikeAndVan,
     moves: [
@@ -889,7 +889,7 @@ const STORIES: Story[] = [
     ],
   },
   {
-    name: 'gang: Deny → watch: hide the fleet (a slow day that expires) → the price went up → pay',
+    name: 'gang: Refuse → watch: Hide the fleet (a slow day that expires) → the price went up → pay',
     level: 2,
     setup: withBikeAndVan,
     moves: [
@@ -1069,7 +1069,7 @@ const STORIES: Story[] = [
 
   // Customers — the rival (5 cards) and the VIP trio.
   {
-    name: 'rival: Price war → poach (Match it) → trouble (Wait) → folds (their calls) → the auction (Bid): five cards',
+    name: 'rival: Price war → poach (Pay a bonus) → trouble (Wait) → folds (their calls) → the auction (Bid): five cards',
     level: 2,
     setup: withBike,
     moves: [

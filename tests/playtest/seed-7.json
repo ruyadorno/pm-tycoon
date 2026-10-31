@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildStamp": "617e97b 2026-10-31",
+  "buildStamp": "f4cb2a4 2026-10-31",
   "seed": 7,
-  "startedAt": "2026-10-31T11:51:18Z",
+  "startedAt": "2026-10-31T12:35:26Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -12,7 +12,7 @@
     "maxTexture": 8192
   },
   "elapsedS": 107.7,
-  "simS": 2102.5,
+  "simS": 2102.7,
   "pausedS": 0.9,
   "firstDeliveryS": 31.5,
   "firstMalware": {
@@ -29,13 +29,13 @@
   "endlessS": null,
   "truckBoughtS": 758.9,
   "deliveries": {
-    "total": 308,
+    "total": 309,
     "onTime": 191,
-    "late": 117,
+    "late": 118,
     "byType": {
       "bike": 187,
       "van": 24,
-      "truck": 97
+      "truck": 98
     }
   },
   "moneyPerMin": [
@@ -75,8 +75,8 @@
     665,
     724
   ],
-  "lifetimeEarned": 12436,
-  "balanceEnd": 563,
+  "lifetimeEarned": 12449,
+  "balanceEnd": 576,
   "malware": {
     "spawned": 53,
     "caught": 49,
@@ -308,7 +308,7 @@
   "tapsPerMin": 3.9,
   "rushTaps": 1,
   "viewSwitches": 2,
-  "warehouseS": 59.3,
+  "warehouseS": 59.4,
   "fps": {
     "p50": 61,
     "p5": 59,
@@ -329,7 +329,7 @@
   "satisfactionEnd": {
     "highres": 5,
     "downtown": 12,
-    "industrial": 1,
+    "industrial": 0,
     "lowres": 14,
     "rural": 3,
     "civic": 40

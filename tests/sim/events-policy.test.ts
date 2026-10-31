@@ -715,12 +715,24 @@ describe('the six hand-checked cards of B3 §3.8', () => {
     expect(pickOf(sim, c)).toBe('Cake for everyone')
   })
 
-  it('the scanner course (seed deck): one inspector at L1, everyone with three', () => {
+  it('the scanner course (seed deck): one inspector at L1 (no "Send everyone"), everyone with three', () => {
     const sim = makeSim(1)
     const c = open(sim, 'ev_staff_training')
     const name = c.pick!.name
-    expect(scores(sim, c)).toEqual({
-      'Send everyone': -150 + W.pips.eye!,
+    // 'Send everyone' shows only with two or more inspectors (its `if`, M14 copy polish).
+    const opts = cardOptions(sim, c)
+    expect(opts.map((o) => [o.label, o.visible])).toEqual([
+      ['Send everyone', false],
+      [`Send ${name}`, true],
+      ['Skip', true],
+    ])
+    expect(
+      Object.fromEntries(
+        opts
+          .filter((o) => o.visible)
+          .map((o) => [o.label, scoreOption(sim, c, o)]),
+      ),
+    ).toEqual({
       [`Send ${name}`]: -60 + W.pips.eye!,
       Skip: 0,
     })
@@ -728,6 +740,7 @@ describe('the six hand-checked cards of B3 §3.8', () => {
     const three = makeSim(1)
     inspectors(three, 3)
     const c3 = open(three, 'ev_staff_training')
+    expect(cardOptions(three, c3)[0]!.visible).toBe(true)
     expect(scoreOption(three, c3, cardOptions(three, c3)[0]!)).toBe(
       -150 + 3 * W.pips.eye!,
     )
@@ -751,16 +764,19 @@ describe('the six hand-checked cards of B3 §3.8', () => {
     buy(sim, 'bike')
     sim.state.economy.balance = 1000
     const head = open(sim, 'ev_crime_gang')
-    expect(scores(sim, head)).toEqual({ 'Accept ($300)': -300, Deny: W.chain })
-    expect(pickOf(sim, head)).toBe('Deny')
+    expect(scores(sim, head)).toEqual({
+      'Pay up ($300)': -300,
+      Refuse: W.chain,
+    })
+    expect(pickOf(sim, head)).toBe('Refuse')
     sim.state.events.open = null
     const watch = open(sim, 'ev_crime_gang_watch')
     const bike = sim.state.vehicles[0]!
     expect(scores(sim, watch)).toEqual({
-      Yes: -75 + W.chain,
-      No: -bike.purchasePrice + W.chain,
+      'Hide the fleet': -75 + W.chain,
+      'Carry on': -bike.purchasePrice + W.chain,
     })
-    expect(pickOf(sim, watch)).toBe('Yes')
+    expect(pickOf(sim, watch)).toBe('Hide the fleet')
   })
 
   it('the loan is never taken (+$400 against $25 a day for 20 days)', () => {
@@ -968,9 +984,9 @@ describe('the policy’s choice (ties → the default, then the lowest index; th
       ['ev_fleet_tyres', 'No'],
       ['ev_cust_refund', 'Refuse'],
       ['ev_tech_barcode', 'Adopt ($50)'],
-      ['ev_luck_friend', 'Hire them'],
+      ['ev_luck_friend', 'Offer a job'],
       ['ev_wx_rain', 'OK'],
-      ['ev_crime_gang', 'Deny'],
+      ['ev_crime_gang', 'Refuse'],
       ['ev_t_investor', 'Take it'],
     ]
     const tally = newTally()
@@ -1165,10 +1181,10 @@ describe('M12 review: per-vehicle prices, driverless vehicles, the poach tie', (
     sim.state.economy.balance = 500
     const c = open(sim, 'ev_cust_rival_poach')
     expect(scores(sim, c)).toEqual({
-      'Match it (a bonus)': -180 + W.chain,
+      'Pay a bonus ($180)': -180 + W.chain,
       'Let them go': -W.staffQuit + W.chain,
     })
-    expect(pickOf(sim, c)).toBe('Match it (a bonus)')
+    expect(pickOf(sim, c)).toBe('Pay a bonus ($180)')
   })
 })
 
@@ -1267,9 +1283,9 @@ describe('the seed deck under the policy', () => {
       ev_tech_barcode: 'Adopt ($50)',
       ev_press_ad: 'No',
       ev_port_fastlane: 'No',
-      ev_luck_friend: 'Hire them',
-      ev_crime_gang: 'Deny',
-      ev_crime_gang_watch: 'Yes',
+      ev_luck_friend: 'Offer a job',
+      ev_crime_gang: 'Refuse',
+      ev_crime_gang_watch: 'Hide the fleet',
       ev_sec_recall: 'Pay the fine ($250)',
       ev_city_audit_fine: 'Pay ($400)',
     }

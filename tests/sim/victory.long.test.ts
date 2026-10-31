@@ -33,10 +33,15 @@
 // leaves that much after the latest victory seen (~50 min), and the endless
 // test asserts the check ran on at least one winning seed (never vacuous).
 //
-// Build 3, M12: these are pass-1 runs (B3 §2.3: the decision draw off) until
-// M14's pass 2 re-times the Golden Release with the deck on — with the M12
-// deck the victories land later and no winning seed keeps ENDLESS_WINDOW
-// inside RUN_MINUTES (the drift is in docs/status.md).
+// Build 3, M12: these were pass-1 runs (B3 §2.3: the decision draw off).
+// M14 (pass 2, plan-build3 §8.5 task 3): the shipped deck is on and the
+// ultimateQuest's minOnTimeRate is 0.85 (Q-B3-7). The victoryMaxMin target
+// (≤ 40, B3 §2.1) stays informational — printed with "BELOW TARGET" when
+// missed; the assertion is the build-2 bar, a victory on at least one of
+// seeds 1-3 by VICTORY_BAR_MIN (48). M14 measured 48.82 / 56.60 / 47.62
+// (the Golden Release fails on its 5-day clock — 60 deliveries — not on the
+// on-time rate: the tycoon config's Accept-only win is 4.21-4.95 min at
+// both 0.9 and 0.85).
 //
 // Tagged [long]: excluded from `vlr check:quick` (tools/check.mjs), run by
 // the full `vlr check`.
@@ -58,8 +63,14 @@ const ultimateRow = data.levels.find((l) => l.ultimateQuest)!
 const ultimate = ultimateRow.ultimateQuest!
 /** Days of endless play checked after a victory (design §7 M9 item 7). */
 const ENDLESS_DAYS = 3
-/** The latest victory minute seen on seeds 1-3 (M11: 47.6 / 49.5 / none by 50). */
+/**
+ * The victory minute the run is sized for (M11, deck off: 47.6 / 49.5 / none
+ * by 50; M14, deck on: 48.8 / 56.6 / 47.6 — seeds 1 and 3 keep the endless
+ * window inside RUN_MINUTES, seed 2's job check is skipped).
+ */
 const VICTORY_SEEN_MIN = 50
+/** Build 2's bar, kept by plan-build3 §8.5 task 3: ≥ 1 of seeds 1-3 wins by it. */
+const VICTORY_BAR_MIN = 48
 /**
  * Build 3 (B3 §3.2): after a victory a job card comes at a deck draw once the
  * job cooldown is over (jobShare per draw) — checked when the run lasts the
@@ -91,7 +102,7 @@ interface VictoryRun {
 let cached: VictoryRun[] | null = null
 /** The seeds 1-3 competent runs (computed once for this file). */
 function runs(): VictoryRun[] {
-  cached ??= withDecisions(false, () =>
+  cached ??= withDecisions(true, () =>
     SEEDS.map((seed) => {
       let counters: VictoryRun['counters'] = null
       let last: Sim | null = null
@@ -135,12 +146,19 @@ describe('the Golden Release and Victory under the competent policy (seeds 1-3) 
     expect(runs()).toHaveLength(SEEDS.length)
   }, 120_000)
 
-  it('at least one of seeds 1-3 wins within the run (the chain checks below are never vacuous)', () => {
+  it(`at least one of seeds 1-3 wins by ${VICTORY_BAR_MIN} min (the chain checks below are never vacuous)`, () => {
     const won = runs().filter((r) => r.victory)
     console.log(
       `[victory] ${won.length}/${SEEDS.length} seeds won by ${RUN_MINUTES} min: ${won.map((r) => `seed ${r.run.seed} at ${r.run.result.metrics.victoryMin}`).join(', ') || 'none'}`,
     )
     expect(won.length, 'a victory on seeds 1-3').toBeGreaterThan(0)
+    const byBar = won.filter(
+      (r) => r.run.result.metrics.victoryMin! <= VICTORY_BAR_MIN,
+    )
+    expect(
+      byBar.length,
+      `a victory on seeds 1-3 by ${VICTORY_BAR_MIN} min`,
+    ).toBeGreaterThan(0)
   }, 120_000)
 
   it('at L5 the Golden Release is offered on the level:up {5} tick, accepted by the policy (never declined or abandoned), and the 3rd truck is bought', () => {

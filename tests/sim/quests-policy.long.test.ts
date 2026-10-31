@@ -56,8 +56,9 @@ const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 let gateRuns: RunResult[] | null = null
 /** The 10-seed × 30-min competent-policy runs (computed once for this file). */
 function runs(): RunResult[] {
-  // Pass 1 (B3 §2.3): the decision draw off until M14's pass 2 (M12).
-  gateRuns ??= withDecisions(false, () =>
+  // Pass 2 (B3 §2.3, plan-build3 §8.5 task 5): the shipped deck on (M14;
+  // M12-M13 ran pass 1, the decision draw off).
+  gateRuns ??= withDecisions(true, () =>
     SEEDS.map((seed) => runSeed(data, seed, 30, createPolicy)),
   )
   return gateRuns

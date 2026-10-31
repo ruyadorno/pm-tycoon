@@ -1134,7 +1134,7 @@ function absentLine(
   return line(`every ${e.absent} off for ${days}`, false)
 }
 
-/** A job card's Accept: "Reward: $150 + 5 satisfaction in Registry Row", "Limit: 3 days". */
+/** A job card's Accept: "Reward: $150 + 5 happiness in Registry Row", "Limit: 3 days". */
 function jobLines(view: ModCtx, templateId: string): EffectLine[] {
   const s = view.state
   const data = view.data

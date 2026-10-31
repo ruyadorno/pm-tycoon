@@ -21,6 +21,7 @@ import type { ModifierKey } from '../../src/data/types.ts'
 import {
   dataFixture,
   deckOn,
+  hireInspector,
   makeSim,
   offerQuest,
   runTicks,
@@ -28,6 +29,14 @@ import {
 } from '../sim/helpers.ts'
 
 const DAY = TICKS_PER_DAY
+
+/** A second inspector at the first desk ('Send everyone' needs two). */
+function twoInspectors(sim: Sim): void {
+  sim.state.economy.balance += 10_000
+  const r = hireInspector(sim)
+  if (!r.ok) throw new Error(`hire: ${r.reason}`)
+  sim.state.economy.balance -= 10_000
+}
 
 /** A modifier row by hand (modifierOps, as an event's `mod` would). */
 function mod(
@@ -92,15 +101,15 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
       parentChoice: null,
       questId: null,
     })
+    // One inspector: 'Send everyone' (`if` inspectorsAtLeast 2) is not shown.
     expect(open.options.map((o) => [o.index, o.cost, o.default])).toEqual([
-      [0, 150, false],
       [1, 60, false],
       [2, 0, true],
     ])
     // The inspector pick is drawn when the card opens and fills the label.
     const audrey = sim.state.employees[0]!.name
-    expect(open.options[1]!.label).toBe(`Send ${audrey}`)
-    expect(open.options[0]!.lines[0]).toEqual({ text: '−$150', tone: 'cost' })
+    expect(open.options[0]!.label).toBe(`Send ${audrey}`)
+    expect(open.options[0]!.lines[0]).toEqual({ text: '−$60', tone: 'cost' })
     expect(open.options.every((o) => o.affordable && o.reason === null)).toBe(
       true,
     )
@@ -113,6 +122,7 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
 
   it("a paid option the balance does not cover: affordable false and the reason `Can't afford`", () => {
     const sim = makeSim(1)
+    twoInspectors(sim)
     sim.state.economy.balance = 100
     const vs = createViewSim(sim, { debug: true })
     vs.debug!.offerEvent('ev_staff_training')
@@ -133,11 +143,20 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
       i === at ? { options: [{ if: { livesAtLeast: 9 } }] } : {},
     )
     const sim = makeSim(1, { events: { deck } })
+    twoInspectors(sim)
     sim.state.economy.balance = 1000
     const vs = createViewSim(sim, { debug: true })
     expect(sim.data.events.deck[at]!.id).toBe('ev_staff_training')
     vs.debug!.offerEvent('ev_staff_training')
     expect(vs.events().open!.options.map((o) => o.index)).toEqual([1, 2])
+    // Unpatched, two inspectors show all three; one hides 'Send everyone'.
+    const both = makeSim(1)
+    twoInspectors(both)
+    both.state.economy.balance = 1000
+    const bv = createViewSim(both, { debug: true })
+    bv.debug!.offerEvent('ev_staff_training')
+    expect(bv.events().open!.options.map((o) => o.index)).toEqual([0, 1, 2])
+    expect(bv.events().open!.options[0]!.label).toBe('Send everyone')
   })
 
   it('event.decide answers the card: it closes, the history records the choice', () => {
@@ -173,8 +192,8 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
     const vs = createViewSim(sim, { debug: true })
     vs.debug!.offerEvent('ev_crime_gang')
     expect(vs.events().open!.options.map((o) => o.label)).toEqual([
-      'Accept ($300)',
-      'Deny',
+      'Pay up ($300)',
+      'Refuse',
     ])
     expect(vs.events().open!.options[1]!.lines.at(-1)?.text).toBe(
       '…then: On the doorstep (in 1 day)',
@@ -188,7 +207,7 @@ describe('ViewSim.events(): the deck as the HUD reads it', () => {
     expect(ev.open).toMatchObject({
       eventId: 'ev_crime_gang_watch',
       title: 'On the doorstep',
-      parentChoice: 'You chose: Deny',
+      parentChoice: 'You chose: Refuse',
     })
     expect(ev.scheduledCount).toBe(0)
   })

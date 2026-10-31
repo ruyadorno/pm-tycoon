@@ -130,7 +130,7 @@ describe('links (B3 §3.7)', () => {
     const sim = playing()
     offer(sim, 'ev_crime_gang')
     const t = sim.state.tick
-    decideOpen(sim, 1) // Deny
+    decideOpen(sim, 1) // Refuse
     expect(sim.state.events.scheduled).toEqual([
       {
         eventId: 'ev_crime_gang_watch',
@@ -138,7 +138,7 @@ describe('links (B3 §3.7)', () => {
         dueTick: t + DAY,
         target: null,
         pick: null,
-        parentChoice: 'Deny',
+        parentChoice: 'Refuse',
         chainHeadId: 'ev_crime_gang',
         depth: 2,
         bookedTick: t,
@@ -153,7 +153,7 @@ describe('links (B3 §3.7)', () => {
       kind: 'decision',
       category: 'underworld',
       openedTick: t + DAY,
-      parentChoice: 'Deny',
+      parentChoice: 'Refuse',
       chainHeadId: 'ev_crime_gang',
       depth: 2,
       drawn: false,
@@ -257,9 +257,9 @@ describe('links (B3 §3.7)', () => {
       offer(sim, 'ev_city_audit_fail')
       const card = sim.state.events.open!
       const fixFirst = cardOptions(sim, card)[1]!
-      expect(fixFirst.hint).toBe('your catch rate in 2 days (95 % or better)')
+      expect(fixFirst.hint).toBe('catch rate in 2 days (95 %+)')
       expect(optionLines(sim, card, fixFirst).map((l) => l.text)).toContain(
-        'Outcome depends on your catch rate in 2 days (95 % or better)',
+        'Outcome depends on catch rate in 2 days (95 %+)',
       )
       decideOpen(sim, 1) // Fix it first
       expect(sim.state.events.scheduled[0]).toMatchObject({
@@ -425,7 +425,7 @@ describe('decide (B3 §6): failures, lines, history, counters', () => {
       {
         eventId: 'ev_crime_gang',
         option: 0,
-        label: 'Accept ($300)',
+        label: 'Pay up ($300)',
         default: false,
         kind: 'decision',
         effects: lines.map((l) => l.text),
@@ -434,7 +434,7 @@ describe('decide (B3 §6): failures, lines, history, counters', () => {
     expect(sim.state.events.history.at(-1)).toMatchObject({
       eventId: 'ev_crime_gang',
       option: 0,
-      label: 'Accept ($300)',
+      label: 'Pay up ($300)',
       default: false,
       outcome: 'decided',
       chainHeadId: 'ev_crime_gang',
@@ -454,7 +454,7 @@ describe('decide (B3 §6): failures, lines, history, counters', () => {
     decideOpen(sim, 1)
     expect(sim.state.events.stats.chainsStarted).toBe(1)
     runUntil(sim, () => sim.state.events.open !== null, 2 * DAY)
-    decideOpen(sim, 0) // Yes: hide the fleet, the return in 2 days
+    decideOpen(sim, 0) // Hide the fleet: the return in 2 days
     expect(sim.state.events.stats.chainsFinished).toBe(0)
     runUntil(sim, () => sim.state.events.open !== null, 3 * DAY)
     expect(sim.state.events.open?.eventId).toBe('ev_crime_gang_return')
@@ -492,7 +492,7 @@ describe('save / load and determinism (B3 §6; plan.md §6.4)', () => {
     offer(sim, 'ev_city_audit')
     decideOpen(sim, 0) // the consultant: flag + the audit day in 2 days
     offer(sim, 'ev_crime_gang')
-    decideOpen(sim, 1) // Deny: the watch in 1 day
+    decideOpen(sim, 1) // Refuse: the watch in 1 day
     offer(sim, 'ev_wx_rain') // open at the save
     const snap = JSON.parse(JSON.stringify(sim.snapshot())) as SimSnapshot
     const loaded = Sim.load(sim.data, snap)

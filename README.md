@@ -135,7 +135,7 @@ nothing; the next job card can come one day after a job ends (done, failed, decl
 
 **The Golden Release** is offered when you reach L5 on its own gold card — the one offer that is not an event card: it
 does not pause the game, has no Decline, and **Later** keeps it waiting (decision cards hold back while it is open):
-within 5 days, 60 deliveries, 0 malware delivered and ≥ 90 % on time. Shipping it wins: the **TYCOON** card with the
+within 5 days, 60 deliveries, 0 malware delivered and ≥ 85 % on time. Shipping it wins: the **TYCOON** card with the
 run's stats, then **Continue** (endless mode: quests keep coming, the malware share climbs 1 point a day up to 20 %,
 the Title's Continue line reads `Tycoon ✓`), **New game** or **Run summary**.
 

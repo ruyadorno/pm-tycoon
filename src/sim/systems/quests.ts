@@ -159,7 +159,7 @@ export function questFlavour(
 
 /**
  * The reward in one line, the sim's single formatter (ticker, card, chip):
- * "+1 life + $150", "$150 + 5 satisfaction in Registry Row", "★ inspector
+ * "+1 life + $150", "$150 + 5 happiness in Registry Row", "★ inspector
  * Vera", "free Metal detector", "Victory".
  */
 export function rewardSummary(
@@ -173,7 +173,7 @@ export function rewardSummary(
   if (r.cash > 0) parts.push(`$${r.cash}`)
   if (r.satisfaction > 0) {
     parts.push(
-      `${r.satisfaction} satisfaction${target === null ? '' : ` in ${districtName(data, target)}`}`,
+      `${r.satisfaction} happiness${target === null ? '' : ` in ${districtName(data, target)}`}`,
     )
   }
   if (r.star) parts.push(`★ ${r.star.role} ${r.star.name}`)

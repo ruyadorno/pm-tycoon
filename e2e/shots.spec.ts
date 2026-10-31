@@ -233,12 +233,13 @@
 //   event-card-job       ?quest=rush_district on a new game: Rush hour as a
 //                        JOB BOARD card, Accept · Decline (replaces the
 //                        retired quest-offer)
-//   event-card-three     the scanner course: three options, `Send {inspector}`
+//   event-card-three     the scanner course with a second inspector hired
+//                        (`Send everyone` needs two): three options, `Send {inspector}`
 //   event-card-danger    one-life.json, the recall offered before any step:
 //                        the strike's red face, `— this can end the run`
 //   event-chain-gang     210 s of the policy (past the deck's quiet start),
-//                        Deny, then 1 day sim-only: card 2 `On the doorstep`
-//                        with `You chose: Deny`
+//                        Refuse, then 1 day sim-only: card 2 `On the doorstep`
+//                        with `You chose: Refuse`
 //   event-chip           a job accepted + Rain's OK: the 82-px quest chip and
 //                        the 24-px event chip in row B; then effects-card
 //                        (the chip's tap: `bikes ×0.85 speed`, `… left · Rain`)
@@ -3810,8 +3811,8 @@ test.describe('M12 shots', () => {
     const ui = await eventCardUp(page, pm, 'ev_crime_gang')
     expect(ui.open!.title).toBe('Protection')
     expect(ui.open!.options.map((o) => o.label)).toEqual([
-      'Accept ($300)',
-      'Deny',
+      'Pay up ($300)',
+      'Refuse',
     ])
     expect(ui.card.mode).toBe('decision')
     expect(ui.holds).toContain('event')
@@ -3849,8 +3850,23 @@ test.describe('M12 shots', () => {
 
   test('event-card-three', async ({ page, pm, consoleErrors }) => {
     phoneOnly()
-    // The scanner course: three options and the {inspector} pick.
+    // The scanner course: three options and the {inspector} pick. 'Send
+    // everyone' shows only with two inspectors (its `if`, M14 copy polish):
+    // the cheapest applicant joins the first desk before the card opens.
     await quietAt60s(page, pm)
+    const hired = await page.evaluate(() => {
+      const vs = window.__pm!.sim
+      const desk = vs.lane.nodes().find((n) => n.fixture?.kind === 'desk')
+      const a = vs
+        .applicants('inspector')
+        .toSorted((x, y) => x.hireFee - y.hireFee)[0]
+      if (!desk || !a) return 'no desk or applicant'
+      const r = vs.hire('inspector', a.id, { nodeId: desk.id })
+      return r.ok ? 'ok' : r.reason
+    })
+    expect(hired, 'a second inspector hired').toBe('ok')
+    await quietHints(page)
+    await pm.settle(8)
     await debugEvent(page, 'ev_staff_training')
     const ui = await eventCardUp(page, pm, 'ev_staff_training')
     const labels = ui.open!.options.map((o) => o.label)
@@ -3896,7 +3912,7 @@ test.describe('M12 shots', () => {
   test('event-chain-gang', async ({ page, pm, consoleErrors }) => {
     phoneOnly()
     test.setTimeout(150_000)
-    // Card 2 of the gang chain: Deny books `On the doorstep` a day later.
+    // Card 2 of the gang chain: Refuse books `On the doorstep` a day later.
     // 210 s of the policy first: before the deck's first draw (3:20) the
     // deck is quiet and no link opens (deckQuiet, firstEventS).
     await quietAt60s(page, pm, POLICY, 210_000)
@@ -3906,7 +3922,7 @@ test.describe('M12 shots', () => {
     await pm.settle(4)
     const down = await eventUi(page)
     expect(down.last).toMatchObject({ eventId: 'ev_crime_gang', option: 1 })
-    expect(down.scheduled, 'Deny booked the next link').toBe(1)
+    expect(down.scheduled, 'Refuse booked the next link').toBe(1)
     const w = await advanceUntil(
       page,
       "api.sim.events().open?.eventId === 'ev_crime_gang_watch'",
@@ -3915,9 +3931,9 @@ test.describe('M12 shots', () => {
     console.log(`shots: event-chain-gang link after ${JSON.stringify(w)}`)
     expect(w.ok, 'the link opens a day later').toBe(true)
     const ui = await eventCardUp(page, pm, 'ev_crime_gang_watch')
-    expect(ui.open!.parentChoice).toBe('You chose: Deny')
+    expect(ui.open!.parentChoice).toBe('You chose: Refuse')
     expect(ui.open!.title).toBe('On the doorstep')
-    expect(await sceneTexts(page, 'HUD')).toContain('You chose: Deny')
+    expect(await sceneTexts(page, 'HUD')).toContain('You chose: Refuse')
     await expectEventCardFits(page, 'event-chain-gang')
     // The day's payday toast and money floats of the sim-only day: gone
     // (the card holds the sim) before the shot.

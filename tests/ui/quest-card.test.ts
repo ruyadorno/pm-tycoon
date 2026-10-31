@@ -260,7 +260,7 @@ describe('design-m7 §6.3: the model per mode', () => {
       title: 'Rush hour',
       masthead: 'JOB BOARD',
       gold: false,
-      flavour: 'Registry Row is swamped — get their parcels moving',
+      flavour: 'Registry Row is swamped — get their parcels moving.',
       objective: 'Deliver 6 parcels sent from Registry Row',
       reward: 'Reward: $120',
       time: 'Time: 3 days · the offer stays open',

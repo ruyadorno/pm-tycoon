@@ -367,7 +367,10 @@ describe('B3 §3.4 layoutEventCard: the heights of contract §1.4 (w 300)', () =
     expect(m.flow[0]!.tint).toBe(EVENT_TITLE_TINT)
     expect(m.flow[1]!.tint).toBe(EVENT_MUTED)
     expect(m.ruleY).toBe(106)
-    const p = layoutEventCard(card({ parentChoice: 'You chose: Deny' }), width)
+    const p = layoutEventCard(
+      card({ parentChoice: 'You chose: Refuse' }),
+      width,
+    )
     expect(p.flow.map((f) => [f.kind, f.y])).toEqual([
       ['parent', 32],
       ['title', 46],

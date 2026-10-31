@@ -58,7 +58,7 @@ Stop the server with Ctrl-C.
                    dock 3; the warehouse room grows (drag to scroll)
       ~25.3 min    level 5: the Airport and the civic park; the Golden
                    Release (60 deliveries in 5 days, no malware
-                   delivered, 90% on time) wins the game
+                   delivered, 85% on time) wins the game
   - The cards: every card pauses the game until you choose (PAUSED in
     its corner; no timer, no Later). Under each option the card prints
     exactly what it does: costs in red, gains in green, "Can't afford"

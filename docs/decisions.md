@@ -1171,3 +1171,33 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
   ($180)"; the audit hint's awkward wrap; the friend's "Offer a job"; "Send everyone" only with two inspectors;
   "satisfaction" → "happiness" in job lines. Not taken: the recall's appeal option and the grant's desk cost (they
   move the policy's picks and the gate).
+
+## Run decisions and deviations (M14 — pacing pass 2, the deck on)
+
+- **[Q-B3-7] `levels.json ultimateQuest.minOnTimeRate` 0.9 → 0.85** (the author's answer; B3 §2.2 lever 4; rows
+  `goldenReleaseOfferedMaxMin` / `victoryMaxMin`, both informational): the 30-, 35-min, delegating and 40-seed gates
+  are identical before and after (Golden Release offered 25.33 ≤ 29; worst seed 8 at 29.04). Victory, deck on, seeds
+  1–3: **48.82 / 56.60 / 47.62 min** at both rates (10 seeds: median 52.36, 9/10 won by 62 min). The Golden Release
+  fails on its 5-day clock for 60 deliveries (34 of 44 offers time out at both rates), not on the on-time rate, so
+  victory ≤ 40 min (B3 §2.1, informational) is **not met**; `days` / `deliveries` are out of scope (plan-build3 §3) —
+  an open question for the author (continues Q-RUN9). The long test's bar (a win by 48 min on ≥ 1 of seeds 1–3) holds
+  (seed 3 at 47.62). The victory fixture now comes from seed 7 (46.64 min; it was seed 8 at 56.6).
+- **R29**: `?config=tycoon`, Accept only on the Golden Release, wins in 4.21–4.95 min on seeds 1–10 (≥ 3 min), as at
+  0.9 and in build 2 — 0.88 not needed.
+- **Thresholds: no change** (plan-build3 §8.5 task 1 nudges only out-of-band rows): L2 $1,750 / L3 $3,250 / L4 $4,650
+  / L5 $6,500 give 10.73 / 16.51 / 20.55 / 25.33 with the deck on (−8.4 / −8.2 / −8.1 / −8.6 %, every window green on
+  10 and 40 seeds). A −$100 step on every row was probed: L2 10.25 (−12.5 %, out of band). The run stays at ≈ −8 %
+  rather than −10 % (R26). Over 40 seeds L3–L5 are only −5.6 / −3.8 / −3.7 % (the band is a 10-seed rule; their
+  windows still pass: L5 26.68 ≤ 27).
+- **Lives: no change**: 40-seed share 12/40 (30 %, M11 13/40), median 0; the M11 levers stay (`newStrainDelayS` 90,
+  `perLevel` 0.015). In the 10-seed gate seed 1 loses 1 life and seed 6 loses 3.
+- **R21 not used**: EV per card $24.4 is above +20, but the fallback (halve the richest money options) applies only
+  when a level median leaves the band; none did.
+- **Copy polish** (the M13 deferred edits; text only except one `if`): gang "Pay up ($300)" / "Refuse", watch "Hide the
+  fleet" / "Carry on", poach "Pay a bonus ($180)", friend "Offer a job", the audit hint "catch rate in 2 days (95 %+)"
+  on one row (a fit test now holds every outcome hint to one row), jobs read "happiness", the magic parcel's offer
+  drops its second clock, "85 % / 95 % / 90 % on time", night_shift is "Bay watch", quest flavour lines end with a
+  full stop. **One rule**: the scanner course's "Send everyone" needs two active inspectors (`if: {inspectorsAtLeast:
+  2}`) — at one inspector it was "Send {inspector}" at a higher price; it moves no pick and no gate row.
+- **Pass-2 tests**: `policy.test.ts`, `levels3.long`, `quests-policy.long` and `victory.long` run with the deck on;
+  `levels3.long` allows the L2 plan's leftover shaker or a carded vehicle between L3 and the Battery checker.

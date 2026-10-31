@@ -117,19 +117,19 @@ export function objectiveText(
     case 'deliveriesFrom':
       return `Deliver ${plural(n, 'parcel')} sent from ${target}`
     case 'satisfactionAtLeast':
-      return `Bring ${target} to ${n} satisfaction`
+      return `Bring ${target} to ${n} happiness`
     case 'magicParcel': {
       const t = formatCountdown(q.limitTicks)
       return q.route
         ? `Deliver the golden parcel: ${buildingName(q.route.origin)} → ${buildingName(q.route.dest)} in ${t}`
-        : `Deliver the golden parcel across town in ${t}`
+        : 'Deliver the golden parcel across town'
     }
     case 'tossStreak':
       return `Toss ${n} malware in a row — a clean parcel tossed resets it`
     case 'onTimeRateDay': {
       const g = templateGoal(data, q.templateId)
       const pct = g?.kind === 'onTimeRateDay' ? Math.round(g.rate * 100) : 100
-      return `One full day at ${pct}% on time (${n}+ deliveries)`
+      return `One full day at ${pct} % on time (${n}+ deliveries)`
     }
     case 'deliveriesOfSize': {
       const g = templateGoal(data, q.templateId)
@@ -152,7 +152,7 @@ export function objectiveText(
       const g = templateGoal(data, q.templateId)
       const days = g?.kind === 'detectionAllStrains' ? g.holdDays : 1
       const span = days === 1 ? 'a day' : plural(days, 'day')
-      return `Hold ${n}% detection on every strain for ${span}`
+      return `Hold ${n} % detection on every strain for ${span}`
     }
     case 'ultimate': {
       const u = ultimateOf(data, q.templateId)
@@ -160,14 +160,14 @@ export function objectiveText(
       const mal = u?.maxMalwareDelivered ?? 0
       const pct = Math.round((u?.minOnTimeRate ?? 1) * 100)
       const malware = mal === 0 ? 'no malware' : `at most ${mal} malware`
-      return `In ${plural(days, 'day')}: ${n} deliveries, ${malware}, ${pct}% on time`
+      return `In ${plural(days, 'day')}: ${n} deliveries, ${malware}, ${pct} % on time`
     }
   }
 }
 
 /**
- * `Reward: $150 + 5 satisfaction in Registry Row` (the sim's rewardSummary).
- * `withTarget` false drops the district (`… + 5 satisfaction`): the card
+ * `Reward: $150 + 5 happiness in Registry Row` (the sim's rewardSummary).
+ * `withTarget` false drops the district (`… + 5 happiness`): the card
  * falls back to it when the full line overflows its row (Pasture Peer
  * Fields) — the objective names the district anyway.
  */
@@ -303,12 +303,12 @@ export function waitingText(name: string): string {
 
 // ---- stamp and newspaper ---------------------------------------------------------
 
-/** The reward's short pieces: `+1 life`, `+$150`, `+5 satisfaction`, `★ Vera`, `free Metal detector`. */
+/** The reward's short pieces: `+1 life`, `+$150`, `+5 happiness`, `★ Vera`, `free Metal detector`. */
 function rewardBits(data: GameData, r: QuestReward): string[] {
   const out: string[] = []
   if (r.lives > 0) out.push(`+${plural(r.lives, 'life', 'lives')}`)
   if (r.cash > 0) out.push(`+${formatMoney(r.cash)}`)
-  if (r.satisfaction > 0) out.push(`+${r.satisfaction} satisfaction`)
+  if (r.satisfaction > 0) out.push(`+${r.satisfaction} happiness`)
   if (r.star) out.push(`★ ${r.star.name}`)
   if (r.voucher !== null) {
     const def = data.machines.checkers.find((c) => c.id === r.voucher)

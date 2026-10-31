@@ -27,8 +27,12 @@ vi.mock('phaser', () => {
 })
 
 const { parseParams } = await import('../../src/debug/params.ts')
-const { offerEventParam, offerQuestParam, forceLevelParam } =
+const { offerEventParam, offerQuestParam, forceLevelParam, newGameSwap } =
   await import('../../src/scenes/BootScene.ts')
+const { SIM_REPLACED, setSim } = await import('../../src/boot/simBinding.ts')
+const { loadGame, newGame } = await import('../../src/boot/autosave.ts')
+const { deserialise, serialise } = await import('../../src/sim/save.ts')
+const { freshOnboarding } = await import('../../src/ui/Onboarding.ts')
 const { Sim } = await import('../../src/sim/sim.ts')
 const { createViewSim } = await import('../../src/sim/view-api.ts')
 const { dataFixture } = await import('../sim/helpers.ts')
@@ -142,5 +146,65 @@ describe('offerEventParam: a fresh game only', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('event=ev_nope'))
     expect(sim.state.events.open).toBeNull()
     warn.mockRestore()
+  })
+})
+
+describe('review sim-4: the debug offers follow a New game swap only (SimReplaced.fresh)', () => {
+  it('newGameSwap: a fresh, non-attract swap', () => {
+    expect(newGameSwap({ attract: false, fresh: true })).toBe(true)
+    expect(newGameSwap({ attract: false, fresh: false })).toBe(false)
+    expect(newGameSwap({ attract: true, fresh: true })).toBe(false)
+    expect(newGameSwap({ attract: true, fresh: false })).toBe(false)
+  })
+
+  it('setSim carries the fresh flag (the Title passes LoadedGame.fresh); a plain swap (__pm.load) and the attract sim are never fresh', () => {
+    const reg = new Map<string, unknown>()
+    const seen: { fresh: boolean; attract: boolean }[] = []
+    const game = {
+      registry: {
+        get: (k: string) => reg.get(k),
+        set: (k: string, v: unknown) => reg.set(k, v),
+      },
+      events: {
+        emit: (n: string, p: { fresh: boolean; attract: boolean }) => {
+          if (n === SIM_REPLACED)
+            seen.push({ fresh: p.fresh, attract: p.attract })
+        },
+      },
+    } as never
+    setSim(game, new Sim(data, 1))
+    setSim(game, new Sim(data, 2), { attract: true, fresh: true })
+    setSim(game, newGame(data, 3).sim, { fresh: newGame(data, 3).fresh })
+    setSim(game, new Sim(data, 4))
+    expect(seen).toEqual([
+      { fresh: false, attract: true },
+      { fresh: true, attract: false },
+      { fresh: false, attract: false },
+    ])
+  })
+
+  it('a ?quest= game held at tick 0 and saved still passes the tick-0 test on Continue — LoadedGame.fresh (false) is what keeps ?event= out', () => {
+    const { sim, vs } = fresh(3)
+    expect(offerQuestParam(vs, sim, 'rush_district')?.ok).toBe(true)
+    for (let i = 0; i < 50; i++) sim.tick()
+    expect(sim.state.tick).toBe(0)
+    const payload = deserialise(
+      serialise(sim, {
+        savedAt: 1,
+        build: 'test',
+        onboarding: freshOnboarding(),
+      }),
+    )
+    const game = loadGame(data, payload)
+    expect(game.fresh).toBe(false)
+    expect(game.sim.state.tick).toBe(0)
+    expect(game.sim.commandLog.map((e) => e.cmd.kind)).toEqual([
+      'debugOfferQuest',
+    ])
+    // The Title's Continue swap: Boot's listeners skip it.
+    expect(newGameSwap({ attract: false, fresh: game.fresh })).toBe(false)
+    // (The tick-0 test alone would have taken it: the bug.)
+    const gvs = createViewSim(game.sim, { debug: true })
+    expect(offerEventParam(gvs, game.sim, 'ev_sec_recall')?.ok).toBe(true)
   })
 })

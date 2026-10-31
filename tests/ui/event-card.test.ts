@@ -118,6 +118,7 @@ interface FakeButton {
   id: string
   onClick: (() => void) | null
   onDisabledTap: (() => void) | null
+  onPress: (() => void) | null
 }
 
 function fakeScene() {
@@ -232,6 +233,25 @@ const lastButton = (bs: FakeButton[], id: string): FakeButton => {
   const b = bs.filter((x) => x.id === id).at(-1)
   if (!b) throw new Error(`no button ${id}`)
   return b
+}
+
+/**
+ * A finger on a kit button as Button.ts drives it: the press lands
+ * (onPress, at pointerdown) at `down`, the tap fires (onClick, or
+ * onDisabledTap on a greyed one, at pointerup) at `up`.
+ */
+function press(
+  scene: { time: { now: number } },
+  b: FakeButton,
+  down: number,
+  up = down,
+  disabled = false,
+): void {
+  scene.time.now = down
+  b.onPress?.()
+  scene.time.now = up
+  if (disabled) b.onDisabledTap?.()
+  else b.onClick?.()
 }
 
 describe('B3 §3.4 the EventCard on the modal stack (D-M12-1)', () => {
@@ -372,8 +392,7 @@ describe('B3 §3.4 taps: the options, the scrim, the panel (critique 19)', () =>
     const { card, onOption, buttons, scene } = makeCard()
     card.open(view({ options: [opt(0), opt(2, { danger: true })] }))
     expect(buttons.map((b) => b.id)).toEqual(['event:opt0', 'event:opt2'])
-    scene.time.now = et.EVENT_CARD_IN_MS
-    lastButton(buttons, 'event:opt2').onClick?.()
+    press(scene, lastButton(buttons, 'event:opt2'), et.EVENT_DANGER_IN_MS)
     expect(onOption).toHaveBeenCalledWith('ev_test', 2)
     card.close()
   })
@@ -390,22 +409,91 @@ describe('B3 §3.4 taps: the options, the scrim, the panel (critique 19)', () =>
         ],
       }),
     )
-    scene.time.now = 2000 + et.EVENT_CARD_IN_MS - 1
-    lastButton(buttons, 'event:opt1').onClick?.()
-    lastButton(buttons, 'event:opt2').onDisabledTap?.()
+    const t = 2000 + et.EVENT_CARD_IN_MS - 1
+    press(scene, lastButton(buttons, 'event:opt1'), t)
+    press(scene, lastButton(buttons, 'event:opt2'), t, t, true)
     expect(onOption).not.toHaveBeenCalled()
     expect(tips).toHaveLength(0)
-    scene.time.now = 2000 + et.EVENT_CARD_IN_MS
-    lastButton(buttons, 'event:opt0').onClick?.()
+    press(scene, lastButton(buttons, 'event:opt0'), 2000 + et.EVENT_CARD_IN_MS)
     expect(onOption).toHaveBeenCalledWith('ev_test', 0)
     // The HUD shows the next card in the same slot: a fresh read-in guard.
     card.open(view({ eventId: 'ev_next', openedTick: 1300 }))
-    lastButton(buttons, 'event:opt1').onClick?.()
+    const at = scene.time.now
+    press(scene, lastButton(buttons, 'event:opt1'), at)
     expect(onOption).toHaveBeenCalledTimes(1)
     card.tap(1) // tests / e2e press an option directly
     expect(onOption).toHaveBeenLastCalledWith('ev_next', 1)
-    scene.time.now += et.EVENT_CARD_IN_MS
+    press(scene, lastButton(buttons, 'event:opt0'), at + et.EVENT_CARD_IN_MS)
+    expect(onOption).toHaveBeenLastCalledWith('ev_next', 0)
+    card.close()
+  })
+
+  it('review mobile-1: the guard is read when the press LANDS — a press that starts while the card slides in never decides it, however late it lifts (the red strike at 1 life)', () => {
+    const { card, onOption, buttons, scene, tips } = makeCard()
+    scene.time.now = 1000
+    card.open(
+      view({
+        options: [
+          opt(0),
+          opt(1, { danger: true }),
+          opt(2, { affordable: false, cost: 150, reason: "Can't afford" }),
+        ],
+      }),
+    )
+    // Lands at 200 ms (mid-slide), lifts at 400 ms: nothing.
+    press(scene, lastButton(buttons, 'event:opt1'), 1200, 1400)
+    press(scene, lastButton(buttons, 'event:opt0'), 1200, 1400)
+    press(scene, lastButton(buttons, 'event:opt2'), 1200, 1400, true)
+    expect(onOption).not.toHaveBeenCalled()
+    expect(tips).toHaveLength(0)
+    // A tap with no press of its own on that button (the finger landed
+    // elsewhere — another option, the scrim) counts for nothing.
+    scene.time.now = 2000
+    lastButton(buttons, 'event:opt0').onPress?.()
+    lastButton(buttons, 'event:opt1').onClick?.()
+    expect(onOption).not.toHaveBeenCalled()
+    lastButton(buttons, 'event:opt0').onPress?.()
+    const scrim = card.scrim as unknown as Emitter
+    scrim.emit('pointerdown')
     lastButton(buttons, 'event:opt0').onClick?.()
+    expect(onOption).not.toHaveBeenCalled()
+    // A press spent once never answers a second up.
+    press(scene, lastButton(buttons, 'event:opt0'), 2000)
+    lastButton(buttons, 'event:opt0').onClick?.()
+    expect(onOption).toHaveBeenCalledTimes(1)
+    card.close()
+  })
+
+  it('review mobile-1: a red (danger) option waits EVENT_DANGER_IN_MS from the open — and again after another card takes the slot', () => {
+    const { card, onOption, buttons, scene } = makeCard()
+    expect(et.EVENT_DANGER_IN_MS).toBeGreaterThan(et.EVENT_CARD_IN_MS)
+    scene.time.now = 3000
+    card.open(view({ options: [opt(0), opt(1, { danger: true })] }))
+    press(scene, lastButton(buttons, 'event:opt1'), 3000 + et.EVENT_CARD_IN_MS)
+    press(
+      scene,
+      lastButton(buttons, 'event:opt1'),
+      3000 + et.EVENT_DANGER_IN_MS - 1,
+    )
+    expect(onOption).not.toHaveBeenCalled()
+    press(
+      scene,
+      lastButton(buttons, 'event:opt1'),
+      3000 + et.EVENT_DANGER_IN_MS,
+    )
+    expect(onOption).toHaveBeenLastCalledWith('ev_test', 1)
+    // The safe option needs only the slide.
+    card.open(
+      view({
+        eventId: 'ev_next',
+        openedTick: 1400,
+        options: [opt(0), opt(1, { danger: true })],
+      }),
+    )
+    const at = scene.time.now
+    press(scene, lastButton(buttons, 'event:opt1'), at + et.EVENT_CARD_IN_MS)
+    expect(onOption).toHaveBeenCalledTimes(1)
+    press(scene, lastButton(buttons, 'event:opt0'), at + et.EVENT_CARD_IN_MS)
     expect(onOption).toHaveBeenLastCalledWith('ev_next', 0)
     card.close()
   })
@@ -430,8 +518,9 @@ describe('B3 §3.4 taps: the options, the scrim, the panel (critique 19)', () =>
       x: r.x + 12 + 138,
       y: r.y + o.y,
     })
-    scene.time.now = et.EVENT_CARD_IN_MS // the slide-in guard (card-2)
-    lastButton(buttons, 'event:opt1').onDisabledTap?.()
+    // The slide-in guard (card-2), read when the press lands (mobile-1).
+    const b = lastButton(buttons, 'event:opt1')
+    press(scene, b, et.EVENT_CARD_IN_MS, et.EVENT_CARD_IN_MS, true)
     expect(tips).toHaveLength(2)
     expect(onOption).not.toHaveBeenCalled()
     card.close()
@@ -488,6 +577,19 @@ describe('B3 §3.4 taps: the options, the scrim, the panel (critique 19)', () =>
     expect(onOption).toHaveBeenCalledWith('ev_test', 0)
     expect(taps).toContainEqual({ id: ec.EVENT_DISMISS_ID })
     panels.at(-1)!.emit('pointerdown')
+    panels.at(-1)!.emit('pointerup', tapAt)
+    expect(onOption).toHaveBeenCalledTimes(2)
+    // Review mobile-1: a press that LANDS in the slide never answers, even
+    // when it lifts after it (a 260-ms press from 50 ms).
+    card.close()
+    scene.time.now = 8000
+    card.open(view({ kind: 'news', options: [opt(0, { label: 'OK' })] }))
+    scrim.emit('pointerdown')
+    scene.time.now = 8000 + et.EVENT_CARD_IN_MS + 10
+    scrim.emit('pointerup', tapAt)
+    scene.time.now = 8050
+    panels.at(-1)!.emit('pointerdown')
+    scene.time.now = 8000 + et.EVENT_CARD_IN_MS + 10
     panels.at(-1)!.emit('pointerup', tapAt)
     expect(onOption).toHaveBeenCalledTimes(2)
     // A drag (or an unarmed up) is not a tap.

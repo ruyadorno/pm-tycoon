@@ -13,10 +13,13 @@
 // Modes: decision and three (2 or 3 options; Esc and a tap outside do
 // nothing, B3 §3.4), job (Accept / Decline + the objective) and news (one
 // OK: any tap — the scrim, the panel, Esc, Enter — answers it). A tap on
-// the scrim, the panel or an option button is ignored for the first
-// EVENT_CARD_IN_MS while the card slides in, or after another card took the
-// slot (critique 19, review card-2): a double tap never decides the next
-// card unread; tap() (tests, e2e) and the keys are not guarded. Enter takes the first option,
+// the scrim, the panel or an option button counts only if its press LANDED
+// EVENT_CARD_IN_MS or more after the card opened or another card took the
+// slot (critique 19, review card-2; decided at pointerdown, review mobile-1 —
+// a press that starts while the card slides in never counts, however late
+// it lifts), EVENT_DANGER_IN_MS for a red (danger) option: a double tap
+// never decides the next card unread; tap() (tests, e2e) and the keys are
+// not guarded. Enter takes the first option,
 // never a danger or greyed one (D-M12-2): it then denies with `Tap an
 // option`.
 //
@@ -42,6 +45,7 @@ import {
   EVENT_CARD_IN_MS,
   EVENT_CARD_PAD,
   EVENT_CARD_W,
+  EVENT_DANGER_IN_MS,
   EVENT_ENTER_DENY,
   EVENT_INSET,
   EVENT_LABEL_PAD,
@@ -121,6 +125,13 @@ export class EventCard {
   private openedAt = 0
   private scrimArmed = false
   private panelArmed = false
+  /**
+   * The option press under way: its data index and whether it landed past
+   * the read-in guard (review mobile-1). Set at the button's pointerdown,
+   * spent by its tap; any other press on the card, a rebuild or a close
+   * drops it.
+   */
+  private press: { index: number; ok: boolean } | null = null
   private destroyed = false
 
   constructor(
@@ -142,8 +153,10 @@ export class EventCard {
     this.scrim.setInteractive()
     this.scrim.setData('id', EVENT_SCRIM_ID)
     this.scrim.setVisible(false)
+    // Armed only by a press that lands once the card is in (review mobile-1).
     this.scrim.on('pointerdown', () => {
-      this.scrimArmed = true
+      this.press = null
+      this.scrimArmed = this.dismissReady()
     })
     this.scrim.on('pointerup', (p: Phaser.Input.Pointer) => {
       const armed = this.scrimArmed
@@ -204,8 +217,10 @@ export class EventCard {
       return
     }
     if (!same) {
-      // Another card in the same slot: a fresh read-in guard, no slide.
+      // Another card in the same slot: a fresh read-in guard, no slide; a
+      // scrim press that began on the last card never answers this one.
       this.openedAt = this.now()
+      this.scrimArmed = false
       this.slide?.stop()
       this.slide = null
     }
@@ -298,10 +313,27 @@ export class EventCard {
     return this.scene.time?.now ?? 0
   }
 
-  /** A dismiss / option tap counts once the card has finished sliding in (critique 19, review card-2). */
-  private dismissReady(): boolean {
+  /**
+   * A dismiss / option press counts once the card has finished sliding in
+   * (critique 19, review card-2) — read when the press lands (review
+   * mobile-1); a red option waits EVENT_DANGER_IN_MS.
+   */
+  private dismissReady(danger = false): boolean {
     if (!this.scene.time) return true
-    return this.now() - this.openedAt >= EVENT_CARD_IN_MS
+    const guard = danger ? EVENT_DANGER_IN_MS : EVENT_CARD_IN_MS
+    return this.now() - this.openedAt >= guard
+  }
+
+  /** A press on option `index` landed: will its tap count? (review mobile-1) */
+  private pressStart(index: number, danger: boolean): void {
+    this.press = { index, ok: this.dismissReady(danger) }
+  }
+
+  /** The tap of option `index`: true when its own press landed past the guard (spent). */
+  private pressCounts(index: number): boolean {
+    const p = this.press
+    this.press = null
+    return p !== null && p.index === index && p.ok
   }
 
   private measure(s: string): number {
@@ -325,7 +357,8 @@ export class EventCard {
     // 1. The panel swallows taps; on a news card a tap on it answers.
     const panel = addPanel(scene, 0, 0, w, m.h, 'ui_panel').setInteractive()
     panel.on('pointerdown', () => {
-      this.panelArmed = true
+      this.press = null
+      this.panelArmed = this.dismissReady()
     })
     panel.on('pointerout', () => {
       this.panelArmed = false
@@ -394,6 +427,7 @@ export class EventCard {
       )
     for (const o of m.options) {
       const index = o.index
+      const danger = o.face === 'red'
       const reason = o.reason ?? this.data.puns.eventWords.cantAfford
       const b = new Button(scene, {
         x: PAD,
@@ -405,13 +439,15 @@ export class EventCard {
         hit: o.hit,
         minHit: L.minHit,
         id: `event:opt${index}`,
-        // Not while the card slides in (review card-2): a quick double tap
-        // never decides a card that opened under the finger unread.
+        // Not a press that landed while the card slid in (review card-2,
+        // mobile-1): a quick double tap never decides a card that opened
+        // under the finger unread — the red option waits longer.
+        onPress: () => this.pressStart(index, danger),
         onClick: () => {
-          if (this.dismissReady()) this.tap(index)
+          if (this.pressCounts(index)) this.tap(index)
         },
         onDisabledTap: () => {
-          if (this.dismissReady()) this.deny(reason, index)
+          if (this.pressCounts(index)) this.deny(reason, index)
         },
       })
       b.setEnabled(o.enabled)
@@ -431,8 +467,10 @@ export class EventCard {
     this.root.add([panel, ...shapes, ...kids])
   }
 
-  /** Destroy the card's children (the root, scrim and scratch stay). */
+  /** Destroy the card's children (the root, scrim and scratch stay); a press under way is dropped. */
   private teardown(): void {
+    this.press = null
+    this.panelArmed = false
     this.root.removeAll(true)
   }
 

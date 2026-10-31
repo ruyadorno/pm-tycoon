@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildStamp": "bb5646e 2026-10-30",
+  "buildStamp": "266015e 2026-10-31",
   "seed": 7,
-  "startedAt": "2026-10-30T17:14:30Z",
+  "startedAt": "2026-10-31T09:58:30Z",
   "device": {
     "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1",
     "cssW": 393,
@@ -11,9 +11,9 @@
     "zoom": 1,
     "maxTexture": 8192
   },
-  "elapsedS": 107.6,
-  "simS": 2102.6,
-  "pausedS": 0.9,
+  "elapsedS": 107.5,
+  "simS": 2102.7,
+  "pausedS": 0.8,
   "firstDeliveryS": 31.5,
   "firstMalware": {
     "spawnedS": 138.4,
@@ -21,67 +21,67 @@
     "by": "inspector",
     "tossedS": 180.1
   },
-  "level2AtS": 713.1,
-  "level3AtS": 1077.8,
-  "level4AtS": 1363.4,
-  "level5AtS": 1672.5,
+  "level2AtS": 747.1,
+  "level3AtS": 1273.9,
+  "level4AtS": 1623.1,
+  "level5AtS": 1963.9,
   "victoryAtS": null,
   "endlessS": null,
-  "truckBoughtS": 737.7,
+  "truckBoughtS": 1133.5,
   "deliveries": {
-    "total": 299,
-    "onTime": 187,
-    "late": 112,
+    "total": 243,
+    "onTime": 137,
+    "late": 106,
     "byType": {
-      "bike": 187,
-      "van": 18,
-      "truck": 94
+      "bike": 175,
+      "van": 0,
+      "truck": 68
     }
   },
   "moneyPerMin": [
     40,
     45,
     54,
-    122,
-    72,
-    163,
-    172,
-    178,
-    284,
-    362,
-    260,
-    276,
-    388,
-    173,
-    251,
-    114,
-    559,
-    225,
-    141,
-    185,
-    715,
-    258,
+    118,
+    64,
+    73,
+    100,
+    215,
     263,
-    346,
-    203,
-    805,
-    345,
-    512,
+    206,
+    195,
+    258,
+    286,
+    155,
+    243,
+    151,
+    138,
+    82,
+    151,
+    228,
+    183,
+    294,
+    201,
     393,
-    402,
-    496,
-    650,
-    470,
-    750,
-    636
+    117,
+    217,
+    137,
+    280,
+    269,
+    338,
+    492,
+    230,
+    438,
+    357,
+    519
   ],
-  "lifetimeEarned": 11308,
-  "balanceEnd": 186,
+  "lifetimeEarned": 7530,
+  "balanceEnd": 957,
   "malware": {
-    "spawned": 43,
-    "caught": 39,
+    "spawned": 37,
+    "caught": 30,
     "missed": 0,
-    "tossedClean": 44,
+    "tossedClean": 33,
     "cleared": 0
   },
   "livesLost": [],
@@ -96,22 +96,14 @@
     },
     {
       "type": "bike",
-      "atS": 416
+      "atS": 494.8
     },
     {
       "type": "truck",
-      "atS": 737.7
-    },
-    {
-      "type": "van",
-      "atS": 1717.5
-    },
-    {
-      "type": "truck",
-      "atS": 1908.7
+      "atS": 1133.5
     }
   ],
-  "inspectorsHired": 1,
+  "inspectorsHired": 0,
   "machinesBought": [
     {
       "id": "metal_detector",
@@ -119,29 +111,25 @@
     },
     {
       "id": "metal_detector",
-      "atS": 473.4
+      "atS": 531
     },
     {
       "id": "shaky_shaker",
-      "atS": 896.6
+      "atS": 1289.3
     },
     {
       "id": "battery_checker",
-      "atS": 1077.8
+      "atS": 1367.9
     },
     {
       "id": "xray",
-      "atS": 1512.5
+      "atS": 1915.7
     }
   ],
   "docksBought": [
     {
       "index": 2,
-      "atS": 1258.9
-    },
-    {
-      "index": 3,
-      "atS": 2088
+      "atS": 1434.3
     }
   ],
   "desks": 1,
@@ -173,61 +161,25 @@
     {
       "role": "driver",
       "pips": {
-        "speed": 3,
-        "energy": 2,
+        "speed": 2,
+        "energy": 4,
         "charisma": 0
       },
-      "salary": 7,
+      "salary": 8,
       "star": false,
-      "atS": 416,
+      "atS": 494.8,
       "cheapest": false
     },
     {
       "role": "driver",
       "pips": {
         "speed": 4,
-        "energy": 4,
-        "charisma": 0
+        "energy": 2,
+        "charisma": 2
       },
       "salary": 30,
       "star": false,
-      "atS": 737.7,
-      "cheapest": false
-    },
-    {
-      "role": "inspector",
-      "pips": {
-        "eye": 4,
-        "pace": 4,
-        "charisma": 0
-      },
-      "salary": 24,
-      "star": false,
-      "atS": 1654.3,
-      "cheapest": false
-    },
-    {
-      "role": "driver",
-      "pips": {
-        "speed": 4,
-        "energy": 4,
-        "charisma": 0
-      },
-      "salary": 18,
-      "star": false,
-      "atS": 1717.5,
-      "cheapest": false
-    },
-    {
-      "role": "driver",
-      "pips": {
-        "speed": 5,
-        "energy": 4,
-        "charisma": 0
-      },
-      "salary": 33,
-      "star": false,
-      "atS": 1908.7,
+      "atS": 1133.5,
       "cheapest": false
     }
   ],
@@ -239,12 +191,12 @@
     "clearedMalware": 0
   },
   "quests": {
-    "offered": 7,
-    "accepted": 7,
+    "offered": 6,
+    "accepted": 6,
     "declined": 0,
-    "completed": 3,
-    "failed": 3,
-    "firstCompletedS": 565.8,
+    "completed": 1,
+    "failed": 4,
+    "firstCompletedS": 846,
     "byTemplate": {
       "on_time_day": {
         "offered": 2,
@@ -254,13 +206,6 @@
         "failed": 2
       },
       "rush_district": {
-        "offered": 1,
-        "accepted": 1,
-        "declined": 0,
-        "completed": 1,
-        "failed": 0
-      },
-      "magic_parcel": {
         "offered": 1,
         "accepted": 1,
         "declined": 0,
@@ -278,8 +223,8 @@
         "offered": 1,
         "accepted": 1,
         "declined": 0,
-        "completed": 1,
-        "failed": 0
+        "completed": 0,
+        "failed": 1
       },
       "golden_release": {
         "offered": 1,
@@ -291,38 +236,38 @@
     }
   },
   "overseas": {
-    "handedOff": 18,
-    "cleared": 17,
+    "handedOff": 11,
+    "cleared": 11,
     "malwareAtClearance": 0
   },
   "taps": 7,
   "tapsPerMin": 3.9,
-  "rushTaps": 1,
+  "rushTaps": 0,
   "viewSwitches": 2,
-  "warehouseS": 59.4,
+  "warehouseS": 59,
   "fps": {
     "p50": 60,
     "p5": 59,
     "min": 55,
     "samples": 107
   },
-  "holdBayEvents": 83,
-  "holdBayEventsPer10Min": 23.7,
+  "holdBayEvents": 63,
+  "holdBayEventsPer10Min": 18,
   "stalls": {
     "count": 0,
     "totalS": 0
   },
   "payroll": {
     "paid": 35,
-    "short": 1,
+    "short": 2,
     "walkouts": 0
   },
   "satisfactionEnd": {
-    "highres": 24,
-    "downtown": 30,
-    "industrial": 3,
-    "lowres": 14,
-    "rural": 21,
-    "civic": 47
+    "highres": 32,
+    "downtown": 11,
+    "industrial": 4,
+    "lowres": 58,
+    "rural": 30,
+    "civic": 58
   }
 }

@@ -37,6 +37,7 @@ describe('onboarding state (pm.save.v2.onboarding)', () => {
       skipped: false,
       sawFirstFlag: false,
       sawTossHint: false,
+      sawVictory: false,
     })
   })
 
@@ -49,6 +50,7 @@ describe('onboarding state (pm.save.v2.onboarding)', () => {
         skipped: true,
         sawFirstFlag: 1,
         sawTossHint: true,
+        sawVictory: 'yes',
         wanted: ['evil-lodash', 3, 'l0dash'],
       }),
     ).toEqual({
@@ -56,7 +58,19 @@ describe('onboarding state (pm.save.v2.onboarding)', () => {
       skipped: true,
       sawFirstFlag: false,
       sawTossHint: true,
+      sawVictory: false,
     })
+    // Review sim-2: Continue on the VictoryCard is remembered.
+    expect(normaliseOnboarding({ sawVictory: true }).sawVictory).toBe(true)
+    // An M12 save (no sawVictory) normalises to not seen.
+    expect(
+      normaliseOnboarding({
+        step: 3,
+        skipped: false,
+        sawFirstFlag: true,
+        sawTossHint: true,
+      }).sawVictory,
+    ).toBe(false)
     expect(normaliseOnboarding({ step: -2 }).step).toBe(0)
   })
 })

@@ -23,7 +23,14 @@ export const EVENT_CARD_GAP = 8
 export const EVENT_CARD_MAX_H = 340
 /** QUEST_CARD_DEPTH: above sheets, under popovers 7000 / tooltips 9500. */
 export const EVENT_CARD_DEPTH = 6000
+/** The slide-in, and the read-in guard: a press must LAND this long after the card opened. */
 export const EVENT_CARD_IN_MS = 300
+/**
+ * The read-in guard of a red (danger) option — the one that can end the run
+ * (review mobile-1): a press on it counts only if it lands this long after
+ * the card opened or took the slot.
+ */
+export const EVENT_DANGER_IN_MS = 600
 export const EVENT_MAST_H = 24
 /** The double rule at 26 and 28 (QuestCard). */
 export const EVENT_RULE_Y = 26

@@ -520,15 +520,19 @@ export function chipOverflow(
  * ticks after the event in the saved frame, and a frame between Continue on
  * the Title and the HUD's create) was written before Continue was tapped: a
  * reload of it reopens the card. Once endless play has run, later autosaves are past
- * the slack and the card stays closed. Never after a game over.
+ * the slack and the card stays closed. Never after a game over, nor once
+ * Continue was tapped (`seen`, onboarding.sawVictory — build 3 review sim-2:
+ * an EventCard can hold the sim inside the slack after Continue, so the tick
+ * alone no longer tells).
  */
 export function victoryCardPending(
   q: { victory: boolean; victoryTick: number | null },
   tick: number,
   gameOver: boolean,
   slack: number,
+  seen = false,
 ): boolean {
-  if (!q.victory || gameOver || q.victoryTick === null) return false
+  if (!q.victory || gameOver || seen || q.victoryTick === null) return false
   const d = tick - q.victoryTick
   return d >= 0 && d <= slack
 }

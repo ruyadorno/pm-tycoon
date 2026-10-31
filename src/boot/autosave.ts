@@ -40,8 +40,10 @@
 // this module serialises it.
 //
 // onboarding (city-view §9.1-§9.2): `step`/`skipped` (the tour), `sawFirstFlag`
-// (the scripted-flag hint was followed into the warehouse) and `sawTossHint`
-// (the one-time puns.json tossHint toast). The wanted list (malware labels
+// (the scripted-flag hint was followed into the warehouse), `sawTossHint`
+// (the one-time puns.json tossHint toast) and `sawVictory` (build 3 review
+// sim-2: the VictoryCard's Continue was tapped, so a reload never reopens
+// it). The wanted list (malware labels
 // revealed by DEFUSED tosses and lost lives) is sim state since M6
 // (spec-build2 §2.8: `state.wanted`, saved with the state); a `wanted` key in
 // an older payload is dropped by normaliseOnboarding. HudScene mutates the
@@ -160,7 +162,8 @@ export function getOnboarding(registry: RegistryLike): OnboardingSave {
     typeof (cur as OnboardingSave).step === 'number' &&
     typeof (cur as OnboardingSave).skipped === 'boolean' &&
     typeof (cur as OnboardingSave).sawFirstFlag === 'boolean' &&
-    typeof (cur as OnboardingSave).sawTossHint === 'boolean'
+    typeof (cur as OnboardingSave).sawTossHint === 'boolean' &&
+    typeof (cur as OnboardingSave).sawVictory === 'boolean'
   if (ok) return cur as OnboardingSave
   const fresh = normaliseOnboarding(cur)
   registry.set(REG_ONBOARDING, fresh)
@@ -406,6 +409,12 @@ export interface LoadedGame {
    * (payload.state.economy.victory) — an endless-mode save (`Tycoon ✓`).
    */
   victory: boolean
+  /**
+   * A New game (newGame), not a resumed save: the Title's swap passes it on
+   * as SimReplaced.fresh, so Boot's debug offers never touch a Continue
+   * (review sim-4).
+   */
+  fresh: boolean
 }
 
 /** Resume a checked payload (Sim.load; throws SimLoadError on a bad state). */
@@ -414,6 +423,7 @@ export function loadGame(data: GameData, payload: SavePayload): LoadedGame {
     sim: restore(data, payload),
     onboarding: normaliseOnboarding(payload.onboarding),
     victory: payload.state.economy.victory === true,
+    fresh: false,
   }
 }
 
@@ -423,6 +433,7 @@ export function newGame(data: GameData, seed: number): LoadedGame {
     sim: new Sim(data, seed),
     onboarding: freshOnboarding(),
     victory: false,
+    fresh: true,
   }
 }
 

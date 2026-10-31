@@ -19,7 +19,7 @@ Run (playtest 1): started 2026-10-29 05:13 UTC — plan.md v1 — Node v26.12.1 
 ## Milestone checklist (build 3)
 
 - [x] M11 pacing pass 1 + the events engine: windows, the threshold scan, the modifier registry, `events.json`, deck/effects/policy, gate rows, save v6 (commit `M11: …`)
-- [ ] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
+- [x] M12 the cards on screen: EventCard / EventChip / EffectsCard, the hold, the category pictures, the Victory art, ~40 cards, the flag on (commit `M12: …`)
 - [ ] M13 the full deck: 100–120 cards, chains, routers, flags, jobs fully folded, the deck review, spicy (commit `M13: …`)
 - [ ] M14 pacing pass 2 with the deck on: thresholds, lives, the Golden Release at 0.85, long tests, fixtures (commit `M14: …`)
 - [ ] M15 playtest-3 build: metrics v3, summary card v3 + fun bar 3, shots, report, hand-off (commit `M15: …`)
@@ -60,6 +60,35 @@ JSON values retuned from spec §12: `parcels.malware.baseShare` 0.03 → 0.05 an
 L3–L5 informational rows (build 2): counter capped at 2 — not measured (no `level:up {3}` in any 30-min run).
 
 ## Checkpoint entries (newest first)
+
+## M12 — the cards on screen (feel check) — 2026-10-31 13:30 UTC — DONE at (this commit; sha recorded in the M13 entry)
+
+M11 is 7d2ec44 (+ 266015e, the M12 build checkpoint).
+Built: `src/ui/effectText.ts` (the pure card model) + `EventCard.ts` (decision, three-option, job and news modes,
+generated effect lines, `Can't afford`, `then:` / `Outcome depends on` / `— this can end the run`, PAUSED pill, the
+read-in guard), `EventChip.ts` + the compact quest chip (row-B rule), `EffectsCard.ts` + the pause-menu entry,
+HudScene plumbing (the card holds the sim; waits behind modals, the gold card and the level-up moment; ticker, SFX,
+newspaper items, cell pulses; `?event=`, `?quest=` and the district row open the job card; the interim M11 job mode
+retired), the lost-life and game-over event variants, VictoryCard art + confetti, SALE tags from `priceOf`, the
+Garage refund at the paid price, the `/N` shelf readout, `vehicle:lost` / `parcel:lost` in the world scenes; the deck
+at 62 cards (48 drawable, 40 at L1; the gang, investor, rival and audit chains); `SIM_FEATURES.events` **on**;
+`e2e/events.spec.ts` (10 tests incl. the modal stack and the R34 legs); the art of B3 §5 (13 category pictures,
+`victory_art`, `ic_event`, `fx_confetti`).
+Gate (seeds 1–10 × 30 min, deck on — docs/gate/latest.md): PASS — first delivery 43.3 s, caught 10/10, L2 10.29,
+truck +2.78, L3 16.73, overseas +2.55, L4 20.13, L5 25.46, lives 0, quests 6 / 3.5, **21 cards by 30 min**, no card
+open past its step, **3 decision cards on the L1 plateau** (at the floor), **EV $25.0 per card**, **non-default share
+0.63**; 35-min PASS (Golden Release offered 25.46); delegating PASS (L5 25.91, lives 1, EV $18.1); 40 seeds:
+10/40 lose a malware life, but **L5 27.27 > 27** (recorded for M14, plan §8.3: not retuned here).
+Tests: vitest green (`vlr check` PASS); e2e 156 passed / 120 project-gated skips; shots 96 passed
+Shots (read): `event-card` (Protection, 227 px, greyed `Can't afford · $300`), `event-card-360x604`, `event-card-job`,
+`event-card-three` (scanner course, `Send Audrey`, 277 px), `event-card-danger` (the recall at 1 life, red, `— this
+can end the run`), `event-chain-gang` (`You chose: Deny`, `Bike 1 lost — your last vehicle` in red), `event-chip`,
+`effects-card`, `event-lost-life`, `event-game-over`, `buysheet-sale`, `victory` + `victory-360x604` (art under
+TYCOON, confetti over the top edge) — all in the STYLE.md look; draw calls 5 with a card open
+Deviations from spec-build3.md: Enter takes the first option, never a danger or greyed one (D-M12-2); a card waiting
+behind a sheet holds the sim; the copy-fit test lives in `tests/data/events-fit.test.ts` — docs/decisions.md (M12)
+Open for the author: G7 (below); the feel check is optional now — `docs/feel-check-m12.md` (the run did not stop)
+Next: M13 the full deck (100–120 cards), the deck review
 
 ## M11 — pacing pass 1 + events engine — 2026-10-31 06:30 UTC — DONE at (this commit; sha recorded in the M12 entry)
 
@@ -390,7 +419,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Art approvals pending
 
-- G7 event pictures + Victory art (build 3): <not yet presented>
+- G7 event pictures + Victory art (build 3): presented at M12 — `art/contact/events@4x.png` (13 `ev_pic_*` at 4× and in situ on EventCard mocks, `victory_art` on a VictoryCard mock, `fx_confetti`, `ic_event`); agent picks (`approved: false`): staff #2, fleet #2, customers #0, security #2 (judge swap), money #0, cityhall #0 (judge swap), weather #2, press #2, underworld #2, tech #0, port (re-roll), luck #0, job #2, victory_art #2; PixelLab 233 of 400
 - G4 the four fixes (build 2, M5): presented — `art/contact/fixes@4x.png`; agent picks (`approved: false`): `wh_ext_t1` #6, `wh_ext_t2` (edit 1 of #6), `bike` #6 (courier, white helmet), `dk_terminal_a` #2, `dk_terminal_b` #1, `dk_port_office` #0; the worker scan frames (scripted edit); procedural: `lot_slab_a/b/c`, `lot_ramp`, `bollard_a/b`, `fx_dust_f0–f3`
 - G5 region sheets (build 2): Low-density presented at M6 — `art/contact/lowres@4x.png` (ten uniques, agent picks); Rural presented at M7 — `art/contact/rural@4x.png` (ten uniques, agent picks); Docks (live), Airport, Park & civic presented at M8 — `art/contact/{docks,airport,civic}@4x.png` (agent picks, 2 candidates for L5)
 - G6 tiers 3–5 + machines + people (build 2): presented — `art/contact/people@4x.png`, `art/contact/tiers@4x.png`, `art/contact/g6-tiers-machines-people@4x.png`, `art/contact/warehouse-tier3@4x.png` (agent picks `battery_checker`, `xray` (M9 re-roll), `sorter_arm`, `wh_ext_t3/t4/t5`; procedural faces, pips, ★, `worker_sorter`, `hold_station`, tier 3–5 interiors); commands in docs/report-playtest2.md §9
@@ -402,6 +431,7 @@ Numbering continues after the consolidated list in plan.md; each line carries th
 
 ## Cost spent
 
+- PixelLab build 3 (budget 400 / reserve 100): M12 233 generations (2,422 → 2,189) — the 13 category pictures, the port re-roll and the Victory art; $0 credits
 - PixelLab build 2 (budget 1,500 / reserve 300): M5 126 generations (3,299 → 3,173); M6 207 (machines + Low-density); M7 276 (Rural + tier 3–5 exteriors); M8 220 (Airport + Park & civic at 2 candidates); M9 48 (dk_ship, xray re-rolls); M10 0; run total 877 of 1,500 (balance 3,299 → 2,422); $0 credits
 
 - PixelLab: <N generations, $<usd> credits, balance before <> / after <>> (from `art/manifest.json#batches`; "$0 — procedural only" when no token; Tier 2 subscription, 5,000 gens/month)

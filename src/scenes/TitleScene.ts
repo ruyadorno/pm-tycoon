@@ -611,14 +611,14 @@ export class TitleScene extends Phaser.Scene {
       )
       return
     }
-    setSim(this.game, game.sim)
+    setSim(this.game, game.sim, { fresh: game.fresh })
     getStepper(this).paused = false
     startWorld(this, 'City')
   }
 
   /** endAttract's swap, under the City's fade: the player's sim, the HUD, no Title. */
   private enterGame(game: LoadedGame): void {
-    setSim(this.game, game.sim)
+    setSim(this.game, game.sim, { fresh: game.fresh })
     getStepper(this).paused = false
     const sm = this.scene
     sm.launch('HUD')

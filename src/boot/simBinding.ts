@@ -63,6 +63,12 @@ export interface SimReplaced {
   viewSim: ViewSim
   /** The Title's attract sim (never the player's; no sound, no save). */
   attract: boolean
+  /**
+   * A New game's sim (SetSimOptions.fresh): Boot's debug offers (?level=,
+   * ?quest=, ?event=) apply to it only — never a Continue or a __pm.load,
+   * whose saved game a held card can keep at tick 0 (review sim-4).
+   */
+  fresh: boolean
 }
 
 export interface SetSimOptions {
@@ -73,6 +79,8 @@ export interface SetSimOptions {
    * omitted = the ?policy=1 factory's policy, or none.
    */
   policy?: StepPolicy | null
+  /** A New game's sim (the Title's begin(newGame(…))): SimReplaced.fresh. */
+  fresh?: boolean
 }
 
 export type SimHandlers = {
@@ -146,6 +154,7 @@ export function setSim(
       sim,
       viewSim,
       attract,
+      fresh: opts.fresh === true && !attract,
     } satisfies SimReplaced)
   return viewSim
 }

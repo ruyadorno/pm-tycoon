@@ -12,7 +12,10 @@
 // at most TAP_PX of travel (so a drag that starts on a list row's button
 // scrolls the list instead). Every tap emits `ui:tap` on game.events; a tap
 // on a disabled button calls onDisabledTap instead of onClick (the tap is
-// still swallowed so it never reaches the city).
+// still swallowed so it never reaches the city). onPress runs on every
+// pointerdown on the button, enabled or not, so a caller can decide when the
+// press LANDED whether its tap will count (EventCard's read-in guard, review
+// mobile-1: a press that starts while the card slides in never decides it).
 import Phaser from 'phaser'
 import type { FrameName } from '../render/frames.ts'
 import { UI_ATLAS } from '../render/atlases.ts'
@@ -55,6 +58,8 @@ export interface ButtonOptions {
   minHit?: number
   onClick?: () => void
   onDisabledTap?: () => void
+  /** Every pointerdown on the button (enabled or not), before the press look. */
+  onPress?: () => void
   /** Carried in the `ui:tap` payload and as data 'id' (e2e selectors). */
   id?: string
 }
@@ -95,6 +100,7 @@ export class Button extends Phaser.GameObjects.Container {
   readonly id: string
   onClick: (() => void) | null
   onDisabledTap: (() => void) | null
+  onPress: (() => void) | null
 
   private icon: Phaser.GameObjects.Image | null = null
   private text: Phaser.GameObjects.BitmapText | null = null
@@ -121,6 +127,7 @@ export class Button extends Phaser.GameObjects.Container {
     this.minHit = opts.minHit ?? minHitFor(scene.scale.zoom)
     this.onClick = opts.onClick ?? null
     this.onDisabledTap = opts.onDisabledTap ?? null
+    this.onPress = opts.onPress ?? null
 
     this.bg = new Phaser.GameObjects.NineSlice(
       scene,
@@ -375,6 +382,7 @@ export class Button extends Phaser.GameObjects.Container {
   }
 
   private onDown(): void {
+    this.onPress?.()
     if (!this.enabled) return
     this.pressed = true
     this.refresh()

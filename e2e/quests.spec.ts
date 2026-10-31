@@ -1,18 +1,19 @@
 // Quests (plan-build2 §8.4 tasks 4 + 6, design-m7 §6.3-§6.6, §6.10, §7
-// "e2e/quests.spec.ts"; build 3 M11: jobs are event cards, B3 §3.1-§3.2, §6,
-// the interim QuestCard of D-18), iPhone 16 profile, the production bundle:
+// "e2e/quests.spec.ts"; build 3: jobs are event cards, B3 §3.1-§3.2, §6 —
+// since M12 the job offer is the HUD's EventCard, the QuestCard keeps the
+// active quest and the Golden Release), iPhone 16 profile, the production
+// bundle:
 //   - ?quest=rush_district on a fresh game: Boot offers it (debugOfferQuest,
-//     the first logged command — a job card) and the HUD opens its QuestCard
-//     at create — `Rush hour`, Accept · Decline (no Later), on the modal
-//     stack; the sim HOLDS on the card (no policy: the tick does not move).
-//     A real Accept tap (acceptQuest → the card's decideEvent) → the card
+//     the first logged command — a job card) and the HUD opens its EventCard
+//     at create — JOB BOARD `Rush hour`, Accept · Decline, on the modal
+//     stack under the 'event' hold; the sim HOLDS on the card (no policy:
+//     the tick does not move). A real Accept tap (decideEvent) → the card
 //     closes, the sim runs on, the chip shows `0/6` + time left and
-//     __pm.quests().active is the quest; a chip tap opens the active card
-//     (Abandon · Close); Esc closes it.
-//   - Esc only hides a job offer (the chip pulses `New job`, the sim stays
-//     held; a chip tap reopens the card); Decline clears it (history
-//     `declined`, the card gone, the sim running, the next job no sooner than
-//     one day = 600 ticks).
+//     __pm.quests().active is the quest; a chip tap opens the active
+//     QuestCard (Abandon · Close); Esc closes it.
+//   - Esc never hides a job card (B3 §3.4: a decision / job swallows it; the
+//     sim stays held); Decline clears it (history `declined`, the card gone,
+//     the sim running, the next job no sooner than one day = 600 ticks).
 //   - Abandon asks first (the Dialog), then frees the slot with no penalty
 //     (history `abandoned`, the next job no sooner than
 //     events.schedule.jobCooldownDays = 1 day).
@@ -27,6 +28,9 @@
 import type { Page } from '@playwright/test'
 import {
   debugQuest,
+  eventCardDown,
+  eventCardUp,
+  eventUi,
   expect,
   finishUltimate,
   questUi,
@@ -34,7 +38,7 @@ import {
   type PmHelpers,
   type QuestUi,
 } from './fixtures.ts'
-import { settleUntil, tapTarget } from './warehouse.ts'
+import { sceneTexts, settleUntil, tapTarget } from './warehouse.ts'
 
 const BASE = '/?seed=7&debug=1&skipTitle=1&audio=0&attract=0'
 const QUEST_URL = `/?quest=rush_district&seed=7&debug=1&skipTitle=1&audio=0&attract=0`
@@ -76,11 +80,12 @@ function commandKinds(page: Page): Promise<string[]> {
   )
 }
 
-/** The ?quest= offer is up in its card (fresh game, frozen clock). */
+/** The ?quest= offer is up in its job EventCard (fresh game, frozen clock). */
 async function openQuestGame(page: Page, pm: PmHelpers): Promise<QuestUi> {
   await pm.open(QUEST_URL)
   await pm.freeze()
-  const ui = await cardUp(page, pm, 'offer')
+  const ev = await eventCardUp(page, pm, 'job:rush_district')
+  const ui = await questUi(page)
   console.log(`quests: boot offer ${JSON.stringify(ui.offer)}`)
   expect(ui.offer).toMatchObject({
     templateId: 'rush_district',
@@ -90,24 +95,21 @@ async function openQuestGame(page: Page, pm: PmHelpers): Promise<QuestUi> {
     goal: 6,
   })
   expect(ui.offer!.target, 'the rush targets a district').not.toBeNull()
-  expect(ui.card).toMatchObject({
-    open: true,
-    mode: 'offer',
-    questId: ui.offer!.id,
-    title: 'Rush hour',
-    gold: false,
-    buttons: ['accept', 'decline'],
-  })
+  // M12: the job offer is the EventCard (the QuestCard never shows it).
+  expect(ui.card.open, 'no QuestCard for a job offer').toBe(false)
+  expect(ev.card).toMatchObject({ open: true, mode: 'job' })
+  expect(ev.open!.options.map((o) => o.label)).toEqual(['Accept', 'Decline'])
+  expect(ev.open!.questId).toBe(ui.offer!.id)
+  expect(await sceneTexts(page, 'HUD')).toContain('Rush hour')
   expect(ui.modalDepth, 'the card is on the modal stack').toBe(1)
-  // B3 §6: the job card holds the sim itself (no HUD hold until M12's
-  // EventCard; the stepper runs, Sim.tick() returns at once).
+  // B3 §6: the job card holds the sim (and the HUD's 'event' hold the stepper).
   expect(ui.openCard).toEqual({
     eventId: 'job:rush_district',
     kind: 'job',
     questId: ui.offer!.id,
   })
-  expect(ui.holds).toEqual([])
-  expect(ui.paused).toBe(false)
+  expect(ui.holds).toEqual(['event'])
+  expect(ui.paused).toBe(true)
   expect(await commandKinds(page)).toEqual(['debugOfferQuest'])
   return ui
 }
@@ -127,7 +129,7 @@ async function expectHeld(
 }
 
 test.describe('M7 quests', () => {
-  test('?quest= opens the job card and holds the sim; Accept → the chip + __pm.quests().active, the sim runs; the chip reopens it; Esc closes', async ({
+  test('?quest= opens the job EventCard and holds the sim; Accept → the chip + __pm.quests().active, the sim runs; the chip opens the active card; Esc closes', async ({
     page,
     pm,
     consoleErrors,
@@ -135,14 +137,10 @@ test.describe('M7 quests', () => {
     const boot = await openQuestGame(page, pm)
     // B3 §3.2 / §6: the job card holds the sim until the player decides.
     await expectHeld(page, pm)
-    expect((await questUi(page)).chip).toMatchObject({
-      visible: true,
-      pulse: true,
-      barText: 'New job',
-    })
 
-    await tapTarget(page, pm, 'HUD', 'quest:accept')
-    let ui = await cardDown(page, pm)
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
+    await eventCardDown(page, pm)
+    let ui = await questUi(page)
     expect(ui.openCard, 'Accept closed the job card').toBeNull()
     await pm.settle(30)
     expect(
@@ -168,8 +166,9 @@ test.describe('M7 quests', () => {
     // limitDays 3 from the accept tick: `2d 23h`-ish.
     expect(ui.chip.label).toMatch(/^(\dd \d{1,2}h|\d{1,2}h|<1h)$/)
     expect(ui.modalDepth).toBe(0)
-    // The HUD's acceptQuest is the card's answer (commands.ts routes it).
-    expect(await commandKinds(page)).toEqual(['debugOfferQuest', 'acceptQuest'])
+    expect(ui.holds).toEqual([])
+    // The card's Accept is the job's decideEvent (option 0).
+    expect(await commandKinds(page)).toEqual(['debugOfferQuest', 'decideEvent'])
 
     // A real tap on the chip: the active card (Abandon · Close).
     await tapTarget(page, pm, 'HUD', 'questChip')
@@ -187,32 +186,22 @@ test.describe('M7 quests', () => {
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
-  test('Esc only hides a job offer (no Later; the sim stays held, the chip reopens it); Decline clears it', async ({
+  test('Esc never hides a job card (the sim stays held); Decline clears it', async ({
     page,
     pm,
     consoleErrors,
   }) => {
     const boot = await openQuestGame(page, pm)
     await page.keyboard.press('Escape')
-    let ui = await cardDown(page, pm)
-    expect(ui.offer?.id, 'Esc keeps the offer').toBe(boot.offer!.id)
-    expect(ui.openCard?.questId, 'and its job card').toBe(boot.offer!.id)
-    expect(ui.active).toBeNull()
-    expect(ui.chip).toMatchObject({
-      visible: true,
-      pulse: true,
-      barText: 'New job',
-    })
-    expect(ui.modalDepth).toBe(0)
-    // Hidden, the card still holds the sim and never reopens by itself.
+    await pm.settle(8)
+    let ev = await eventUi(page)
+    expect(ev.card.open, 'Esc is swallowed by a job card').toBe(true)
+    expect(ev.holds).toEqual(['event'])
     await expectHeld(page, pm, 60)
-    expect((await questUi(page)).card.open).toBe(false)
 
-    await tapTarget(page, pm, 'HUD', 'questChip')
-    ui = await cardUp(page, pm, 'offer')
-    expect(ui.card.questId).toBe(boot.offer!.id)
-    await tapTarget(page, pm, 'HUD', 'quest:decline')
-    ui = await cardDown(page, pm)
+    await tapTarget(page, pm, 'HUD', 'event:opt1')
+    ev = await eventCardDown(page, pm)
+    const ui = await questUi(page)
     console.log(
       `quests: declined ${JSON.stringify(ui.last)} next in ${ui.nextOfferInTicks}`,
     )
@@ -225,17 +214,14 @@ test.describe('M7 quests', () => {
       outcome: 'declined',
     })
     expect(ui.chip.visible, 'the chip hides with no quest').toBe(false)
-    // declineCooldownDays 1 from the decline tick: the next job comes at the
+    // jobCooldownDays 1 from the decline tick: the next job comes at the
     // first draw after it (QuestsView.nextOfferInTicks, D-17).
     expect(ui.nextOfferInTicks).toBeGreaterThanOrEqual(DAY_TICKS - 30)
     await pm.settle(30)
     expect((await questUi(page)).tick, 'the sim runs again').toBeGreaterThan(
       ui.tick,
     )
-    expect(await commandKinds(page)).toEqual([
-      'debugOfferQuest',
-      'declineQuest',
-    ])
+    expect(await commandKinds(page)).toEqual(['debugOfferQuest', 'decideEvent'])
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
@@ -245,14 +231,9 @@ test.describe('M7 quests', () => {
     consoleErrors,
   }) => {
     const boot = await openQuestGame(page, pm)
-    await page.keyboard.press('Escape')
-    let ui = await cardDown(page, pm)
-    expect(ui.offer?.id, 'Esc only hides the card').toBe(boot.offer!.id)
-
-    await tapTarget(page, pm, 'HUD', 'questChip')
-    await cardUp(page, pm, 'offer')
-    await tapTarget(page, pm, 'HUD', 'quest:accept')
-    ui = await cardDown(page, pm)
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
+    await eventCardDown(page, pm)
+    let ui = await questUi(page)
     expect(ui.active?.id).toBe(boot.offer!.id)
     const money = await page.evaluate(() => window.__pm!.sim.money)
 
@@ -288,7 +269,7 @@ test.describe('M7 quests', () => {
     expect(ui.modalDepth).toBe(0)
     expect(await commandKinds(page)).toEqual([
       'debugOfferQuest',
-      'acceptQuest',
+      'decideEvent',
       'abandonQuest',
     ])
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])

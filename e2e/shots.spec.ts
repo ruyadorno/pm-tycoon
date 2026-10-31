@@ -115,15 +115,10 @@
 // tools/fixtures/people.ts writes both fixtures (same staleness rule).
 //
 // M7 (plan-build2 §8.4 task 8; design-m7 §6.3-§6.8, §7 "e2e/shots.spec.ts"):
-//   quest-offer           a new game, 20 s of a player-less city (waiting
-//                         badges), then debug.offerQuest('rush_district')
-//                         (the ?quest= command — build 3: a job card the
-//                         sim holds on, so the 20 s run first): the JOB
-//                         BOARD card, Accept · Decline (no Later, D-18)
-//                         (+ `-360x604`: the card inside the canvas, above
-//                         the bottom bar)
-//   quest-chip            policy, ?fastForward=720 (L2 at ~11.9 min on
-//                         seed 7), the quest it holds abandoned, then
+//   quest-offer           retired in M12: a job offer is an EventCard now
+//                         (event-card-job below)
+//   quest-chip            policy, ?fastForward=780 (L2 at ~12.5 min on
+//                         seed 7 since M11), the quest it holds abandoned, then
 //                         debug rush_district on the busiest district (L2
 //                         goal 10): frozen at its 4th delivery — the chip
 //                         `4/10 · 1d 19h` in row B (the plan's `1d 12h`
@@ -223,17 +218,50 @@
 //                          `Day … · $… · Tycoon ✓` (+ `-360x604`: the line
 //                          inside the button, `Lv 5` dropped if too wide)
 // Every M9 shot but title-tycoon marks the page's one-time hints done after
-// the load (quietHints: the tour skipped, the first-flag funnel, the
-// first-Toss hint and the 30-minute summary offer seen), so no toast covers
-// the M9 art.
+// the load (quietHints, e2e/fixtures.ts: the tour skipped, the first-flag
+// funnel, the first-Toss hint and the 30-minute summary offer seen), so no
+// toast covers the M9 art.
+//
+// Build 3 M12 (plan-build3 §8.3 task 6, contract §9.4-§9.5; B3 §3.4-§3.6,
+// §5): a policy-less sim holds on an open card, so every shot that runs
+// without the policy (or after policyOff, which disposes it) quiets the deck
+// first (deckOff: no automatic draw, no link) — the fixture shots included.
+// The new shots (60 s of the policy, then the policy off, the deck quiet and
+// the hints done, unless stated):
+//   event-card           the gang's first card (Protection) (+ `-360x604`:
+//                        ≤ 300 × 340, inside the bands, buttons inside)
+//   event-card-job       ?quest=rush_district on a new game: Rush hour as a
+//                        JOB BOARD card, Accept · Decline (replaces the
+//                        retired quest-offer)
+//   event-card-three     the scanner course: three options, `Send {inspector}`
+//   event-card-danger    one-life.json, the recall offered before any step:
+//                        the strike's red face, `— this can end the run`
+//   event-chain-gang     210 s of the policy (past the deck's quiet start),
+//                        Deny, then 1 day sim-only: card 2 `On the doorstep`
+//                        with `You chose: Deny`
+//   event-chip           a job accepted + Rain's OK: the 82-px quest chip and
+//                        the 24-px event chip in row B; then effects-card
+//                        (the chip's tap: `bikes ×0.85 speed`, `… left · Rain`)
+//   event-lost-life      the recall's strike at 3 lives: the event variant
+//   event-game-over      one-life.json + the strike: the GameOverCard's
+//                        `The recall — you chose: Take the strike`
+//   buysheet-sale        the Warehouse at 60 s, Vendor clearance's OK, an
+//                        empty slot tapped: the BuySheet's SALE pills
+//   victory              re-taken with victory_art and the confetti burst
+//                        (12 frames after the card opens) (+ `-360x604`)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Page } from '@playwright/test'
 import {
+  debugEvent,
   debugQuest,
+  deckOff,
+  eventCardUp,
+  eventUi,
   expect,
   finishUltimate,
   questUi,
+  quietHints,
   test,
   titleUp,
   type PmHelpers,
@@ -657,6 +685,7 @@ test.describe('M1 shots', () => {
     ).toBe(hash)
     await pm.freeze()
     await page.evaluate((json) => window.__pm!.load(json), text)
+    await deckOff(page) // no policy answers a card here (contract §9.5)
     await pm.settle(5)
     const a = await buildingCentre(page, fx.fixture.amber)
     const r = await buildingCentre(page, fx.fixture.red)
@@ -960,8 +989,10 @@ test.describe('M2 shots', () => {
     phoneAndMinFit()
     await pm.open(WH_POLICY)
     const { fixture } = await loadFixture(page, pm, 'holdbay-full')
-    // The policy would Toss the full bay on the first tick.
+    // The policy would Toss the full bay on the first tick; with it off no
+    // one answers a card (build 3, contract §9.5).
     await policyOff(page)
+    await deckOff(page)
     await pm.settle(64)
     const lane = await page.evaluate(() => {
       const vs = window.__pm!.sim
@@ -1101,9 +1132,13 @@ async function levelUpAt(
   if (quiet) await quietHints(page)
   if (focus === 'warehouse') await focusCity(page, await warehouseCentre(page))
   else if (focus !== null) {
-    // The chip's own pan (pm:panTo), one frame per 16 ms until it lands.
+    // The chip's own pan (pm:panTo), one frame per 16 ms until it lands —
+    // at speed 0: no tick runs under the pan (build 3: a fixture can sit
+    // 0.3 s before its level:up, which the 640-ms pan would swallow).
+    await page.evaluate(() => window.__pm!.speed(0))
     await emit(page, 'pm:panTo', { regionId: focus })
     await pm.settle(40)
+    await page.evaluate(() => window.__pm!.speed(1))
   }
   await pm.freeze()
   const capFrames = Math.ceil(
@@ -1130,36 +1165,6 @@ async function levelUpAt(
   }, capFrames)
   console.log(`shots: ${name} level:up after ${w.frames} frames`)
   expect(w.level, `the fixture levels up to ${level}`).toBe(level)
-}
-
-/**
- * M9 shots: the one-time hints a fresh page would raise over a loaded
- * mid-game fixture are marked done, as a player of that run has seen them —
- * the tour skipped (its Skip tour), the first-flag funnel and the first-Toss
- * hint seen (the policy Tosses as the player) and the 30-minute summary offer
- * made (victory.json is past 30:00) — and any toast up is cleared, so nothing
- * covers the M9 art. Every
- * other HUD reaction (level stamp, paper, chips, quest UI) is untouched.
- */
-async function quietHints(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const api = window.__pm!
-    type Seen = { sawFirstFlag: boolean; sawTossHint: boolean }
-    const hud = api.game.scene.getScene('HUD') as unknown as {
-      onboarding: { skipTour(): void; state: Seen }
-      recorder: { offered: boolean; markOffered(): void }
-      toast: { clear(): void }
-    }
-    hud.onboarding.skipTour()
-    const ob = api.game.registry.get('onboarding') as Seen | null
-    for (const s of [hud.onboarding.state, ob])
-      if (s) {
-        s.sawFirstFlag = true
-        s.sawTossHint = true
-      }
-    if (!hud.recorder.offered) hud.recorder.markOffered()
-    hud.toast.clear()
-  })
 }
 
 /** The HUD newspaper: the paper on screen (kind) and whether it shows. */
@@ -1496,6 +1501,19 @@ async function dismissQuestUi(
   settle: () => Promise<void>,
 ): Promise<void> {
   for (let i = 0; i < 12; i++) {
+    // Build 3 M12 (contract §9.5): an EventCard up (a card the policy has
+    // not answered yet) takes its default — the answer the policy gives.
+    const ev = await eventUi(page)
+    if (ev.card.open && ev.open) {
+      const ok = ev.open.options.filter((o) => o.affordable)
+      const pick = ok.find((o) => o.default) ?? ok[0]
+      if (pick) {
+        await settle()
+        await tapTarget(page, pm, 'HUD', `event:opt${pick.index}`)
+        await settle()
+        continue
+      }
+    }
     const card = (await questUi(page)).card
     if (card.open) {
       const name =
@@ -1519,6 +1537,7 @@ async function dismissQuestUi(
     await settle()
   }
   expect((await questUi(page)).card.open, 'no QuestCard left up').toBe(false)
+  expect((await eventUi(page)).card.open, 'no EventCard left up').toBe(false)
   expect((await paperPending(page)).visible, 'no newspaper left up').toBe(false)
 }
 
@@ -2154,6 +2173,8 @@ test.describe('M6 shots', () => {
     // at desk 1 during the settle.
     await pm.open(WH_NEW)
     const { fixture } = await loadFixture(page, pm, 'people-l3')
+    // Build 3 (contract §9.5): no policy answers a card here.
+    await deckOff(page)
     await pm.settle(64)
     const desks = fixture.desks as {
       index: number
@@ -2220,6 +2241,7 @@ test.describe('M6 shots', () => {
     // tagged a parcel `looks clean`.
     await pm.open(WH_NEW)
     const { fixture } = await loadFixture(page, pm, 'sorter-duty')
+    await deckOff(page) // no policy answers a card here (contract §9.5)
     await pm.settle(64)
     const sorter = fixture.sorter as { id: number; name: string }
     const st = await page.evaluate(() => {
@@ -2264,6 +2286,7 @@ test.describe('M6 shots', () => {
     phoneAndMinFit()
     await pm.open(WH_NEW)
     const { fixture } = await loadFixture(page, pm, 'sorter-duty')
+    await deckOff(page) // no policy answers a card here (contract §9.5)
     await pm.settle(64)
     const bay = await page.evaluate(
       (id) =>
@@ -2406,46 +2429,11 @@ async function magicQuest(
 }
 
 test.describe('M7 shots', () => {
-  test('quest-offer', async ({ page, pm, consoleErrors }) => {
-    phoneAndMinFit()
-    await pm.open(CITY)
-    await pm.freeze()
-    // 20 s with no player: parcels wait (the badges). Then the ?quest=
-    // command: a job card, which holds the policy-less sim (B3 §6) — so it
-    // comes after the 20 s, not at create.
-    await page.evaluate(() => window.__pm!.advance(20_000))
-    await debugQuest(page, 'rush_district', false)
-    expect(
-      await settleUntil(page, pm, async () => {
-        const ui = await questUi(page)
-        return ui.card.open && ui.card.mode === 'offer'
-      }),
-      'the job offer opens its card',
-    ).toBe(true)
-    await pm.settle(30)
-    const ui = await questUi(page)
-    const fit = await questCardFit(page)
-    console.log(
-      `shots: quest-offer ${JSON.stringify({ offer: ui.offer, card: ui.card, fit })}`,
-    )
-    expect(ui.card).toMatchObject({
-      title: 'Rush hour',
-      buttons: ['accept', 'decline'],
-    })
-    expect(ui.openCard?.kind, 'a job card').toBe('job')
-    expect(fit.card.x).toBeGreaterThanOrEqual(0)
-    expect(fit.card.x + fit.card.w).toBeLessThanOrEqual(fit.W)
-    expect(fit.card.y).toBeGreaterThanOrEqual(fit.bandTop)
-    expect(fit.card.y + fit.card.h).toBeLessThanOrEqual(fit.bandBottom)
-    await expectInside(page, 'HUD', ['quest:accept', 'quest:decline'])
-    await pm.shot(shotName('quest-offer'), 20)
-    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
-  })
-
   test('quest-chip', async ({ page, pm, consoleErrors }) => {
     phoneOnly()
     test.setTimeout(180_000)
-    await pm.open(`${POLICY}&fastForward=720`)
+    // M11 pacing (−10 %): seed 7 reaches L2 at ~12.5 min (12:27).
+    await pm.open(`${POLICY}&fastForward=780`)
     await pm.freeze()
     await abandonActive(page)
     await debugQuest(page, 'rush_district')
@@ -3214,6 +3202,56 @@ async function victoryCardUp(page: Page, pm: PmHelpers): Promise<boolean> {
   return settleUntil(page, pm, async () => (await questUi(page)).victoryCard)
 }
 
+/**
+ * The open VictoryCard's art (B3 §5): whether `victory_art` is drawn (and
+ * inside the card's panel), and the confetti frames showing right now.
+ */
+function victoryArt(page: Page): Promise<{
+  art: boolean
+  artInside: boolean
+  confetti: string[]
+  bursting: boolean
+}> {
+  return page.evaluate(() => {
+    type Img = {
+      type: string
+      visible: boolean
+      frame?: { name: string }
+      x: number
+      y: number
+      width: number
+      height: number
+    }
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      victoryCard: {
+        root: { list: Img[] } | null
+        bursting: boolean
+        top: number
+      }
+    }
+    const vc = hud.victoryCard
+    const list = vc.root?.list ?? []
+    const imgs = list.filter((o) => o.type === 'Image' && o.visible)
+    const art = imgs.find((o) => o.frame?.name === 'victory_art')
+    const panel = list.find(
+      (o) => o.type === 'NineSlice' && o.visible && o.y === vc.top,
+    )
+    return {
+      art: art !== undefined,
+      artInside:
+        art !== undefined &&
+        panel !== undefined &&
+        art.x >= panel.x &&
+        art.x + art.width <= panel.x + panel.width &&
+        art.y + art.height <= panel.y + panel.height,
+      confetti: imgs
+        .map((o) => o.frame?.name ?? '')
+        .filter((n) => n.startsWith('fx_confetti')),
+      bursting: vc.bursting,
+    }
+  })
+}
+
 test.describe('M9 shots', () => {
   for (const region of ['lowres', 'rural'] as const) {
     test(`${region}-live`, async ({ page, pm, consoleErrors }) => {
@@ -3260,6 +3298,7 @@ test.describe('M9 shots', () => {
       return {
         ms: c ? city.time.now - c.start : null,
         offer: window.__pm!.quests().offer?.templateId ?? null,
+        active: window.__pm!.quests().active?.templateId ?? null,
       }
     })
     const hud = await sceneTexts(page, 'HUD')
@@ -3269,9 +3308,12 @@ test.describe('M9 shots', () => {
     expect(st.ms, 'the construction overlay is up').not.toBeNull()
     expect(st.ms!).toBeGreaterThanOrEqual(500)
     expect(st.ms!).toBeLessThan(750)
-    expect(st.offer, 'the Golden Release offered on level:up {5}').toBe(
-      'golden_release',
-    )
+    // Build 3: with no job running the policy accepts the gold offer on
+    // the level-up tick itself.
+    expect(
+      st.offer ?? st.active,
+      'the Golden Release offered on level:up {5}',
+    ).toBe('golden_release')
     expect(
       hud.filter((t) => /coming soon/.test(t)),
       'no "coming soon" at the top level',
@@ -3380,6 +3422,7 @@ test.describe('M9 shots', () => {
     // No policy: it would accept the offer as soon as its quest ends.
     await pm.open(CITY)
     const { fixture } = await loadFixture(page, pm, 'l5-tycoon')
+    await deckOff(page) // no policy answers a card here (contract §9.5)
     await pm.settle(5)
     await quietHints(page)
     await pm.settle(11)
@@ -3515,8 +3558,16 @@ test.describe('M9 shots', () => {
     )
     console.log(`shots: victory game:victory ${JSON.stringify(w)}`)
     expect(w.ok, 'game:victory').toBe(true)
+    // Build 3 M12 (B3 §5, D-M12-12): the card opens with the confetti burst
+    // (0–880 ms after open): the shot's 12 frames land inside it.
     expect(await victoryCardUp(page, pm), 'the VictoryCard opens').toBe(true)
-    await pm.settle(30)
+    await pm.shot(shotName('victory'), 12)
+    const art = await victoryArt(page)
+    console.log(`shots: victory art ${JSON.stringify(art)}`)
+    expect(art.art, 'victory_art is drawn').toBe(true)
+    expect(art.confetti.length, 'a confetti frame is up').toBeGreaterThan(0)
+    for (const f of art.confetti) expect(f).toMatch(/^fx_confetti_f[0-7]$/)
+    expect(art.artInside, 'the art inside the card').toBe(true)
     const ui = await questUi(page)
     const texts = await sceneTexts(page, 'HUD')
     console.log(
@@ -3535,7 +3586,6 @@ test.describe('M9 shots', () => {
       'victory:newGame',
       'victory:summary',
     ])
-    await pm.shot(shotName('victory'), 20)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 
@@ -3616,6 +3666,397 @@ test.describe('M9 shots', () => {
     )
     expect(ui.holds).toContain('victory')
     expect(ui.paused).toBe(true)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+})
+
+// ---- M12 ------------------------------------------------------------------
+
+/** effects.ts lifeLine: a life option that can take the last one. */
+const ENDS_RUN = '— this can end the run'
+
+/** The HUD's EventCard rect and the bands around it (logical px). */
+function eventCardFit(page: Page): Promise<{
+  W: number
+  H: number
+  card: { x: number; y: number; w: number; h: number } | null
+  bandTop: number
+  bandBottom: number
+}> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      L: {
+        W: number
+        H: number
+        ticker: { y: number; h: number }
+        bottomBar: { y: number }
+      }
+      eventCard: { rect: { x: number; y: number; w: number; h: number } | null }
+    }
+    const L = hud.L
+    return {
+      W: L.W,
+      H: L.H,
+      card: hud.eventCard.rect,
+      bandTop: L.ticker.y + L.ticker.h,
+      bandBottom: L.bottomBar.y,
+    }
+  })
+}
+
+/**
+ * The open EventCard fits (B3 §3.4, R22): ≤ 300 × 340 px, inside the canvas
+ * between the ticker and the bottom bar, the layout's own `fits`, and every
+ * option button live inside the canvas.
+ */
+async function expectEventCardFits(page: Page, label: string): Promise<void> {
+  const fit = await eventCardFit(page)
+  const ui = await eventUi(page)
+  console.log(
+    `shots: ${label} ${JSON.stringify({ open: ui.open, card: ui.card, fit })}`,
+  )
+  const c = fit.card
+  expect(c, `${label}: the card is open`).not.toBeNull()
+  expect(c!.w, `${label}: width`).toBeLessThanOrEqual(300)
+  expect(c!.h, `${label}: height ≤ 340`).toBeLessThanOrEqual(340)
+  expect(c!.x, `${label}: left`).toBeGreaterThanOrEqual(0)
+  expect(c!.x + c!.w, `${label}: right`).toBeLessThanOrEqual(fit.W)
+  expect(c!.y, `${label}: below the ticker`).toBeGreaterThanOrEqual(fit.bandTop)
+  expect(c!.y + c!.h, `${label}: above the bottom bar`).toBeLessThanOrEqual(
+    fit.bandBottom,
+  )
+  expect(ui.card.fits, `${label}: the copy fits`).toBe(true)
+  await expectInside(
+    page,
+    'HUD',
+    ui.open!.options.map((o) => `event:opt${o.index}`),
+  )
+}
+
+/**
+ * 60 s of the policy (bikes out, an inspector at the desk), then the policy
+ * off — no one answers a card now — the deck quiet (deckOff: only the cards
+ * a shot offers) and the one-time hints done (nothing over the card).
+ */
+async function quietAt60s(
+  page: Page,
+  pm: PmHelpers,
+  url = POLICY,
+  ms = 60_000,
+): Promise<void> {
+  await pm.open(url)
+  await runFor(page, pm, ms)
+  await policyOff(page)
+  await deckOff(page)
+  await quietHints(page)
+  await pm.settle(8)
+}
+
+/** The lost-life card's model kind ('event' for an option's life, B3 §3.5). */
+function lostCardKind(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+      lostCard: { current: { kind?: string } | null }
+    }
+    const m = hud.lostCard.current
+    return m ? (m.kind ?? 'malware') : null
+  })
+}
+
+test.describe('M12 shots', () => {
+  test('event-card', async ({ page, pm, consoleErrors }) => {
+    phoneAndMinFit()
+    // The gang's first card (B3 §4 underworld chain head).
+    await quietAt60s(page, pm)
+    await debugEvent(page, 'ev_crime_gang')
+    const ui = await eventCardUp(page, pm, 'ev_crime_gang')
+    expect(ui.open!.title).toBe('Protection')
+    expect(ui.open!.options.map((o) => o.label)).toEqual([
+      'Accept ($300)',
+      'Deny',
+    ])
+    expect(ui.card.mode).toBe('decision')
+    expect(ui.holds).toContain('event')
+    await expectEventCardFits(page, 'event-card')
+    if (isMinFit()) {
+      const fit = await eventCardFit(page)
+      expect({ W: fit.W, H: fit.H }).toEqual({ W: 360, H: 604 })
+    }
+    await pm.shot(shotName('event-card'), 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-card-job', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // Rush hour as a card (B3 §3.1, §6): ?quest= opens it at create.
+    await pm.open(`${CITY}&quest=rush_district`)
+    await pm.freeze()
+    await quietHints(page)
+    const ui = await eventCardUp(page, pm, 'job:rush_district')
+    expect(ui.open!.kind).toBe('job')
+    expect(ui.card.mode).toBe('job')
+    expect(ui.open!.options.map((o) => o.label)).toEqual(['Accept', 'Decline'])
+    expect(ui.holds).toContain('event')
+    const texts = await sceneTexts(page, 'HUD')
+    console.log(
+      `shots: event-card-job ${JSON.stringify(texts.filter((t) => /Rush|JOB|Reward|deliver|Deliver/.test(t)))}`,
+    )
+    expect(texts).toContain('Rush hour')
+    expect(texts).toContain('JOB BOARD')
+    await expectEventCardFits(page, 'event-card-job')
+    await pm.shot('event-card-job', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-card-three', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // The scanner course: three options and the {inspector} pick.
+    await quietAt60s(page, pm)
+    await debugEvent(page, 'ev_staff_training')
+    const ui = await eventCardUp(page, pm, 'ev_staff_training')
+    const labels = ui.open!.options.map((o) => o.label)
+    console.log(`shots: event-card-three ${JSON.stringify(ui.open!.options)}`)
+    expect(ui.card.mode).toBe('three')
+    expect(labels.length).toBe(3)
+    expect(labels[0]).toBe('Send everyone')
+    expect(labels[1]).toMatch(/^Send [A-Z][a-z]+$/)
+    expect(labels[2]).toBe('Skip')
+    await expectEventCardFits(page, 'event-card-three')
+    await pm.shot('event-card-three', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-card-danger', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // The recall at 1 life: the strike is the red face with `— this can end
+    // the run` (B3 §3.4, R32). Offered before any step: the fixture's
+    // malware parcel stays on its way.
+    await pm.open(POLICY)
+    await loadFixture(page, pm, 'one-life')
+    await policyOff(page)
+    await deckOff(page)
+    await debugEvent(page, 'ev_sec_recall')
+    await pm.settle(2)
+    await quietHints(page)
+    const ui = await eventCardUp(page, pm, 'ev_sec_recall')
+    const strike = ui.open!.options[1]!
+    expect(ui.lives).toBe(1)
+    expect(strike).toMatchObject({ label: 'Take the strike', danger: true })
+    expect(strike.lines.at(-1)!.endsWith(ENDS_RUN)).toBe(true)
+    expect(
+      (await sceneTexts(page, 'HUD')).some((t) => t.endsWith(ENDS_RUN)),
+      'the danger line is on the card',
+    ).toBe(true)
+    await expectEventCardFits(page, 'event-card-danger')
+    // The card holds the sim: let the load's money float (900 ms) fade.
+    await pm.settle(64)
+    await pm.shot('event-card-danger', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-chain-gang', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    test.setTimeout(150_000)
+    // Card 2 of the gang chain: Deny books `On the doorstep` a day later.
+    // 210 s of the policy first: before the deck's first draw (3:20) the
+    // deck is quiet and no link opens (deckQuiet, firstEventS).
+    await quietAt60s(page, pm, POLICY, 210_000)
+    await debugEvent(page, 'ev_crime_gang')
+    await eventCardUp(page, pm, 'ev_crime_gang')
+    await tapTarget(page, pm, 'HUD', 'event:opt1')
+    await pm.settle(4)
+    const down = await eventUi(page)
+    expect(down.last).toMatchObject({ eventId: 'ev_crime_gang', option: 1 })
+    expect(down.scheduled, 'Deny booked the next link').toBe(1)
+    const w = await advanceUntil(
+      page,
+      "api.sim.events().open?.eventId === 'ev_crime_gang_watch'",
+      70_000,
+    )
+    console.log(`shots: event-chain-gang link after ${JSON.stringify(w)}`)
+    expect(w.ok, 'the link opens a day later').toBe(true)
+    const ui = await eventCardUp(page, pm, 'ev_crime_gang_watch')
+    expect(ui.open!.parentChoice).toBe('You chose: Deny')
+    expect(ui.open!.title).toBe('On the doorstep')
+    expect(await sceneTexts(page, 'HUD')).toContain('You chose: Deny')
+    await expectEventCardFits(page, 'event-chain-gang')
+    // The day's payday toast and money floats of the sim-only day: gone
+    // (the card holds the sim) before the shot.
+    await quietHints(page)
+    await pm.settle(64)
+    await pm.shot('event-chain-gang', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-chip + effects-card', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // Both chips in row B: the job's chip compacts to 82 px beside the
+    // 24-px event chip (B3 §3.4, layout.rowB).
+    await quietAt60s(page, pm)
+    await debugQuest(page, 'rush_district')
+    await pm.settle(8)
+    await debugEvent(page, 'ev_wx_rain')
+    await eventCardUp(page, pm, 'ev_wx_rain')
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
+    await pm.settle(20)
+    const chips = await page.evaluate(() => {
+      const hud = window.__pm!.game.scene.getScene('HUD') as unknown as {
+        questChip: {
+          w: number
+          root: { x: number; y: number; visible: boolean }
+        }
+        eventChip: {
+          w: number
+          root: { x: number; y: number; visible: boolean }
+        }
+        L: { W: number }
+      }
+      return {
+        W: hud.L.W,
+        quest: {
+          w: hud.questChip.w,
+          x: hud.questChip.root.x,
+          visible: hud.questChip.root.visible,
+        },
+        event: {
+          w: hud.eventChip.w,
+          x: hud.eventChip.root.x,
+          visible: hud.eventChip.root.visible,
+        },
+      }
+    })
+    const ui = await eventUi(page)
+    console.log(`shots: event-chip ${JSON.stringify({ chips, chip: ui.chip })}`)
+    expect(ui.chip).toEqual({ visible: true, count: 1, pulse: false })
+    expect((await questUi(page)).chip.visible).toBe(true)
+    expect(chips.quest).toMatchObject({ w: 82, visible: true })
+    expect(chips.event).toMatchObject({ w: 24, visible: true })
+    expect(chips.event.x + 24, 'the event chip left of the quest chip').toBe(
+      chips.quest.x - 4,
+    )
+    await pm.shot('event-chip', 10)
+    // The chip's tap: the EffectsCard.
+    await tapTarget(page, pm, 'HUD', 'eventChip')
+    expect(
+      await settleUntil(page, pm, async () => (await eventUi(page)).effects),
+      'the EffectsCard opens',
+    ).toBe(true)
+    await pm.settle(24)
+    const texts = await sceneTexts(page, 'HUD')
+    console.log(
+      `shots: effects-card ${JSON.stringify(texts.filter((t) => /active|speed|left/.test(t)))}`,
+    )
+    expect(texts).toContain('bikes ×0.85 speed')
+    expect(texts.some((t) => t.endsWith('left · Rain'))).toBe(true)
+    await pm.shot('effects-card', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-lost-life', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // The recall's strike with 3 lives: the lost-life card's event variant.
+    await quietAt60s(page, pm)
+    await debugEvent(page, 'ev_sec_recall')
+    await eventCardUp(page, pm, 'ev_sec_recall')
+    await tapTarget(page, pm, 'HUD', 'event:opt1')
+    expect(
+      await settleUntil(page, pm, async () => (await hudCards(page)).lost),
+      'the lost-life card opens',
+    ).toBe(true)
+    await pm.settle(20)
+    const kind = await lostCardKind(page)
+    const texts = await sceneTexts(page, 'HUD')
+    console.log(
+      `shots: event-lost-life ${kind} ${JSON.stringify(texts.filter((t) => /recall|chose|Lives/.test(t)))}`,
+    )
+    expect(kind).toBe('event')
+    expect(await page.evaluate(() => window.__pm!.sim.lives)).toBe(2)
+    expect(texts).toContain('You chose: Take the strike')
+    await pm.shot('event-lost-life', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event-game-over', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // one-life.json + the recall + the strike: the GameOverCard names the
+    // card and the choice that ended the run (B3 §3.5).
+    await pm.open(POLICY)
+    await loadFixture(page, pm, 'one-life')
+    await policyOff(page)
+    await deckOff(page)
+    await debugEvent(page, 'ev_sec_recall')
+    await pm.settle(2)
+    await quietHints(page)
+    await eventCardUp(page, pm, 'ev_sec_recall')
+    await tapTarget(page, pm, 'HUD', 'event:opt1')
+    expect(
+      await settleUntil(page, pm, async () => (await hudCards(page)).over),
+      'the game-over screen opens',
+    ).toBe(true)
+    await pm.settle(20)
+    const texts = await sceneTexts(page, 'HUD')
+    expect(await hudCards(page)).toEqual({ lost: false, over: true })
+    expect(texts).toContain('The recall — you chose: Take the strike')
+    await pm.shot('event-game-over', 10)
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('buysheet-sale', async ({ page, pm, consoleErrors }) => {
+    phoneOnly()
+    // Vendor clearance: machines ×0.8 for a day — the BuySheet's SALE tags.
+    // The grant's Apply first ($102 + $150): the sale price is affordable,
+    // so the row shows the pill on a live row, not a greyed one.
+    await warehouseAt60s(page, pm)
+    await policyOff(page)
+    await deckOff(page)
+    await quietHints(page)
+    await debugEvent(page, 'ev_money_grant')
+    await eventCardUp(page, pm, 'ev_money_grant')
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
+    // Its ≥ $100 paper: OK once it has slid up.
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await eventUi(page)).paper !== null,
+      ),
+      'the grant paper comes up',
+    ).toBe(true)
+    await pm.settle(24)
+    await tapTarget(page, pm, 'HUD', 'newspaper:ok')
+    await pm.settle(24)
+    await debugEvent(page, 'ev_money_machine_sale')
+    await eventCardUp(page, pm, 'ev_money_machine_sale')
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
+    await pm.settle(20)
+    expect((await eventUi(page)).modifiers.map((m) => m.key)).toContain(
+      'machinePrice',
+    )
+    const slot = await page.evaluate(
+      () =>
+        window
+          .__pm!.sim.lane.nodes()
+          .find((n) => n.kind === 'slot' && !n.locked && n.fixture === null)
+          ?.id ?? null,
+    )
+    expect(slot, 'an empty live slot').not.toBeNull()
+    await tapRoomRect(page, pm, roomLayout.rectFor(slot!)!)
+    expect(
+      await settleUntil(
+        page,
+        pm,
+        async () => (await openSheet(page)) === 'buy',
+      ),
+      'the BuySheet opens',
+    ).toBe(true)
+    await pm.settle(30)
+    const texts = await sceneTexts(page, 'Warehouse')
+    console.log(
+      `shots: buysheet-sale ${JSON.stringify(texts.filter((t) => /SALE|\$/.test(t)))}`,
+    )
+    expect(texts).toContain('SALE')
+    expect((await eventUi(page)).paper, 'no paper over the sheet').toBeNull()
+    await pm.shot('buysheet-sale', 10)
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })
 })

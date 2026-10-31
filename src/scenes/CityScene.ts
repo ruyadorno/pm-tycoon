@@ -126,6 +126,7 @@ import {
   getViewSim,
   REG,
 } from '../boot/simBinding.ts'
+import { simStopped } from '../boot/stepper.ts'
 import {
   blockRect,
   mapBlockAt,
@@ -1633,12 +1634,12 @@ export class CityScene extends Phaser.Scene implements WorldTransition {
   /**
    * Spec §9.2 grumble: an angry district label on screen grumbles now, then
    * every 20 s (DistrictLabel.tickGrumble; the director throttles overall).
-   * Quiet while the sim is paused (0× or a modal card), like the director's
-   * own loops.
+   * Quiet while the sim is paused (0×, a modal card, or a pending card
+   * holding the sim — review sim-3), like the director's own loops.
    */
   private updateGrumble(now: number): void {
     const st = getStepper(this)
-    if (st && (st.paused || st.speed === 0)) return
+    if (st && simStopped(st)) return
     const view = this.cameras.main.worldView
     let due = false
     for (const l of this.labels.values())

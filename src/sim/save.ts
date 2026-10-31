@@ -32,6 +32,12 @@ export interface OnboardingSave {
   skipped: boolean
   sawFirstFlag: boolean
   sawTossHint: boolean
+  /**
+   * The VictoryCard's Continue was tapped (review sim-2): a reload never
+   * reopens the card after it — a held card can keep the tick inside
+   * victoryCardPending's slack.
+   */
+  sawVictory: boolean
 }
 
 export interface SavePayload {

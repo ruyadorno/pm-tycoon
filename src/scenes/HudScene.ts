@@ -1940,10 +1940,17 @@ export class HudScene extends Phaser.Scene {
     this.hold('victory')
   }
 
-  /** `Continue` (endless): the card closes and the sim runs on. */
+  /**
+   * `Continue` (endless): the card closes and the sim runs on. It is never
+   * shown again for this run (onboarding.sawVictory, saved now — review
+   * sim-2: a card held within victoryCardPending's slack reopened it on
+   * every reload).
+   */
   private continueAfterVictory(): void {
     this.victoryCard.close()
     this.release('victory')
+    getOnboarding(this.registry).sawVictory = true
+    if (this.saveSoon !== 'final') this.saveSoon = 'save'
   }
 
   /** `Run summary` from the VictoryCard: its `Back` returns to the card. */
@@ -1957,7 +1964,8 @@ export class HudScene extends Phaser.Scene {
    * create / WAKE / Sim swap: the chip from quests(), the card closed, a
    * stale victory screen or stamp gone (the victory shows on its event
    * only — or at create from a save written on the victory tick, before
-   * Continue: a reload then reopens the VictoryCard, victoryCardPending). At
+   * Continue: a reload then reopens the VictoryCard, victoryCardPending —
+   * never once Continue was tapped, onboarding.sawVictory). At
    * create the Golden Release's standing offer opens its card (a reload,
    * Boot's `?quest=golden_release`, made before the HUD listened); after a
    * swap (__pm.load, a fixture) the chip just pulses, so a swap leaves the
@@ -1994,6 +2002,9 @@ export class HudScene extends Phaser.Scene {
         // One frame after the event in the saved state, one more between
         // the Title's Continue and this create (autosaves are 10 s apart).
         2 * MAX_TICKS_PER_FRAME,
+        // Continue was tapped: a card that holds the sim keeps the tick in
+        // the slack after it (review sim-2).
+        getOnboarding(this.registry).sawVictory,
       )
     )
       this.onVictory()
@@ -3701,6 +3712,16 @@ export class HudScene extends Phaser.Scene {
     if (this.district?.isOpen()) this.districtDirty = true
   }
 
+  /**
+   * pm:select is refused while a card holds the sim or an EventCard shows
+   * (review mobile-2): every hold is a modal card that takes the taps
+   * (lost life, game over, summary, victory, the Paused / rotate cards, an
+   * EventCard), so a select then is a gesture that began before it opened.
+   */
+  private selectBlocked(): boolean {
+    return this.eventCard.isOpen || this.holds.size > 0
+  }
+
   private openDistrict(id: string): void {
     this.closeMood()
     this.shield?.close()
@@ -4105,7 +4126,11 @@ export class HudScene extends Phaser.Scene {
       if (p?.name === 'city' || p?.name === 'warehouse') this.setView(p.name)
     }
     const onSelect = (p: SelectPayload): void => {
-      if (!p) return
+      // Never under a card that holds the sim (review mobile-2): a city
+      // long-press already under way when an EventCard (or a lost-life /
+      // victory card) opens still fires from CityScene.update — its panel
+      // would open under the card and outlive the decision.
+      if (!p || this.selectBlocked()) return
       if (p.kind === 'district') this.openDistrict(String(p.id))
       else if (p.kind === 'locked') {
         this.toast.show(lockedRegionText(this.gd, String(p.id)))

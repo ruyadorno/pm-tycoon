@@ -2,7 +2,7 @@
 // `ui_panel` with the step text, a grey `Skip tour` link (44-px hit) and the
 // 16x16 `arrow` frame (an 8x8 down-pointing glyph, artUi hand-off) touching
 // its target. The state object is `pm.save.v2.onboarding` = {step, skipped,
-// sawFirstFlag, sawTossHint}: HudScene keeps it in the game registry
+// sawFirstFlag, sawTossHint, sawVictory}: HudScene keeps it in the game registry
 // (REG_ONBOARDING, src/boot/autosave.ts), this class mutates it in place and
 // autosave.ts writes it; the sim never sees it, so a reload never repeats a
 // step. `step` = the highest step completed (0 = none).
@@ -96,6 +96,7 @@ export function freshOnboarding(): OnboardingSave {
     skipped: false,
     sawFirstFlag: false,
     sawTossHint: false,
+    sawVictory: false,
   }
 }
 
@@ -109,6 +110,7 @@ export function normaliseOnboarding(x: unknown): OnboardingSave {
   o.skipped = r.skipped === true
   o.sawFirstFlag = r.sawFirstFlag === true
   o.sawTossHint = r.sawTossHint === true
+  o.sawVictory = r.sawVictory === true
   return o
 }
 

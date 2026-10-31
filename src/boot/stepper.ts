@@ -62,6 +62,19 @@ export interface Stepper {
 export const REG_ALPHA = 'alpha'
 export const REG_STEPPER = 'stepper'
 
+/**
+ * True while no tick runs: a HUD hold, 0×, or (B3 §6) the sim held by a
+ * pending card — Sim.held while a sheet, panel or paper keeps the card off
+ * the screen and no hold is set yet (review sim-3). The audio director's
+ * loops (hiss, stall alarm, grumble) and the City's grumble wait on it, as
+ * the HUD's ❚❚ / PAUSED do (speedSegment(st.paused || vs.held)).
+ */
+export function simStopped(
+  st: Pick<Stepper, 'paused' | 'speed' | 'sim'>,
+): boolean {
+  return st.paused || st.speed === 0 || st.sim.held === true
+}
+
 const clock = (): number =>
   typeof performance === 'undefined' ? 0 : performance.now()
 

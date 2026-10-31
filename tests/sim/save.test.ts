@@ -94,6 +94,7 @@ describe('save round trip (plan.md §6.4)', () => {
       skipped: false,
       sawFirstFlag: true,
       sawTossHint: false,
+      sawVictory: false,
     }
     const text = serialise(sim, { savedAt: 1234, build: 'test', onboarding })
     const payload = deserialise(text)

@@ -1109,3 +1109,23 @@ seeds 1–10 × 30 min, competent policy, events off; the 40-seed share counts s
   L3 16.73, overseas +2.55, L4 20.13, L5 25.46, cards 21, L1 plateau 3, EV/card 25.01, non-default 0.63
   (was EV 30.37, L4 20.60, L5 26.17); 35 min PASS (Golden Release offered by 25.46, EV 38.1, non-default 0.57);
   delegating PASS (EV 18.1, non-default 0.59, events took no workers — was 2).
+
+### M12 wave 2 (e2e, shots, the mobile and sim review passes)
+
+- **A press counts where it lands** (review mobile-1): the read-in guard is checked on pointerdown — a finger that
+  lands while the card slides in never answers it, however late it lifts; a red (danger) option waits 600 ms
+  (`EVENT_DANGER_IN_MS`, a UI timing, not balance). The news scrim and panel follow the same rule.
+- **No world select under a card** (mobile-2): a city long-press already under way when a card opens is dropped.
+- **The Victory card opens once** (sim-2): `sawVictory` in the onboarding save, set by Continue, so a card held near
+  the victory tick no longer reopens the VictoryCard and its confetti on every reload.
+- **The sim's hold silences the loops** (sim-3): `simStopped()` (paused, 0×, or held by a pending card) drives the
+  audio director's and the City's grumble pause.
+- **`?event=` / `?quest=` act on a new game only** (sim-4): freshness comes from the Title's new-game swap, not from
+  tick 0 (the hold can keep a saved game at tick 0).
+- **e2e**: `quest-offer` is replaced by `event-card-job`; `policyOff` disposes the policy; `deckOff` keeps fixture
+  shots without a policy from holding. Draw calls with an open EventCard: 5 (≤ 8); the EffectsCard: 5.
+- **The plan's acceptance command** `vlr test -- tests/data/events.test.ts` is run as `vlr test -- tests/data/events`
+  so it also matches `events-fit.test.ts` (the real copy-fit cases at 360 × 604 and 393 × 659).
+- **A card waiting behind a sheet holds the sim** (M12 wave 0): with M11's sim-side hold, a card drawn while a sheet
+  is open freezes the sim (the chip pulses) until the sheet closes and the card shows — B3 §3.4 said "a sheet does
+  not hold the sim". Kept: every card pauses (Q-B3-2), and the frozen frame is stable (no jitter).

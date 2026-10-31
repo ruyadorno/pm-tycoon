@@ -14,7 +14,14 @@
 //     __pm.quests() reads them and the HUD's QuestCard / QuestChip /
 //     VictoryCard / QUEST COMPLETE stamp, its modal depth and holds; build 3
 //     (M11): the open event card (__pm.events().open — a job card holds a
-//     policy-less sim) and the sim tick.
+//     policy-less sim) and the sim tick;
+//   - build 3 M12 (contract §9.1): eventUi(page) — the deck and the HUD's
+//     EventCard / EventChip / EffectsCard / lost-life, game-over, victory
+//     and quest cards / newspaper, holds, modal depth, the sim tick;
+//     debugEvent (sim.debug.offerEvent), eventCardUp / eventCardDown (the
+//     slide and the read-in guard waited out), deckOff (no automatic card
+//     — shots and fixture loads only, never before a replay check) and
+//     quietHints (the one-time hints done; moved here from shots.spec.ts).
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -260,6 +267,281 @@ export async function finishUltimate(
     const w = await api.waitEvent('game:victory', 2_000)
     return { ok: w.ok, day: w.payload?.day ?? null, tick: api.sim.tick }
   })
+}
+
+/**
+ * The one-time hints a fresh page would raise over a loaded mid-game fixture
+ * or a fresh game are marked done, as a player of that run has seen them —
+ * the tour skipped (its Skip tour), the first-flag funnel and the first-Toss
+ * hint seen (the policy Tosses as the player) and the 30-minute summary offer
+ * made (victory.json is past 30:00) — and any toast up is cleared, so nothing
+ * covers the art. Every other HUD reaction (level stamp, paper, chips, quest
+ * and event UI) is untouched. M12 (critique 12): the gold QuestCard auto-opens
+ * only past the tour, so the event stack e2e calls this too (moved here from
+ * shots.spec.ts).
+ */
+export async function quietHints(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const api = window.__pm!
+    type Seen = { sawFirstFlag: boolean; sawTossHint: boolean }
+    const hud = api.game.scene.getScene('HUD') as unknown as {
+      onboarding: { skipTour(): void; state: Seen }
+      recorder: { offered: boolean; markOffered(): void }
+      toast: { clear(): void }
+    }
+    hud.onboarding.skipTour()
+    const ob = api.game.registry.get('onboarding') as Seen | null
+    for (const s of [hud.onboarding.state, ob])
+      if (s) {
+        s.sawFirstFlag = true
+        s.sawTossHint = true
+      }
+    if (!hud.recorder.offered) hud.recorder.markOffered()
+    hud.toast.clear()
+  })
+}
+
+/** An option of the open card as the e2e specs read it (OpenCardView.options). */
+export interface EventOptionInfo {
+  index: number
+  label: string
+  lines: string[]
+  tones: string[]
+  affordable: boolean
+  danger: boolean
+  default: boolean
+}
+
+/**
+ * Build 3 M12 (B3 §3.4, §6): the sim's deck (__pm.events()) and the HUD's
+ * EventCard / EventChip / EffectsCard / lost-life and game-over cards /
+ * newspaper, its holds and modal depth, the stepper and the sim tick.
+ */
+export interface EventUi {
+  open: {
+    eventId: string
+    kind: string
+    title: string
+    parentChoice: string | null
+    questId: string | null
+    options: EventOptionInfo[]
+  } | null
+  openedTick: number | null
+  queue: number
+  scheduled: number
+  modifiers: {
+    key: string
+    line: string
+    ticksLeft: number | null
+    label: string
+  }[]
+  /** The newest history record. */
+  last: { eventId: string; option: number | null; outcome: string } | null
+  card: {
+    open: boolean
+    eventId: string | null
+    openedTick: number | null
+    mode: string | null
+    h: number | null
+    fits: boolean | null
+    rect: { x: number; y: number; w: number; h: number } | null
+  }
+  pending: boolean
+  chip: { visible: boolean; count: number; pulse: boolean }
+  effects: boolean
+  lost: boolean
+  over: boolean
+  victory: boolean
+  questCard: boolean
+  /** The newspaper's headline while one is on screen, else null. */
+  paper: string | null
+  /** Papers waiting in the HUD's queue (incl. the current one). */
+  papersQueued: number
+  holds: string[]
+  modalDepth: number
+  paused: boolean
+  held: boolean
+  tick: number
+  money: number
+  lives: number
+}
+
+export function eventUi(page: Page): Promise<EventUi> {
+  return page.evaluate((): EventUi => {
+    const api = window.__pm!
+    const ev = api.events()
+    const o = ev.open
+    const hud = api.game.scene.getScene('HUD') as unknown as {
+      eventCard: {
+        isOpen: boolean
+        eventId: string | null
+        openedTick: number | null
+        model: { h: number; mode: string; fits: boolean } | null
+        rect: { x: number; y: number; w: number; h: number } | null
+      }
+      eventPending: boolean
+      eventChip: {
+        current: { visible: boolean; count: number; pulse: boolean }
+      }
+      effectsCard: { isOpen: boolean }
+      lostCard: { isOpen(): boolean }
+      overCard: { isOpen(): boolean }
+      victoryCard: { isOpen: boolean }
+      questCard: { isOpen: boolean }
+      paper: {
+        isVisible(): boolean
+        current(): { headline: string } | null
+        queue: { current: unknown; waiting: unknown[] }
+      }
+      holds: Set<string>
+      modalDepth(): number
+    }
+    const last = ev.history[ev.history.length - 1] ?? null
+    const c = hud.eventChip.current
+    const q = hud.paper.queue
+    return {
+      open: o
+        ? {
+            eventId: o.eventId,
+            kind: o.kind,
+            title: o.title,
+            parentChoice: o.parentChoice,
+            questId: o.questId,
+            options: o.options.map((x) => ({
+              index: x.index,
+              label: x.label,
+              lines: x.lines.map((l) => l.text),
+              tones: x.lines.map((l) => l.tone),
+              affordable: x.affordable,
+              danger: x.danger,
+              default: x.default,
+            })),
+          }
+        : null,
+      openedTick: api.core.state.events.open?.openedTick ?? null,
+      queue: ev.queue,
+      scheduled: ev.scheduledCount,
+      modifiers: ev.modifiers.map((m) => ({
+        key: m.key,
+        line: m.line,
+        ticksLeft: m.ticksLeft,
+        label: m.label,
+      })),
+      last: last
+        ? { eventId: last.eventId, option: last.option, outcome: last.outcome }
+        : null,
+      card: {
+        open: hud.eventCard.isOpen,
+        eventId: hud.eventCard.eventId,
+        openedTick: hud.eventCard.openedTick,
+        mode: hud.eventCard.model?.mode ?? null,
+        h: hud.eventCard.model?.h ?? null,
+        fits: hud.eventCard.model?.fits ?? null,
+        rect: hud.eventCard.rect,
+      },
+      pending: hud.eventPending,
+      chip: { visible: c.visible, count: c.count, pulse: c.pulse },
+      effects: hud.effectsCard.isOpen,
+      lost: hud.lostCard.isOpen(),
+      over: hud.overCard.isOpen(),
+      victory: hud.victoryCard.isOpen,
+      questCard: hud.questCard.isOpen,
+      paper: hud.paper.isVisible()
+        ? (hud.paper.current()?.headline ?? '')
+        : null,
+      papersQueued: (q.current !== null ? 1 : 0) + q.waiting.length,
+      holds: [...hud.holds].toSorted(),
+      modalDepth: hud.modalDepth(),
+      paused: api.stepper.paused,
+      held: api.core.held,
+      tick: api.sim.tick,
+      money: api.sim.money,
+      lives: api.sim.lives,
+    }
+  })
+}
+
+/** `sim.debug.offerEvent(id)` (the ?event= command): opens (or queues) that deck card now (asserts ok). */
+export async function debugEvent(page: Page, id: string): Promise<void> {
+  const r = await page.evaluate(
+    (eid) => window.__pm!.sim.debug!.offerEvent(eid),
+    id,
+  )
+  expect(r, `debug event ${id}`).toMatchObject({ ok: true })
+}
+
+/** Settle in 8-frame hops until `cond` holds (max `frames`); fixtures.ts' own (warehouse.ts imports this module). */
+async function settleFor(
+  pm: PmHelpers,
+  cond: () => Promise<boolean>,
+  frames: number,
+): Promise<boolean> {
+  for (let n = 0; n < frames; n += 8) {
+    if (await cond()) return true
+    await pm.settle(8)
+  }
+  return cond()
+}
+
+/**
+ * Settle until the HUD's EventCard shows (`eventId` when given), then 40
+ * frames (640 ms) more: the 300-ms slide has landed and the read-in guards
+ * have passed — EVENT_CARD_IN_MS, and EVENT_DANGER_IN_MS (600) for a red
+ * option (review mobile-1: a press counts only if it LANDS past them) — so
+ * its buttons take taps. Asserts.
+ */
+export async function eventCardUp(
+  page: Page,
+  pm: PmHelpers,
+  eventId?: string,
+  frames = 240,
+): Promise<EventUi> {
+  const ok = await settleFor(
+    pm,
+    async () => {
+      const ui = await eventUi(page)
+      return ui.card.open && (!eventId || ui.card.eventId === eventId)
+    },
+    frames,
+  )
+  if (!ok) console.log(`eventCardUp: ${JSON.stringify(await eventUi(page))}`)
+  expect(ok, `the EventCard opens${eventId ? ` on ${eventId}` : ''}`).toBe(true)
+  await pm.settle(40)
+  return eventUi(page)
+}
+
+/** Settle until the HUD's EventCard is closed (asserts). */
+export async function eventCardDown(
+  page: Page,
+  pm: PmHelpers,
+): Promise<EventUi> {
+  const ok = await settleFor(
+    pm,
+    async () => !(await eventUi(page)).card.open,
+    120,
+  )
+  expect(ok, 'the EventCard closes').toBe(true)
+  await pm.settle(4)
+  return eventUi(page)
+}
+
+/**
+ * Shots / fixture loads only, never before a replay check (a page
+ * mutation): the deck makes no automatic card from now on —
+ * nextDrawTick = DECK_OFF_TICK (the rescue goes with it) and the links
+ * booked so far are dropped; a link a decision books later still opens (a
+ * chain shot). Call it with no drawn card open: deciding a drawn card
+ * resets nextDrawTick (M12 critique 22) — asserted.
+ */
+export async function deckOff(page: Page): Promise<void> {
+  const open = await page.evaluate(() => {
+    const ev = window.__pm!.core.state.events
+    const o = ev.open
+    ev.nextDrawTick = 1e12
+    ev.scheduled.length = 0
+    return o ? { eventId: o.eventId, drawn: o.drawn } : null
+  })
+  expect(open?.drawn ?? false, 'deckOff with no drawn card open').toBe(false)
 }
 
 export interface PmHelpers {

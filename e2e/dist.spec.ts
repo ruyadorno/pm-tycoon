@@ -31,10 +31,22 @@
 //      8, iPhone profile = one texture per batch): City + HUD ≤ 3, Warehouse
 //      + HUD ≤ 7 after 60 s of the policy, and ≤ 7 again at tier 5 scrolled
 //      (M9 review: the cover over the bands batches with the readout).
+//   6. Build 3 M12 (plan-build3 §8.3 acceptance, contract §9.3): City + HUD
+//      + an open EventCard (the scanner course, three options) ≤ 8 draw
+//      calls; the EffectsCard (Rain's timed modifier) ≤ 8.
 import { readFileSync } from 'node:fs'
 import type { CDPSession, Page } from '@playwright/test'
 import sharp from 'sharp'
-import { expect, questUi, READY_TIMEOUT_MS, test } from './fixtures.ts'
+import {
+  debugEvent,
+  eventCardDown,
+  eventCardUp,
+  eventUi,
+  expect,
+  questUi,
+  READY_TIMEOUT_MS,
+  test,
+} from './fixtures.ts'
 import { sceneTarget, settleUntil, tapTarget, worlds } from './warehouse.ts'
 
 const NEW_GAME = 'title:new-game'
@@ -44,6 +56,11 @@ const SAVE_VERSION = 6
 /** plan-build2 §6 "Draw-call budget": city 3 (measured), warehouse 7. */
 const CITY_DRAW_CALLS = 3
 const WAREHOUSE_DRAW_CALLS = 7
+/** plan-build3 §8.3 acceptance: HUD + city + an open EventCard ≤ 8; the EffectsCard ≤ 8. */
+const EVENT_DRAW_CALLS = 8
+/** A policy-less fresh game with ?event= (the card holds the sim from tick 0). */
+const EVENT_URL = (id: string): string =>
+  `/?seed=7&debug=1&skipTitle=1&audio=0&attract=0&event=${id}`
 const POLICY_URL = '/?seed=7&debug=1&skipTitle=1&audio=0&policy=1'
 /** The tycoon recipe on Boot's fresh game (L5, the full lane, docks 2–3, 8 vehicles). */
 const TYCOON_URL =
@@ -584,6 +601,47 @@ test.describe('dist build (vite preview of dist/)', () => {
     )
     expect(scrolled, 'full tier 5 scrolled + HUD').toBeLessThanOrEqual(
       WAREHOUSE_DRAW_CALLS,
+    )
+    expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
+  })
+
+  test('event cards: City + HUD + an open EventCard ≤ 8 draw calls; the EffectsCard ≤ 8', async ({
+    page,
+    pm,
+    consoleErrors,
+  }) => {
+    await pm.open(EVENT_URL('ev_staff_training'))
+    await pm.freeze()
+    await pm.overlay(false)
+    const ui = await eventCardUp(page, pm, 'ev_staff_training')
+    expect(ui.card.mode).toBe('three')
+    await pm.settle(30)
+    const card = await page.evaluate(() => window.__pm!.metrics().drawCalls)
+    // Skip (the default, index 2), then Rain's OK: one timed modifier.
+    await tapTarget(page, pm, 'HUD', 'event:opt2')
+    await eventCardDown(page, pm)
+    await debugEvent(page, 'ev_wx_rain')
+    await eventCardUp(page, pm, 'ev_wx_rain')
+    await tapTarget(page, pm, 'HUD', 'event:opt0')
+    await eventCardDown(page, pm)
+    await pm.settle(10)
+    await tapTarget(page, pm, 'HUD', 'eventChip')
+    expect(
+      await settleUntil(page, pm, async () => (await eventUi(page)).effects),
+      'the EffectsCard opens',
+    ).toBe(true)
+    await pm.settle(30)
+    const effects = await page.evaluate(() => window.__pm!.metrics().drawCalls)
+    console.log(`dist: draw calls event card ${card}, effects card ${effects}`)
+    test.info().annotations.push({
+      type: 'draw calls event cards',
+      description: `event card ${card}, effects card ${effects}`,
+    })
+    expect(card, 'City + HUD + EventCard draw calls').toBeLessThanOrEqual(
+      EVENT_DRAW_CALLS,
+    )
+    expect(effects, 'City + HUD + EffectsCard draw calls').toBeLessThanOrEqual(
+      EVENT_DRAW_CALLS,
     )
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
   })

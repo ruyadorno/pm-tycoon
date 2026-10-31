@@ -38,7 +38,7 @@ import {
 } from '../boot/simBinding.ts'
 import { applyConfigStart } from '../boot/configStart.ts'
 import { installNav } from '../boot/nav.ts'
-import { installStepper, type Stepper } from '../boot/stepper.ts'
+import { installStepper, simStopped, type Stepper } from '../boot/stepper.ts'
 import { DataError, type ConfigStart, type GameData } from '../data/index.ts'
 import { loadConfigured } from '../data/load.browser.ts'
 import { installDebugApi } from '../debug/pm.ts'
@@ -172,6 +172,19 @@ export function patchKeyboardShutdown(): void {
       else delete (events as { off?: unknown }).off
     }
   }
+}
+
+/**
+ * A swap that installs a New game's sim (SimReplaced.fresh): the only swap
+ * Boot's debug offers (?level=, ?quest=, ?event=) follow. Never the attract
+ * sim, a Continue or a __pm.load — a held card can keep a saved game at tick
+ * 0 with only a debug offer in its log, so the tick-0 test alone let a
+ * Continue take another ?event= / ?quest= (review sim-4).
+ */
+export function newGameSwap(
+  e: Pick<SimReplaced, 'attract' | 'fresh'>,
+): boolean {
+  return e.fresh && !e.attract
 }
 
 /**
@@ -391,10 +404,12 @@ export class BootScene extends Phaser.Scene {
     // ?level=N: Boot's fresh sim now, each New game's on its swap. This
     // listener is registered before any scene's and the director's, so the
     // forced level:up events reach nobody: the views sync from state.
+    // The swap's own `fresh` (a New game) decides, not the tick: a held
+    // card can keep a saved game at tick 0 (review sim-4).
     if (!resume.game) forceLevelParam(vs, sim, p.level)
     if (p.level !== null)
       game.events.on(SIM_REPLACED, (e: SimReplaced) => {
-        if (!e.attract) forceLevelParam(e.viewSim, e.sim, p.level)
+        if (newGameSwap(e)) forceLevelParam(e.viewSim, e.sim, p.level)
       })
     // ?quest=<id> (M7): after ?level= (registered after its listener too),
     // before the fast-forward; the HUD reads the standing offer at create.
@@ -402,7 +417,7 @@ export class BootScene extends Phaser.Scene {
     if (!resume.game) offerQuestParam(vs, sim, quest)
     if (quest !== null)
       game.events.on(SIM_REPLACED, (e: SimReplaced) => {
-        if (!e.attract) offerQuestParam(e.viewSim, e.sim, quest)
+        if (newGameSwap(e)) offerQuestParam(e.viewSim, e.sim, quest)
       })
     // ?event=<id> (build 3 M12): after ?quest= (registered after its
     // listener too). The card holds the sim from tick 0: a ?fastForward=
@@ -411,7 +426,7 @@ export class BootScene extends Phaser.Scene {
     if (!resume.game) offerEventParam(vs, sim, eventId)
     if (eventId !== null)
       game.events.on(SIM_REPLACED, (e: SimReplaced) => {
-        if (!e.attract) offerEventParam(e.viewSim, e.sim, eventId)
+        if (newGameSwap(e)) offerEventParam(e.viewSim, e.sim, eventId)
       })
     const waitFrom = performance.now()
     const audio = await (this.audioModule ?? importAudio())
@@ -475,9 +490,11 @@ export function installAudio(
     holdBayCount: () =>
       (game.registry.get(REG.viewSim) as ViewSim | undefined)?.holdBay.count ??
       0,
-    // 0× or a modal card (Paused, lost life, game over, Title): the hiss,
-    // stall-alarm and grumble loops wait (Q47: the music keeps playing).
-    isPaused: () => stepper.paused || stepper.speed === 0,
+    // 0× or a modal card (Paused, lost life, game over, Title), or a
+    // pending card holding the sim behind a sheet / panel / paper (Sim.held,
+    // review sim-3): the hiss, stall-alarm and grumble loops wait (Q47: the
+    // music keeps playing).
+    isPaused: () => simStopped(stepper),
   }
   const first = sim()
   let detach = first ? audio.attachSim(first.events, lookups) : () => {}

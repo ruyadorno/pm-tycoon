@@ -7,13 +7,14 @@
 // hold released, frames run again. Phaser is mocked (only the STEP event
 // name is read); the game is a stub with an event bus and a registry.
 
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('phaser', () => ({
   default: { Core: { Events: { STEP: 'step' } } },
 }))
 
-const { installStepper, REG_ALPHA, TICK_MS } =
+const { installStepper, REG_ALPHA, simStopped, TICK_MS } =
   await import('../../src/boot/stepper.ts')
 const { Sim } = await import('../../src/sim/sim.ts')
 const { createPolicy } = await import('../../src/sim/policy.ts')
@@ -118,5 +119,37 @@ describe('the stepper through a sim hold (review deck-2)', () => {
     expect(played.state.events.open).toBeNull()
     policy.dispose?.()
     st2.destroy()
+  })
+})
+
+describe('review sim-3: simStopped — the audio loops and the grumble wait on a held sim too', () => {
+  it('a hold, 0× or Sim.held (a pending card behind a sheet: no HUD hold yet)', () => {
+    const sim = makeSim(1)
+    const st = installStepper(stubGame().game, sim)
+    st.speed = 1
+    expect(simStopped(st)).toBe(false)
+    st.paused = true
+    expect(simStopped(st)).toBe(true)
+    st.paused = false
+    st.speed = 0
+    expect(simStopped(st)).toBe(true)
+    st.speed = 1
+    expect(
+      sim.dispatch({ kind: 'debugOfferEvent', eventId: 'ev_wx_rain' }).ok,
+    ).toBe(true)
+    expect(sim.held).toBe(true)
+    expect(st.paused).toBe(false)
+    expect(simStopped(st)).toBe(true)
+    st.destroy()
+  })
+
+  it('Boot wires the director with it, and the City grumble reads it', () => {
+    const boot = readFileSync('src/scenes/BootScene.ts', 'utf8')
+    expect(boot).toMatch(/isPaused: \(\) => simStopped\(stepper\)/)
+    const city = readFileSync('src/scenes/CityScene.ts', 'utf8')
+    const g = city.slice(
+      city.indexOf('  private updateGrumble(now: number): void {'),
+    )
+    expect(g.slice(0, 200)).toContain('simStopped(st)')
   })
 })

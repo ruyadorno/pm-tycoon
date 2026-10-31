@@ -404,6 +404,20 @@ describe('city-view §9.5 / plan.md §6.4: Title Continue', () => {
     expect(game.sim.state.tick).toBe(sim.state.tick)
     expect(stateHash(game.sim.state)).toBe(stateHash(sim.state))
     expect(game.onboarding.step).toBe(1)
+    // Review sim-4: a resumed save is never a New game's sim.
+    expect(game.fresh).toBe(false)
+  })
+
+  it('review sim-2: Continue on the VictoryCard (onboarding.sawVictory) survives the save', () => {
+    const store = new MemoryStore()
+    const { saver, ob } = saverFor(store, wonSim(8))
+    expect(ob.sawVictory).toBe(false)
+    ob.sawVictory = true
+    expect(saver.save('manual')).toBe(true)
+    const check = readSave(data, store)
+    if (check.kind !== 'ok') throw new Error('won save')
+    expect(check.payload.onboarding?.sawVictory).toBe(true)
+    expect(loadGame(data, check.payload).onboarding.sawVictory).toBe(true)
   })
 
   it("M6: the run's wanted list comes back with the state; a stored onboarding `wanted` is dropped", () => {
@@ -428,6 +442,8 @@ describe('city-view §9.5 / plan.md §6.4: Title Continue', () => {
     expect(game.sim.state.economy.balance).toBe(data.economy.startMoney)
     expect(game.onboarding).toEqual(freshOnboarding())
     expect(game.victory).toBe(false)
+    // Review sim-4: the Title's swap passes it on (SimReplaced.fresh).
+    expect(game.fresh).toBe(true)
   })
 
   it('M9 (B2 §3.4, design-m8-m9 §6.3): an endless-mode save reads "… · Lv 5 · Tycoon ✓" and loads with LoadedGame.victory', () => {

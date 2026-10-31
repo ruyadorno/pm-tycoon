@@ -287,10 +287,19 @@ export async function tapTarget(
   await pm.tap(r!.x + Math.floor(r!.w / 2), r!.y + Math.floor(r!.h / 2))
 }
 
-/** Stop the ?policy=1 player (it Tosses every flag on the next tick). */
+/**
+ * Stop the ?policy=1 player (it Tosses every flag on the next tick). Build 3
+ * (M12 contract §9.1, D-M12-18): the policy is disposed first, which detaches
+ * the sim's hold switch (Sim.attachPolicy) — without it a card opened after
+ * policyOff would never hold the sim.
+ */
 export function policyOff(page: Page): Promise<void> {
   return page.evaluate(() => {
-    ;(window.__pm!.stepper as unknown as { policy: unknown }).policy = null
+    const s = window.__pm!.stepper as unknown as {
+      policy: { dispose?(): void } | null
+    }
+    s.policy?.dispose?.()
+    s.policy = null
   })
 }
 

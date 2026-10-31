@@ -253,27 +253,39 @@ test.describe('data configs (?config=, plan-build2 §8.7 task 3)', () => {
     expect(got.nextDrawTick).toBe(firstDrawTick)
 
     // The first draw comes at firstEventS (1:00), not the base 3:20; a draw
-    // is a job with probability jobShare (else a blank, the next 30–60 s
-    // on). No policy: the sim holds once the job card opens.
+    // is a job with probability jobShare (else, since M12, a decision card
+    // or a blank, the next 30–60 s on). No policy: the sim holds on any
+    // open card — a decision card is answered here (__pm.answerCard, a
+    // logged decideEvent), a job card is the stop.
     let q = {
       tick: 0,
       offered: null as number | null,
       open: null as string | null,
+      firstOpenTick: null as number | null,
     }
-    for (let i = 0; i < 40 && q.offered === null; i++) {
+    for (let i = 0; i < 60 && q.offered === null; i++) {
       await pm.advance(5_000)
-      q = await page.evaluate(() => {
+      q = await page.evaluate((first) => {
         const api = window.__pm!
+        const open = api.events().open
+        const firstOpenTick = first ?? open?.openedTick ?? null
+        if (open && open.kind !== 'job') api.answerCard()
         return {
           tick: api.sim.tick,
           offered: api.quests().offer?.offeredTick ?? null,
           open: api.events().open?.eventId ?? null,
+          firstOpenTick,
         }
-      })
+      }, q.firstOpenTick)
     }
     console.log(`configs: spicy first job ${JSON.stringify(q)}`)
     expect(q.offered, 'a job card came').not.toBeNull()
     expect(q.offered!).toBeGreaterThanOrEqual(firstDrawTick)
+    // The deck's first card (job or decision) from the spicy firstEventS
+    // on, before the base data's first draw (3:20).
+    expect(q.firstOpenTick).not.toBeNull()
+    expect(q.firstOpenTick!).toBeGreaterThanOrEqual(firstDrawTick)
+    expect(q.firstOpenTick!).toBeLessThan(200 * TICKS_PER_S)
     expect(q.open).toMatch(/^job:/)
     // Held on the card: another advance moves nothing.
     await pm.advance(5_000)

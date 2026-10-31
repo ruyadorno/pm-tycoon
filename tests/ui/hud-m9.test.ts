@@ -292,6 +292,27 @@ describe('a reload of the victory-tick save reopens the VictoryCard (final revie
     ).toBe(false)
   })
 
+  it('review sim-2: never once Continue was tapped (onboarding.sawVictory) — a held EventCard keeps the tick inside the slack', () => {
+    const won = { victory: true, victoryTick: 28_698 }
+    // The card opened on the victory tick and holds the sim there: the
+    // save after Continue is still inside the slack.
+    expect(kit.victoryCardPending(won, 28_698, false, 20, false)).toBe(true)
+    expect(kit.victoryCardPending(won, 28_698, false, 20, true)).toBe(false)
+    expect(kit.victoryCardPending(won, 28_710, false, 20, true)).toBe(false)
+    const src = readFileSync('src/scenes/HudScene.ts', 'utf8')
+    const cont = src.slice(
+      src.indexOf('  private continueAfterVictory(): void {'),
+      src.indexOf('  private openVictorySummary(): void {'),
+    )
+    expect(cont).toContain('getOnboarding(this.registry).sawVictory = true')
+    expect(cont).toContain("this.saveSoon = 'save'")
+    const sync = src.slice(
+      src.indexOf('  private syncQuests(): void {'),
+      src.indexOf('  private syncQuests(): void {') + 2500,
+    )
+    expect(sync).toContain('getOnboarding(this.registry).sawVictory')
+  })
+
   it('the HUD calls it on the boot sync only (a WAKE / sim swap keeps the card closed)', () => {
     const src = readFileSync('src/scenes/HudScene.ts', 'utf8')
     const body = src.slice(

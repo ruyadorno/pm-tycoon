@@ -1,5 +1,9 @@
 # Package Management Tycoon
 
+<p align="center">
+  <img src="screenshot.jpeg" alt="The Title screen: the Package Management Tycoon logo over a live isometric pixel-art city, with Continue, New game, Reset and Credits buttons" width="360">
+</p>
+
 A portrait, mobile-first, pixel-art isometric tycoon game (Phaser 4 + TypeScript + Vite): run a small courier
 company, collect parcels across a sunny city, and catch the hidden "malware" parcels in your warehouse before
 they reach a customer.
